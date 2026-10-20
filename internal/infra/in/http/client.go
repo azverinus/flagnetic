@@ -38,12 +38,12 @@ func resolveClient(r *http.Request, trusted []netip.Prefix) Client {
 	if err != nil {
 		return c
 	}
-	c.IP = peer.Addr().Unmap()
+	c.IP = plain(peer.Addr())
 	if !isTrusted(c.IP, trusted) {
 		return c
 	}
 	c.IP = forwardedFor(r.Header.Values("X-Forwarded-For"), c.IP, trusted)
-	if proto := forwardedProto(r.Header.Get("X-Forwarded-Proto")); proto != "" {
+	if proto := forwardedProto(r.Header.Values("X-Forwarded-Proto")); proto != "" {
 		c.Scheme = proto
 	}
 	return c
@@ -52,19 +52,19 @@ func resolveClient(r *http.Request, trusted []netip.Prefix) Client {
 // forwardedFor walks X-Forwarded-For from the right, where each trusted proxy
 // appended the address it received the request from, and returns the first
 // address outside the trusted list; when every address is trusted, the
-// leftmost. An entry that is not an address (some proxies write "unknown")
-// is skipped: ending the walk there would collapse every client behind that
-// hop onto one address.
+// leftmost. An entry may carry a port. An entry that is not an address (some
+// proxies write "unknown") is skipped: ending the walk there would collapse
+// every client behind that hop onto one address.
 func forwardedFor(headers []string, peer netip.Addr, trusted []netip.Prefix) netip.Addr {
 	client := peer
 	for i := len(headers) - 1; i >= 0; i-- {
 		entries := strings.Split(headers[i], ",")
 		for j := len(entries) - 1; j >= 0; j-- {
-			addr, err := netip.ParseAddr(strings.TrimSpace(entries[j]))
-			if err != nil {
+			addr, ok := parseForwarded(strings.TrimSpace(entries[j]))
+			if !ok {
 				continue
 			}
-			client = addr.Unmap()
+			client = addr
 			if !isTrusted(client, trusted) {
 				return client
 			}
@@ -73,10 +73,14 @@ func forwardedFor(headers []string, peer netip.Addr, trusted []netip.Prefix) net
 	return client
 }
 
-// forwardedProto returns the scheme in the header's rightmost entry, the one
-// the nearest proxy set, or "" when it is not http or https. An entry further
-// left may come from the client.
-func forwardedProto(header string) string {
+// forwardedProto returns the scheme in the rightmost entry of the last header
+// line, the one the nearest proxy set, or "" when it is not http or https. An
+// entry further left, or a line before, may come from the client.
+func forwardedProto(lines []string) string {
+	if len(lines) == 0 {
+		return ""
+	}
+	header := lines[len(lines)-1]
 	last := header[strings.LastIndex(header, ",")+1:]
 	switch proto := strings.ToLower(strings.TrimSpace(last)); proto {
 	case "http", "https":
@@ -84,6 +88,22 @@ func forwardedProto(header string) string {
 	}
 	return ""
 }
+
+// parseForwarded reads one X-Forwarded-For entry: an address, with or without
+// a port.
+func parseForwarded(entry string) (netip.Addr, bool) {
+	if a, err := netip.ParseAddr(entry); err == nil {
+		return plain(a), true
+	}
+	if ap, err := netip.ParseAddrPort(entry); err == nil {
+		return plain(ap.Addr()), true
+	}
+	return netip.Addr{}, false
+}
+
+// plain drops an IPv6 zone and unmaps an IPv4-mapped address, so an address
+// matches a trusted prefix however it was written and logs the same way.
+func plain(a netip.Addr) netip.Addr { return a.WithZone("").Unmap() }
 
 func isTrusted(addr netip.Addr, trusted []netip.Prefix) bool {
 	for _, p := range trusted {

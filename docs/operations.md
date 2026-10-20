@@ -58,6 +58,20 @@ The public listener bounds what one client can hold:
 
 There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own.
 
+## Metrics
+
+Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNETIC_METRICS_LISTEN_ADDR` (`:9090` by default), and never on the public listener. Keep the port inside your network. Setting the address empty switches metrics off and opens no port.
+
+| Metric | Labels | What it tells |
+|---|---|---|
+| `flagnetic_http_requests_total` | `method`, `route`, `code` | Requests served. `route` is the matched route pattern or `unmatched`, `method` an HTTP method or `other`, so the label set stays bounded. |
+| `flagnetic_http_request_duration_seconds` | `method`, `route` | Time to serve a request (histogram). |
+| `flagnetic_db_pool_acquired_conns`, `_idle_conns`, `_total_conns`, `_max_conns` | | The PostgreSQL pool of the replica. |
+| `flagnetic_db_pool_acquires_total`, `_empty_acquires_total`, `_acquire_wait_seconds_total` | | Connections taken from the pool, how many had to wait, and how long they waited in total. |
+| `go_*`, `process_*` | | The Go runtime and the process. |
+
+Worth an alert: `flagnetic_db_pool_acquired_conns` close to `flagnetic_db_pool_max_conns` for minutes, or a growing rate of `flagnetic_db_pool_acquire_wait_seconds_total`: the pool is saturated and requests will start to time out. Raise `FLAGNETIC_DB_MAX_CONNS` within what PostgreSQL's `max_connections` allows across all replicas, or add replicas.
+
 ## Logs
 
 Logs go to standard error, one JSON object per line by default (`FLAGNETIC_LOG_FORMAT=text` for a terminal), at `FLAGNETIC_LOG_LEVEL`. Secrets are written as `[redacted]`, and `DATABASE_URL` is logged without its password.

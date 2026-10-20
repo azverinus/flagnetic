@@ -100,6 +100,7 @@ func TestMalformedValuesAreRefusedNamingTheVariableAndAnExample(t *testing.T) {
 		{"FLAGNETIC_TRUSTED_PROXIES", "10.0.0.0/33", "10.0.0.0/8"},
 		{"FLAGNETIC_TRUSTED_PROXIES", "10.0.0.0/8,,192.168.0.0/16", "10.0.0.0/8"},
 		{"FLAGNETIC_TRUSTED_PROXIES", "proxy.internal", "10.0.0.0/8"},
+		{"FLAGNETIC_TRUSTED_PROXIES", "::ffff:10.0.0.0/64", "10.0.0.0/8"},
 		{"FLAGNETIC_HTTP_READ_HEADER_TIMEOUT", "0s", "10s"},
 		{"FLAGNETIC_HTTP_IDLE_TIMEOUT", "forever", "120s"},
 		{"FLAGNETIC_HTTP_BODY_READ_TIMEOUT", "-1s", "30s"},
@@ -141,6 +142,27 @@ func TestTrustedProxiesAreUnmappedPrefixes(t *testing.T) {
 	}
 	if want := "10.0.0.0/8 192.168.1.10/32 172.16.0.0/12 fd00::/8"; strings.Join(got, " ") != want {
 		t.Errorf("TrustedProxies = %v, want %s", got, want)
+	}
+}
+
+func TestAnEmptyMetricsAddressSwitchesMetricsOff(t *testing.T) {
+	load := func(vars map[string]string) string {
+		t.Helper()
+		vars["DATABASE_URL"] = "postgres://localhost/flagnetic"
+		cfg, err := config.Load(env(vars))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg.MetricsListenAddr
+	}
+	if got := load(map[string]string{}); got != ":9090" {
+		t.Errorf("unset: %q, want :9090", got)
+	}
+	if got := load(map[string]string{"FLAGNETIC_METRICS_LISTEN_ADDR": ""}); got != "" {
+		t.Errorf("set empty: %q, want off", got)
+	}
+	if got := load(map[string]string{"FLAGNETIC_CONFIG_FILE": writeFile(t, "metrics_listen_addr: \"\"\n")}); got != "" {
+		t.Errorf("empty in the file: %q, want off", got)
 	}
 }
 

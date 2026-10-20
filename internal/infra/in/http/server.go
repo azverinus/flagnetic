@@ -46,6 +46,8 @@ type Options struct {
 	// MaxBodyBytes limits a request's body unless its route declares its own
 	// limit; 0 sets none.
 	MaxBodyBytes int64
+	// Metrics records every request; nil records none.
+	Metrics *Metrics
 }
 
 // OptionsFrom returns the edge's options as cfg sets them, Logger and DB
@@ -164,21 +166,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, pattern := s.mux.Handler(r)
 	route, ok := s.patterns[pattern]
 	if !ok {
-		// No route, a wrong method, or a redirect to a cleaned path.
+		// No route, or a wrong method.
 		st.route = "unmatched"
 		s.serveUnmatched(rw, r)
 		return
 	}
 	st.route = pattern
-	if !route.stream && s.opts.BodyReadTimeout > 0 {
-		_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(s.opts.BodyReadTimeout))
+	if !route.stream && s.opts.BodyReadTimeout > 0 && r.Body != nil && r.Body != http.NoBody {
+		r.Body = withReadDeadline(r.Body, r.ContentLength, http.NewResponseController(w), s.opts.BodyReadTimeout)
 	}
 	if route.maxBodyBytes > 0 {
 		if r.ContentLength > route.maxBodyBytes {
 			s.WriteError(rw, r, &http.MaxBytesError{Limit: route.maxBodyBytes})
 			return
 		}
-		r.Body = http.MaxBytesReader(rw, r.Body, route.maxBodyBytes)
+		// The connection's own writer, so net/http learns of a body too
+		// large and closes the connection rather than read the rest.
+		r.Body = http.MaxBytesReader(w, r.Body, route.maxBodyBytes)
 	}
 	s.mux.ServeHTTP(rw, r)
 }
@@ -187,13 +191,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // balancers polling them do not drown it.
 var quietRoutes = map[string]bool{"GET /healthz": true, "GET /readyz": true}
 
+// accessLog records a served request in the metrics and, probes aside, in
+// the log.
 func (s *Server) accessLog(r *http.Request, st *requestState, rw *recorder, took time.Duration, aborted bool) {
-	if quietRoutes[st.route] {
-		return
-	}
 	status := rw.status
 	if status == 0 && !aborted {
 		status = http.StatusOK // a handler that wrote nothing answered 200
+	}
+	// Probes are counted, unlike logged: their rate is what a scrape shows of
+	// the load balancers, at no cost in labels.
+	s.opts.Metrics.observe(r.Method, st.route, status, took)
+	if quietRoutes[st.route] {
+		return
 	}
 	attrs := []slog.Attr{
 		slog.String("method", r.Method),

@@ -9,6 +9,8 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/metrics"
+	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 )
 
 // Server is a replica's public handler served in-process, for black-box HTTP
@@ -18,6 +20,20 @@ type Server struct {
 	URL string
 	// Logs captures everything the server logs.
 	Logs *LogSink
+
+	metrics http.Handler
+}
+
+// Scrape returns the server's metrics in the Prometheus text format, as the
+// metrics listener serves them.
+func (s *Server) Scrape(t testing.TB) string {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	s.metrics.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/metrics", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("scrape = %d: %s", rec.Code, rec.Body)
+	}
+	return rec.Body.String()
 }
 
 type serverOptions struct {
@@ -66,7 +82,9 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	}
 	logs := NewLogSink()
 	edge := flaghttp.OptionsFrom(defaults(t))
-	edge.Logger, edge.DB = logs.Logger(), o.pool
+	reg := metrics.NewRegistry()
+	reg.MustRegister(postgres.NewPoolCollector(o.pool))
+	edge.Logger, edge.DB, edge.Metrics = logs.Logger(), o.pool, flaghttp.NewMetrics(reg)
 	for _, change := range o.edge {
 		change(&edge)
 	}
@@ -78,7 +96,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	srv.Config = h.HTTPServer()
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return &Server{URL: srv.URL, Logs: logs}
+	return &Server{URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg)}
 }
 
 // defaults returns the configuration a replica has when nothing is set.

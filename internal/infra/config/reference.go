@@ -14,7 +14,7 @@ func Reference() []byte {
 
 <!-- Generated from the settings table in internal/infra/config by ` + "`task generate`" + `. Do not edit. -->
 
-Flagnetic is configured with environment variables and, optionally, a YAML file named by ` + "`FLAGNETIC_CONFIG_FILE`" + `. Each setting is read from its environment variable when that is set, even to the empty string; otherwise from the file; otherwise it takes its default. An empty value means the default.
+Flagnetic is configured with environment variables and, optionally, a YAML file named by ` + "`FLAGNETIC_CONFIG_FILE`" + `. Each setting is read from its environment variable when that is set, even to the empty string; otherwise from the file; otherwise it takes its default. An empty value means the default, except where a setting says it switches something off.
 
 The file is a mapping from the keys in the File key column to single values:
 

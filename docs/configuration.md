@@ -2,7 +2,7 @@
 
 <!-- Generated from the settings table in internal/infra/config by `task generate`. Do not edit. -->
 
-Flagnetic is configured with environment variables and, optionally, a YAML file named by `FLAGNETIC_CONFIG_FILE`. Each setting is read from its environment variable when that is set, even to the empty string; otherwise from the file; otherwise it takes its default. An empty value means the default.
+Flagnetic is configured with environment variables and, optionally, a YAML file named by `FLAGNETIC_CONFIG_FILE`. Each setting is read from its environment variable when that is set, even to the empty string; otherwise from the file; otherwise it takes its default. An empty value means the default, except where a setting says it switches something off.
 
 The file is a mapping from the keys in the File key column to single values:
 
@@ -21,6 +21,7 @@ Durations are written as a number and a unit: `500ms`, `15s`, `2m`.
 | `DATABASE_URL` | `database_url` | required | PostgreSQL connection string, as a URL or as keyword/value pairs. PostgreSQL 16 or newer. Example: `postgres://flagnetic@db:5432/flagnetic?sslmode=require`. |
 | `FLAGNETIC_CONFIG_FILE` | — | — | YAML file of settings, keyed by the names in the File key column. Environment only. Example: `/etc/flagnetic/flagnetic.yaml`. |
 | `FLAGNETIC_LISTEN_ADDR` | `listen_addr` | `:8080` | Address of the public listener: the APIs, the console, `/healthz` and `/readyz`. Example: `:8080`. |
+| `FLAGNETIC_METRICS_LISTEN_ADDR` | `metrics_listen_addr` | `:9090` | Address of the metrics listener, which serves Prometheus metrics on `/metrics` and nothing else. Keep it off the internet. Set it empty to switch metrics off and open no port. Example: `127.0.0.1:9090`. |
 | `FLAGNETIC_AUTO_MIGRATE` | `auto_migrate` | `true` | Whether `serve` applies pending migrations on start. Set it to false when migrations run as a job (`flagnetic migrate`). Example: `false`. |
 | `FLAGNETIC_DB_MAX_CONNS` | `db_max_conns` | `10` | Size of the PostgreSQL connection pool of one replica. When unset, `pool_max_conns` in `DATABASE_URL` applies if present; when both are set, this wins and a notice is logged. Unit: connections. Example: `25`. |
 | `FLAGNETIC_SHUTDOWN_DRAIN` | `shutdown_drain` | `5s` | How long a replica told to stop keeps serving while `/readyz` answers 503, so load balancers route away from it before it stops accepting requests. `0` skips the drain. Unit: duration. Example: `5s`. |

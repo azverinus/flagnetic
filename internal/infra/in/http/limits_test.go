@@ -217,3 +217,92 @@ func TestAnOversizedBodyIsRefused(t *testing.T) {
 		}
 	}
 }
+
+func TestTheBodyReadTimeoutBoundsOnlyTheBody(t *testing.T) {
+	cancelled := make(chan bool, 2)
+	slowHandler := func(read bool) func(*flaghttp.Server) nethttp.Handler {
+		return func(*flaghttp.Server) nethttp.Handler {
+			return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, r *nethttp.Request) {
+				if read {
+					// Exactly the declared length and no further, as a JSON
+					// decoder reads: the end of the body is never seen.
+					_, _ = io.ReadFull(r.Body, make([]byte, r.ContentLength))
+				}
+				select {
+				case <-r.Context().Done():
+					cancelled <- true
+				case <-time.After(500 * time.Millisecond):
+					cancelled <- false
+				}
+				w.WriteHeader(nethttp.StatusNoContent)
+			})
+		}
+	}
+	srv := testkit.StartServer(t,
+		testkit.WithEdge(func(o *flaghttp.Options) { o.BodyReadTimeout = 100 * time.Millisecond }),
+		testkit.WithRoute("POST /test/work", slowHandler(true)),
+		testkit.WithRoute("GET /test/work", slowHandler(false)),
+	)
+	for _, method := range []string{"POST", "GET"} {
+		var body io.Reader
+		if method == "POST" {
+			body = strings.NewReader("payload")
+		}
+		req, _ := nethttp.NewRequestWithContext(t.Context(), method, srv.URL+"/test/work", body)
+		resp, err := nethttp.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if <-cancelled {
+			t.Errorf("%s: a handler running past the body read timeout, its body long read, was cancelled", method)
+		}
+	}
+}
+
+func TestForwardedProtoIsTheLastLineFromTheNearestProxy(t *testing.T) {
+	srv := testkit.StartServer(t, whoami, trusting("127.0.0.1/32"))
+	req := mustRequest(t, srv.URL+"/test/whoami", nil)
+	req.Header.Add("X-Forwarded-Proto", "https")
+	req.Header.Add("X-Forwarded-Proto", "http")
+	resp, err := nethttp.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	b, _ := io.ReadAll(resp.Body)
+	if string(b) != "127.0.0.1 http" {
+		t.Errorf("got %q, want the scheme of the last line, http", b)
+	}
+}
+
+func TestForwardedEntriesWithPortsAndAcrossHeaderLines(t *testing.T) {
+	srv := testkit.StartServer(t, whoami, trusting("127.0.0.1/32", "10.0.0.0/8"))
+	req := func(lines ...string) string {
+		r := mustRequest(t, srv.URL+"/test/whoami", nil)
+		for _, l := range lines {
+			r.Header.Add("X-Forwarded-For", l)
+		}
+		resp, err := nethttp.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		id := resp.Header.Get("X-Request-ID")
+		for _, rec := range srv.Logs.Find("request") {
+			if rec.Attrs["request_id"] == id {
+				return fmt.Sprint(rec.Attrs["client_ip"])
+			}
+		}
+		return ""
+	}
+	if got := req("198.51.100.9:51234, 10.0.0.5"); got != "198.51.100.9" {
+		t.Errorf("an entry with a port: client_ip = %s", got)
+	}
+	if got := req("198.51.100.9", "10.0.0.5"); got != "198.51.100.9" {
+		t.Errorf("entries across two header lines: client_ip = %s", got)
+	}
+	if got := req("[2001:db8::7]:443"); got != "2001:db8::7" {
+		t.Errorf("an IPv6 entry with a port: client_ip = %s", got)
+	}
+}

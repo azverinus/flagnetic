@@ -49,7 +49,9 @@ type Config struct {
 	DatabaseURL secret.String
 	ConfigFile  string
 	ListenAddr  string
-	AutoMigrate bool
+	// MetricsListenAddr is "" when metrics are switched off.
+	MetricsListenAddr string
+	AutoMigrate       bool
 	// DBMaxConns is the pool size, or 0 when it was not set: then
 	// pool_max_conns of DatabaseURL applies, or postgres.DefaultMaxConns.
 	DBMaxConns    int
@@ -88,6 +90,9 @@ type Setting struct {
 
 	// apply parses a non-empty value into cfg.
 	apply func(cfg *Config, value string) error
+	// emptyMeansOff marks a setting whose empty value, when set, switches
+	// something off rather than taking the default.
+	emptyMeansOff bool
 	// defaultElsewhere marks a Default that Load leaves unapplied because the
 	// code using the setting applies it, after weighing another source.
 	defaultElsewhere bool
@@ -133,6 +138,23 @@ func Settings() []Setting {
 				cfg.ListenAddr = v
 				return nil
 			},
+		},
+		{
+			Name:        "FLAGNETIC_METRICS_LISTEN_ADDR",
+			Key:         "metrics_listen_addr",
+			Default:     ":9090",
+			Description: "Address of the metrics listener, which serves Prometheus metrics on `/metrics` and nothing else. Keep it off the internet. Set it empty to switch metrics off and open no port.",
+			Example:     "127.0.0.1:9090",
+			apply: func(cfg *Config, v string) error {
+				if v != "" {
+					if err := checkAddr(v); err != nil {
+						return err
+					}
+				}
+				cfg.MetricsListenAddr = v
+				return nil
+			},
+			emptyMeansOff: true,
 		},
 		{
 			Name:        "FLAGNETIC_AUTO_MIGRATE",
@@ -316,7 +338,12 @@ func parsePrefixes(v string) ([]netip.Prefix, error) {
 				return nil, fmt.Errorf("%q is not a CIDR prefix", entry)
 			}
 			if p.Addr().Is4In6() {
-				p = netip.PrefixFrom(p.Addr().Unmap(), max(p.Bits()-96, 0))
+				// Shorter than 96 bits it reaches outside the IPv4-mapped
+				// range, and unmapped it would trust every IPv4 peer.
+				if p.Bits() < 96 {
+					return nil, fmt.Errorf("%q is shorter than the IPv4-mapped range", entry)
+				}
+				p = netip.PrefixFrom(p.Addr().Unmap(), p.Bits()-96)
 			}
 			out = append(out, p.Masked())
 			continue
@@ -359,7 +386,11 @@ func Load(lookupEnv func(string) (string, bool)) (Config, error) {
 	for _, s := range settings {
 		value, set := lookupEnv(s.Name)
 		if !set && s.Key != "" {
-			value = file[s.Key]
+			value, set = file[s.Key]
+		}
+		if value == "" && set && s.emptyMeansOff {
+			_ = s.apply(&cfg, "") // an empty value is always accepted where it means off
+			continue
 		}
 		if value == "" {
 			if s.Required {

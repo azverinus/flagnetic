@@ -13,6 +13,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
 )
@@ -42,8 +43,12 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		return failStart(ctx, log, err)
 	}
 
+	// The registry every part of the replica registers its metrics on.
+	reg := metrics.NewRegistry()
+	reg.MustRegister(postgres.NewPoolCollector(pool))
+
 	edgeOpts := flaghttp.OptionsFrom(cfg)
-	edgeOpts.Logger, edgeOpts.DB = log, pool
+	edgeOpts.Logger, edgeOpts.DB, edgeOpts.Metrics = log, pool, flaghttp.NewMetrics(reg)
 	edge := flaghttp.New(edgeOpts)
 	for _, r := range o.routes {
 		edge.Handle(r.pattern, r.handler)
@@ -52,6 +57,22 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	ln, err := lc.Listen(ctx, "tcp", cfg.ListenAddr)
 	if err != nil {
 		return fail(log, "start failed", err)
+	}
+	var metricsLn *metrics.Listener
+	if cfg.MetricsListenAddr != "" {
+		if metricsLn, err = metrics.Listen(ctx, cfg.MetricsListenAddr, reg); err != nil {
+			_ = ln.Close()
+			return fail(log, "start failed", fmt.Errorf("metrics listener: %w", err))
+		}
+		// Stopped on every way out, after the public listener and before the
+		// pool closes.
+		defer metricsLn.Stop()
+		go func() {
+			if err := metricsLn.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Error("metrics listener failed", "error", err.Error())
+			}
+		}()
+		log.InfoContext(ctx, "metrics listening", "addr", metricsLn.Addr().String())
 	}
 
 	// Every request's context derives from base, never from ctx: a request
