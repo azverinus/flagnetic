@@ -53,6 +53,11 @@ var protocolScenarios = map[string]bool{
 	"server: events are retried on 5xx and 429 with the same IDs and never after a rejection": true,
 	"server: the evaluation summary counts every evaluation, fallback included":               true,
 	"server: a schema_version outside the supported range is a failure logged once":           true,
+	"server: an answer carries the experiment block":                                          true,
+	"server: an explicit exposure is sent with its envelope":                                  true,
+	"server: an evaluation alone records no exposure":                                         true,
+	"server: automatic exposure follows the flag's setting":                                   true,
+	"server: repeated exposures of one assignment are sent once":                              true,
 }
 
 // quietFor is how long a no_request step waits. The scenarios ask for up
@@ -69,6 +74,9 @@ type answer struct {
 	Value     json.RawMessage `json:"value"`
 	Variation string          `json:"variation"`
 	Reason    string          `json:"reason"`
+	// Experiment is the experiment block the answer carries; an answer
+	// without one carries none.
+	Experiment json.RawMessage `json:"experiment"`
 }
 
 // protocolResponse is a scripted answer of the mock server.
@@ -107,6 +115,9 @@ type protocolEvents struct {
 	SummaryCounts         []protocolCount `json:"summary_counts"`
 	SummaryRulesetVersion *int64          `json:"summary_ruleset_version"`
 	AbsentStrings         []string        `json:"absent_strings"`
+	// Exposures are the fields each exposure event of the batch must carry,
+	// in order.
+	Exposures []map[string]any `json:"exposures"`
 }
 
 // protocolCount is one row of an evaluation summary a batch must carry.
@@ -188,17 +199,28 @@ type scenarioFile struct {
 // readScenarios is scenarios.json, which the server produces, with the
 // scenarios of versioning-scenarios.json appended: the same step language
 // over the same documents, for what only the SDKs decide (versioning and
-// compatibility).
+// compatibility); and those of experiment-scenarios.json, with the answers
+// of the experiment documents they name.
 func readScenarios(t *testing.T) scenarioFile {
 	t.Helper()
-	var file, versioning scenarioFile
+	var file, versioning, experiments scenarioFile
 	if err := json.Unmarshal(readProtocol(t, "scenarios.json"), &file); err != nil {
 		t.Fatal(err)
 	}
 	if err := json.Unmarshal(readProtocol(t, "versioning-scenarios.json"), &versioning); err != nil {
 		t.Fatal(err)
 	}
+	if err := json.Unmarshal(readProtocol(t, "experiment-scenarios.json"), &experiments); err != nil {
+		t.Fatal(err)
+	}
 	file.Scenarios = append(file.Scenarios, versioning.Scenarios...)
+	file.Scenarios = append(file.Scenarios, experiments.Scenarios...)
+	for doc, answers := range experiments.Answers {
+		if _, ok := file.Answers[doc]; ok {
+			t.Fatalf("experiment-scenarios.json redefines the answers of %s", doc)
+		}
+		file.Answers[doc] = answers
+	}
 	return file
 }
 
@@ -261,19 +283,32 @@ func answerMismatch(c *flagnetic.Client, ctx flagnetic.Context, a answer) string
 	if d.Variation != a.Variation || string(d.Reason) != a.Reason {
 		return fmt.Sprintf("served %q/%s, want %q/%s", d.Variation, d.Reason, a.Variation, a.Reason)
 	}
-	served, err := json.Marshal(d.Value)
+	if diff := jsonDiff("value", d.Value, a.Value); diff != "" {
+		return diff
+	}
+	block := a.Experiment
+	if len(block) == 0 {
+		block = json.RawMessage("null")
+	}
+	return jsonDiff("experiment", d.Experiment, block)
+}
+
+// jsonDiff says how got, encoded, differs from the JSON want as values, or
+// "" when it does not.
+func jsonDiff(field string, got any, want json.RawMessage) string {
+	served, err := json.Marshal(got)
 	if err != nil {
-		return fmt.Sprintf("value %v does not encode: %v", d.Value, err)
+		return fmt.Sprintf("%s %v does not encode: %v", field, got, err)
 	}
-	var got, want any
-	if err := json.Unmarshal(served, &got); err != nil {
-		return fmt.Sprintf("value %s does not decode: %v", served, err)
+	var g, w any
+	if err = json.Unmarshal(served, &g); err != nil {
+		return fmt.Sprintf("%s %s does not decode: %v", field, served, err)
 	}
-	if err := json.Unmarshal(a.Value, &want); err != nil {
-		return fmt.Sprintf("the fixture's value %s does not decode: %v", a.Value, err)
+	if err = json.Unmarshal(want, &w); err != nil {
+		return fmt.Sprintf("the fixture's %s %s does not decode: %v", field, want, err)
 	}
-	if !reflect.DeepEqual(got, want) {
-		return fmt.Sprintf("value = %s, want %s", served, a.Value)
+	if !reflect.DeepEqual(g, w) {
+		return fmt.Sprintf("%s = %s, want %s", field, served, want)
 	}
 	return ""
 }
@@ -395,6 +430,9 @@ func checkBatch(t *testing.T, note string, r *http.Request, want protocolEvents)
 			t.Errorf("%s: the batch carries %q:\n%s", note, absent, raw)
 		}
 	}
+	if want.Exposures != nil {
+		checkExposures(t, note, raw, want.Exposures)
+	}
 	if want.SummaryCounts == nil {
 		return ids
 	}
@@ -422,6 +460,36 @@ func checkBatch(t *testing.T, note string, r *http.Request, want protocolEvents)
 		t.Errorf("%s: ruleset_version = %d, want %d", note, summary.RulesetVersion, *v)
 	}
 	return ids
+}
+
+// checkExposures asserts that the exposure events of a batch, in order,
+// carry every field the fixture names with the value it gives.
+func checkExposures(t *testing.T, note string, raw []byte, want []map[string]any) {
+	t.Helper()
+	var body struct {
+		Events []map[string]any `json:"events"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Errorf("%s: decode the batch %s: %v", note, raw, err)
+		return
+	}
+	var exposures []map[string]any
+	for _, e := range body.Events {
+		if e["type"] == "exposure" {
+			exposures = append(exposures, e)
+		}
+	}
+	if len(exposures) != len(want) {
+		t.Errorf("%s: the batch carries %d exposures, want %d:\n%s", note, len(exposures), len(want), raw)
+		return
+	}
+	for i, fields := range want {
+		for k, v := range fields {
+			if got := exposures[i][k]; !reflect.DeepEqual(got, v) {
+				t.Errorf("%s: exposure %d: %s = %v, want %v", note, i, k, got, v)
+			}
+		}
+	}
 }
 
 func TestProtocolDegradationCases(t *testing.T) {

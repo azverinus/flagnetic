@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "version": 3,
+  "scope": "server",
+  "environment": {
+    "key": "staging",
+    "protected": false
+  },
+  "unit_types": [
+    "anonymous",
+    "user"
+  ],
+  "attributes": [
+    {
+      "key": "app_version",
+      "type": "semver"
+    },
+    {
+      "key": "country",
+      "type": "string"
+    },
+    {
+      "key": "plan",
+      "type": "string"
+    },
+    {
+      "key": "platform",
+      "type": "string"
+    }
+  ],
+  "segments": [],
+  "flags": [
+    {
+      "key": "pricing",
+      "type": "string",
+      "automatic_exposure": false,
+      "variations": [
+        {
+          "key": "control",
+          "value": "old"
+        },
+        {
+          "key": "treatment",
+          "value": "new"
+        }
+      ],
+      "on": true,
+      "off_variation": "control",
+      "fallthrough": "control",
+      "rules": [
+        {
+          "id": "0199a2b4-1000-7000-8000-00000000e001",
+          "conditions": [],
+          "serve": {
+            "kind": "experiment",
+            "unit_type": "user",
+            "experiment": "pricing_test",
+            "inclusion_salt": "pricing-in-7f3a",
+            "variation_salt": "pricing-var-c41e",
+            "traffic_allocation": 10000,
+            "weights": [
+              {
+                "variation": "treatment",
+                "weight": 5000
+              },
+              {
+                "variation": "control",
+                "weight": 5000
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "recommendations",
+      "type": "boolean",
+      "automatic_exposure": true,
+      "variations": [
+        {
+          "key": "on",
+          "value": true
+        },
+        {
+          "key": "off",
+          "value": false
+        }
+      ],
+      "on": true,
+      "off_variation": "off",
+      "fallthrough": "off",
+      "rules": [
+        {
+          "id": "0199a2b4-1000-7000-8000-00000000e002",
+          "conditions": [],
+          "serve": {
+            "kind": "experiment",
+            "unit_type": "user",
+            "experiment": "recommendations_test",
+            "inclusion_salt": "reco-in-2b9d",
+            "variation_salt": "reco-var-5e17",
+            "traffic_allocation": 10000,
+            "weights": [
+              {
+                "variation": "on",
+                "weight": 5000
+              },
+              {
+                "variation": "off",
+                "weight": 5000
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

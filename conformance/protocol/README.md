@@ -16,6 +16,7 @@ The documents under `server/` are what the SDK API serves, byte for byte where i
 - `degradation/`: documents derived from `server/` by one change each, and `cases.json`, which lists them with the outcome every SDK must reach.
 - `scenarios.json`: the scenario list for mock servers.
 - `versioning-scenarios.json`: scenarios the server cannot produce because only the SDKs decide them (versioning and compatibility), written by hand in the same step language and naming only documents the server produced. Every runner appends its `scenarios` to those of `scenarios.json`, and reads `context`, `defaults` and `answers` from `scenarios.json`.
+- `experiment-scenarios.json`: running experiments, for a server key and a client key: an answer carrying the experiment block, an explicit exposure with its envelope, an evaluation that records no exposure, automatic exposure, and repeats sent once. Its documents are `server/ruleset-experiment.json` and `server/evaluation-experiment.json`, whose `answers` it carries; every runner appends its `scenarios` and merges its `answers` into those of `scenarios.json`.
 
 Offline mode takes `server/ruleset.json` (server mode) or `server/evaluation.json` (client mode) as it is.
 
@@ -29,7 +30,7 @@ A client key ships inside apps and browsers, so it learns the values it is serve
 - Identifiers (rules, segments, events) are UUIDv7 in canonical form.
 - A response's `body` is a path relative to this directory; no `body` means an empty body.
 - `context` in `cases.json` and `scenarios.json` is the context of every evaluation: client-mode SDKs are built with it, server-mode SDKs pass it to every getter. `defaults` are the built-in defaults every getter is called with, each unlike anything the flag serves, so a `fallback` is visible.
-- An answer is what a getter of `type` returns for `flag` with `default`: `value`, `variation` (absent when none was served) and `reason`. A server-mode SDK computes it with its evaluator; a client-mode SDK reads it.
+- An answer is what a getter of `type` returns for `flag` with `default`: `value`, `variation` (absent when none was served), `reason`, and `experiment` when the value comes from a running experiment (absent means the answer carries no experiment block). A server-mode SDK computes it with its evaluator; a client-mode SDK reads it.
 
 ## Degradation cases
 
@@ -55,7 +56,7 @@ A mock server consumes the list like this:
    - `stream_send`: write these bytes to the open stream. `stream_close`: end it from the server's side.
    - `advance_ms`: let time pass. `no_request`: let `for_ms` pass while the SDK sends nothing to `path` (any path when absent).
    - `call`: call the SDK's API: `evaluate` (the getter of `type` for `flag` with `default`, `times` times), `set_override`, `exposure`, `alias` (from the anonymous unit `d-8f1c` to the user `u-1001`), `flush`.
-3. `events` in a request: `types` are the batch's event types in order; `same_ids_as_step` and `excludes_ids_of_step` compare its event IDs with the batch of another step (0-based); `summary_counts` are the rows of its evaluation summary in any order (`variation` null when none was served) and `summary_ruleset_version` its `ruleset_version`; `absent_strings` appear nowhere in the body.
+3. `events` in a request: `types` are the batch's event types in order; `same_ids_as_step` and `excludes_ids_of_step` compare its event IDs with the batch of another step (0-based); `summary_counts` are the rows of its evaluation summary in any order (`variation` null when none was served) and `summary_ruleset_version` its `ruleset_version`; `absent_strings` appear nowhere in the body; `exposures` are, in order, the fields each exposure event of the batch must carry with these values.
 4. A 202 answer's `rejected[].event_id` holds the ID the server was sent when the document was produced: the mock replaces it with the ID of the event at `index` in the request it answers.
 
 A passing run asserts, for every step: the expected request arrived within its window with its headers and body; each `expect` holds: `stage` from the SDK's stage API, `stale_since` set or unset from its status API, `answers_of` by calling every getter of `answers[answers_of]` with its default, `result` for every call of the step, `refused` from `set_override`, `logs` as the number of events of each name the logger hook received since construction, `recorded` as the offline recorder's events by type. After the last step no request may be left unanswered or unexpected.
