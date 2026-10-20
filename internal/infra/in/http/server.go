@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 	"time"
 )
 
@@ -28,9 +29,10 @@ type Options struct {
 
 // Server is the public handler of a replica.
 type Server struct {
-	mux *http.ServeMux
-	log *slog.Logger
-	db  Pinger
+	mux      *http.ServeMux
+	log      *slog.Logger
+	db       Pinger
+	draining atomic.Bool
 }
 
 // New returns the public handler with its probes mounted.
@@ -40,6 +42,10 @@ func New(o Options) *Server {
 	s.mux.HandleFunc("GET /readyz", s.ready)
 	return s
 }
+
+// Drain makes readiness answer 503 from now on while every route is still
+// served, so load balancers route away from a replica about to stop.
+func (s *Server) Drain() { s.draining.Store(true) }
 
 // Handle mounts h on pattern, a ServeMux pattern with a method and a path.
 func (s *Server) Handle(pattern string, h http.Handler) { s.mux.Handle(pattern, h) }
@@ -56,6 +62,10 @@ func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 // ready answers whether this replica can serve: PostgreSQL answers a ping in
 // time. A load balancer routes away from a replica that is not ready.
 func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
+	if s.draining.Load() {
+		writeStatus(w, http.StatusServiceUnavailable, "draining")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), readinessTimeout)
 	defer cancel()
 	if err := s.db.Ping(ctx); err != nil {

@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sync/atomic"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -26,10 +27,11 @@ import (
 const usage = `Usage: flagnetic <command>
 
 Commands:
-  serve     Run the server
-  migrate   Apply pending database migrations and exit
-  version   Print the version and exit
-  help      Print this help
+  serve         Run the server
+  migrate       Apply pending database migrations and exit
+  healthcheck   Exit 0 when the local server is ready, 1 otherwise
+  version       Print the version and exit
+  help          Print this help
 
 Configuration is read from environment variables and an optional YAML file
 named by FLAGNETIC_CONFIG_FILE; see docs/configuration.md.
@@ -84,46 +86,76 @@ func Main(args []string, lookupEnv func(string) (string, bool), stdout, stderr i
 		return exitUsage
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// The first signal asks the command to stop as it normally would; a
+	// second one, from an operator who does not want to wait, ends it at once.
+	stop, stopNow := context.WithCancel(context.Background())
+	defer stopNow()
+	kill, killNow := context.WithCancel(context.Background())
+	defer killNow()
 	go func() {
-		select {
-		case <-signals:
-			cancel()
-		case <-ctx.Done():
+		for first := true; ; first = false {
+			select {
+			case <-signals:
+				if !first {
+					killNow()
+					return
+				}
+				stopNow()
+			case <-kill.Done():
+				return
+			}
 		}
 	}()
 
-	switch args[0] {
-	case "serve":
-		return withConfig(lookupEnv, stderr, func(cfg config.Config, log *slog.Logger) int {
-			return serve(ctx, cfg, log, o)
-		})
-	case "migrate":
-		return withConfig(lookupEnv, stderr, func(cfg config.Config, log *slog.Logger) int {
-			return migrate(ctx, cfg, log, o)
-		})
-	case "version":
-		fmt.Fprintln(stdout, buildinfo.Version())
-		return exitOK
-	case "help", "-h", "--help":
-		fmt.Fprint(stdout, usage)
-		return exitOK
-	default:
-		fmt.Fprintf(stderr, "flagnetic: unknown command %q\n\n%s", args[0], usage)
-		return exitUsage
+	var logger atomic.Pointer[slog.Logger]
+	logger.Store(newLogger(stderr, config.Config{LogFormat: config.LogJSON}))
+	withConfig := func(cmd func(config.Config, *slog.Logger) int) int {
+		cfg, err := config.Load(lookupEnv)
+		if err != nil {
+			return fail(logger.Load(), "configuration refused", configError(err))
+		}
+		log := newLogger(stderr, cfg)
+		logger.Store(log)
+		return cmd(cfg, log)
 	}
-}
 
-// withConfig loads the configuration and builds the logger it asks for, then
-// runs cmd. A configuration that does not load is reported in the default
-// format, the only one known at that point.
-func withConfig(lookupEnv func(string) (string, bool), stderr io.Writer, cmd func(config.Config, *slog.Logger) int) int {
-	cfg, err := config.Load(lookupEnv)
-	if err != nil {
-		return fail(newLogger(stderr, config.Config{LogFormat: config.LogJSON}), "configuration refused", configError(err))
+	exited := make(chan int, 1)
+	go func() {
+		switch args[0] {
+		case "serve":
+			exited <- withConfig(func(cfg config.Config, log *slog.Logger) int {
+				return serve(stop, kill, cfg, log, o)
+			})
+		case "migrate":
+			exited <- withConfig(func(cfg config.Config, log *slog.Logger) int {
+				return migrate(stop, cfg, log, o)
+			})
+		case "healthcheck":
+			code := withConfig(func(cfg config.Config, log *slog.Logger) int {
+				return healthcheck(stop, cfg, log)
+			})
+			// A container runtime reads only 0 and 1; a refused configuration
+			// is a replica that is not healthy.
+			exited <- min(code, exitFailure)
+		case "version":
+			fmt.Fprintln(stdout, buildinfo.Version())
+			exited <- exitOK
+		case "help", "-h", "--help":
+			fmt.Fprint(stdout, usage)
+			exited <- exitOK
+		default:
+			fmt.Fprintf(stderr, "flagnetic: unknown command %q\n\n%s", args[0], usage)
+			exited <- exitUsage
+		}
+	}()
+
+	select {
+	case code := <-exited:
+		return code
+	case <-kill.Done():
+		logger.Load().Warn("second signal: exiting at once")
+		return exitFailure
 	}
-	return cmd(cfg, newLogger(stderr, cfg))
 }
 
 func newLogger(w io.Writer, cfg config.Config) *slog.Logger {

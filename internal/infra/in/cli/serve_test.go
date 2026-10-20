@@ -52,8 +52,11 @@ type replica struct {
 // replica is stopped when the test ends unless the test stopped it.
 func serve(t *testing.T, env map[string]string, opts ...cli.Option) *replica {
 	t.Helper()
-	if _, ok := env["FLAGNETIC_LISTEN_ADDR"]; !ok {
-		env["FLAGNETIC_LISTEN_ADDR"] = "127.0.0.1:0"
+	// A test that does not look at the drain skips it, so it stops at once.
+	for k, v := range map[string]string{"FLAGNETIC_LISTEN_ADDR": "127.0.0.1:0", "FLAGNETIC_SHUTDOWN_DRAIN": "0"} {
+		if _, ok := env[k]; !ok {
+			env[k] = v
+		}
 	}
 	r := &replica{t: t, stderr: &syncBuffer{}, signals: make(chan os.Signal, 2), done: make(chan struct{})}
 	lookup := func(k string) (string, bool) {

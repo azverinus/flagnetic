@@ -23,6 +23,7 @@ Durations are written as a number and a unit: `500ms`, `15s`, `2m`.
 | `FLAGNETIC_LISTEN_ADDR` | `listen_addr` | `:8080` | Address of the public listener: the APIs, the console, `/healthz` and `/readyz`. Example: `:8080`. |
 | `FLAGNETIC_AUTO_MIGRATE` | `auto_migrate` | `true` | Whether `serve` applies pending migrations on start. Set it to false when migrations run as a job (`flagnetic migrate`). Example: `false`. |
 | `FLAGNETIC_DB_MAX_CONNS` | `db_max_conns` | `10` | Size of the PostgreSQL connection pool of one replica. When unset, `pool_max_conns` in `DATABASE_URL` applies if present; when both are set, this wins and a notice is logged. Unit: connections. Example: `25`. |
-| `FLAGNETIC_SHUTDOWN_GRACE` | `shutdown_grace` | `15s` | How long in-flight requests may run once the replica stops accepting new ones; then they are cancelled. Unit: duration. Example: `15s`. |
+| `FLAGNETIC_SHUTDOWN_DRAIN` | `shutdown_drain` | `5s` | How long a replica told to stop keeps serving while `/readyz` answers 503, so load balancers route away from it before it stops accepting requests. `0` skips the drain. Unit: duration. Example: `5s`. |
+| `FLAGNETIC_SHUTDOWN_GRACE` | `shutdown_grace` | `15s` | How long in-flight requests may run once the drain is over and the replica stops accepting new ones; then they are cancelled. Unit: duration. Example: `15s`. |
 | `FLAGNETIC_LOG_LEVEL` | `log_level` | `info` | Lowest level logged: debug, info, warn or error. Example: `debug`. |
 | `FLAGNETIC_LOG_FORMAT` | `log_format` | `json` | Format of the log written to standard error: json, one object per line, or text. Example: `text`. |

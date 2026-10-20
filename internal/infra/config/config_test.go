@@ -59,7 +59,7 @@ func TestDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.ListenAddr != ":8080" || !cfg.AutoMigrate || cfg.ShutdownGrace != 15*time.Second ||
+	if cfg.ListenAddr != ":8080" || !cfg.AutoMigrate || cfg.ShutdownGrace != 15*time.Second || cfg.ShutdownDrain != 5*time.Second ||
 		cfg.LogLevel != slog.LevelInfo || cfg.LogFormat != config.LogJSON || cfg.DBMaxConns != 0 {
 		t.Errorf("defaults = %+v", cfg)
 	}
@@ -96,6 +96,7 @@ func TestMalformedValuesAreRefusedNamingTheVariableAndAnExample(t *testing.T) {
 		{"FLAGNETIC_DB_MAX_CONNS", "ten", "25"},
 		{"FLAGNETIC_SHUTDOWN_GRACE", "15", "15s"},
 		{"FLAGNETIC_SHUTDOWN_GRACE", "-1s", "15s"},
+		{"FLAGNETIC_SHUTDOWN_DRAIN", "5", "5s"},
 		{"FLAGNETIC_LOG_LEVEL", "loud", "debug"},
 		{"FLAGNETIC_LOG_FORMAT", "xml", "text"},
 	} {

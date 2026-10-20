@@ -24,10 +24,11 @@ const poolCloseBound = 5 * time.Second
 // headers, so slow clients cannot hold connections open.
 const readHeaderTimeout = 10 * time.Second
 
-// serve runs a replica until ctx is cancelled, then stops it within a known
-// bound: in-flight requests get the grace period, then their contexts are
-// cancelled, and the pool closes last.
-func serve(ctx context.Context, cfg config.Config, log *slog.Logger, o options) int {
+// serve runs a replica until stop is cancelled, then stops it within a known
+// bound: it drains, in-flight requests get the grace period, then their
+// contexts are cancelled, and the pool closes last. Cancelling kill skips
+// whatever of the drain and the grace is left.
+func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o options) int {
 	log.InfoContext(ctx, "starting", "version", buildinfo.Version())
 	pool, err := openDatabase(ctx, cfg, log, o)
 	if err != nil {
@@ -53,7 +54,7 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger, o options) 
 	// Every request's context derives from base, never from ctx: a request
 	// keeps running after the stop signal until the grace period is over, and
 	// cancelling base is what ends the requests still running then.
-	base, cancelRequests := context.WithCancel(context.WithoutCancel(ctx))
+	base, cancelRequests := context.WithCancel(kill)
 	defer cancelRequests()
 	srv := &http.Server{
 		Handler:           edge,
@@ -71,8 +72,17 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger, o options) 
 	case <-ctx.Done():
 	}
 
+	if cfg.ShutdownDrain > 0 {
+		edge.Drain()
+		log.Info("draining", "drain", cfg.ShutdownDrain.String())
+		select {
+		case <-time.After(cfg.ShutdownDrain):
+		case <-kill.Done():
+		}
+	}
+
 	log.Info("stopping", "grace", cfg.ShutdownGrace.String())
-	graceCtx, cancelGrace := context.WithTimeout(context.Background(), cfg.ShutdownGrace)
+	graceCtx, cancelGrace := context.WithTimeout(kill, cfg.ShutdownGrace)
 	defer cancelGrace()
 	if err := srv.Shutdown(graceCtx); err != nil {
 		log.Warn("grace period over; cancelling the requests still running", "error", err.Error())

@@ -1,0 +1,66 @@
+# Flagnetic with its PostgreSQL, for evaluation and as a starting point for a
+# deployment. From this directory:
+#
+#   docker compose up
+#
+# then open http://localhost:8080. The image is pulled from GHCR, or built
+# from this checkout with `docker compose build`.
+name: flagnetic
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: flagnetic
+      POSTGRES_USER: flagnetic
+      POSTGRES_PASSWORD: flagnetic
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "flagnetic", "-d", "flagnetic"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # Migrations run once, as a job, before the server starts; the server itself
+  # is told not to migrate, as a scaled deployment would be.
+  migrate:
+    image: &image ghcr.io/azverinus/flagnetic:${FLAGNETIC_VERSION:-latest}
+    build: &build
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["migrate"]
+    environment:
+      DATABASE_URL: &database postgres://flagnetic:flagnetic@postgres:5432/flagnetic?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  flagnetic:
+    image: *image
+    build: *build
+    command: ["serve"]
+    environment:
+      DATABASE_URL: *database
+      FLAGNETIC_AUTO_MIGRATE: "false"
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/flagnetic", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    # Covers the drain (FLAGNETIC_SHUTDOWN_DRAIN, 5s) and the grace period
+    # (FLAGNETIC_SHUTDOWN_GRACE, 15s) with a margin, so the container is not
+    # killed while it still finishes requests.
+    stop_grace_period: 25s
+    restart: unless-stopped
+
+volumes:
+  postgres:
