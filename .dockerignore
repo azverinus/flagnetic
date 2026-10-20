@@ -1,6 +1,6 @@
 .git
 .github
-.workbench
+.scratch
 bin
 web/**/node_modules
 **/*.test
