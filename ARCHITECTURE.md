@@ -60,7 +60,7 @@ A context reaches another only through an application port, never by importing t
 
 ## Transactions
 
-A command handler is the unit of work. It wraps its work in `Transactor.Within(ctx, fn)`; repositories take the transaction from the context, or use the pool outside one. No port or domain type mentions the database driver. A command that touches several aggregates (applying a change request writes a flag configuration, its audit entry and an outbox row) does it all inside one `Within`. Row locks are explicit repository methods, so the lock order of a use case is visible in its handler. Side effects outside the database (webhooks, mail, sinks) go through an outbox written in the same transaction and delivered by workers.
+A command handler is the unit of work. It wraps its work in `Transactor.Within(ctx, fn)`; repositories take the transaction from the context, or use the pool outside one. No port or domain type mentions the database driver. A command that touches several aggregates (applying a change request writes a flag configuration, its audit entry and an outbox row) does it all inside one `Within`. A `Within` inside another joins it, so a handler composed of others is still one unit of work. A query that must see one consistent view across several statements runs in `Transactor.Snapshot` (repeatable read, read only). Row locks are explicit repository methods, so the lock order of a use case is visible in its handler; a deadlock or serialization failure is not retried but answered as `unavailable`, because a retry would hide a lock order that is wrong. Side effects outside the database (webhooks, mail, sinks) go through an outbox written in the same transaction and delivered by workers.
 
 ## Errors
 
@@ -84,7 +84,7 @@ Only the HTTP adapter answers 400 `invalid_request` (a request it cannot decode)
 
 Every identifier is a UUIDv7 minted by the application, never by a column default: an application handler draws it from an `id.Source` (`internal/shared/id`) and hands it to the domain, so a domain object has its identity before it is stored. Identifiers are typed per entity (`type ProjectID = id.Of[Project]`, declared in the entity's domain package), so one entity's identifier passed where another's is expected does not compile; the PostgreSQL adapter converts them to and from `uuid` columns. Being time-ordered, they keep index inserts local and make keyset cursors follow creation order.
 
-Every instant the server reasons about comes from `internal/shared/clock`: handlers read the clock and pass the time to the domain, and to SQL as a query parameter. SQL never reads the database clock (`now()`, `current_timestamp` and their relatives), not even in a column default. A test therefore moves all time at once with the fake clock, and replicas judge time by their own wall clocks, which is why a deployment needs NTP.
+Every instant the server reasons about comes from `internal/shared/clock`: handlers read the clock and pass the time to the domain, and to SQL as a query parameter. SQL never reads the database clock (`now()`, `current_timestamp` and their relatives), not even in a column default; a test over the embedded migrations and the SQL of the outbound adapters fails on any of them. A test therefore moves all time at once with the fake clock, and replicas judge time by their own wall clocks, which is why a deployment needs NTP.
 
 ## Contracts
 
