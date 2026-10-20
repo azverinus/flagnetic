@@ -6,4 +6,5 @@ package cli
 var (
 	WithMigrations       = withMigrations
 	WithServerVersionNum = withServerVersionNum
+	WithRoute            = withRoute
 )
