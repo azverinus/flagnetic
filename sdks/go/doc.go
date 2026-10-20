@@ -101,7 +101,7 @@
 // Ready returns at once, and what it would report goes to an in-memory
 // Recorder: Summary is the running count, EvaluationSummaries the reports
 // a flush would have sent, and Exposures and Aliases the events the calls
-// above recorded.
+// above recorded. The flagnetictest package builds such clients for tests.
 //
 //	c, err := flagnetic.New("", "", flagnetic.WithOfflineFile("ruleset.json"))
 //	fc := flagnetic.Context{Units: map[string]string{"user": "u-1"}}
