@@ -4,3 +4,4 @@
 # when one of its packages falls below its floor or no longer reports
 # coverage, so coverage never erodes unnoticed; raise a floor, never lower it.
 eval eval 90
+sdks/go sdks/go 85

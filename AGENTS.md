@@ -16,7 +16,7 @@ task test       # go test -race in every module (starts PostgreSQL through testc
 task build      # bin/flagnetic
 ```
 
-Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for PostgreSQL in tests, and [Task](https://taskfile.dev).
+Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for PostgreSQL in tests, [Task](https://taskfile.dev), and [jq](https://jqlang.org) for the check scripts.
 
 ## Rules
 

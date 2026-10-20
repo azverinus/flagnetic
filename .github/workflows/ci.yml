@@ -181,7 +181,7 @@ jobs:
           done
           cat "$GOWORK"
       - name: go.mod is tidy
-        run: go mod tidy -diff
+        run: '"$GITHUB_WORKSPACE/.github/scripts/check-tidy.sh" .'
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14.0

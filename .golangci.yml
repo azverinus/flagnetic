@@ -34,6 +34,17 @@ linters:
           allow:
             - $gostd
             - github.com/azverinus/flagnetic/eval
+        # The Go SDK adds nothing to a service's dependencies but the
+        # evaluator; the OpenFeature provider is a module of its own.
+        sdk-go:
+          list-mode: strict
+          files:
+            - "**/sdks/go/**"
+            - "!**/sdks/go/openfeature/**"
+          allow:
+            - $gostd
+            - github.com/azverinus/flagnetic/eval
+            - github.com/azverinus/flagnetic/sdks/go
         domain:
           files:
             - "**/internal/domain/**"

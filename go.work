@@ -5,4 +5,5 @@ toolchain go1.26.9
 use (
 	.
 	./eval
+	./sdks/go
 )

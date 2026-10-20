@@ -11,6 +11,7 @@ You need:
 - Go (the version in `go.mod`; `go` downloads the pinned toolchain itself)
 - Docker, for the PostgreSQL that tests start through testcontainers
 - [Task](https://taskfile.dev)
+- [jq](https://jqlang.org), which the check scripts use to read `go.work` and `go.mod`
 
 ```bash
 task check   # lint, tests and vulnerability scan: what CI runs
