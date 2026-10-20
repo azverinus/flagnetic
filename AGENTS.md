@@ -11,8 +11,8 @@ Flagnetic: self-hosted, open-source feature flags and experiments. One Go binary
 ```bash
 task            # list tasks
 task check      # what CI runs on every push: lint, tests, vulnerability scan
-task lint       # golangci-lint, including the layer rules
-task test       # go test ./... (starts PostgreSQL through testcontainers unless DATABASE_URL is set)
+task lint       # golangci-lint in every module of go.work, including the layer rules
+task test       # go test -race in every module (starts PostgreSQL through testcontainers unless DATABASE_URL is set)
 task build      # bin/flagnetic
 ```
 
