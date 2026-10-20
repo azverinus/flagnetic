@@ -14,7 +14,8 @@ type requestState struct {
 	id string
 	// route is the matched pattern, "unmatched" when none matches, or "" until
 	// the request is routed.
-	route string
+	route  string
+	client Client
 }
 
 type stateKey struct{}

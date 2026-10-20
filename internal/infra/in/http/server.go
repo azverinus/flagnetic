@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
+
+	"github.com/azverinus/flagnetic/internal/infra/config"
 )
 
 // readinessTimeout bounds the database ping of a readiness check, so a probe
@@ -29,7 +32,49 @@ type Options struct {
 	Logger *slog.Logger
 	// DB is pinged by every readiness check.
 	DB Pinger
+	// TrustedProxies are the peers whose X-Forwarded-For and
+	// X-Forwarded-Proto are believed.
+	TrustedProxies []netip.Prefix
+	// ReadHeaderTimeout bounds reading a request's headers, so slow clients
+	// cannot hold connections.
+	ReadHeaderTimeout time.Duration
+	// IdleTimeout closes a keep-alive connection idle that long.
+	IdleTimeout time.Duration
+	// BodyReadTimeout bounds reading a request's body, except on stream
+	// routes; 0 sets none.
+	BodyReadTimeout time.Duration
+	// MaxBodyBytes limits a request's body unless its route declares its own
+	// limit; 0 sets none.
+	MaxBodyBytes int64
 }
+
+// OptionsFrom returns the edge's options as cfg sets them, Logger and DB
+// aside.
+func OptionsFrom(cfg config.Config) Options {
+	return Options{
+		TrustedProxies:    cfg.TrustedProxies,
+		ReadHeaderTimeout: cfg.HTTPReadHeaderTimeout,
+		IdleTimeout:       cfg.HTTPIdleTimeout,
+		BodyReadTimeout:   cfg.HTTPBodyReadTimeout,
+		MaxBodyBytes:      cfg.HTTPMaxBodyBytes,
+	}
+}
+
+// RouteOption declares how the edge treats one route's requests.
+type RouteOption func(*routeConfig)
+
+type routeConfig struct {
+	stream       bool
+	maxBodyBytes int64
+}
+
+// Stream marks a long-lived route, such as server-sent events: its requests
+// get no body read deadline, which would otherwise end them.
+func Stream() RouteOption { return func(c *routeConfig) { c.stream = true } }
+
+// MaxBodyBytes gives a route a body limit of its own, for the few that take
+// large bodies.
+func MaxBodyBytes(n int64) RouteOption { return func(c *routeConfig) { c.maxBodyBytes = n } }
 
 // Server is the public handler of a replica.
 type Server struct {
@@ -37,9 +82,10 @@ type Server struct {
 	// patterns are the mounted patterns: the only values a route may take in
 	// the log and the metrics besides "unmatched", so their cardinality stays
 	// bounded.
-	patterns map[string]bool
+	patterns map[string]routeConfig
 	log      *slog.Logger
 	db       Pinger
+	opts     Options
 	draining atomic.Bool
 }
 
@@ -47,9 +93,10 @@ type Server struct {
 func New(o Options) *Server {
 	s := &Server{
 		mux:      http.NewServeMux(),
-		patterns: map[string]bool{},
+		patterns: map[string]routeConfig{},
 		log:      slog.New(newLogHandler(o.Logger.Handler())),
 		db:       o.DB,
+		opts:     o,
 	}
 	s.Handle("GET /healthz", http.HandlerFunc(s.health))
 	s.Handle("GET /readyz", http.HandlerFunc(s.ready))
@@ -61,9 +108,23 @@ func New(o Options) *Server {
 func (s *Server) Drain() { s.draining.Store(true) }
 
 // Handle mounts h on pattern, a ServeMux pattern with a method and a path.
-func (s *Server) Handle(pattern string, h http.Handler) {
+func (s *Server) Handle(pattern string, h http.Handler, opts ...RouteOption) {
+	c := routeConfig{maxBodyBytes: s.opts.MaxBodyBytes}
+	for _, opt := range opts {
+		opt(&c)
+	}
 	s.mux.Handle(pattern, h)
-	s.patterns[pattern] = true
+	s.patterns[pattern] = c
+}
+
+// HTTPServer returns an http.Server serving the edge with its connection
+// timeouts. It sets no write timeout, which would cut off streams.
+func (s *Server) HTTPServer() *http.Server {
+	return &http.Server{
+		Handler:           s,
+		ReadHeaderTimeout: s.opts.ReadHeaderTimeout,
+		IdleTimeout:       s.opts.IdleTimeout,
+	}
 }
 
 // Logger returns the logger of the edge, whose records logged with a
@@ -74,7 +135,7 @@ func (s *Server) Logger() *slog.Logger { return s.log }
 // a panic as an internal problem, and writes one access log record.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
-	st := &requestState{id: requestID(r)}
+	st := &requestState{id: requestID(r), client: resolveClient(r, s.opts.TrustedProxies)}
 	w.Header().Set("X-Request-ID", st.id)
 	r = r.WithContext(context.WithValue(r.Context(), stateKey{}, st))
 	rw := &recorder{ResponseWriter: w}
@@ -100,13 +161,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.accessLog(r, st, rw, time.Since(start), false)
 	}()
 
-	if _, pattern := s.mux.Handler(r); s.patterns[pattern] {
-		st.route = pattern
-	} else {
+	_, pattern := s.mux.Handler(r)
+	route, ok := s.patterns[pattern]
+	if !ok {
 		// No route, a wrong method, or a redirect to a cleaned path.
 		st.route = "unmatched"
 		s.serveUnmatched(rw, r)
 		return
+	}
+	st.route = pattern
+	if !route.stream && s.opts.BodyReadTimeout > 0 {
+		_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(s.opts.BodyReadTimeout))
+	}
+	if route.maxBodyBytes > 0 {
+		if r.ContentLength > route.maxBodyBytes {
+			s.WriteError(rw, r, &http.MaxBytesError{Limit: route.maxBodyBytes})
+			return
+		}
+		r.Body = http.MaxBytesReader(rw, r.Body, route.maxBodyBytes)
 	}
 	s.mux.ServeHTTP(rw, r)
 }
@@ -129,6 +201,7 @@ func (s *Server) accessLog(r *http.Request, st *requestState, rw *recorder, took
 		slog.Int("status", status),
 		slog.Duration("duration", took),
 		slog.Int64("bytes", rw.bytes),
+		slog.String("client_ip", st.client.IP.String()),
 	}
 	if aborted {
 		attrs = append(attrs, slog.Bool("aborted", true))

@@ -22,10 +22,6 @@ import (
 // connection forever; the bound keeps the stop finite even then.
 const poolCloseBound = 5 * time.Second
 
-// readHeaderTimeout bounds how long a client may take to send its request
-// headers, so slow clients cannot hold connections open.
-const readHeaderTimeout = 10 * time.Second
-
 // serve runs a replica until stop is cancelled, then stops it within a known
 // bound: it drains, in-flight requests get the grace period, then their
 // contexts are cancelled, and the pool closes last. Cancelling kill skips
@@ -46,7 +42,9 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		return failStart(ctx, log, err)
 	}
 
-	edge := flaghttp.New(flaghttp.Options{Logger: log, DB: pool})
+	edgeOpts := flaghttp.OptionsFrom(cfg)
+	edgeOpts.Logger, edgeOpts.DB = log, pool
+	edge := flaghttp.New(edgeOpts)
 	for _, r := range o.routes {
 		edge.Handle(r.pattern, r.handler)
 	}
@@ -61,12 +59,9 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	// cancelling base is what ends the requests still running then.
 	base, cancelRequests := context.WithCancel(kill)
 	defer cancelRequests()
-	srv := &http.Server{
-		Handler:           edge,
-		ReadHeaderTimeout: readHeaderTimeout,
-		BaseContext:       func(net.Listener) context.Context { return base },
-		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
-	}
+	srv := edge.HTTPServer()
+	srv.BaseContext = func(net.Listener) context.Context { return base }
+	srv.ErrorLog = slog.NewLogLogger(log.Handler(), slog.LevelWarn)
 	served := make(chan error, 1)
 	go func() { served <- srv.Serve(ln) }()
 	log.InfoContext(ctx, "listening", "addr", ln.Addr().String())

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 )
 
@@ -21,19 +22,27 @@ type Server struct {
 
 type serverOptions struct {
 	pool   *pgxpool.Pool
+	edge   []func(*flaghttp.Options)
 	routes []route
 }
 
 type route struct {
 	pattern string
 	build   func(*flaghttp.Server) http.Handler
+	opts    []flaghttp.RouteOption
 }
 
 // WithRoute mounts the handler build returns on pattern, for a test to
 // exercise the edge through routes of its own. build receives the server, to
 // answer errors through it or log with its logger.
-func WithRoute(pattern string, build func(*flaghttp.Server) http.Handler) ServerOption {
-	return func(o *serverOptions) { o.routes = append(o.routes, route{pattern, build}) }
+func WithRoute(pattern string, build func(*flaghttp.Server) http.Handler, opts ...flaghttp.RouteOption) ServerOption {
+	return func(o *serverOptions) { o.routes = append(o.routes, route{pattern, build, opts}) }
+}
+
+// WithEdge changes the edge's options, which otherwise are the defaults of
+// the configuration.
+func WithEdge(change func(*flaghttp.Options)) ServerOption {
+	return func(o *serverOptions) { o.edge = append(o.edge, change) }
 }
 
 // ServerOption changes what the in-process server is built with.
@@ -56,11 +65,33 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		o.pool = Pool(t)
 	}
 	logs := NewLogSink()
-	h := flaghttp.New(flaghttp.Options{Logger: logs.Logger(), DB: o.pool})
-	for _, r := range o.routes {
-		h.Handle(r.pattern, r.build(h))
+	edge := flaghttp.OptionsFrom(defaults(t))
+	edge.Logger, edge.DB = logs.Logger(), o.pool
+	for _, change := range o.edge {
+		change(&edge)
 	}
-	srv := httptest.NewServer(h)
+	h := flaghttp.New(edge)
+	for _, r := range o.routes {
+		h.Handle(r.pattern, r.build(h), r.opts...)
+	}
+	srv := httptest.NewUnstartedServer(h)
+	srv.Config = h.HTTPServer()
+	srv.Start()
 	t.Cleanup(srv.Close)
 	return &Server{URL: srv.URL, Logs: logs}
+}
+
+// defaults returns the configuration a replica has when nothing is set.
+func defaults(t testing.TB) config.Config {
+	t.Helper()
+	cfg, err := config.Load(func(k string) (string, bool) {
+		if k == "DATABASE_URL" {
+			return "postgres://localhost/unused", true
+		}
+		return "", false
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg
 }

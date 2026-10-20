@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -75,11 +76,31 @@ func internalProblem() problem {
 	return problem{status: http.StatusInternalServerError, code: "internal", title: "Internal error"}
 }
 
-// problemOf resolves err into the problem every API answers it with.
+func requestTooLargeProblem(limit int64) problem {
+	return problem{status: http.StatusRequestEntityTooLarge, code: "request_too_large", title: "Request too large",
+		detail: "the request body is larger than " + strconv.FormatInt(limit, 10) + " bytes"}
+}
+
+func requestTimeoutProblem() problem {
+	return problem{status: http.StatusRequestTimeout, code: "request_timeout", title: "Request timeout",
+		detail: "the request body did not arrive in time"}
+}
+
+// problemOf resolves err into the problem every API answers it with. Errors
+// from reading the body past its limit or its deadline are the adapter's
+// own, whichever handler hands them on.
 func problemOf(err error) problem {
-	var ap *adapterProblem
-	if errors.As(err, &ap) {
+	var (
+		ap       *adapterProblem
+		tooLarge *http.MaxBytesError
+	)
+	switch {
+	case errors.As(err, &ap):
 		return ap.problem
+	case errors.As(err, &tooLarge):
+		return requestTooLargeProblem(tooLarge.Limit)
+	case errors.Is(err, os.ErrDeadlineExceeded):
+		return requestTimeoutProblem()
 	}
 	if e, ok := apperrors.From(err); ok {
 		if k, ok := kinds[e.Kind]; ok {
