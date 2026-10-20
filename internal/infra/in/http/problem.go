@@ -75,9 +75,25 @@ func internalProblem() problem {
 	return problem{status: http.StatusInternalServerError, code: "internal", title: "Internal error"}
 }
 
-// problemOf resolves err into the problem every API answers it with.
+func requestTooLargeProblem(limit int64) problem {
+	return problem{status: http.StatusRequestEntityTooLarge, code: "request_too_large", title: "Request too large",
+		detail: "the request body is larger than " + strconv.FormatInt(limit, 10) + " bytes"}
+}
+
+func requestTimeoutProblem() problem {
+	return problem{status: http.StatusRequestTimeout, code: "request_timeout", title: "Request timeout",
+		detail: "the request body did not arrive in time"}
+}
+
+// problemOf resolves err into the problem every API answers it with. A body
+// read past its limit or its deadline is the adapter's own problem, whichever
+// handler hands the error on, unless the error has a kind of its own.
 func problemOf(err error) problem {
-	var ap *adapterProblem
+	var (
+		ap          *adapterProblem
+		tooLarge    *http.MaxBytesError
+		bodyTimeout *bodyTimeoutError
+	)
 	if errors.As(err, &ap) {
 		return ap.problem
 	}
@@ -92,6 +108,12 @@ func problemOf(err error) problem {
 			}
 			return p
 		}
+	}
+	switch {
+	case errors.As(err, &tooLarge):
+		return requestTooLargeProblem(tooLarge.Limit)
+	case errors.As(err, &bodyTimeout):
+		return requestTimeoutProblem()
 	}
 	return internalProblem()
 }

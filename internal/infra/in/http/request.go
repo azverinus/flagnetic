@@ -3,9 +3,13 @@ package http
 import (
 	"context"
 	"crypto/rand"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"regexp"
+	"time"
 )
 
 // requestState is what the edge learns about a request as it is served,
@@ -14,7 +18,8 @@ type requestState struct {
 	id string
 	// route is the matched pattern, "unmatched" when none matches, or "" until
 	// the request is routed.
-	route string
+	route  string
+	client Client
 }
 
 type stateKey struct{}
@@ -129,3 +134,66 @@ func (rw *recorder) Flush() {
 
 // Unwrap lets http.ResponseController reach the connection's own writer.
 func (rw *recorder) Unwrap() http.ResponseWriter { return rw.ResponseWriter }
+
+// withReadDeadline bounds reading body to timeout from now. The deadline is
+// the connection's, and net/http's own read of the connection after the body
+// would hit it too and cancel the request; so it is lifted once the whole
+// body has arrived (its declared length, or its end), and only the body is
+// bounded. A body cut off by the deadline keeps it, so that net/http, which
+// discards the rest of an unread body, gives up at once instead of waiting
+// on the stalled client.
+func withReadDeadline(body io.ReadCloser, length int64, rc *http.ResponseController, timeout time.Duration) io.ReadCloser {
+	if err := rc.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return body // a connection without deadlines, such as HTTP/2 in tests
+	}
+	return &deadlineBody{ReadCloser: body, rc: rc, remaining: length}
+}
+
+type deadlineBody struct {
+	io.ReadCloser
+	rc *http.ResponseController
+	// remaining is how much of a declared length is still to arrive, or
+	// negative when the length is unknown.
+	remaining int64
+	lifted    bool
+}
+
+func (b *deadlineBody) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if b.remaining > 0 {
+		b.remaining -= int64(n)
+	}
+	switch {
+	case errors.Is(err, os.ErrDeadlineExceeded):
+		err = &bodyTimeoutError{err}
+	case errors.Is(err, io.EOF) || b.remaining == 0:
+		b.lift()
+	}
+	return n, err
+}
+
+// bodyTimeoutError is a body that did not arrive within the body read
+// timeout. It is told apart from any other timeout by its type, so that only
+// the body's own deadline is answered 408.
+type bodyTimeoutError struct{ cause error }
+
+func (e *bodyTimeoutError) Error() string {
+	return "the request body did not arrive in time: " + e.cause.Error()
+}
+
+func (e *bodyTimeoutError) Unwrap() error { return e.cause }
+
+// Close closes the body, which discards what is left of it still under the
+// deadline, and then lifts the deadline for the rest of the request.
+func (b *deadlineBody) Close() error {
+	err := b.ReadCloser.Close()
+	b.lift()
+	return err
+}
+
+func (b *deadlineBody) lift() {
+	if !b.lifted {
+		b.lifted = true
+		_ = b.rc.SetReadDeadline(time.Time{})
+	}
+}

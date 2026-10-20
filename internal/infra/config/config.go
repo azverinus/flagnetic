@@ -18,6 +18,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/netip"
 	"net/url"
 	"os"
 	"regexp"
@@ -48,7 +49,9 @@ type Config struct {
 	DatabaseURL secret.String
 	ConfigFile  string
 	ListenAddr  string
-	AutoMigrate bool
+	// MetricsListenAddr is "" when metrics are switched off.
+	MetricsListenAddr string
+	AutoMigrate       bool
 	// DBMaxConns is the pool size, or 0 when it was not set: then
 	// pool_max_conns of DatabaseURL applies, or postgres.DefaultMaxConns.
 	DBMaxConns    int
@@ -56,6 +59,12 @@ type Config struct {
 	ShutdownGrace time.Duration
 	LogLevel      slog.Level
 	LogFormat     LogFormat
+
+	TrustedProxies        []netip.Prefix
+	HTTPReadHeaderTimeout time.Duration
+	HTTPIdleTimeout       time.Duration
+	HTTPBodyReadTimeout   time.Duration
+	HTTPMaxBodyBytes      int64
 }
 
 // Setting is one row of the settings table.
@@ -81,6 +90,9 @@ type Setting struct {
 
 	// apply parses a non-empty value into cfg.
 	apply func(cfg *Config, value string) error
+	// emptyMeansOff marks a setting whose empty value, when set, switches
+	// something off rather than taking the default.
+	emptyMeansOff bool
 	// defaultElsewhere marks a Default that Load leaves unapplied because the
 	// code using the setting applies it, after weighing another source.
 	defaultElsewhere bool
@@ -126,6 +138,23 @@ func Settings() []Setting {
 				cfg.ListenAddr = v
 				return nil
 			},
+		},
+		{
+			Name:        "FLAGNETIC_METRICS_LISTEN_ADDR",
+			Key:         "metrics_listen_addr",
+			Default:     ":9090",
+			Description: "Address of the metrics listener, which serves Prometheus metrics on `/metrics` and nothing else. Keep it off the internet. Set it empty to switch metrics off and open no port.",
+			Example:     "127.0.0.1:9090",
+			apply: func(cfg *Config, v string) error {
+				if v != "" {
+					if err := checkAddr(v); err != nil {
+						return err
+					}
+				}
+				cfg.MetricsListenAddr = v
+				return nil
+			},
+			emptyMeansOff: true,
 		},
 		{
 			Name:        "FLAGNETIC_AUTO_MIGRATE",
@@ -224,7 +253,109 @@ func Settings() []Setting {
 				return errors.New("not json or text")
 			},
 		},
+		{
+			Name:        "FLAGNETIC_TRUSTED_PROXIES",
+			Key:         "trusted_proxies",
+			Description: "Comma-separated CIDR prefixes or single addresses of the reverse proxies in front of the server. Their `X-Forwarded-For` and `X-Forwarded-Proto` headers are believed, so the client's address and scheme are the real client's; from any other peer the headers are ignored, so a client cannot choose the address it is seen with.",
+			Example:     "10.0.0.0/8,192.168.1.10",
+			apply: func(cfg *Config, v string) error {
+				p, err := parsePrefixes(v)
+				if err != nil {
+					return fmt.Errorf("not a list of prefixes: %w", err)
+				}
+				cfg.TrustedProxies = p
+				return nil
+			},
+		},
+		{
+			Name:        "FLAGNETIC_HTTP_READ_HEADER_TIMEOUT",
+			Key:         "http_read_header_timeout",
+			Default:     "10s",
+			Unit:        "duration",
+			Description: "How long a client may take to send a request's headers on the public listener.",
+			Example:     "10s",
+			apply:       durationSetting(func(c *Config, d time.Duration) { c.HTTPReadHeaderTimeout = d }),
+		},
+		{
+			Name:        "FLAGNETIC_HTTP_IDLE_TIMEOUT",
+			Key:         "http_idle_timeout",
+			Default:     "120s",
+			Unit:        "duration",
+			Description: "How long a keep-alive connection may stay idle before the server closes it.",
+			Example:     "120s",
+			apply:       durationSetting(func(c *Config, d time.Duration) { c.HTTPIdleTimeout = d }),
+		},
+		{
+			Name:        "FLAGNETIC_HTTP_BODY_READ_TIMEOUT",
+			Key:         "http_body_read_timeout",
+			Default:     "30s",
+			Unit:        "duration",
+			Description: "How long a client may take to send a request's body; a body still arriving then is answered 408. Long-lived streams are excepted.",
+			Example:     "30s",
+			apply:       durationSetting(func(c *Config, d time.Duration) { c.HTTPBodyReadTimeout = d }),
+		},
+		{
+			Name:        "FLAGNETIC_HTTP_MAX_BODY_BYTES",
+			Key:         "http_max_body_bytes",
+			Default:     "1048576",
+			Unit:        "bytes",
+			Description: "Largest request body accepted, unless a route declares a larger limit of its own; a larger body is answered 413.",
+			Example:     "1048576",
+			apply: func(cfg *Config, v string) error {
+				n, err := strconv.ParseInt(v, 10, 64)
+				if err != nil || n < 1 {
+					return errors.New("not a whole number of bytes of at least 1")
+				}
+				cfg.HTTPMaxBodyBytes = n
+				return nil
+			},
+		},
 	}
+}
+
+// durationSetting parses a positive duration into the field set picks.
+func durationSetting(set func(*Config, time.Duration)) func(*Config, string) error {
+	return func(cfg *Config, v string) error {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			return errors.New("not a positive duration")
+		}
+		set(cfg, d)
+		return nil
+	}
+}
+
+// parsePrefixes reads a comma-separated list of CIDR prefixes and single
+// addresses. IPv4-mapped IPv6 forms are unmapped, so a prefix matches a peer
+// however its address is written.
+func parsePrefixes(v string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for _, entry := range strings.Split(v, ",") {
+		entry = strings.TrimSpace(entry)
+		if strings.Contains(entry, "/") {
+			p, err := netip.ParsePrefix(entry)
+			if err != nil {
+				return nil, fmt.Errorf("%q is not a CIDR prefix", entry)
+			}
+			if p.Addr().Is4In6() {
+				// Shorter than 96 bits it reaches outside the IPv4-mapped
+				// range, and unmapped it would trust every IPv4 peer.
+				if p.Bits() < 96 {
+					return nil, fmt.Errorf("%q is shorter than the IPv4-mapped range", entry)
+				}
+				p = netip.PrefixFrom(p.Addr().Unmap(), p.Bits()-96)
+			}
+			out = append(out, p.Masked())
+			continue
+		}
+		a, err := netip.ParseAddr(entry)
+		if err != nil {
+			return nil, fmt.Errorf("%q is not an IP address or a CIDR prefix", entry)
+		}
+		a = a.Unmap()
+		out = append(out, netip.PrefixFrom(a, a.BitLen()))
+	}
+	return out, nil
 }
 
 // checkAddr accepts host:port with an empty host or one, and a numeric port.
@@ -255,7 +386,11 @@ func Load(lookupEnv func(string) (string, bool)) (Config, error) {
 	for _, s := range settings {
 		value, set := lookupEnv(s.Name)
 		if !set && s.Key != "" {
-			value = file[s.Key]
+			value, set = file[s.Key]
+		}
+		if value == "" && set && s.emptyMeansOff {
+			_ = s.apply(&cfg, "") // an empty value is always accepted where it means off
+			continue
 		}
 		if value == "" {
 			if s.Required {

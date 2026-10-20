@@ -53,7 +53,8 @@ type replica struct {
 func serve(t *testing.T, env map[string]string, opts ...cli.Option) *replica {
 	t.Helper()
 	// A test that does not look at the drain skips it, so it stops at once.
-	for k, v := range map[string]string{"FLAGNETIC_LISTEN_ADDR": "127.0.0.1:0", "FLAGNETIC_SHUTDOWN_DRAIN": "0"} {
+	// Nor does it open a metrics listener, unless it looks at one.
+	for k, v := range map[string]string{"FLAGNETIC_LISTEN_ADDR": "127.0.0.1:0", "FLAGNETIC_SHUTDOWN_DRAIN": "0", "FLAGNETIC_METRICS_LISTEN_ADDR": ""} {
 		if _, ok := env[k]; !ok {
 			env[k] = v
 		}
