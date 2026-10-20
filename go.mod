@@ -5,6 +5,7 @@ go 1.26.0
 toolchain go1.26.9
 
 require (
+	github.com/azverinus/flagnetic/eval v0.0.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/prometheus/client_golang v1.25.0
@@ -77,3 +78,7 @@ require (
 	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
+
+// The server is never imported by another module, so it takes the evaluator
+// from this repository instead of a published version.
+replace github.com/azverinus/flagnetic/eval => ./eval

@@ -1,0 +1,119 @@
+{
+  "name": "scope/client",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "client",
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [],
+    "segments": [],
+    "flags": [
+      {
+        "key": "public_flag",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "employee_feature",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "server_only": true
+      },
+      {
+        "key": "no_environment",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "a flag without private dependencies evaluates",
+      "flag": "public_flag",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a server_only flag is an error",
+      "flag": "employee_feature",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "server_only",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a document without environment is evaluable",
+      "flag": "no_environment",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    }
+  ]
+}

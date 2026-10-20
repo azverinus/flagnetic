@@ -1,0 +1,974 @@
+{
+  "name": "experiments/boundaries",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "os",
+        "type": "string"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "alloc_7000",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "anonymous",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 7000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "alloc_0",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "anonymous",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 0,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "alloc_10000",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "anonymous",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "weights_235",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "a",
+            "value": "a"
+          },
+          {
+            "key": "b",
+            "value": "b"
+          },
+          {
+            "key": "c",
+            "value": "c"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "three_way",
+              "unit_type": "anonymous",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "c",
+                  "weight": 2000
+                },
+                {
+                  "variation": "a",
+                  "weight": 3000
+                },
+                {
+                  "variation": "b",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "conditions_fail",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "macos"
+              }
+            ],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "anonymous",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "two_experiments",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "anonymous",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 7000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          },
+          {
+            "id": "ry",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "second",
+              "unit_type": "anonymous",
+              "inclusion_salt": "5ec0nd1nc1us10n0",
+              "variation_salt": "5ec0ndv4r14t10n0",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "keyed_on_user",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "on_user",
+              "unit_type": "user",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "inclusion bucket 6999 is included at 7000",
+      "context": {
+        "units": {
+          "anonymous": "anon-17155"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_7000",
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "control",
+          "unit_type": "anonymous",
+          "unit_id": "anon-17155",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 6999,
+          "variation_bucket": 3842,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "inclusion bucket 7000 is not included at 7000",
+      "context": {
+        "units": {
+          "anonymous": "anon-9540"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_7000",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "allocation 0 includes nobody, even bucket 0",
+      "context": {
+        "units": {
+          "anonymous": "anon-1710"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_0",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "allocation 10000 includes everyone, even bucket 9999",
+      "context": {
+        "units": {
+          "anonymous": "anon-52933"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_10000",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "treatment",
+          "unit_type": "anonymous",
+          "unit_id": "anon-52933",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 9999,
+          "variation_bucket": 5934,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "worked example u_10482 is included and assigned control",
+      "context": {
+        "units": {
+          "anonymous": "u_10482"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_7000",
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "control",
+          "unit_type": "anonymous",
+          "unit_id": "u_10482",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 6884,
+          "variation_bucket": 3653,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "worked example u_10483 is not included",
+      "context": {
+        "units": {
+          "anonymous": "u_10483"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_7000",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "worked example u_10484 is included and assigned treatment",
+      "context": {
+        "units": {
+          "anonymous": "u_10484"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_7000",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "treatment",
+          "unit_type": "anonymous",
+          "unit_id": "u_10484",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 724,
+          "variation_bucket": 8270,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "5000/5000 at variation bucket 4999",
+      "context": {
+        "units": {
+          "anonymous": "anon-393"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_10000",
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "control",
+          "unit_type": "anonymous",
+          "unit_id": "anon-393",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 7020,
+          "variation_bucket": 4999,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "5000/5000 at variation bucket 5000",
+      "context": {
+        "units": {
+          "anonymous": "anon-9673"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_10000",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "treatment",
+          "unit_type": "anonymous",
+          "unit_id": "anon-9673",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 3117,
+          "variation_bucket": 5000,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "2000/3000/5000 in list order c, a, b at variation bucket 0",
+      "context": {
+        "units": {
+          "anonymous": "anon-1920"
+        },
+        "attributes": {}
+      },
+      "flag": "weights_235",
+      "expect": {
+        "type": "string",
+        "value": "c",
+        "variation": "c",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "three_way",
+          "variation": "c",
+          "unit_type": "anonymous",
+          "unit_id": "anon-1920",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 8905,
+          "variation_bucket": 0,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "2000/3000/5000 in list order c, a, b at variation bucket 1999",
+      "context": {
+        "units": {
+          "anonymous": "anon-228"
+        },
+        "attributes": {}
+      },
+      "flag": "weights_235",
+      "expect": {
+        "type": "string",
+        "value": "c",
+        "variation": "c",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "three_way",
+          "variation": "c",
+          "unit_type": "anonymous",
+          "unit_id": "anon-228",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 5634,
+          "variation_bucket": 1999,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "2000/3000/5000 in list order c, a, b at variation bucket 2000",
+      "context": {
+        "units": {
+          "anonymous": "anon-16989"
+        },
+        "attributes": {}
+      },
+      "flag": "weights_235",
+      "expect": {
+        "type": "string",
+        "value": "a",
+        "variation": "a",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "three_way",
+          "variation": "a",
+          "unit_type": "anonymous",
+          "unit_id": "anon-16989",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 1442,
+          "variation_bucket": 2000,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "2000/3000/5000 in list order c, a, b at variation bucket 4999",
+      "context": {
+        "units": {
+          "anonymous": "anon-393"
+        },
+        "attributes": {}
+      },
+      "flag": "weights_235",
+      "expect": {
+        "type": "string",
+        "value": "a",
+        "variation": "a",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "three_way",
+          "variation": "a",
+          "unit_type": "anonymous",
+          "unit_id": "anon-393",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 7020,
+          "variation_bucket": 4999,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "2000/3000/5000 in list order c, a, b at variation bucket 5000",
+      "context": {
+        "units": {
+          "anonymous": "anon-9673"
+        },
+        "attributes": {}
+      },
+      "flag": "weights_235",
+      "expect": {
+        "type": "string",
+        "value": "b",
+        "variation": "b",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "three_way",
+          "variation": "b",
+          "unit_type": "anonymous",
+          "unit_id": "anon-9673",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 3117,
+          "variation_bucket": 5000,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "2000/3000/5000 in list order c, a, b at variation bucket 9999",
+      "context": {
+        "units": {
+          "anonymous": "anon-3278"
+        },
+        "attributes": {}
+      },
+      "flag": "weights_235",
+      "expect": {
+        "type": "string",
+        "value": "b",
+        "variation": "b",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "three_way",
+          "variation": "b",
+          "unit_type": "anonymous",
+          "unit_id": "anon-3278",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 2195,
+          "variation_bucket": 9999,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "unit type of the experiment absent: rule skipped, fallthrough",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_10000",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "hashing uses the experiment's unit type when both units are present",
+      "context": {
+        "units": {
+          "anonymous": "d0c1f4a2-8e3b-4a7c-9f11-2b6d5e8c0a34",
+          "user": "u_10482"
+        },
+        "attributes": {}
+      },
+      "flag": "alloc_10000",
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "control",
+          "unit_type": "anonymous",
+          "unit_id": "d0c1f4a2-8e3b-4a7c-9f11-2b6d5e8c0a34",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 3537,
+          "variation_bucket": 2898,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "experiment keyed on user hashes the user ID",
+      "context": {
+        "units": {
+          "anonymous": "d0c1f4a2-8e3b-4a7c-9f11-2b6d5e8c0a34",
+          "user": "u_10482"
+        },
+        "attributes": {}
+      },
+      "flag": "keyed_on_user",
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "on_user",
+          "variation": "control",
+          "unit_type": "user",
+          "unit_id": "u_10482",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 6884,
+          "variation_bucket": 3653,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "rule conditions fail: skipped although the unit would be included",
+      "context": {
+        "units": {
+          "anonymous": "anon-1710"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "conditions_fail",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "two experiment rules: a unit excluded from the first is included by the second",
+      "context": {
+        "units": {
+          "anonymous": "anon-9540"
+        },
+        "attributes": {}
+      },
+      "flag": "two_experiments",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "experiment",
+        "rule_id": "ry",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "second",
+          "variation": "treatment",
+          "unit_type": "anonymous",
+          "unit_id": "anon-9540",
+          "inclusion_salt": "5ec0nd1nc1us10n0",
+          "variation_salt": "5ec0ndv4r14t10n0",
+          "inclusion_bucket": 9551,
+          "variation_bucket": 9193,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "two experiment rules: a unit included by the first stays there",
+      "context": {
+        "units": {
+          "anonymous": "anon-17155"
+        },
+        "attributes": {}
+      },
+      "flag": "two_experiments",
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "control",
+          "unit_type": "anonymous",
+          "unit_id": "anon-17155",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 6999,
+          "variation_bucket": 3842,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    }
+  ]
+}

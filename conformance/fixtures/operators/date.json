@@ -1,0 +1,835 @@
+{
+  "name": "operators/date",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "d",
+        "type": "date"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "date_before",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "d",
+                "op": "before",
+                "value": "2026-09-19T12:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "date_after",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "d",
+                "op": "after",
+                "value": "2026-09-19T12:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "date_exists",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "d",
+                "op": "exists"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "date_not_exists",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "d",
+                "op": "not_exists"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "before \"2026-09-19T12:00:00Z\": earlier",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19T11:59:59Z"
+        }
+      },
+      "flag": "date_before",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "before \"2026-09-19T12:00:00Z\": same instant",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19T12:00:00Z"
+        }
+      },
+      "flag": "date_before",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "before \"2026-09-19T12:00:00Z\": later",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19T12:00:01Z"
+        }
+      },
+      "flag": "date_before",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "before \"2026-09-19T12:00:00Z\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "date_before",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "before \"2026-09-19T12:00:00Z\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": null
+        }
+      },
+      "flag": "date_before",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "before \"2026-09-19T12:00:00Z\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": true
+        }
+      },
+      "flag": "date_before",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "before \"2026-09-19T12:00:00Z\": unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "yesterday"
+        }
+      },
+      "flag": "date_before",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "before \"2026-09-19T12:00:00Z\": date without time is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19"
+        }
+      },
+      "flag": "date_before",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "before \"2026-09-19T12:00:00Z\": fractional epoch milliseconds is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": 1.5
+        }
+      },
+      "flag": "date_before",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "after \"2026-09-19T12:00:00Z\": later",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19T12:00:00.001Z"
+        }
+      },
+      "flag": "date_after",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "after \"2026-09-19T12:00:00Z\": same instant",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19T12:00:00Z"
+        }
+      },
+      "flag": "date_after",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "after \"2026-09-19T12:00:00Z\": earlier",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2020-01-01T00:00:00Z"
+        }
+      },
+      "flag": "date_after",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "after \"2026-09-19T12:00:00Z\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "date_after",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "after \"2026-09-19T12:00:00Z\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": null
+        }
+      },
+      "flag": "date_after",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "after \"2026-09-19T12:00:00Z\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": true
+        }
+      },
+      "flag": "date_after",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "after \"2026-09-19T12:00:00Z\": unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "yesterday"
+        }
+      },
+      "flag": "date_after",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "after \"2026-09-19T12:00:00Z\": date without time is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19"
+        }
+      },
+      "flag": "date_after",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "after \"2026-09-19T12:00:00Z\": fractional epoch milliseconds is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": 1.5
+        }
+      },
+      "flag": "date_after",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: present",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19T12:00:00Z"
+        }
+      },
+      "flag": "date_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: present as epoch milliseconds",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": 0
+        }
+      },
+      "flag": "date_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "date_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": null
+        }
+      },
+      "flag": "date_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": true
+        }
+      },
+      "flag": "date_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "yesterday"
+        }
+      },
+      "flag": "date_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: date without time is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19"
+        }
+      },
+      "flag": "date_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: fractional epoch milliseconds is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": 1.5
+        }
+      },
+      "flag": "date_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: present",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19T12:00:00Z"
+        }
+      },
+      "flag": "date_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: absent is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "date_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: null is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": null
+        }
+      },
+      "flag": "date_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: wrong-typed is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": true
+        }
+      },
+      "flag": "date_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: unparsable is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "yesterday"
+        }
+      },
+      "flag": "date_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: date without time is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": "2026-09-19"
+        }
+      },
+      "flag": "date_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: fractional epoch milliseconds is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "d": 1.5
+        }
+      },
+      "flag": "date_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

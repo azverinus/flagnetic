@@ -1,0 +1,883 @@
+{
+  "name": "overrides/influence",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "os",
+        "type": "string"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "checkout",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "qa-0",
+            "variation": "treatment"
+          }
+        ],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "user",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "checkout_not_included",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "qa-0",
+            "variation": "treatment"
+          }
+        ],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_low",
+              "unit_type": "user",
+              "inclusion_salt": "l0w1nc1us10ns4lt",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 1,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "checkout_shadow_rule_first",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "qa-0",
+            "variation": "treatment"
+          }
+        ],
+        "rules": [
+          {
+            "id": "r0",
+            "conditions": [],
+            "serve": {
+              "kind": "variation",
+              "variation": "control"
+            }
+          },
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "user",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "checkout_shadow_prerequisite_fails",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [
+          {
+            "flag": "closed",
+            "variation": "true"
+          }
+        ],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "qa-0",
+            "variation": "treatment"
+          }
+        ],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "user",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "closed",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": false,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "checkout_off",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": false,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "qa-0",
+            "variation": "treatment"
+          }
+        ],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "user",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "gate",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "qa-0",
+            "variation": "true"
+          }
+        ],
+        "rules": []
+      },
+      {
+        "key": "gated_experiment",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [
+          {
+            "flag": "gate",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "user",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "attribute_first",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "macos"
+              },
+              {
+                "kind": "prerequisite",
+                "flag": "gate",
+                "variation": "true"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "prerequisite_first",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "prerequisite",
+                "flag": "gate",
+                "variation": "true"
+              },
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "macos"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "failed_via_override",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "gate",
+            "variation": "false"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "later_rule_not_evaluated",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          },
+          {
+            "id": "r2",
+            "conditions": [
+              {
+                "kind": "prerequisite",
+                "flag": "gate",
+                "variation": "true"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "through_two_levels",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "gated_bool",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "gated_bool",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "gate",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "override with a running experiment: reason override, shadow experiment detail marked override with the served variation",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "checkout",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "override",
+        "automatic_exposure": false,
+        "override_influenced": true,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "treatment",
+          "unit_type": "user",
+          "unit_id": "qa-0",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 502,
+          "variation_bucket": 1838,
+          "override": true
+        }
+      }
+    },
+    {
+      "name": "override whose shadow is not included in the experiment carries no experiment detail",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "checkout_not_included",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "override",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "override whose shadow ends in an earlier variation rule carries no experiment detail",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "checkout_shadow_rule_first",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "override",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "override whose shadow fails a prerequisite carries no experiment detail",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "checkout_shadow_prerequisite_fails",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "override",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "flag off: reason off, no experiment detail, not override-influenced",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "checkout_off",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "off",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "override on a prerequisite that admits the unit to another flag's experiment",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "gated_experiment",
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "experiment",
+        "rule_id": "rx",
+        "automatic_exposure": false,
+        "override_influenced": true,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "control",
+          "unit_type": "user",
+          "unit_id": "qa-0",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 502,
+          "variation_bucket": 1838,
+          "override": true
+        }
+      }
+    },
+    {
+      "name": "without the prerequisite override the experiment is not reached",
+      "context": {
+        "units": {
+          "user": "u-1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "gated_experiment",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "gate",
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a false attribute condition before an overridden prerequisite short-circuits: not influenced",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "attribute_first",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "the overridden prerequisite first is evaluated: influenced although the rule fails",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "prerequisite_first",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "a prerequisite failed through an override is influenced",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "failed_via_override",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "gate",
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "rules after the first match are not evaluated: not influenced",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "later_rule_not_evaluated",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "influence propagates through two levels of prerequisites",
+      "context": {
+        "units": {
+          "user": "qa-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "through_two_levels",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,496 @@
+{
+  "name": "segments/membership",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "os",
+        "type": "string"
+      },
+      {
+        "key": "app_version",
+        "type": "semver"
+      }
+    ],
+    "segments": [
+      {
+        "key": "employees",
+        "private": true,
+        "conditions": [
+          {
+            "kind": "attribute",
+            "attribute": "user",
+            "op": "in",
+            "value": [
+              "u-emp-1",
+              "u-emp-2"
+            ]
+          }
+        ]
+      },
+      {
+        "key": "linux_old",
+        "private": false,
+        "conditions": [
+          {
+            "kind": "attribute",
+            "attribute": "os",
+            "op": "eq",
+            "value": "linux"
+          },
+          {
+            "kind": "attribute",
+            "attribute": "app_version",
+            "op": "lt",
+            "value": "1.17.0"
+          }
+        ]
+      },
+      {
+        "key": "everyone",
+        "private": false,
+        "conditions": []
+      }
+    ],
+    "flags": [
+      {
+        "key": "for_employees",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "in_segment",
+                "segment": "employees"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "for_old_linux",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "in_segment",
+                "segment": "linux_old"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "not_old_linux",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "not_in_segment",
+                "segment": "linux_old"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "for_everyone",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "in_segment",
+                "segment": "everyone"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "anonymous_in_list",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "anonymous",
+                "op": "eq",
+                "value": "a-7"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "unit ID of the unit type is a string attribute",
+      "context": {
+        "units": {
+          "user": "u-emp-2"
+        },
+        "attributes": {}
+      },
+      "flag": "for_employees",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "unit ID not in the list",
+      "context": {
+        "units": {
+          "user": "u-3"
+        },
+        "attributes": {}
+      },
+      "flag": "for_employees",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "unit type absent from the context",
+      "context": {
+        "units": {
+          "anonymous": "u-emp-1"
+        },
+        "attributes": {}
+      },
+      "flag": "for_employees",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "no units at all",
+      "context": {
+        "units": {},
+        "attributes": {}
+      },
+      "flag": "for_employees",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "empty unit ID is absent",
+      "context": {
+        "units": {
+          "user": ""
+        },
+        "attributes": {}
+      },
+      "flag": "anonymous_in_list",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "equality on a unit ID",
+      "context": {
+        "units": {
+          "anonymous": "a-7"
+        },
+        "attributes": {}
+      },
+      "flag": "anonymous_in_list",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "all segment conditions hold",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux",
+          "app_version": "1.16.2"
+        }
+      },
+      "flag": "for_old_linux",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "one segment condition fails",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux",
+          "app_version": "1.17.0"
+        }
+      },
+      "flag": "for_old_linux",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a segment attribute is absent",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "flag": "for_old_linux",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in_segment holds for a context lacking the attributes",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "not_old_linux",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in_segment fails for a member",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux",
+          "app_version": "1.0"
+        }
+      },
+      "flag": "not_old_linux",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in_segment holds for a non-member",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "macos",
+          "app_version": "1.0"
+        }
+      },
+      "flag": "not_old_linux",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a segment with no conditions holds for every context",
+      "context": {
+        "units": {}
+      },
+      "flag": "for_everyone",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

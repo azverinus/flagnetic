@@ -1,0 +1,1686 @@
+{
+  "name": "operators/string",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "s",
+        "type": "string"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "string_eq",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "eq",
+                "value": "linux"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_neq",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "neq",
+                "value": "linux"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_in",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "in",
+                "value": [
+                  "linux",
+                  "macos"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_not_in",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "not_in",
+                "value": [
+                  "linux",
+                  "macos"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_contains",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "contains",
+                "value": "inu"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_not_contains",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "not_contains",
+                "value": "inu"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_starts_with",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "starts_with",
+                "value": "lin"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_ends_with",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "ends_with",
+                "value": "nux"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_matches",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "matches",
+                "value": "^(macos|linux)-[0-9]+$"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_matches_utf8",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "matches",
+                "value": "роид"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_exists",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "exists"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "string_not_exists",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "s",
+                "op": "not_exists"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "eq \"linux\": equal",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "linux"
+        }
+      },
+      "flag": "string_eq",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"linux\": different case",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "Linux"
+        }
+      },
+      "flag": "string_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"linux\": different",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "macos"
+        }
+      },
+      "flag": "string_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"linux\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"linux\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"linux\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"linux\": different",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "macos"
+        }
+      },
+      "flag": "string_neq",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"linux\": equal",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "linux"
+        }
+      },
+      "flag": "string_neq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"linux\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_neq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"linux\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_neq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"linux\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_neq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"linux\",\"macos\"]: member",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "macos"
+        }
+      },
+      "flag": "string_in",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"linux\",\"macos\"]: not a member",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "web"
+        }
+      },
+      "flag": "string_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"linux\",\"macos\"]: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"linux\",\"macos\"]: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"linux\",\"macos\"]: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"linux\",\"macos\"]: not a member",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "web"
+        }
+      },
+      "flag": "string_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"linux\",\"macos\"]: member",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "linux"
+        }
+      },
+      "flag": "string_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"linux\",\"macos\"]: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"linux\",\"macos\"]: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"linux\",\"macos\"]: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"inu\": substring",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "linux"
+        }
+      },
+      "flag": "string_contains",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"inu\": no substring",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "macos"
+        }
+      },
+      "flag": "string_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"inu\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"inu\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"inu\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"inu\": no substring",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "macos"
+        }
+      },
+      "flag": "string_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"inu\": substring",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "linux"
+        }
+      },
+      "flag": "string_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"inu\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"inu\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"inu\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "starts_with \"lin\": prefix",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "linux"
+        }
+      },
+      "flag": "string_starts_with",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "starts_with \"lin\": suffix only",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "berlin"
+        }
+      },
+      "flag": "string_starts_with",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "starts_with \"lin\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_starts_with",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "starts_with \"lin\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_starts_with",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "starts_with \"lin\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_starts_with",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "ends_with \"nux\": suffix",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "linux"
+        }
+      },
+      "flag": "string_ends_with",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "ends_with \"nux\": prefix only",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "nuxt"
+        }
+      },
+      "flag": "string_ends_with",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "ends_with \"nux\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_ends_with",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "ends_with \"nux\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_ends_with",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "ends_with \"nux\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_ends_with",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"^(macos|linux)-[0-9]+$\": matches",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "macos-17"
+        }
+      },
+      "flag": "string_matches",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"^(macos|linux)-[0-9]+$\": unanchored text fails the anchors",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "x-macos-17"
+        }
+      },
+      "flag": "string_matches",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"^(macos|linux)-[0-9]+$\": no match",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "macos-"
+        }
+      },
+      "flag": "string_matches",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"^(macos|linux)-[0-9]+$\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_matches",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"^(macos|linux)-[0-9]+$\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_matches",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"^(macos|linux)-[0-9]+$\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_matches",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"роид\": unanchored search in UTF-8",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "андроид"
+        }
+      },
+      "flag": "string_matches_utf8",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"роид\": no match",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "айос"
+        }
+      },
+      "flag": "string_matches_utf8",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"роид\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_matches_utf8",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"роид\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_matches_utf8",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "matches \"роид\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_matches_utf8",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: present",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "linux"
+        }
+      },
+      "flag": "string_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: empty string is present",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": ""
+        }
+      },
+      "flag": "string_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: present",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": "linux"
+        }
+      },
+      "flag": "string_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: absent is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "string_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: null is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": null
+        }
+      },
+      "flag": "string_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: wrong-typed is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "s": 5
+        }
+      },
+      "flag": "string_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,250 @@
+{
+  "name": "overrides/before-prerequisites",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [],
+    "segments": [],
+    "flags": [
+      {
+        "key": "gate_off",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": false,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "guarded",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "gate_off",
+            "variation": "true"
+          }
+        ],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "qa-7",
+            "variation": "true"
+          },
+          {
+            "unit_type": "anonymous",
+            "unit_id": "qa-7",
+            "variation": "false"
+          }
+        ],
+        "rules": []
+      },
+      {
+        "key": "switched_off",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": false,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "qa-7",
+            "variation": "true"
+          }
+        ],
+        "rules": []
+      },
+      {
+        "key": "ordered",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "anonymous",
+            "unit_id": "a-1",
+            "variation": "false"
+          },
+          {
+            "unit_type": "user",
+            "unit_id": "u-1",
+            "variation": "true"
+          }
+        ],
+        "rules": []
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "an override wins before a failing prerequisite",
+      "context": {
+        "units": {
+          "user": "qa-7"
+        },
+        "attributes": {}
+      },
+      "flag": "guarded",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "override",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "without the override the prerequisite fails",
+      "context": {
+        "units": {
+          "user": "u-2"
+        },
+        "attributes": {}
+      },
+      "flag": "guarded",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "gate_off",
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "the override matches on unit type and unit ID together",
+      "context": {
+        "units": {
+          "anonymous": "qa-7"
+        },
+        "attributes": {}
+      },
+      "flag": "guarded",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "override",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "a unit ID under another unit type does not match",
+      "context": {
+        "units": {
+          "device": "qa-7"
+        },
+        "attributes": {}
+      },
+      "flag": "guarded",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "gate_off",
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a flag switched off ignores overrides",
+      "context": {
+        "units": {
+          "user": "qa-7"
+        },
+        "attributes": {}
+      },
+      "flag": "switched_off",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "off",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "overrides are checked in order, the first match wins",
+      "context": {
+        "units": {
+          "user": "u-1",
+          "anonymous": "a-1"
+        },
+        "attributes": {}
+      },
+      "flag": "ordered",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "override",
+        "automatic_exposure": false,
+        "override_influenced": true
+      }
+    }
+  ]
+}

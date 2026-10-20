@@ -1,0 +1,520 @@
+{
+  "name": "prerequisites/chain",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [],
+    "segments": [],
+    "flags": [
+      {
+        "key": "c_on",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "c_off",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": false,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "b_on_chain",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "c_on",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "b_off_chain",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "c_off",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "a_on_chain",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "b_on_chain",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "a_off_chain",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "b_off_chain",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "requires_off_variation_of_failed",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "b_off_chain",
+            "variation": "false"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "requires_off_flag_false",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "c_off",
+            "variation": "false"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "wrong_variation",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "c_on",
+            "variation": "false"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "first_failure_wins",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "c_on",
+            "variation": "true"
+          },
+          {
+            "flag": "c_off",
+            "variation": "true"
+          },
+          {
+            "flag": "wrong_variation",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "condition_prerequisite",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "prerequisite",
+                "flag": "c_on",
+                "variation": "true"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "condition_prerequisite_off",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "prerequisite",
+                "flag": "c_off",
+                "variation": "false"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "chain holds through every level",
+      "flag": "a_on_chain",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "an off prerequisite fails its dependent",
+      "flag": "b_off_chain",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "c_off",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "failure propagates up the chain naming the direct prerequisite",
+      "flag": "a_off_chain",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "b_off_chain",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a prerequisite that failed its own prerequisite still serves a variation that can satisfy a requirement",
+      "flag": "requires_off_variation_of_failed",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "an off prerequisite never holds, even when its off variation is the required one",
+      "flag": "requires_off_flag_false",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "c_off",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a prerequisite serving another variation fails",
+      "flag": "wrong_variation",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "c_on",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "prerequisites are checked in order and the first failure is reported",
+      "flag": "first_failure_wins",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "c_off",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a prerequisite condition holds",
+      "flag": "condition_prerequisite",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a prerequisite condition on an off flag never holds",
+      "flag": "condition_prerequisite_off",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    }
+  ]
+}
