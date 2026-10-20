@@ -9,7 +9,7 @@ import (
 	of "github.com/open-feature/go-sdk/openfeature"
 
 	flagnetic "github.com/azverinus/flagnetic/sdks/go"
-	fnof "github.com/azverinus/flagnetic/sdks/go/openfeature"
+	fnof "github.com/azverinus/flagnetic/sdks/go-openfeature"
 )
 
 // document is a server ruleset document exercising every mapping the

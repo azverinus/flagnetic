@@ -8,7 +8,7 @@
 go get github.com/azverinus/flagnetic/sdks/go
 ```
 
-On OpenFeature? Install the [OpenFeature provider](openfeature/README.md) instead, `github.com/azverinus/flagnetic/sdks/go/openfeature`, a module of its own over this SDK.
+On OpenFeature? Install the [OpenFeature provider](../go-openfeature/README.md) instead, `github.com/azverinus/flagnetic/sdks/go-openfeature`, a module of its own over this SDK.
 
 ## Quick start
 

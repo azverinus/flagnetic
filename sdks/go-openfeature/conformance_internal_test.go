@@ -16,9 +16,9 @@ import (
 	"github.com/azverinus/flagnetic/sdks/go/flagnetictest"
 )
 
-// fixturesDir is the language-agnostic conformance suite, three
-// levels up from sdks/go/openfeature.
-const fixturesDir = "../../../conformance/fixtures"
+// fixturesDir is the language-agnostic conformance suite, two
+// levels up from sdks/go-openfeature.
+const fixturesDir = "../../conformance/fixtures"
 
 type fixture struct {
 	Ruleset json.RawMessage `json:"ruleset"`

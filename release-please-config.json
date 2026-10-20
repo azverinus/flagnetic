@@ -43,14 +43,13 @@
       "component": "sdks/go",
       "include-component-in-tag": true,
       "changelog-path": "CHANGELOG.md",
-      "exclude-paths": ["sdks/go/openfeature"],
       "extra-files": ["version.go"]
     },
-    "sdks/go/openfeature": {
+    "sdks/go-openfeature": {
       "release-type": "go",
       "initial-version": "0.1.0",
-      "package-name": "sdks/go/openfeature",
-      "component": "sdks/go/openfeature",
+      "package-name": "sdks/go-openfeature",
+      "component": "sdks/go-openfeature",
       "include-component-in-tag": true,
       "changelog-path": "CHANGELOG.md"
     }

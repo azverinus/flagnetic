@@ -32,7 +32,7 @@ A client key never learns which rule, segment or prerequisite produced a value, 
 
 ## Versioning policy
 
-- **Semantic versioning per SDK, independent numbers.** Each SDK releases on its own tag with its own version; the same number in two SDKs promises nothing about each other. The Go modules are tagged `eval/vX.Y.Z`, `sdks/go/vX.Y.Z` and `sdks/go/openfeature/vX.Y.Z`.
+- **Semantic versioning per SDK, independent numbers.** Each SDK releases on its own tag with its own version; the same number in two SDKs promises nothing about each other. The Go modules are tagged `eval/vX.Y.Z`, `sdks/go/vX.Y.Z` and `sdks/go-openfeature/vX.Y.Z`.
 - **A new SDK API path prefix is a new SDK major version.** An SDK moving from `/sdk/v1` to `/sdk/v2` releases a new major, and the table gains a row for it. The server serves `/sdk/v2` alongside `/sdk/v1` for as long as a released SDK speaks `/sdk/v1`.
 - **`schema_version` changes only when structure changes.** Within `/sdk/v1` every change is additive and leaves `schema_version` alone. A new `schema_version` appears only when a change cannot be read under the degradation rules below; an SDK that reads it widens its range and the table gains a row.
 - **What an SDK sends.** Every request for a document (the ruleset, remote evaluation) and every events batch carries `Flagnetic-Schema-Version` with the highest `schema_version` the SDK reads. The server answers with a document of that schema or a lower one it still produces, and 406 `schema_version_unsupported` when it produces none that low, so a new server keeps sending an old build the schema it asked for.

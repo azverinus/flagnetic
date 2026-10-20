@@ -40,7 +40,6 @@ linters:
           list-mode: strict
           files:
             - "**/sdks/go/**"
-            - "!**/sdks/go/openfeature/**"
           allow:
             - $gostd
             - github.com/azverinus/flagnetic/eval
@@ -50,7 +49,7 @@ linters:
         sdk-go-openfeature:
           list-mode: strict
           files:
-            - "**/sdks/go/openfeature/**"
+            - "**/sdks/go-openfeature/**"
           allow:
             - $gostd
             - github.com/azverinus/flagnetic/sdks/go

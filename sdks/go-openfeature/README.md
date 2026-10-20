@@ -1,11 +1,11 @@
 # Flagnetic OpenFeature provider for Go
 
-`github.com/azverinus/flagnetic/sdks/go/openfeature` is an [OpenFeature](https://openfeature.dev) provider over the [Flagnetic Go SDK](../README.md), for a service already standardised on OpenFeature. It is a module of its own, so the SDK itself stays free of the OpenFeature dependency.
+`github.com/azverinus/flagnetic/sdks/go-openfeature` is an [OpenFeature](https://openfeature.dev) provider over the [Flagnetic Go SDK](../go/README.md), for a service already standardised on OpenFeature. It is a module of its own, so the SDK itself stays free of the OpenFeature dependency.
 
 ## Install
 
 ```bash
-go get github.com/azverinus/flagnetic/sdks/go/openfeature
+go get github.com/azverinus/flagnetic/sdks/go-openfeature
 ```
 
 ## Wiring
@@ -14,7 +14,7 @@ go get github.com/azverinus/flagnetic/sdks/go/openfeature
 import (
 	of "github.com/open-feature/go-sdk/openfeature"
 
-	flagneticof "github.com/azverinus/flagnetic/sdks/go/openfeature"
+	flagneticof "github.com/azverinus/flagnetic/sdks/go-openfeature"
 )
 
 provider, err := flagneticof.New(os.Getenv("FLAGNETIC_SDK_KEY"), "https://flags.example.com",
@@ -41,7 +41,7 @@ enabled, _ := client.BooleanValue(ctx, "new_checkout", false, of.NewEvaluationCo
 
 ## Reasons
 
-Flagnetic reasons map to OpenFeature reasons the same way in every Flagnetic provider, in every language, fixed by [`conformance/openfeature/reasons.json`](../../../conformance/openfeature/reasons.json):
+Flagnetic reasons map to OpenFeature reasons the same way in every Flagnetic provider, in every language, fixed by [`conformance/openfeature/reasons.json`](../../conformance/openfeature/reasons.json):
 
 | Flagnetic | OpenFeature |
 |---|---|

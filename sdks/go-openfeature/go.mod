@@ -1,4 +1,4 @@
-module github.com/azverinus/flagnetic/sdks/go/openfeature
+module github.com/azverinus/flagnetic/sdks/go-openfeature
 
 go 1.26.0
 

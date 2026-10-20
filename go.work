@@ -6,7 +6,7 @@ use (
 	.
 	./eval
 	./sdks/go
-	./sdks/go/openfeature
+	./sdks/go-openfeature
 )
 
 // A published module requires another module of this repository at the

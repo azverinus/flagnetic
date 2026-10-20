@@ -13,7 +13,7 @@ import (
 
 // reasonsFixture is the mapping every Flagnetic provider in every language
 // follows, so that dashboards agree across languages.
-const reasonsFixture = "../../../conformance/openfeature/reasons.json"
+const reasonsFixture = "../../conformance/openfeature/reasons.json"
 
 type reasonsFile struct {
 	Name        string            `json:"name"`

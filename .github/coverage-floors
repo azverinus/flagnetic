@@ -6,4 +6,4 @@
 eval eval 90
 sdks/go sdks/go 85
 sdks/go sdks/go/flagnetictest 80
-sdks/go/openfeature sdks/go/openfeature 80
+sdks/go-openfeature sdks/go-openfeature 80

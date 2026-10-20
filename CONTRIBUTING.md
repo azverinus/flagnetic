@@ -56,7 +56,7 @@ A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: i
 
 ### Go modules
 
-The evaluator (`eval`), the Go SDK (`sdks/go`, with `flagnetictest` inside it) and the OpenFeature provider (`sdks/go/openfeature`) are separate Go modules with their own versions and changelogs. A Go module is published by its tag alone, so merging a release pull request is the release: the tags are `eval/vX.Y.Z`, `sdks/go/vX.Y.Z` and `sdks/go/openfeature/vX.Y.Z`. Use the scopes `eval`, `sdk-go`, `sdk-go-openfeature` and `conformance` for commits to them.
+The evaluator (`eval`), the Go SDK (`sdks/go`, with `flagnetictest` inside it) and the OpenFeature provider (`sdks/go-openfeature`) are separate Go modules with their own versions and changelogs. A Go module is published by its tag alone, so merging a release pull request is the release: the tags are `eval/vX.Y.Z`, `sdks/go/vX.Y.Z` and `sdks/go-openfeature/vX.Y.Z`. Use the scopes `eval`, `sdk-go`, `sdk-go-openfeature` and `conformance` for commits to them.
 
 Each module requires the released version of what it imports, because that is what `go get` gives a consumer; the committed `go.work` only makes a change across modules build in one checkout. So an SDK change that needs a new evaluator lands with it, but releases in order:
 
