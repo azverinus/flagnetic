@@ -7,6 +7,7 @@ A change to evaluation lands here first, as a fixture. Every implementation runs
 ## Layout
 
 - `fixtures/murmur3.json`: hash vectors `{input, hash, bucket}`. Every hash was computed by ClickHouse `murmurHash3_32(input)`, and `bucket = hash % 10000`. Reproduce them with `clickhouse local --query "SELECT line, murmurHash3_32(line) FROM file('inputs.txt', 'LineAsString')"`. An implementation must reproduce `hash` from the UTF-8 bytes of `input`; where `input` contains a `.`, `Bucket(salt, unit_id)` split at the first `.` must reproduce `bucket`.
+- `fixtures/regex.json`: RE2 vectors `{pattern, input, match}`, where `match` is `true`, `false` or `"invalid"`, saying how a `matches` condition behaves; see below.
 - `fixtures/<topic>/<name>.json`: one ruleset and its cases. The file's `name` equals its path without `.json`.
 
 ## Fixture shape
@@ -49,6 +50,16 @@ A fixture may also carry `unsupported`: the report the evaluator must produce wh
 }
 ```
 
+## Regular expressions
+
+A `matches` condition uses RE2 syntax and searches anywhere in the string unless the pattern is anchored. Regular expression engines differ in many corners (multiline anchors, `\d` and `\w` beyond ASCII, POSIX classes, case folding, invalid escapes), and a difference serves a different value to the same context. `fixtures/regex.json` fixes those corners: for each `pattern` and `input`, `match` is whether the pattern matches, or `"invalid"` when the pattern is not RE2, in which case the condition is `inconsistent_ruleset`.
+
+The vectors are **normative for every SDK, with no skip list**: an SDK whose engine disagrees on a vector must translate the pattern or bring an RE2 implementation, and a pattern Go accepts must be accepted. Go `regexp`, which is RE2, is the oracle; the evaluator's tests check every vector against it and against the evaluator's own `matches`. To add vectors, append them to the file with any `match` and regenerate the expectations from Go:
+
+```bash
+cd eval && go test -run TestRegexVectorsUpdate -update-regex .
+```
+
 ## Unsupported rules
 
 A server newer than an SDK may send an operator, a condition kind or a serve kind the SDK's evaluator does not know: an **unsupported rule**. Every SDK handles it the same way:
@@ -65,10 +76,9 @@ The evaluator always returns the true reason. Which reasons a caller may see is 
 
 Where prose leaves a choice, the fixture decides, and every implementation must agree.
 
-- An absent, `null` or wrong-typed attribute makes every operator false except `not_exists`, which is true. An unparseable semver or date in a context is wrong-typed; in a condition value it makes the condition false, and so does one unparseable item of a semver `in` or `not_in` list (`not_in ["garbage"]` never matches every version). A condition value of the wrong JSON type, an operator not defined for the type, or a regex outside RE2 is `inconsistent_ruleset`.
+- An absent, `null` or wrong-typed attribute makes every operator false except `not_exists`, which is true. An unparsable semver or date in a context is wrong-typed; in a condition value it makes the condition false, and so does one unparsable item of a semver `in` or `not_in` list (`not_in ["garbage"]` never matches every version). A condition value of the wrong JSON type, an operator not defined for the type, or a regex outside RE2 is `inconsistent_ruleset`.
 - Semver: optional lower-case `v`; one to three dot-separated integers of any size, leading zeros ignored (`1.05` equals `1.5.0`); pre-release and build identifiers are non-empty `[0-9A-Za-z-]` runs; pre-release numeric identifiers compare numerically, leading zeros ignored.
 - Dates: RFC 3339 with an offset, or integral Unix epoch milliseconds (a JSON number) in contexts; comparison is strict on instants.
-- `matches` searches anywhere in the string unless the pattern is anchored.
 - An empty unit ID is an absent unit.
 - A prerequisite holds when its reason is neither `off` nor `error` and it serves the required variation, so a prerequisite that itself failed its own prerequisite still serves its off variation. An `error` in a prerequisite (a cycle, a dangling reference) becomes the dependent flag's error instead of a silent `prerequisite_failed`.
 - An override's shadow experiment detail carries the served (override's) variation, the shadow's buckets and `override: true`.

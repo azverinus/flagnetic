@@ -24,7 +24,7 @@ Every implementation produces the same result, key for key; [`../conformance/REA
 
 Both are left out only when there is no flag to read them from: an error with `flag_not_found`. Every other result carries them, errors and reasons `off` and `prerequisite_failed` included.
 
-## Bucketing
+## Buckets
 
 A unit's bucket for a salt is
 
@@ -46,7 +46,7 @@ The algorithm and the operator semantics are documented on the package (`go doc 
 
 ## Using the conformance suite from another SDK
 
-An SDK walks `conformance/fixtures`, decodes each file's `ruleset` with its own evaluator, evaluates every case and compares the result with `expect` key for key, with no file or case skipped. `murmur3.json` holds hash vectors instead of a ruleset. [`../conformance/README.md`](../conformance/README.md) describes the formats.
+An SDK walks `conformance/fixtures`, decodes each file's `ruleset` with its own evaluator, evaluates every case and compares the result with `expect` key for key, with no file or case skipped. Two files hold vectors instead of a ruleset: `murmur3.json` for the hash and buckets, `regex.json` for the `matches` operator. A fixture's `unsupported` key is the decode report its ruleset must produce. [`../conformance/README.md`](../conformance/README.md) describes the formats.
 
 ## Tests
 
@@ -56,5 +56,6 @@ go test -run XXX -fuzz FuzzParseSemver -fuzztime 30s .
 go test -run XXX -fuzz FuzzConditionDecoding -fuzztime 30s .
 ```
 
-- `conformance_test.go` runs every file under `conformance/fixtures` and checks that `EvaluateAll` agrees with `Evaluate` on each case. It also checks `experiments/allocation-growth` against the invariant its expectations exist to pin: a unit included at one traffic allocation is included, with the same variation, at every higher one.
+- `conformance_test.go` runs every file under `conformance/fixtures`, checks each fixture's unsupported-rule report, and checks that `EvaluateAll` agrees with `Evaluate` on each case. It also checks `experiments/allocation-growth` against the invariant its expectations exist to pin: a unit included at one traffic allocation is included, with the same variation, at every higher one.
+- `regex_test.go` checks every RE2 vector of `conformance/fixtures/regex.json` against Go `regexp` and the evaluator's `matches`; `go test -run TestRegexVectorsUpdate -update-regex .` regenerates the expectations.
 - `property_test.go` checks bucket uniformity by chi-squared over 10,000 buckets on one million identifiers of four shapes (sequential base62, UUIDv4, UUIDv7, integers); rollout monotonicity over random salts and percentages; and fuzzes semantic version parsing and condition decoding.

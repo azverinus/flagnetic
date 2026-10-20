@@ -43,8 +43,9 @@ type fixture struct {
 }
 
 // TestConformance runs every fixture file under conformance/fixtures.
-// murmur3.json holds hash vectors; every other file is a ruleset with
-// cases, each compared exactly against the evaluation result.
+// murmur3.json holds hash vectors and regex.json RE2 vectors; every other
+// file is a ruleset with cases, each compared exactly against the
+// evaluation result.
 func TestConformance(t *testing.T) {
 	files := fixtureFiles(t)
 	if len(files) == 0 {
@@ -57,8 +58,12 @@ func TestConformance(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if filepath.Base(path) == "murmur3.json" {
+			switch filepath.Base(path) {
+			case "murmur3.json":
 				runMurmur(t, data)
+				return
+			case regexFile:
+				runRegex(t, data)
 				return
 			}
 			runFixture(t, rel, data)
@@ -117,7 +122,7 @@ func runFixture(t *testing.T, rel string, data []byte) {
 	if err != nil {
 		t.Fatalf("decode ruleset: %v", err)
 	}
-	if got := rs.UnsupportedRules(); !(len(got) == 0 && len(f.Unsupported) == 0) && !reflect.DeepEqual(got, f.Unsupported) {
+	if got := rs.UnsupportedRules(); (len(got) != 0 || len(f.Unsupported) != 0) && !reflect.DeepEqual(got, f.Unsupported) {
 		t.Errorf("unsupported rules\n got:  %s\n want: %s", mustJSON(got), mustJSON(f.Unsupported))
 	}
 	if len(f.Cases) == 0 {
