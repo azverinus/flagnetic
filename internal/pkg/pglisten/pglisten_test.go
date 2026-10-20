@@ -17,6 +17,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/pkg/pgtest"
+	"github.com/azverinus/flagnetic/internal/pkg/safego"
 )
 
 func TestMain(m *testing.M) {
@@ -166,7 +167,8 @@ func TestAPanickingHandlerIsRecoveredAndTheListenerReconnects(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := newRecorder()
-	ctx, cancel := context.WithCancel(context.Background())
+	counted := make(chan string, 4)
+	ctx, cancel := context.WithCancel(safego.WithPanicHook(context.Background(), func(name string) { counted <- name }))
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -176,5 +178,13 @@ func TestAPanickingHandlerIsRecoveredAndTheListenerReconnects(t *testing.T) {
 	rec.expectListening(t, true, 10*time.Second)
 	notify(t, ch, "poison")
 	rec.expectListening(t, false, 5*time.Second)
+	select {
+	case name := <-counted:
+		if name != "listener "+ch {
+			t.Errorf("the panic was counted under %q, want %q", name, "listener "+ch)
+		}
+	case <-time.After(5 * time.Second):
+		t.Error("the handler's panic was not counted")
+	}
 	rec.expectListening(t, true, 10*time.Second)
 }
