@@ -28,11 +28,11 @@ internal/
   app/<context>/        Use cases: command and query handlers, and the ports they need.
   infra/in/...          Inbound adapters: HTTP APIs, SSO callbacks, workers, CLI.
   infra/out/...         Outbound adapters: PostgreSQL repositories, mail, ClickHouse, object storage, outbound HTTP.
-  shared/               Kernel types every layer may use: error kinds, IDs, clock.
+  shared/               Kernel types every layer may use: error kinds, IDs, clock, secret values.
   pkg/                  Code that knows nothing about Flagnetic (for example the transaction-in-context helper).
 ```
 
-**Dependencies point inwards.** `infra` may import `app` and `domain`; `app` may import `domain`; `domain` imports only `shared`, `eval` and the standard library, and never `pgx`, `net/http` or `database/sql`. `pkg` imports nothing from `internal`. These rules are enforced by `depguard` in CI (see `.golangci.yml`), so a violation fails the build rather than a review.
+**Dependencies point inwards.** `infra` may import `app` and `domain`; `app` may import `domain`; `domain` imports only `shared`, `eval` and the standard library, and never `pgx`, `net/http` or `database/sql`. `shared` imports only the standard library. `pkg` imports nothing from `internal`. These rules are enforced by `depguard` in CI (see `.golangci.yml`), so a violation fails the build rather than a review. The application rule covers handlers and not their tests: an application test wires the real PostgreSQL repositories from `infra`, because repositories are never faked. The domain rule covers tests too.
 
 **Domain.** Rules that must always hold live here and nowhere else: a flag key's pattern, which variation a rule may serve, an experiment's status transitions, which permissions a grant may carry. Domain code does no I/O and reads no clock: time and IDs are passed in. It is tested with plain unit and property tests.
 
@@ -64,7 +64,27 @@ A command handler is the unit of work. It wraps its work in `Transactor.Within(c
 
 ## Errors
 
-Domain and application code return errors of a small set of kinds from `internal/shared/errors` (not found, conflict, invalid, forbidden, precondition failed, unavailable), each with a stable machine-readable code. The HTTP adapter maps kinds to status codes and writes RFC 9457 problem documents in one place. Nothing below the adapter knows about HTTP.
+Domain and application code return errors of a fixed set of kinds from `internal/shared/errors`, each with a stable snake_case code that clients branch on, a detail for humans, and optionally field violations (a JSON Pointer into the request body, a code and a detail), code-specific extensions and a wrapped cause that is logged and never sent. The kinds and the status every API answers them with:
+
+| Kind | Status |
+|---|---|
+| `invalid` | 422 |
+| `not_found` | 404 |
+| `conflict` | 409 |
+| `forbidden` | 403 |
+| `unauthenticated` | 401 |
+| `precondition_failed` | 412 |
+| `gone` | 410 |
+| `rate_limited` | 429, with `Retry-After` |
+| `unavailable` | 503 |
+
+Only the HTTP adapter answers 400 `invalid_request` (a request it cannot decode) and 428 `precondition_required` (a write without `If-Match`). Any error carrying no kind is 500 `internal`, answered with no detail and logged with its cause and the request ID. Every API answers errors as RFC 9457 problem documents (`application/problem+json`) written in one place in `internal/infra/in/http`; nothing below the adapter knows about HTTP.
+
+## Identifiers and time
+
+Every identifier is a UUIDv7 minted by the application, never by a column default: an application handler draws it from an `id.Source` (`internal/shared/id`) and hands it to the domain, so a domain object has its identity before it is stored. Identifiers are typed per entity (`type ProjectID = id.Of[Project]`, declared in the entity's domain package), so one entity's identifier passed where another's is expected does not compile; the PostgreSQL adapter converts them to and from `uuid` columns. Being time-ordered, they keep index inserts local and make keyset cursors follow creation order.
+
+Every instant the server reasons about comes from `internal/shared/clock`: handlers read the clock and pass the time to the domain, and to SQL as a query parameter. SQL never reads the database clock (`now()`, `current_timestamp` and their relatives), not even in a column default. A test therefore moves all time at once with the fake clock, and replicas judge time by their own wall clocks, which is why a deployment needs NTP.
 
 ## Contracts
 

@@ -8,6 +8,18 @@ This is the vocabulary of Flagnetic, a self-hosted platform for feature flags an
 One running deployment of Flagnetic. It hosts one or more projects.
 _Avoid_: server, installation, tenant
 
+**Replica**:
+One running process of an instance. Every replica of an instance is the same: it serves every API, holds every environment's ruleset and runs every worker, and replicas coordinate only through PostgreSQL.
+_Avoid_: node, pod, server, leader
+
+**Worker**:
+Background work every replica runs in rounds, one round every interval, until the replica stops. A round that fails or panics is counted and the next round still runs; what keeps two replicas from doing one piece of work twice is the work's own locking in PostgreSQL, never the worker.
+_Avoid_: job, cron, daemon, background task
+
+**Drain**:
+The window after a replica is told to stop in which it reports itself not ready, so that load balancers stop routing to it, while it still serves every request that reaches it. After the drain the replica stops accepting requests and shuts down.
+_Avoid_: grace period (the bound on in-flight requests after the drain), cooldown
+
 **Secret key**:
 The instance-wide key, given as `FLAGNETIC_SECRET_KEY`. Every stored secret is sealed under it — encrypted so that only an instance holding the key opens it again — and sessions are signed with it. An instance keeps the key it was set up with: one stored **canary**, sealed under the key and opened on every start, proves the key still opens what the instance stored. Here, and only here, canary means that check.
 _Avoid_: master key, encryption key, salt (reserved for the public bucketing salt)

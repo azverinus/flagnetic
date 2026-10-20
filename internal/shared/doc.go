@@ -1,4 +1,4 @@
 // Package shared is the root of the kernel every layer may import: error
-// kinds, identifiers and the clock abstraction. It imports nothing from the
-// other layers.
+// kinds, identifiers, the clock and secret values. It imports the standard
+// library only, so the domain can depend on it.
 package shared
