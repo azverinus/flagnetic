@@ -8,6 +8,8 @@
 go get github.com/azverinus/flagnetic/sdks/go
 ```
 
+On OpenFeature? Install the [OpenFeature provider](openfeature/README.md) instead, `github.com/azverinus/flagnetic/sdks/go/openfeature`, a module of its own over this SDK.
+
 ## Quick start
 
 An offline client reads a ruleset document, exactly as the ruleset endpoint of a Flagnetic instance serves it, from a file, a byte slice or a function of yours, and never touches the network:

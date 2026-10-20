@@ -8,6 +8,8 @@ A change to evaluation lands here first, as a fixture. Every implementation runs
 
 - `fixtures/murmur3.json`: hash vectors `{input, hash, bucket}`. Every hash was computed by ClickHouse `murmurHash3_32(input)`, and `bucket = hash % 10000`. Reproduce them with `clickhouse local --query "SELECT line, murmurHash3_32(line) FROM file('inputs.txt', 'LineAsString')"`. An implementation must reproduce `hash` from the UTF-8 bytes of `input`; where `input` contains a `.`, `Bucket(salt, unit_id)` split at the first `.` must reproduce `bucket`.
 - `fixtures/regex.json`: RE2 vectors `{pattern, input, match}`, where `match` is `true`, `false` or `"invalid"`, saying how a `matches` condition behaves; see below.
+- `openfeature/reasons.json`: the OpenFeature reason every Flagnetic evaluation reason maps to, and the flag metadata key carrying the Flagnetic reason itself. Every OpenFeature provider, in every language, follows it, so dashboards agree across languages.
+- `protocol/`: what every SDK's transport is tested against; see [`protocol/README.md`](protocol/README.md).
 - `fixtures/<topic>/<name>.json`: one ruleset and its cases. The file's `name` equals its path without `.json`.
 
 ## Fixture shape

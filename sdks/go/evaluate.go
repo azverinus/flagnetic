@@ -65,9 +65,15 @@ func (c *Client) JSON(ctx context.Context, fc Context, key string, def json.RawM
 // names the flag type asked for: bool is boolean, string is string, any Go
 // number is number, anything else is JSON. A served number is a float64 and
 // a served JSON value a json.RawMessage; with reason fallback, Value is def
-// as passed.
+// as passed. An int64 default reads the flag as Int does: Value is an int64,
+// and a number that is not whole or does not fit serves def with
+// type_mismatch.
 func (c *Client) Detail(ctx context.Context, fc Context, key string, def any) Detail {
-	return c.evaluate(ctx, fc, key, requestedType(def), def)
+	typ := requestedType(def)
+	if _, ok := def.(int64); ok {
+		typ = typeInt64
+	}
+	return c.evaluate(ctx, fc, key, typ, def)
 }
 
 // flagTypeOf is the flag type a requested type reads.

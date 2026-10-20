@@ -89,6 +89,23 @@ func TestIntUsesLocalOverrides(t *testing.T) {
 	}
 }
 
+// TestDetailWithAnInt64DefaultReadsLikeInt: an int64 default makes Detail
+// apply Int's rule, so a caller that needs the reason, such as an
+// OpenFeature provider, gets the same answer as Int.
+func TestDetailWithAnInt64DefaultReadsLikeInt(t *testing.T) {
+	c := offline(t, []byte(numbers))
+	if d := c.Detail(t.Context(), flagnetic.Context{}, "retries", int64(0)); d.Value != int64(42) || d.Reason != flagnetic.ReasonFallthrough {
+		t.Errorf("Detail(retries, int64) = %+v, want int64 42 with fallthrough", d)
+	}
+	d := c.Detail(t.Context(), flagnetic.Context{}, "ratio", int64(5))
+	if d.Value != int64(5) || d.Reason != flagnetic.ReasonFallback || d.ErrorCode != flagnetic.ErrorTypeMismatch {
+		t.Errorf("Detail(ratio, int64) = %+v, want the default with type_mismatch", d)
+	}
+	if d := c.Detail(t.Context(), flagnetic.Context{}, "retries", 0.0); d.Value != 42.0 {
+		t.Errorf("Detail(retries, float64) = %+v, want float64 42", d)
+	}
+}
+
 func TestIntOnANilClientServesTheDefault(t *testing.T) {
 	var c *flagnetic.Client
 	if got := c.Int(t.Context(), flagnetic.Context{}, "retries", 11); got != 11 {

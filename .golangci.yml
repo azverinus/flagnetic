@@ -45,6 +45,16 @@ linters:
             - $gostd
             - github.com/azverinus/flagnetic/eval
             - github.com/azverinus/flagnetic/sdks/go
+        # The OpenFeature provider adds the OpenFeature Go SDK and nothing
+        # else to what the SDK depends on.
+        sdk-go-openfeature:
+          list-mode: strict
+          files:
+            - "**/sdks/go/openfeature/**"
+          allow:
+            - $gostd
+            - github.com/azverinus/flagnetic/sdks/go
+            - github.com/open-feature/go-sdk
         domain:
           files:
             - "**/internal/domain/**"

@@ -179,6 +179,13 @@ jobs:
           for dir in $(jq -r '.[]' <<< "$DIRS"); do
             go work use "$GITHUB_WORKSPACE/$dir"
           done
+          # As in the committed go.work: v0.0.0, the version required before
+          # a first release, resolves to the module's directory.
+          go work edit -json "$GITHUB_WORKSPACE/go.work" |
+            jq -r '.Replace[]? | select(.Old.Version == "v0.0.0") | "\(.Old.Path) \(.New.Path)"' |
+            while read -r path target; do
+              go work edit -replace="$path@v0.0.0=$GITHUB_WORKSPACE/${target#./}"
+            done
           cat "$GOWORK"
       - name: go.mod is tidy
         run: '"$GITHUB_WORKSPACE/.github/scripts/check-tidy.sh" .'
