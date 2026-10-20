@@ -28,6 +28,10 @@ Items arrive as the corresponding parts of the codebase land.
 - Contracts are versioned from the first release, because a mobile app in a store is served for years.
 - Everything in the console is available through the API.
 
+## Running it
+
+`flagnetic serve` runs the server and `flagnetic migrate` applies the database migrations; both need `DATABASE_URL` pointing at PostgreSQL 16 or newer. Every setting is listed in the [configuration reference](docs/configuration.md).
+
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) and [ARCHITECTURE.md](ARCHITECTURE.md). Security issues: see [SECURITY.md](SECURITY.md).

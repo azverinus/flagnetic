@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
+	"regexp"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -33,13 +35,39 @@ func Migrations() fs.FS {
 	return sub
 }
 
-// Open creates a pool for databaseURL. It does not wait for PostgreSQL to be
-// reachable: the first query does, and readiness reports it.
-func Open(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
-	cfg, err := pgxpool.ParseConfig(databaseURL)
+// DefaultMaxConns is the pool size when neither the configuration nor
+// pool_max_conns in DATABASE_URL sets one: enough for a replica's requests
+// and workers on a small container, a known number on a large node.
+const DefaultMaxConns = 10
+
+// setsPoolMaxConns finds pool_max_conns as a URL query parameter or as a
+// keyword/value pair, spaces around the equals sign included.
+var setsPoolMaxConns = regexp.MustCompile(`(?:^|[?&\s])pool_max_conns\s*=`)
+
+// PoolConfig is the pool configuration of databaseURL with maxConns
+// connections. maxConns 0 keeps pool_max_conns of the URL, or DefaultMaxConns
+// when the URL has none. overrode reports a maxConns that replaced the URL's
+// own pool_max_conns, for the caller to log: an existing URL is never
+// overridden silently.
+func PoolConfig(databaseURL string, maxConns int) (cfg *pgxpool.Config, overrode bool, err error) {
+	cfg, err = pgxpool.ParseConfig(databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
+		return nil, false, fmt.Errorf("parse DATABASE_URL: %w", err)
 	}
+	inURL := setsPoolMaxConns.MatchString(databaseURL)
+	switch {
+	case maxConns > 0:
+		cfg.MaxConns = int32(min(maxConns, math.MaxInt32)) //nolint:gosec // clamped
+		overrode = inURL
+	case !inURL:
+		cfg.MaxConns = DefaultMaxConns
+	}
+	return cfg, overrode, nil
+}
+
+// Open creates a pool. It does not wait for PostgreSQL to be reachable: the
+// first query does, and readiness reports it.
+func Open(ctx context.Context, cfg *pgxpool.Config) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(ctx, cfg)
 }
 

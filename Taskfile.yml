@@ -48,7 +48,7 @@ tasks:
       - docker build -f deploy/Dockerfile --build-arg VERSION=dev -t flagnetic:dev .
 
   generate:
-    desc: Regenerate code from api/*.yaml
+    desc: Regenerate generated code and docs (API code, the configuration reference)
     cmds:
       - go generate ./...
 

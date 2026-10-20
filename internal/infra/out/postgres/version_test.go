@@ -31,3 +31,27 @@ func TestServerVersionCheck(t *testing.T) {
 		}
 	}
 }
+
+func TestPoolSizePrecedence(t *testing.T) {
+	for _, tt := range []struct {
+		url      string
+		maxConns int
+		want     int32
+		overrode bool
+	}{
+		{"postgres://db/flagnetic", 0, postgres.DefaultMaxConns, false},
+		{"postgres://db/flagnetic?pool_max_conns=3", 0, 3, false},
+		{"postgres://db/flagnetic?pool_max_conns=3", 7, 7, true},
+		{"host=db dbname=flagnetic pool_max_conns = 3", 0, 3, false},
+		{"host=db dbname=flagnetic pool_max_conns = 3", 7, 7, true},
+		{"host=db dbname=flagnetic", 7, 7, false},
+	} {
+		cfg, overrode, err := postgres.PoolConfig(tt.url, tt.maxConns)
+		if err != nil {
+			t.Fatalf("PoolConfig(%q): %v", tt.url, err)
+		}
+		if cfg.MaxConns != tt.want || overrode != tt.overrode {
+			t.Errorf("PoolConfig(%q, %d) = %d, overrode %v; want %d, %v", tt.url, tt.maxConns, cfg.MaxConns, overrode, tt.want, tt.overrode)
+		}
+	}
+}
