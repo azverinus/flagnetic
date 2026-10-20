@@ -26,7 +26,7 @@ jobs:
         with:
           version: v2.14.0
 
-  test-postgres:
+  test:
     name: go test (postgres ${{ matrix.postgres }})
     runs-on: ubuntu-latest
     strategy:
@@ -68,21 +68,6 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Coverage floors
         run: go run github.com/vladopajic/go-test-coverage/v2@v2.19.0 --config=.testcoverage.yml
-
-  # One check over the PostgreSQL matrix, under the name the matrix job had
-  # before it was split, so a check required by that name still reports.
-  test:
-    name: go test
-    needs: test-postgres
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Every PostgreSQL version passed
-        env:
-          RESULT: ${{ needs.test-postgres.result }}
-        run: |
-          echo "PostgreSQL matrix: $RESULT"
-          test "$RESULT" = success
 
   vuln:
     name: govulncheck
@@ -222,7 +207,7 @@ jobs:
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test-postgres, test, vuln, tidy, workflows, docker, modules, module]
+    needs: [lint, test, vuln, tidy, workflows, docker, modules, module]
     if: always()
     runs-on: ubuntu-latest
     steps:
