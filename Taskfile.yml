@@ -89,7 +89,7 @@ tasks:
     desc: Tidy go.mod and fail if it changed
     cmds:
       - go mod tidy
-      - git diff --exit-code -- go.mod $(ls go.sum 2>/dev/null)
+      - git diff --exit-code -- go.mod go.sum
 
   # --- Local database ---
 
