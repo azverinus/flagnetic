@@ -17,6 +17,7 @@ vars:
   GOVULNCHECK: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4
   ACTIONLINT: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
   GOTESTSUM: go run gotest.tools/gotestsum@v1.13.0
+  GO_TEST_COVERAGE: go run github.com/vladopajic/go-test-coverage/v2@v2.19.0
   # The directory of every module in go.work, the root module first. `./...`
   # stops at a nested module, so each Go check runs once per module.
   MODULES:
@@ -58,6 +59,7 @@ tasks:
     cmds:
       - task: lint
       - task: test
+      - task: cover
       - task: vuln
       - task: tidy
 
@@ -76,16 +78,24 @@ tasks:
         cmd: cd '{{.ITEM}}' && {{.GOLANGCI_LINT}} fmt --config '{{.ROOT_DIR}}/.golangci.yml' ./...
 
   test:
-    desc: Run the Go tests of every module with the race detector
+    desc: Run the Go tests of every module with the race detector, recording the server's coverage
     cmds:
+      # The coverage floors are the server's, so only the root module records
+      # a profile, counting every server package any test exercises.
       - for: { var: MODULES, split: "\n" }
-        cmd: cd '{{.ITEM}}' && {{.GOTESTSUM}} --format pkgname -- -race ./...
+        cmd: >-
+          cd '{{.ITEM}}' && {{.GOTESTSUM}} --format pkgname -- -race
+          {{if eq .ITEM .ROOT_DIR}}-coverpkg=./internal/... -coverprofile='{{.ROOT_DIR}}/coverage.out'{{end}} ./...
 
-  test:cover:
-    desc: Run the Go tests and open the coverage report
+  cover:
+    desc: Check the coverage floors per layer (after task test)
     cmds:
-      - go test -coverprofile=coverage.out ./...
-      - go tool cover -func=coverage.out | tail -n 1
+      - .github/scripts/coverage-by-layer.sh coverage.out
+      - '{{.GO_TEST_COVERAGE}} --config=.testcoverage.yml'
+
+  cover:html:
+    desc: Open the coverage report of the last task test
+    cmds:
       - go tool cover -html=coverage.out
 
   vuln:

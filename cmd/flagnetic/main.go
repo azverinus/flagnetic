@@ -2,28 +2,15 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
+	"github.com/azverinus/flagnetic/internal/infra/in/cli"
 )
 
-const usage = `Usage: flagnetic <command>
-
-Commands:
-  version   Print the version and exit
-`
-
 func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
-}
-
-func run(args []string, stdout, stderr io.Writer) int {
-	if len(args) == 1 && args[0] == "version" {
-		fmt.Fprintln(stdout, buildinfo.Version())
-		return 0
-	}
-	fmt.Fprint(stderr, usage)
-	return 2
+	signals := make(chan os.Signal, 2)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	os.Exit(cli.Main(os.Args[1:], os.LookupEnv, os.Stdout, os.Stderr, signals))
 }
