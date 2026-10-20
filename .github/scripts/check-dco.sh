@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Checks that every non-merge commit in base..head carries a Developer
-# Certificate of Origin sign-off matching its author.
+# Certificate of Origin sign-off matching its author. Commits by GitHub bots
+# (Dependabot, release-please) are exempt: no person certifies them.
 set -euo pipefail
 
 base="${1:?usage: check-dco.sh <base> <head>}"
@@ -9,6 +10,9 @@ failed=0
 
 for sha in $(git rev-list --no-merges "$base..$head"); do
   author="$(git log -1 --format='%an <%ae>' "$sha")"
+  if [[ "$author" == *"[bot]@users.noreply.github.com>" ]]; then
+    continue
+  fi
   if git log -1 --format='%B' "$sha" | grep -qiF "Signed-off-by: $author"; then
     continue
   fi
