@@ -68,9 +68,11 @@ Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNET
 | `flagnetic_http_request_duration_seconds` | `method`, `route` | Time to serve a request (histogram). |
 | `flagnetic_db_pool_acquired_conns`, `_idle_conns`, `_total_conns`, `_max_conns` | | The PostgreSQL pool of the replica. |
 | `flagnetic_db_pool_acquires_total`, `_empty_acquires_total`, `_acquire_wait_seconds_total` | | Connections taken from the pool, how many had to wait, and how long they waited in total. |
+| `flagnetic_worker_rounds_total`, `_failures_total`, `_panics_total` | `worker` | Rounds of each background worker, how many failed, and how many panicked. A failed or panicking round is logged and the next round runs. |
+| `flagnetic_worker_round_duration_seconds` | `worker` | Time a worker's round took (histogram). |
 | `go_*`, `process_*` | | The Go runtime and the process. |
 
-Worth an alert: `flagnetic_db_pool_acquired_conns` close to `flagnetic_db_pool_max_conns` for minutes, or a growing rate of `flagnetic_db_pool_acquire_wait_seconds_total`: the pool is saturated and requests will start to time out. Raise `FLAGNETIC_DB_MAX_CONNS` within what PostgreSQL's `max_connections` allows across all replicas, or add replicas.
+Worth an alert: any increase of `flagnetic_worker_panics_total`, which is a bug to report with the stack from the log; `flagnetic_worker_failures_total` growing round after round for one worker, which is work not getting done; and `flagnetic_db_pool_acquired_conns` close to `flagnetic_db_pool_max_conns` for minutes, or a growing rate of `flagnetic_db_pool_acquire_wait_seconds_total`: the pool is saturated and requests will start to time out. Raise `FLAGNETIC_DB_MAX_CONNS` within what PostgreSQL's `max_connections` allows across all replicas, or add replicas.
 
 ## Logs
 

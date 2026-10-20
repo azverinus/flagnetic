@@ -9,6 +9,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 )
@@ -22,6 +23,15 @@ type Server struct {
 	Logs *LogSink
 
 	metrics http.Handler
+	runner  *worker.Runner
+}
+
+// Tick runs one round of the worker called name, through the runner's
+// wrapper. The in-process server never starts the workers' timers: a test
+// drives every round it wants, when it wants.
+func (s *Server) Tick(t testing.TB, name string) error {
+	t.Helper()
+	return s.runner.Tick(s.runner.PanicHook(t.Context()), name)
 }
 
 // Scrape returns the server's metrics in the Prometheus text format, as the
@@ -37,9 +47,10 @@ func (s *Server) Scrape(t testing.TB) string {
 }
 
 type serverOptions struct {
-	pool   *pgxpool.Pool
-	edge   []func(*flaghttp.Options)
-	routes []route
+	workers []worker.Worker
+	pool    *pgxpool.Pool
+	edge    []func(*flaghttp.Options)
+	routes  []route
 }
 
 type route struct {
@@ -53,6 +64,11 @@ type route struct {
 // answer errors through it or log with its logger.
 func WithRoute(pattern string, build func(*flaghttp.Server) http.Handler, opts ...flaghttp.RouteOption) ServerOption {
 	return func(o *serverOptions) { o.routes = append(o.routes, route{pattern, build, opts}) }
+}
+
+// WithWorker registers w with the server's runner, for Tick.
+func WithWorker(w worker.Worker) ServerOption {
+	return func(o *serverOptions) { o.workers = append(o.workers, w) }
 }
 
 // WithEdge changes the edge's options, which otherwise are the defaults of
@@ -88,6 +104,12 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	for _, change := range o.edge {
 		change(&edge)
 	}
+	runner := worker.NewRunner(logs.Logger(), reg)
+	for _, w := range o.workers {
+		if err := runner.Register(w); err != nil {
+			t.Fatal(err)
+		}
+	}
 	h := flaghttp.New(edge)
 	for _, r := range o.routes {
 		h.Handle(r.pattern, r.build(h), r.opts...)
@@ -96,7 +118,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	srv.Config = h.HTTPServer()
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return &Server{URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg)}
+	return &Server{URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg), runner: runner}
 }
 
 // defaults returns the configuration a replica has when nothing is set.

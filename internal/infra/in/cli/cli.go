@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/infra/config"
+	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
 )
@@ -51,6 +52,7 @@ type options struct {
 	migrations       fs.FS
 	serverVersionNum func(context.Context, *pgxpool.Pool) (int, error)
 	routes           []route
+	workers          []worker.Worker
 }
 
 type route struct {
@@ -68,6 +70,10 @@ func withServerVersionNum(f func(context.Context, *pgxpool.Pool) (int, error)) O
 
 func withRoute(pattern string, h http.Handler) Option {
 	return func(o *options) { o.routes = append(o.routes, route{pattern, h}) }
+}
+
+func withWorker(w worker.Worker) Option {
+	return func(o *options) { o.workers = append(o.workers, w) }
 }
 
 // Main runs the command named by args[0] and returns the process's exit code.
