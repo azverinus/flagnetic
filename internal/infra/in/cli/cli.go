@@ -158,6 +158,7 @@ func Main(args []string, lookupEnv func(string) (string, bool), stdout, stderr i
 	}
 }
 
+// newLogger writes cfg's format at cfg's level to w.
 func newLogger(w io.Writer, cfg config.Config) *slog.Logger {
 	opts := &slog.HandlerOptions{Level: cfg.LogLevel}
 	if cfg.LogFormat == config.LogText {

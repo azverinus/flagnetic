@@ -41,6 +41,14 @@ With `FLAGNETIC_AUTO_MIGRATE=false`, `serve` compares the database's schema with
 
 Both are served on the public listener (`FLAGNETIC_LISTEN_ADDR`). In a container image without a shell, `flagnetic healthcheck` checks `/readyz` itself.
 
+## Logs
+
+Logs go to standard error, one JSON object per line by default (`FLAGNETIC_LOG_FORMAT=text` for a terminal), at `FLAGNETIC_LOG_LEVEL`. Secrets are written as `[redacted]`, and `DATABASE_URL` is logged without its password.
+
+Every response carries an `X-Request-ID` header: the one the request came with when it is well formed (letters, digits and `._:-`, at most 128 characters), otherwise a new one. Every log line written while serving a request carries it as `request_id`, together with the matched `route`, so one request's lines can be found together.
+
+Each request is logged once when it completes, as a `request` record with `method`, `route` (the matched route pattern, or `unmatched`), `path`, `status`, `duration` and `bytes`. `/healthz` and `/readyz` are left out. An unexpected error is answered with a bare `internal` problem and logged at error with its cause under the same request ID, so a client can report the ID and you can find the cause.
+
 ## Stopping
 
 On SIGTERM or SIGINT a replica stops in three steps:
