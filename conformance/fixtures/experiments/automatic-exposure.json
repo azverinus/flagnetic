@@ -1,0 +1,361 @@
+{
+  "name": "experiments/automatic-exposure",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": false
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "os",
+        "type": "string"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "auto_on",
+        "type": "string",
+        "automatic_exposure": true,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "anonymous",
+            "unit_id": "u_10484",
+            "variation": "off"
+          }
+        ],
+        "rules": [
+          {
+            "id": "r_ios",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "macos"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "treatment"
+            }
+          },
+          {
+            "id": "r_exp",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "anonymous",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 7000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "auto_off",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "anonymous",
+            "unit_id": "u_10484",
+            "variation": "off"
+          }
+        ],
+        "rules": [
+          {
+            "id": "r_ios",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "macos"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "treatment"
+            }
+          },
+          {
+            "id": "r_exp",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "anonymous",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 7000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "auto_on: a rule before the experiment rule",
+      "context": {
+        "units": {
+          "anonymous": "u_10482"
+        },
+        "attributes": {
+          "os": "macos"
+        }
+      },
+      "flag": "auto_on",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "rule",
+        "rule_id": "r_ios",
+        "automatic_exposure": true,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "auto_on: the experiment assigns",
+      "context": {
+        "units": {
+          "anonymous": "u_10482"
+        },
+        "attributes": {}
+      },
+      "flag": "auto_on",
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "experiment",
+        "rule_id": "r_exp",
+        "automatic_exposure": true,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "control",
+          "unit_type": "anonymous",
+          "unit_id": "u_10482",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 6884,
+          "variation_bucket": 3653,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "auto_on: a unit outside the traffic allocation falls through",
+      "context": {
+        "units": {
+          "anonymous": "u_10483"
+        },
+        "attributes": {}
+      },
+      "flag": "auto_on",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "fallthrough",
+        "automatic_exposure": true,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "auto_on: an override into the experiment",
+      "context": {
+        "units": {
+          "anonymous": "u_10484"
+        },
+        "attributes": {}
+      },
+      "flag": "auto_on",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "override",
+        "automatic_exposure": true,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "off",
+          "unit_type": "anonymous",
+          "unit_id": "u_10484",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 724,
+          "variation_bucket": 8270,
+          "override": true
+        },
+        "override_influenced": true
+      }
+    },
+    {
+      "name": "auto_off: a rule before the experiment rule",
+      "context": {
+        "units": {
+          "anonymous": "u_10482"
+        },
+        "attributes": {
+          "os": "macos"
+        }
+      },
+      "flag": "auto_off",
+      "expect": {
+        "type": "string",
+        "value": "treatment",
+        "variation": "treatment",
+        "reason": "rule",
+        "rule_id": "r_ios",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "auto_off: the experiment assigns",
+      "context": {
+        "units": {
+          "anonymous": "u_10482"
+        },
+        "attributes": {}
+      },
+      "flag": "auto_off",
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "experiment",
+        "rule_id": "r_exp",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "control",
+          "unit_type": "anonymous",
+          "unit_id": "u_10482",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 6884,
+          "variation_bucket": 3653,
+          "override": false
+        },
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "auto_off: a unit outside the traffic allocation falls through",
+      "context": {
+        "units": {
+          "anonymous": "u_10483"
+        },
+        "attributes": {}
+      },
+      "flag": "auto_off",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "auto_off: an override into the experiment",
+      "context": {
+        "units": {
+          "anonymous": "u_10484"
+        },
+        "attributes": {}
+      },
+      "flag": "auto_off",
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "override",
+        "automatic_exposure": false,
+        "experiment": {
+          "key": "checkout_v2",
+          "variation": "off",
+          "unit_type": "anonymous",
+          "unit_id": "u_10484",
+          "inclusion_salt": "a3f9c2e17b4d0e58",
+          "variation_salt": "7e1d4c90b2a6f3d1",
+          "inclusion_bucket": 724,
+          "variation_bucket": 8270,
+          "override": true
+        },
+        "override_influenced": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,249 @@
+{
+  "name": "rollout/unit-type-and-boundaries",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [],
+    "segments": [],
+    "flags": [
+      {
+        "key": "rollout_user",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [],
+            "serve": {
+              "kind": "rollout",
+              "unit_type": "user",
+              "variation": "true",
+              "percentage": 2000,
+              "salt": "k3f9s0d2m1x8q7wz"
+            }
+          }
+        ]
+      },
+      {
+        "key": "rollout_zero",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [],
+            "serve": {
+              "kind": "rollout",
+              "unit_type": "user",
+              "variation": "true",
+              "percentage": 0,
+              "salt": "k3f9s0d2m1x8q7wz"
+            }
+          }
+        ]
+      },
+      {
+        "key": "rollout_all",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [],
+            "serve": {
+              "kind": "rollout",
+              "unit_type": "user",
+              "variation": "true",
+              "percentage": 10000,
+              "salt": "k3f9s0d2m1x8q7wz"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "bucket 1999 is inside 2000",
+      "context": {
+        "units": {
+          "user": "u-33194"
+        },
+        "attributes": {}
+      },
+      "flag": "rollout_user",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rollout",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "bucket": 1999,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "bucket 2000 is outside 2000",
+      "context": {
+        "units": {
+          "user": "u-7249"
+        },
+        "attributes": {}
+      },
+      "flag": "rollout_user",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "unit type absent: the rule is skipped",
+      "context": {
+        "units": {
+          "anonymous": "u-33194"
+        },
+        "attributes": {}
+      },
+      "flag": "rollout_user",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "no units: the rule is skipped",
+      "context": {
+        "units": {},
+        "attributes": {}
+      },
+      "flag": "rollout_user",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "empty unit ID: the rule is skipped",
+      "context": {
+        "units": {
+          "user": ""
+        },
+        "attributes": {}
+      },
+      "flag": "rollout_all",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "percentage 0 includes nobody",
+      "context": {
+        "units": {
+          "user": "u-33194"
+        },
+        "attributes": {}
+      },
+      "flag": "rollout_zero",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "percentage 10000 includes everyone",
+      "context": {
+        "units": {
+          "user": "u-7249"
+        },
+        "attributes": {}
+      },
+      "flag": "rollout_all",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rollout",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "bucket": 2000,
+        "override_influenced": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,605 @@
+{
+  "name": "unsupported/rules",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 7,
+    "scope": "server",
+    "unit_types": [
+      "user"
+    ],
+    "attributes": [
+      {
+        "key": "plan",
+        "type": "string"
+      }
+    ],
+    "segments": [
+      {
+        "key": "future_segment",
+        "private": false,
+        "conditions": [
+          {
+            "kind": "attribute",
+            "attribute": "plan",
+            "op": "sounds_like",
+            "value": "pro"
+          }
+        ]
+      },
+      {
+        "key": "segment_of_a_future_kind",
+        "private": false,
+        "conditions": [
+          {
+            "kind": "device_class",
+            "value": "tablet"
+          }
+        ]
+      },
+      {
+        "key": "pro_users",
+        "private": false,
+        "conditions": [
+          {
+            "kind": "attribute",
+            "attribute": "plan",
+            "op": "eq",
+            "value": "pro"
+          }
+        ]
+      }
+    ],
+    "flags": [
+      {
+        "key": "unknown_operator",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "plan",
+                "op": "glob_matches",
+                "value": "pro*"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "unknown_condition_kind",
+        "type": "boolean",
+        "automatic_exposure": true,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "geo_distance",
+                "attribute": "plan",
+                "value": 10
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "unknown_serve_kind",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "a",
+            "value": "A"
+          },
+          {
+            "key": "b",
+            "value": "B"
+          }
+        ],
+        "on": true,
+        "off_variation": "a",
+        "fallthrough": "a",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [],
+            "serve": {
+              "kind": "multi_armed_bandit",
+              "unit_type": "user"
+            }
+          }
+        ]
+      },
+      {
+        "key": "unknown_operator_in_a_segment",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "in_segment",
+                "segment": "future_segment"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "unknown_condition_kind_in_a_segment",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "not_in_segment",
+                "segment": "segment_of_a_future_kind"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "several_unknown_constructs",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "plan",
+                "op": "glob_matches",
+                "value": "pro*"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          },
+          {
+            "id": "r2",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "plan",
+                "op": "glob_matches",
+                "value": "team*"
+              }
+            ],
+            "serve": {
+              "kind": "multi_armed_bandit",
+              "unit_type": "user"
+            }
+          }
+        ]
+      },
+      {
+        "key": "unknown_operator_not_reached",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "in_segment",
+                "segment": "pro_users"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          },
+          {
+            "id": "r2",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "plan",
+                "op": "glob_matches",
+                "value": "team*"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "unknown_operator_while_off",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": false,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "plan",
+                "op": "glob_matches",
+                "value": "pro*"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "supported",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "in_segment",
+                "segment": "pro_users"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "unsupported": {
+    "unknown_operator": [
+      {
+        "kind": "operator",
+        "name": "glob_matches"
+      }
+    ],
+    "unknown_condition_kind": [
+      {
+        "kind": "condition_kind",
+        "name": "geo_distance"
+      }
+    ],
+    "unknown_serve_kind": [
+      {
+        "kind": "serve_kind",
+        "name": "multi_armed_bandit"
+      }
+    ],
+    "unknown_operator_in_a_segment": [
+      {
+        "kind": "operator",
+        "name": "sounds_like"
+      }
+    ],
+    "unknown_condition_kind_in_a_segment": [
+      {
+        "kind": "condition_kind",
+        "name": "device_class"
+      }
+    ],
+    "several_unknown_constructs": [
+      {
+        "kind": "operator",
+        "name": "glob_matches"
+      },
+      {
+        "kind": "serve_kind",
+        "name": "multi_armed_bandit"
+      }
+    ],
+    "unknown_operator_not_reached": [
+      {
+        "kind": "operator",
+        "name": "glob_matches"
+      }
+    ],
+    "unknown_operator_while_off": [
+      {
+        "kind": "operator",
+        "name": "glob_matches"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "an unknown operator is an inconsistent ruleset",
+      "context": {
+        "attributes": {
+          "plan": "pro"
+        }
+      },
+      "flag": "unknown_operator",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "an unknown condition kind is an inconsistent ruleset",
+      "context": {
+        "attributes": {
+          "plan": "pro"
+        }
+      },
+      "flag": "unknown_condition_kind",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": true,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "an unknown serve kind is an inconsistent ruleset",
+      "context": {
+        "units": {
+          "user": "u-1"
+        }
+      },
+      "flag": "unknown_serve_kind",
+      "expect": {
+        "type": "string",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "an unknown operator inside a segment is an inconsistent ruleset",
+      "context": {
+        "attributes": {
+          "plan": "pro"
+        }
+      },
+      "flag": "unknown_operator_in_a_segment",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "an unknown condition kind inside a segment is an inconsistent ruleset",
+      "context": {
+        "attributes": {
+          "plan": "pro"
+        }
+      },
+      "flag": "unknown_condition_kind_in_a_segment",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "the first unknown construct reached decides",
+      "context": {
+        "attributes": {
+          "plan": "pro"
+        }
+      },
+      "flag": "several_unknown_constructs",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "an unknown operator after the first match is not reached",
+      "context": {
+        "attributes": {
+          "plan": "pro"
+        }
+      },
+      "flag": "unknown_operator_not_reached",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "an unknown operator reached after no match is an inconsistent ruleset",
+      "context": {
+        "attributes": {
+          "plan": "team"
+        }
+      },
+      "flag": "unknown_operator_not_reached",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a flag that is off serves its off variation over an unknown operator",
+      "context": {
+        "attributes": {
+          "plan": "pro"
+        }
+      },
+      "flag": "unknown_operator_while_off",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "off",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a flag without unknown constructs evaluates normally beside them",
+      "context": {
+        "attributes": {
+          "plan": "pro"
+        }
+      },
+      "flag": "supported",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

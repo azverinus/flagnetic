@@ -1,0 +1,261 @@
+{
+  "name": "rules/first-match",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "os",
+        "type": "string"
+      },
+      {
+        "key": "country",
+        "type": "string"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "copy",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "short",
+            "value": "short"
+          },
+          {
+            "key": "long",
+            "value": "long"
+          },
+          {
+            "key": "default",
+            "value": "default"
+          },
+          {
+            "key": "rollout",
+            "value": "rollout"
+          }
+        ],
+        "on": true,
+        "off_variation": "short",
+        "fallthrough": "default",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "macos"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "short"
+            }
+          },
+          {
+            "id": "r2",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "country",
+                "op": "eq",
+                "value": "DE"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "long"
+            }
+          },
+          {
+            "id": "r3",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "macos"
+              },
+              {
+                "kind": "attribute",
+                "attribute": "country",
+                "op": "eq",
+                "value": "DE"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "default"
+            }
+          }
+        ]
+      },
+      {
+        "key": "rollout_then_rule",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "a",
+            "value": "a"
+          },
+          {
+            "key": "b",
+            "value": "b"
+          },
+          {
+            "key": "c",
+            "value": "c"
+          }
+        ],
+        "on": true,
+        "off_variation": "a",
+        "fallthrough": "c",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [],
+            "serve": {
+              "kind": "rollout",
+              "unit_type": "user",
+              "variation": "a",
+              "percentage": 5000,
+              "salt": "firstmatch0salt1"
+            }
+          },
+          {
+            "id": "r2",
+            "conditions": [],
+            "serve": {
+              "kind": "variation",
+              "variation": "b"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "both rules match, the first wins",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "macos",
+          "country": "DE"
+        }
+      },
+      "flag": "copy",
+      "expect": {
+        "type": "string",
+        "value": "short",
+        "variation": "short",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "first rule fails, second matches",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux",
+          "country": "DE"
+        }
+      },
+      "flag": "copy",
+      "expect": {
+        "type": "string",
+        "value": "long",
+        "variation": "long",
+        "reason": "rule",
+        "rule_id": "r2",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "no rule matches",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux",
+          "country": "FR"
+        }
+      },
+      "flag": "copy",
+      "expect": {
+        "type": "string",
+        "value": "default",
+        "variation": "default",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a unit inside the rollout is served by it",
+      "context": {
+        "units": {
+          "user": "u-0"
+        },
+        "attributes": {}
+      },
+      "flag": "rollout_then_rule",
+      "expect": {
+        "type": "string",
+        "value": "a",
+        "variation": "a",
+        "reason": "rollout",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "bucket": 4501,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a unit outside the rollout continues to the next rule",
+      "context": {
+        "units": {
+          "user": "u-2"
+        },
+        "attributes": {}
+      },
+      "flag": "rollout_then_rule",
+      "expect": {
+        "type": "string",
+        "value": "b",
+        "variation": "b",
+        "reason": "rule",
+        "rule_id": "r2",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

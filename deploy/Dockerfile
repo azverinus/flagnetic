@@ -5,7 +5,9 @@ ARG TARGETOS TARGETARCH
 ARG VERSION=dev
 WORKDIR /src
 ENV GOTOOLCHAIN=auto
+# The evaluator's go.mod comes along: go.mod replaces the evaluator with ./eval.
 COPY go.mod go.sum ./
+COPY eval/go.mod ./eval/
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \

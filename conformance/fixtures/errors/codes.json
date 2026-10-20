@@ -1,0 +1,887 @@
+{
+  "name": "errors/codes",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "os",
+        "type": "string"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "fine",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "missing_off_variation",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": false,
+        "off_variation": "nope",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "missing_fallthrough",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "nope",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "missing_rule_variation",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [],
+            "serve": {
+              "kind": "variation",
+              "variation": "nope"
+            }
+          }
+        ]
+      },
+      {
+        "key": "missing_override_variation",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [
+          {
+            "unit_type": "user",
+            "unit_id": "u1",
+            "variation": "nope"
+          }
+        ],
+        "rules": []
+      },
+      {
+        "key": "missing_segment",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "in_segment",
+                "segment": "nope"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "missing_prerequisite_flag",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [
+          {
+            "flag": "nope",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "missing_prerequisite_variation",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [
+          {
+            "flag": "fine",
+            "variation": "nope"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "missing_condition_flag",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "prerequisite",
+                "flag": "nope",
+                "variation": "true"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "undeclared_attribute",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "nope",
+                "op": "eq",
+                "value": "x"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "operator_not_for_type",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "lt",
+                "value": "x"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "wrong_value_type",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "in",
+                "value": "linux"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "invalid_regex",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "matches",
+                "value": "(?=macos)"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "depends_on_broken",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [
+          {
+            "flag": "missing_fallthrough",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "broken_rule_not_reached",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          },
+          {
+            "id": "r2",
+            "conditions": [],
+            "serve": {
+              "kind": "variation",
+              "variation": "nope"
+            }
+          }
+        ]
+      },
+      {
+        "key": "broken_condition_after_false",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "macos"
+              },
+              {
+                "kind": "in_segment",
+                "segment": "nope"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "broken_weights",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "anonymous",
+              "inclusion_salt": "a3f9c2e17b4d0e58",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "true",
+                  "weight": 1
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "unknown flag",
+      "flag": "does_not_exist",
+      "expect": {
+        "reason": "error",
+        "error_code": "flag_not_found",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "off variation missing",
+      "flag": "missing_off_variation",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "fallthrough variation missing",
+      "flag": "missing_fallthrough",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "rule variation missing",
+      "flag": "missing_rule_variation",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "override variation missing: the override decided, so the error is override-influenced",
+      "flag": "missing_override_variation",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": true
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "segment missing",
+      "flag": "missing_segment",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "prerequisite flag missing",
+      "flag": "missing_prerequisite_flag",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "required prerequisite variation missing",
+      "flag": "missing_prerequisite_variation",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "prerequisite condition flag missing",
+      "flag": "missing_condition_flag",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "condition on an undeclared attribute",
+      "flag": "undeclared_attribute",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "operator not defined for the attribute type",
+      "flag": "operator_not_for_type",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "condition value of the wrong JSON type",
+      "flag": "wrong_value_type",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "regex outside RE2 syntax",
+      "flag": "invalid_regex",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "an inconsistent prerequisite makes its dependent an error",
+      "flag": "depends_on_broken",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "a defect in a rule after the first match is not reached",
+      "flag": "broken_rule_not_reached",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "a defect in a condition after a false one is not reached",
+      "flag": "broken_condition_after_false",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    },
+    {
+      "name": "weights not covering the variation bucket",
+      "flag": "broken_weights",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "inconsistent_ruleset",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "anonymous": "anon-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,1172 @@
+{
+  "name": "operators/list",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "l",
+        "type": "list"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "list_contains",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "l",
+                "op": "contains",
+                "value": "beta"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "list_not_contains",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "l",
+                "op": "not_contains",
+                "value": "beta"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "list_contains_any",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "l",
+                "op": "contains_any",
+                "value": [
+                  "beta",
+                  "rc"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "list_contains_all",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "l",
+                "op": "contains_all",
+                "value": [
+                  "beta",
+                  "rc"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "list_is_empty",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "l",
+                "op": "is_empty"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "list_exists",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "l",
+                "op": "exists"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "list_not_exists",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "l",
+                "op": "not_exists"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "contains \"beta\": element",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "alpha",
+            "beta"
+          ]
+        }
+      },
+      "flag": "list_contains",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"beta\": no element",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "alpha"
+          ]
+        }
+      },
+      "flag": "list_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"beta\": substring of an element is not an element",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "betamax"
+          ]
+        }
+      },
+      "flag": "list_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"beta\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "list_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"beta\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": null
+        }
+      },
+      "flag": "list_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"beta\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": "beta"
+        }
+      },
+      "flag": "list_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains \"beta\": list with a non-string element is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "beta",
+            1
+          ]
+        }
+      },
+      "flag": "list_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"beta\": no element",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "alpha"
+          ]
+        }
+      },
+      "flag": "list_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"beta\": element",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "beta"
+          ]
+        }
+      },
+      "flag": "list_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"beta\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "list_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"beta\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": null
+        }
+      },
+      "flag": "list_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"beta\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": "beta"
+        }
+      },
+      "flag": "list_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_contains \"beta\": list with a non-string element is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "beta",
+            1
+          ]
+        }
+      },
+      "flag": "list_not_contains",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_any [\"beta\",\"rc\"]: one of them",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "rc",
+            "x"
+          ]
+        }
+      },
+      "flag": "list_contains_any",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_any [\"beta\",\"rc\"]: none of them",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "x"
+          ]
+        }
+      },
+      "flag": "list_contains_any",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_any [\"beta\",\"rc\"]: empty list",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": []
+        }
+      },
+      "flag": "list_contains_any",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_any [\"beta\",\"rc\"]: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "list_contains_any",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_any [\"beta\",\"rc\"]: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": null
+        }
+      },
+      "flag": "list_contains_any",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_any [\"beta\",\"rc\"]: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": "beta"
+        }
+      },
+      "flag": "list_contains_any",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_any [\"beta\",\"rc\"]: list with a non-string element is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "beta",
+            1
+          ]
+        }
+      },
+      "flag": "list_contains_any",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_all [\"beta\",\"rc\"]: all of them",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "rc",
+            "x",
+            "beta"
+          ]
+        }
+      },
+      "flag": "list_contains_all",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_all [\"beta\",\"rc\"]: some of them",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "beta"
+          ]
+        }
+      },
+      "flag": "list_contains_all",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_all [\"beta\",\"rc\"]: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "list_contains_all",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_all [\"beta\",\"rc\"]: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": null
+        }
+      },
+      "flag": "list_contains_all",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_all [\"beta\",\"rc\"]: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": "beta"
+        }
+      },
+      "flag": "list_contains_all",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "contains_all [\"beta\",\"rc\"]: list with a non-string element is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "beta",
+            1
+          ]
+        }
+      },
+      "flag": "list_contains_all",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "is_empty: empty",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": []
+        }
+      },
+      "flag": "list_is_empty",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "is_empty: not empty",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "a"
+          ]
+        }
+      },
+      "flag": "list_is_empty",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "is_empty: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "list_is_empty",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "is_empty: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": null
+        }
+      },
+      "flag": "list_is_empty",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "is_empty: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": "beta"
+        }
+      },
+      "flag": "list_is_empty",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "is_empty: list with a non-string element is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "beta",
+            1
+          ]
+        }
+      },
+      "flag": "list_is_empty",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: present empty",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": []
+        }
+      },
+      "flag": "list_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "list_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": null
+        }
+      },
+      "flag": "list_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": "beta"
+        }
+      },
+      "flag": "list_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: list with a non-string element is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "beta",
+            1
+          ]
+        }
+      },
+      "flag": "list_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: present",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "a"
+          ]
+        }
+      },
+      "flag": "list_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: absent is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "list_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: null is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": null
+        }
+      },
+      "flag": "list_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: wrong-typed is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": "beta"
+        }
+      },
+      "flag": "list_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: list with a non-string element is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "l": [
+            "beta",
+            1
+          ]
+        }
+      },
+      "flag": "list_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

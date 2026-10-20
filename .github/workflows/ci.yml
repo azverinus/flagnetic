@@ -203,7 +203,17 @@ jobs:
           working-directory: ${{ matrix.dir }}
           args: --config=${{ github.workspace }}/.golangci.yml
       - name: Test with the race detector
-        run: go test -race ./...
+        run: go test -race -coverprofile=coverage.out ./...
+      - name: Coverage floors
+        env:
+          MODULE: ${{ matrix.dir }}
+          GO: ${{ matrix.go }}
+        run: |
+          set -o pipefail
+          {
+            echo "### Coverage of $MODULE (go $GO)"
+            "$GITHUB_WORKSPACE/.github/scripts/check-coverage.sh" "$MODULE" coverage.out "$GITHUB_WORKSPACE/.github/coverage-floors"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Scan reachable code
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
 

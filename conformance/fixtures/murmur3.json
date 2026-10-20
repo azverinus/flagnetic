@@ -1,0 +1,30 @@
+{
+  "name": "murmur3",
+  "source": "Every hash computed by ClickHouse murmurHash3_32(input); bucket = hash % 10000. The hash is MurmurHash3 x86 32-bit, seed 0, over the UTF-8 bytes, read as unsigned.",
+  "vectors": [
+    {"input": "", "hash": 0, "bucket": 0},
+    {"input": "a", "hash": 1009084850, "bucket": 4850},
+    {"input": "ab", "hash": 2613040991, "bucket": 991},
+    {"input": "abc", "hash": 3017643002, "bucket": 3002},
+    {"input": "abcd", "hash": 1139631978, "bucket": 1978},
+    {"input": "hello", "hash": 613153351, "bucket": 3351},
+    {"input": "The quick brown fox jumps over the lazy dog", "hash": 776992547, "bucket": 2547},
+    {"input": "a3f9c2e17b4d0e58.u_10482", "hash": 4117616884, "bucket": 6884},
+    {"input": "7e1d4c90b2a6f3d1.u_10482", "hash": 3808353653, "bucket": 3653},
+    {"input": "a3f9c2e17b4d0e58.u_10483", "hash": 2251508036, "bucket": 8036},
+    {"input": "a3f9c2e17b4d0e58.u_10484", "hash": 3872700724, "bucket": 724},
+    {"input": "a3f9c2e17b4d0e58.Ünïcødé-42", "hash": 2031774765, "bucket": 4765},
+    {"input": "k3f9s0d2m1x8q7wz.Пользователь-42", "hash": 2569051790, "bucket": 1790},
+    {"input": "k3f9s0d2m1x8q7wz.иван.петров@почта.рф", "hash": 3509242469, "bucket": 2469},
+    {"input": "k3f9s0d2m1x8q7wz.d0c1f4a2-8e3b-4a7c-9f11-2b6d5e8c0a34", "hash": 2501191092, "bucket": 1092},
+    {"input": "k3f9s0d2m1x8q7wz.0192a7c4-5b1e-7d3f-8e2a-1c4b6d9f0a37", "hash": 3272103906, "bucket": 3906},
+    {"input": "k3f9s0d2m1x8q7wz.10482", "hash": 1132478777, "bucket": 8777},
+    {"input": "k3f9s0d2m1x8q7wz.0", "hash": 3211994965, "bucket": 4965},
+    {"input": "k3f9s0d2m1x8q7wz.9007199254740993", "hash": 2114603843, "bucket": 3843},
+    {"input": "k3f9s0d2m1x8q7wz.jR4kXw9", "hash": 3847568361, "bucket": 8361},
+    {"input": ".u_10482", "hash": 2859698537, "bucket": 8537},
+    {"input": ".10482", "hash": 992305828, "bucket": 5828},
+    {"input": ".d0c1f4a2-8e3b-4a7c-9f11-2b6d5e8c0a34", "hash": 1625029969, "bucket": 9969},
+    {"input": "k3f9s0d2m1x8q7wz.😀", "hash": 851760593, "bucket": 593}
+  ]
+}

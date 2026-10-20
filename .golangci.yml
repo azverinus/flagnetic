@@ -25,6 +25,15 @@ linters:
     # The layer rules of ARCHITECTURE.md: dependencies point inwards.
     depguard:
       rules:
+        # The evaluator is published for every Go program to import, and
+        # adds no dependency to any of them.
+        eval:
+          list-mode: strict
+          files:
+            - "**/eval/**"
+          allow:
+            - $gostd
+            - github.com/azverinus/flagnetic/eval
         domain:
           files:
             - "**/internal/domain/**"

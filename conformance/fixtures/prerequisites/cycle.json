@@ -1,0 +1,464 @@
+{
+  "name": "prerequisites/cycle",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [],
+    "segments": [],
+    "flags": [
+      {
+        "key": "a",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "b",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "b",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "a",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "depends_on_cycle",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "a",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "self",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "self",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "via_condition",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "prerequisite",
+                "flag": "back",
+                "variation": "true"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "back",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "via_condition",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "fails_before_cycle",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "off_flag",
+            "variation": "true"
+          },
+          {
+            "flag": "a",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "off_flag",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": false,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "diamond_top",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "diamond_left",
+            "variation": "true"
+          },
+          {
+            "flag": "diamond_right",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "diamond_left",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "diamond_bottom",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "diamond_right",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [
+          {
+            "flag": "diamond_bottom",
+            "variation": "true"
+          }
+        ],
+        "overrides": [],
+        "rules": []
+      },
+      {
+        "key": "diamond_bottom",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "true",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "a two-flag cycle is an error",
+      "flag": "a",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "prerequisite_cycle",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "the other flag of the cycle is an error too",
+      "flag": "b",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "prerequisite_cycle",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a flag depending on a cycle is an error",
+      "flag": "depends_on_cycle",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "prerequisite_cycle",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a flag that is its own prerequisite is an error",
+      "flag": "self",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "prerequisite_cycle",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a cycle through a prerequisite condition is an error",
+      "flag": "via_condition",
+      "expect": {
+        "type": "boolean",
+        "reason": "error",
+        "automatic_exposure": false,
+        "error_code": "prerequisite_cycle",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a failure before the cycle is reached stops evaluation",
+      "flag": "fails_before_cycle",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "prerequisite_failed",
+        "automatic_exposure": false,
+        "prerequisite": "off_flag",
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    },
+    {
+      "name": "a diamond is not a cycle",
+      "flag": "diamond_top",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      },
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      }
+    }
+  ]
+}

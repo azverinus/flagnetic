@@ -1,0 +1,405 @@
+{
+  "name": "dates/formats",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "signed_up_at",
+        "type": "date"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "before_noon",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "signed_up_at",
+                "op": "before",
+                "value": "2026-09-19T12:00:00Z"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "after_noon_offset",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "signed_up_at",
+                "op": "after",
+                "value": "2026-09-19T15:00:00+03:00"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "bad_condition_value",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "signed_up_at",
+                "op": "before",
+                "value": "tomorrow"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "RFC 3339 in UTC",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": "2026-09-19T11:00:00Z"
+        }
+      },
+      "flag": "before_noon",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "RFC 3339 with an offset is compared as an instant",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": "2026-09-19T14:59:59+03:00"
+        }
+      },
+      "flag": "before_noon",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "same instant written with an offset is not before",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": "2026-09-19T15:00:00+03:00"
+        }
+      },
+      "flag": "before_noon",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "fractional seconds",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": "2026-09-19T11:59:59.999Z"
+        }
+      },
+      "flag": "before_noon",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "epoch milliseconds one below",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": 1789819199999
+        }
+      },
+      "flag": "before_noon",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "epoch milliseconds equal is not before",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": 1789819200000
+        }
+      },
+      "flag": "before_noon",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "negative epoch milliseconds",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": -1000
+        }
+      },
+      "flag": "before_noon",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "condition value with an offset",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": "2026-09-19T12:00:01Z"
+        }
+      },
+      "flag": "after_noon_offset",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "condition value with an offset, same instant",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": 1789819200000
+        }
+      },
+      "flag": "after_noon_offset",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "epoch milliseconds after",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": 1789819200001
+        }
+      },
+      "flag": "after_noon_offset",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "no offset is unparsable",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": "2026-09-19T11:00:00"
+        }
+      },
+      "flag": "before_noon",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "epoch milliseconds as a string are unparsable",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": "1789819199999"
+        }
+      },
+      "flag": "before_noon",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "unparsable condition value is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "signed_up_at": "2020-01-01T00:00:00Z"
+        }
+      },
+      "flag": "bad_condition_value",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

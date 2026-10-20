@@ -1,0 +1,1699 @@
+{
+  "name": "operators/semver",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": true
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "v",
+        "type": "semver"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "semver_eq",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "eq",
+                "value": "1.17.0"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_neq",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "neq",
+                "value": "1.17.0"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_lt",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "lt",
+                "value": "1.17.0"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_lte",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "lte",
+                "value": "1.17.0"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_gt",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "gt",
+                "value": "1.17.0"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_gte",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "gte",
+                "value": "1.17.0"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_in",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "in",
+                "value": [
+                  "1.17.0",
+                  "1.18"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_not_in",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "not_in",
+                "value": [
+                  "1.17.0",
+                  "1.18"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_exists",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "exists"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "semver_not_exists",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "v",
+                "op": "not_exists"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "eq \"1.17.0\": equal",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17.0"
+        }
+      },
+      "flag": "semver_eq",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"1.17.0\": equal with two components",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17"
+        }
+      },
+      "flag": "semver_eq",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"1.17.0\": different",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17.1"
+        }
+      },
+      "flag": "semver_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"1.17.0\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"1.17.0\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"1.17.0\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "eq \"1.17.0\": unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_eq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"1.17.0\": different",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.18.0"
+        }
+      },
+      "flag": "semver_neq",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"1.17.0\": equal",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "v1.17"
+        }
+      },
+      "flag": "semver_neq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"1.17.0\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_neq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"1.17.0\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_neq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"1.17.0\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_neq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "neq \"1.17.0\": unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_neq",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt \"1.17.0\": below",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.16.9"
+        }
+      },
+      "flag": "semver_lt",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt \"1.17.0\": numeric not lexical",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.9.0"
+        }
+      },
+      "flag": "semver_lt",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt \"1.17.0\": equal",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17.0"
+        }
+      },
+      "flag": "semver_lt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt \"1.17.0\": above",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.100.0"
+        }
+      },
+      "flag": "semver_lt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt \"1.17.0\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_lt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt \"1.17.0\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_lt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt \"1.17.0\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_lt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lt \"1.17.0\": unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_lt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lte \"1.17.0\": below",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17.0-rc.1"
+        }
+      },
+      "flag": "semver_lte",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lte \"1.17.0\": equal",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17"
+        }
+      },
+      "flag": "semver_lte",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lte \"1.17.0\": above",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17.1"
+        }
+      },
+      "flag": "semver_lte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lte \"1.17.0\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_lte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lte \"1.17.0\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_lte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lte \"1.17.0\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_lte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "lte \"1.17.0\": unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_lte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gt \"1.17.0\": above",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17.1"
+        }
+      },
+      "flag": "semver_gt",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gt \"1.17.0\": equal",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17.0"
+        }
+      },
+      "flag": "semver_gt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gt \"1.17.0\": pre-release is below",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17.0-rc.1"
+        }
+      },
+      "flag": "semver_gt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gt \"1.17.0\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_gt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gt \"1.17.0\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_gt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gt \"1.17.0\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_gt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gt \"1.17.0\": unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_gt",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gte \"1.17.0\": above",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "2"
+        }
+      },
+      "flag": "semver_gte",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gte \"1.17.0\": equal",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17.0+build.9"
+        }
+      },
+      "flag": "semver_gte",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gte \"1.17.0\": below",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.16.99"
+        }
+      },
+      "flag": "semver_gte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gte \"1.17.0\": absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_gte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gte \"1.17.0\": null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_gte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gte \"1.17.0\": wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_gte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "gte \"1.17.0\": unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_gte",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"1.17.0\",\"1.18\"]: member by precedence",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.18.0"
+        }
+      },
+      "flag": "semver_in",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"1.17.0\",\"1.18\"]: member with v",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "v1.17"
+        }
+      },
+      "flag": "semver_in",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"1.17.0\",\"1.18\"]: not a member",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.19.0"
+        }
+      },
+      "flag": "semver_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"1.17.0\",\"1.18\"]: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"1.17.0\",\"1.18\"]: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"1.17.0\",\"1.18\"]: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "in [\"1.17.0\",\"1.18\"]: unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"1.17.0\",\"1.18\"]: not a member",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.19.0"
+        }
+      },
+      "flag": "semver_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"1.17.0\",\"1.18\"]: member",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.17"
+        }
+      },
+      "flag": "semver_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"1.17.0\",\"1.18\"]: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"1.17.0\",\"1.18\"]: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"1.17.0\",\"1.18\"]: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_in [\"1.17.0\",\"1.18\"]: unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_not_in",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: present",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.0.0"
+        }
+      },
+      "flag": "semver_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: absent is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: null is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: wrong-typed is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "exists: unparsable is false",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: present",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "1.0.0"
+        }
+      },
+      "flag": "semver_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: absent is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {}
+      },
+      "flag": "semver_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: null is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": null
+        }
+      },
+      "flag": "semver_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: wrong-typed is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": 1.17
+        }
+      },
+      "flag": "semver_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "not_exists: unparsable is true",
+      "context": {
+        "units": {
+          "user": "u1"
+        },
+        "attributes": {
+          "v": "latest"
+        }
+      },
+      "flag": "semver_not_exists",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

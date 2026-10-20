@@ -1,0 +1,74 @@
+{
+  "name": "rules/empty-rule-id",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "unit_types": [
+      "user"
+    ],
+    "attributes": [
+      {
+        "key": "plan",
+        "type": "string"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "banner",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "pro",
+            "value": "Thanks for upgrading"
+          },
+          {
+            "key": "default",
+            "value": "Upgrade to Pro"
+          }
+        ],
+        "on": true,
+        "off_variation": "default",
+        "fallthrough": "default",
+        "rules": [
+          {
+            "id": "",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "plan",
+                "op": "eq",
+                "value": "pro"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "pro"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "a rule with an empty identifier serves with no rule_id key",
+      "context": {
+        "attributes": {
+          "plan": "pro"
+        }
+      },
+      "flag": "banner",
+      "expect": {
+        "type": "string",
+        "value": "Thanks for upgrading",
+        "variation": "pro",
+        "reason": "rule",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

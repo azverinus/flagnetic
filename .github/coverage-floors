@@ -1,0 +1,6 @@
+# Minimum statement coverage of the packages of the published Go modules:
+#   <module directory> <package directory> <percent>
+# both directories relative to the repository root. CI fails a module's job
+# when one of its packages falls below its floor or no longer reports
+# coverage, so coverage never erodes unnoticed; raise a floor, never lower it.
+eval eval 90
