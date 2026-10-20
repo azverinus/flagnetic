@@ -502,6 +502,8 @@ func TestProtocolDegradationCases(t *testing.T) {
 			Response protocolResponse `json:"response"`
 			Outcome  string           `json:"outcome"`
 			Answers  []answer         `json:"answers"`
+			// Logs are the log events the case must cause, by name.
+			Logs map[string]int `json:"logs"`
 		} `json:"cases"`
 	}
 	if err := json.Unmarshal(readProtocol(t, "degradation/cases.json"), &file); err != nil {
@@ -523,8 +525,9 @@ func TestProtocolDegradationCases(t *testing.T) {
 				}
 			}))
 			defer srv.Close()
+			var l logs
 			clk := newSleeper()
-			c := newOnline(t, srv.URL, clk.option())
+			c := newOnline(t, srv.URL, clk.option(), flagnetic.WithLogger(l.logger()))
 			clk.next(t).wake()
 			clk.next(t)
 
@@ -536,6 +539,11 @@ func TestProtocolDegradationCases(t *testing.T) {
 				t.Errorf("outcome %s: stage = %q, want %q", tc.Outcome, got, want)
 			}
 			checkAnswers(t, c, file.Context, tc.Answers)
+			for event, n := range tc.Logs {
+				if got := len(l.named(flagnetic.Event(event))); got != n {
+					t.Errorf("%s logged %d times, want %d", event, got, n)
+				}
+			}
 		})
 	}
 	if ran == 0 {
@@ -782,19 +790,23 @@ func TestProtocolScenarios(t *testing.T) {
 }
 
 // TestEveryServerScenarioIsCovered is the SDK's no-skip-list gate: every
-// server-mode scenario of scenarios.json must run in exactly one
-// of TestProtocolScenarios (this file) or TestProtocolStreamScenarios
-// (protocol_stream_test.go, which needs two loops waiting at once). A
-// scenario added to the fixture and covered by neither fails here instead
-// of silently never running.
+// server-mode scenario of the scenario files readScenarios reads must run
+// in exactly one of TestProtocolScenarios (this file) or
+// TestProtocolStreamScenarios (protocol_stream_test.go, which needs two
+// loops waiting at once). A scenario added to the fixtures and covered by
+// neither fails here instead of silently never running, and one listed in
+// both instead of running twice.
 func TestEveryServerScenarioIsCovered(t *testing.T) {
 	file := readScenarios(t)
 	for _, sc := range file.Scenarios {
 		if sc.Mode != "server" {
 			continue
 		}
-		if !protocolScenarios[sc.Name] && !streamScenarios[sc.Name] {
+		switch inFile, inStream := protocolScenarios[sc.Name], streamScenarios[sc.Name]; {
+		case !inFile && !inStream:
 			t.Errorf("scenario %q is not covered by TestProtocolScenarios or TestProtocolStreamScenarios", sc.Name)
+		case inFile && inStream:
+			t.Errorf("scenario %q is listed for both TestProtocolScenarios and TestProtocolStreamScenarios", sc.Name)
 		}
 	}
 }

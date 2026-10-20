@@ -88,6 +88,12 @@ type Client struct {
 
 	// mismatched holds the flag keys already logged as type_mismatch.
 	mismatched sync.Map
+
+	// unsupportedLogged holds, by flag key, the ruleset version whose
+	// unsupported rules were last logged, so that rule_unsupported is
+	// logged once per flag and version however often either arrives.
+	unsupportedLogged   map[string]int64
+	unsupportedLoggedMu sync.Mutex
 }
 
 // loadedRuleset is a decoded ruleset and when it was received.
@@ -454,12 +460,56 @@ func (c *Client) swap(rs *eval.Ruleset, source string, receivedAt time.Time) []s
 		"ruleset_version": rs.Version,
 		"flags":           len(rs.Flags),
 	})
+	c.reportUnsupported(rs)
 	dropped := c.refuseLocalOverrides(rs)
 	before := &eval.Ruleset{}
 	if prev != nil {
 		before = prev.rs
 	}
 	return mergeKeys(changedFlags(before, rs), dropped)
+}
+
+// reportUnsupported logs rule_unsupported for every flag of rs holding a
+// construct the evaluator does not know, once per flag and ruleset
+// version: the evaluator finds them when it decodes, so a flag nobody
+// evaluates is reported too, and an SDK that must be upgraded says so
+// without a line per evaluation.
+func (c *Client) reportUnsupported(rs *eval.Ruleset) {
+	report := rs.UnsupportedRules()
+	if len(report) == 0 {
+		return
+	}
+	keys := make([]string, 0, len(report))
+	for key := range report {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	// The logger runs synchronously and may call back into the client, so
+	// the lines are logged after the lock is released.
+	c.unsupportedLoggedMu.Lock()
+	if c.unsupportedLogged == nil {
+		c.unsupportedLogged = map[string]int64{}
+	}
+	fresh := keys[:0]
+	for _, key := range keys {
+		if v, ok := c.unsupportedLogged[key]; ok && v == rs.Version {
+			continue
+		}
+		c.unsupportedLogged[key] = rs.Version
+		fresh = append(fresh, key)
+	}
+	c.unsupportedLoggedMu.Unlock()
+	for _, key := range fresh {
+		constructs := make([]string, 0, len(report[key]))
+		for _, u := range report[key] {
+			constructs = append(constructs, string(u.Kind)+" "+u.Name)
+		}
+		c.log(slog.LevelError, EventRuleUnsupported, map[string]any{
+			"flag":            key,
+			"constructs":      constructs,
+			"ruleset_version": rs.Version,
+		})
+	}
 }
 
 // setStage moves the fallback chain to stage and reports a transition

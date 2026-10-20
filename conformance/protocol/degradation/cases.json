@@ -374,7 +374,10 @@
         },
         "status": 200
       },
-      "why": "an unknown operator is an evaluation error (inconsistent_ruleset) where it is reached: the built-in default with reason fallback"
+      "why": "an unknown operator is an evaluation error (inconsistent_ruleset) where it is reached: the built-in default with reason fallback",
+      "logs": {
+        "rule_unsupported": 1
+      }
     },
     {
       "answers": [
@@ -435,7 +438,10 @@
         },
         "status": 200
       },
-      "why": "an unknown condition kind is an evaluation error where it is reached, and a prerequisite's error is its dependent's"
+      "why": "an unknown condition kind is an evaluation error where it is reached, and a prerequisite's error is its dependent's",
+      "logs": {
+        "rule_unsupported": 1
+      }
     },
     {
       "answers": [
@@ -496,7 +502,10 @@
         },
         "status": 200
       },
-      "why": "a rule serving an unknown kind is an evaluation error when it matches, and a prerequisite's error is its dependent's"
+      "why": "a rule serving an unknown kind is an evaluation error when it matches, and a prerequisite's error is its dependent's",
+      "logs": {
+        "rule_unsupported": 1
+      }
     },
     {
       "answers": [

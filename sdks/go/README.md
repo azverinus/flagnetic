@@ -76,6 +76,30 @@ d := c.Detail(ctx, fc, "new_checkout", false)
 - An offline client counts every evaluation in `c.Recorder()`, by flag, variation and reason.
 - `flagnetic.WithLogger` receives every event with structured fields, or `flagnetic.SlogLogger` sends them to a `log/slog` logger; the default logs warnings and above through `log/slog`.
 
+## Logger events
+
+Event names are stable: filter and alert on them.
+
+| Event | Level | When |
+|---|---|---|
+| `ruleset_loaded` | info | a ruleset was accepted (`source`: server, store or offline) |
+| `fetch_failed` | warn | a fetch failed and the held ruleset keeps serving (`cause`) |
+| `stage_changed` | info, warn | the fallback chain moved (`from`, `to`) |
+| `key_revoked` | error | the SDK key was refused; values keep serving |
+| `schema_unsupported` | error | a ruleset of a schema this SDK cannot read; logged once |
+| `rule_unsupported` | error | a flag holds an operator, condition kind or serve kind this SDK does not know; logged once per flag and ruleset version |
+| `sse_connected`, `sse_dropped` | info, warn | the change stream opened or ended |
+| `ingest_failed` | warn | an events batch will be sent again |
+| `queue_dropped` | warn | events or counts were given up on |
+| `exposure_skipped` | debug | an exposure call sent nothing (`cause`) |
+| `exposures_disabled` | warn | the client was built with `WithExposures(false)` |
+| `store_failed` | warn | the store file could not be loaded or saved |
+| `override_set`, `override_refused`, `local_overrides_allowed` | warn | local overrides |
+| `type_mismatch` | warn | a getter asked for another type than the flag's; once per flag |
+| `evaluation_failed`, `listener_failed` | error | a failure was contained at the API boundary or in a listener |
+
+**`rule_unsupported`** means the server is newer than this SDK: a flag uses an operator, a condition kind or a serve kind this SDK's evaluator does not know. The line names the flag, its constructs (for example `operator glob_matches`) and the ruleset version. Wherever evaluating the flag reaches the construct it serves your built-in default with `inconsistent_ruleset`; every other flag keeps working. The fix is to upgrade the SDK.
+
 ## Exposures, aliases and evaluation summaries
 
 ```go
@@ -91,7 +115,7 @@ c.Alias(ctx, "anonymous", "d-8f1c", "user", "u-1001") // at sign-up
 - The exposure carries a UUIDv7 event ID chosen at that moment and unchanged across every retry, `experiment_key`, `flag_key`, `variation_key`, `unit_type`, `unit_id`, `platform` and `app_version` from the context's attributes (null when absent), `evaluation_reason` (`experiment`, or `override` when a platform override decided it), `override` from the experiment block, `ruleset_version` and `occurred_at`; the SDK's name and version are the envelope's.
 - **Automatic exposure.** A flag whose `automatic_exposure` is set records one after every evaluation yielding an experiment block, with no `Exposure` call, for backend code where evaluation is the exposure; `fallback` and `local_override` never do. Repeats per experiment, unit and variation are suppressed by a bounded in-process set for at least the flush interval, and the platform's deduplication stays what analysis relies on.
 - `Alias(ctx, fromUnitType, fromUnitID, toUnitType, toUnitID)` records that two unit IDs belong to the same person and changes no context: an experiment crossing registration keeps hashing on the unit type it declared, and the alias is what lets analysis join the two.
-- Exposures and aliases share one in-memory queue flushed every 2 s (`WithFlushInterval`) or at 500 events, holding 10 000 and dropping the oldest with `queue_dropped`. A batch answered 429, a 5xx or nothing at all is sent again whole, with the same event IDs, backing off from 1 s to 5 min with full jitter and logging `ingest_failed`; a batch still unanswered when the flush interval is up stays queued and its backoff carries over. Events the platform rejected are never sent again. A refused key holds the queue back at a backoff growing to 15 min; any other 4xx drops the batch. `WithExposures(false)` turns both calls off and logs `exposures_disabled` at construction.
+- Exposures and aliases share one in-memory queue flushed every 2 s (`WithFlushInterval`) or at 500 events, holding 10 000 and dropping the oldest with `queue_dropped`. A batch answered 429, a 5xx or nothing at all is sent again whole, with the same event IDs, backing off from 1 s to 5 min with full jitter and logging `ingest_failed`; the queue backs off on its own rather than honouring `Retry-After`, so a rate limit naming minutes does not hold exposures back for minutes. A batch still unanswered when the flush interval is up stays queued and its backoff carries over. Events the platform rejected are never sent again. A refused key holds the queue back at a backoff growing to 15 min; any other 4xx drops the batch. `WithExposures(false)` turns both calls off and logs `exposures_disabled` at construction.
 - **Evaluation summaries.** Every evaluation increments a counter keyed by flag, variation and evaluation reason, `fallback` and `local_override` included. Every 60 s (`WithSummaryInterval`) the window becomes one evaluation summary with a UUIDv7 event ID, the interval's bounds, the ruleset version held at its end and the counts, gzipped into the events envelope with this SDK's name, version and platform. No unit ID, attribute or flag value is ever in it, so reporting usage never says who your users are. More than 1000 rows split into several events, and nothing evaluated is nothing sent. 429 (honouring `Retry-After`), a 5xx and a network error send the batch again with the same event IDs; a batch still unsent when the interval is up merges into the next window, and a window kept for over an hour is dropped rather than delivered late. A refused key logs `key_revoked` once and holds reporting back at a capped backoff, so a restored key recovers without a redeploy. `WithSummaries(false)` turns reporting off, and offline mode implies it.
 - `Flush(ctx)` sends the queue and the current window and returns within its context; `Close(ctx)` flushes within five seconds or its context, then stops.
 - An offline client sends nothing: `c.Recorder()` holds `Summary()`, the running counts, `EvaluationSummaries()`, the reports a flush would have sent, and `Exposures()` and `Aliases()`, the events the calls recorded, suppression included.

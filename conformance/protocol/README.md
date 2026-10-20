@@ -34,7 +34,7 @@ A client key ships inside apps and browsers, so it learns the values it is serve
 
 ## Degradation cases
 
-Each case of `degradation/cases.json` gives an `endpoint`, the document `held` (fresh) when the `response` arrives, the `outcome` and the `answers` the SDK serves afterwards.
+Each case of `degradation/cases.json` gives an `endpoint`, the document `held` (fresh) when the `response` arrives, the `outcome`, the `answers` the SDK serves afterwards and, where it matters, the `logs` the logger hook must have received by name: a ruleset holding an unsupported rule logs `rule_unsupported` once.
 
 | Outcome | What the SDK does |
 |---|---|

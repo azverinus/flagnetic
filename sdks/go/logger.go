@@ -38,6 +38,14 @@ const (
 	// SDK cannot read; logged once. Fields: schema_version, supported
 	// (every schema_version from schemaVersionMin to schemaVersionMax).
 	EventSchemaUnsupported Event = "schema_unsupported"
+	// EventRuleUnsupported (error): a flag of an accepted ruleset holds an
+	// operator, condition kind or serve kind this SDK does not know,
+	// typically because the server is newer; logged once per flag and
+	// ruleset version. Where evaluation reaches the construct the flag
+	// serves the built-in default with inconsistent_ruleset, and every
+	// other flag serves normally. Upgrade the SDK. Fields: flag,
+	// constructs (each as "<kind> <name>"), ruleset_version.
+	EventRuleUnsupported Event = "rule_unsupported"
 	// EventIngestFailed (warn): an ingest batch was answered 429, a 5xx or
 	// nothing at all, and will be sent again with the same event IDs after
 	// retry_in. Fields: kind, events (how many), retry_in, status for an
