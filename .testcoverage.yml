@@ -1,0 +1,20 @@
+# Coverage floors per layer, checked in CI and by `task cover`. Each package of
+# a layer must reach its layer's floor; the floors rise as slices land.
+profile: coverage.out
+
+override:
+  - path: ^internal/domain/
+    threshold: 90
+  - path: ^internal/app/
+    threshold: 80
+  - path: ^internal/(infra|pkg|shared)/
+    threshold: 80
+
+exclude:
+  paths:
+    # The entry point holds no logic, and test helpers are not product code.
+    - ^cmd/
+    - ^internal/testkit/
+    - ^internal/pkg/pgtest/
+    # Generated code.
+    - \.gen\.go$

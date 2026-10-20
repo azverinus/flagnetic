@@ -26,12 +26,18 @@ jobs:
         with:
           version: v2.14.0
 
-  test:
-    name: go test
+  test-postgres:
+    name: go test (postgres ${{ matrix.postgres }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest and the newest supported PostgreSQL, so a feature newer
+        # than the minimum cannot slip in.
+        postgres: [16, 18]
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:${{ matrix.postgres }}-alpine
         env:
           POSTGRES_DB: flagnetic
           POSTGRES_USER: flagnetic
@@ -51,15 +57,32 @@ jobs:
       - name: Build
         run: go build ./...
       - name: Test with the race detector
-        run: go test -race -coverprofile=coverage.out ./...
-      - name: Coverage summary
+        run: go test -race -coverpkg=./internal/... -coverprofile=coverage.out ./...
+      - name: Coverage by layer
+        env:
+          POSTGRES: ${{ matrix.postgres }}
         run: |
           {
-            echo '### Go coverage'
-            echo '```'
-            go tool cover -func=coverage.out | tail -n 1
-            echo '```'
+            echo "### Go coverage (PostgreSQL $POSTGRES)"
+            .github/scripts/coverage-by-layer.sh coverage.out
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Coverage floors
+        run: go run github.com/vladopajic/go-test-coverage/v2@v2.19.0 --config=.testcoverage.yml
+
+  # One check over the PostgreSQL matrix, under the name the matrix job had
+  # before it was split, so a check required by that name still reports.
+  test:
+    name: go test
+    needs: test-postgres
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every PostgreSQL version passed
+        env:
+          RESULT: ${{ needs.test-postgres.result }}
+        run: |
+          echo "PostgreSQL matrix: $RESULT"
+          test "$RESULT" = success
 
   vuln:
     name: govulncheck
@@ -189,7 +212,7 @@ jobs:
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, tidy, workflows, docker, modules, module]
+    needs: [lint, test-postgres, test, vuln, tidy, workflows, docker, modules, module]
     if: always()
     runs-on: ubuntu-latest
     steps:

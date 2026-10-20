@@ -43,9 +43,13 @@ linters:
               desc: transport belongs in infra
             - pkg: os/exec
               desc: the domain layer performs no I/O
+        # Application tests are external packages that wire the real
+        # PostgreSQL repositories, since repositories are never faked; the rule
+        # therefore covers the handlers and not their tests.
         app:
           files:
             - "**/internal/app/**"
+            - "!$test"
           deny:
             - pkg: github.com/azverinus/flagnetic/internal/infra
               desc: the application layer declares ports; infra implements them
@@ -55,16 +59,15 @@ linters:
               desc: persistence belongs in infra/out/postgres
             - pkg: net/http
               desc: transport belongs in infra
+        # The kernel every layer imports, the domain included, so it may use
+        # the standard library and itself only.
         shared:
           files:
             - "**/internal/shared/**"
-          deny:
-            - pkg: github.com/azverinus/flagnetic/internal/domain
-              desc: shared is the kernel; it depends on no layer
-            - pkg: github.com/azverinus/flagnetic/internal/app
-              desc: shared is the kernel; it depends on no layer
-            - pkg: github.com/azverinus/flagnetic/internal/infra
-              desc: shared is the kernel; it depends on no layer
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/azverinus/flagnetic/internal/shared
         pkg:
           files:
             - "**/internal/pkg/**"
