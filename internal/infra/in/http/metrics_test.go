@@ -1,37 +1,16 @@
 package http_test
 
 import (
-	"bufio"
-	"context"
 	"io"
 	nethttp "net/http"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
-	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
-// metric returns the value of the sample named series, such as
-// `flagnetic_http_requests_total{code="200",method="GET",route="unmatched"}`,
-// or -1 when the scrape has none.
-func metric(t *testing.T, scrape, series string) float64 {
-	t.Helper()
-	sc := bufio.NewScanner(strings.NewReader(scrape))
-	for sc.Scan() {
-		if v, ok := strings.CutPrefix(sc.Text(), series+" "); ok {
-			f, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				t.Fatalf("%s: %v", series, err)
-			}
-			return f
-		}
-	}
-	return -1
-}
+func metric(t *testing.T, scrape, series string) float64 { return testkit.Metric(t, scrape, series) }
 
 var okRoute = testkit.WithRoute("GET /test/flags/{key}", func(*flaghttp.Server) nethttp.Handler {
 	return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) { _, _ = io.WriteString(w, "ok") })
@@ -98,22 +77,4 @@ func grep(s, prefix string) string {
 		}
 	}
 	return strings.Join(out, "\n")
-}
-
-func TestWorkersOfTheInProcessServerRunOnlyWhenTicked(t *testing.T) {
-	rounds := 0
-	srv := testkit.StartServer(t, testkit.WithWorker(worker.Worker{Name: "rollup", Interval: time.Millisecond, Round: func(context.Context) error {
-		rounds++
-		return nil
-	}}))
-	time.Sleep(20 * time.Millisecond)
-	if rounds != 0 {
-		t.Fatalf("%d rounds ran on their own", rounds)
-	}
-	if err := srv.Tick(t, "rollup"); err != nil || rounds != 1 {
-		t.Errorf("Tick = %v after %d rounds, want one round", err, rounds)
-	}
-	if got := metric(t, srv.Scrape(t), `flagnetic_worker_rounds_total{worker="rollup"}`); got != 1 {
-		t.Errorf("flagnetic_worker_rounds_total = %v, want the round counted on the server's registry", got)
-	}
 }

@@ -19,8 +19,8 @@ import (
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
 )
 
-// workerStopBound is how long the stop waits for worker rounds to end once
-// cancelled. Each round is bounded by its own timeout too; this keeps the stop
+// workerStopBound is how long the stop waits for worker rounds, and for
+// notification listeners, to end once cancelled. Each round is bounded by its own timeout too; this keeps the stop
 // finite even for a round that ignores its context.
 const workerStopBound = 10 * time.Second
 
@@ -100,11 +100,15 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	go func() { served <- srv.Serve(ln) }()
 	log.InfoContext(ctx, "listening", "addr", ln.Addr().String())
 
-	// Workers run on the replica's own context, never a request's: they
-	// outlive the stop signal until the requests are done, and stop before
-	// the metrics listener and the pool.
-	runner.Start(runner.PanicHook(kill))
+	// Workers and notification listeners run on the replica's own context,
+	// never a request's: they outlive the stop signal until the requests are
+	// done, and stop before the metrics listener and the pool. Goroutines
+	// spawned from it have their panics counted.
+	replica := runner.PanicHook(kill)
+	runner.Start(replica)
 	defer runner.Stop(workerStopBound)
+	listeners := postgres.NewListeners(replica, pool, log, reg)
+	defer listeners.Stop(workerStopBound)
 
 	select {
 	case err := <-served:
@@ -133,6 +137,7 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		log.Warn("serving ended with an error", "error", err.Error())
 	}
 	runner.Stop(workerStopBound)
+	listeners.Stop(workerStopBound)
 	log.Info("stopped")
 	return exitOK
 }
