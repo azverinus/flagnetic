@@ -28,9 +28,14 @@ Items arrive as the corresponding parts of the codebase land.
 - Contracts are versioned from the first release, because a mobile app in a store is served for years.
 - Everything in the console is available through the API.
 
-## Running it
+## Quick start
 
-`flagnetic serve` runs the server and `flagnetic migrate` applies the database migrations; both need `DATABASE_URL` pointing at PostgreSQL 16 or newer. Every setting is listed in the [configuration reference](docs/configuration.md).
+```bash
+cd deploy
+docker compose up
+```
+
+This runs PostgreSQL, applies the migrations and starts the server on http://localhost:8080. To run it your own way, `flagnetic serve` needs only `DATABASE_URL` pointing at PostgreSQL 16 or newer; see the [operations guide](docs/operations.md) and the [configuration reference](docs/configuration.md).
 
 ## Contributing
 

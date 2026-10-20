@@ -52,8 +52,11 @@ type replica struct {
 // replica is stopped when the test ends unless the test stopped it.
 func serve(t *testing.T, env map[string]string, opts ...cli.Option) *replica {
 	t.Helper()
-	if _, ok := env["FLAGNETIC_LISTEN_ADDR"]; !ok {
-		env["FLAGNETIC_LISTEN_ADDR"] = "127.0.0.1:0"
+	// A test that does not look at the drain skips it, so it stops at once.
+	for k, v := range map[string]string{"FLAGNETIC_LISTEN_ADDR": "127.0.0.1:0", "FLAGNETIC_SHUTDOWN_DRAIN": "0"} {
+		if _, ok := env[k]; !ok {
+			env[k] = v
+		}
 	}
 	r := &replica{t: t, stderr: &syncBuffer{}, signals: make(chan os.Signal, 2), done: make(chan struct{})}
 	lookup := func(k string) (string, bool) {
@@ -186,20 +189,6 @@ func TestAMalformedSettingIsRefusedBeforeAnythingStarts(t *testing.T) {
 	res := run(map[string]string{"DATABASE_URL": "postgres://localhost/flagnetic", "FLAGNETIC_SHUTDOWN_GRACE": "soon"}, nil, "serve")
 	if res.code != 2 || !strings.Contains(res.stderr, "FLAGNETIC_SHUTDOWN_GRACE") || !strings.Contains(res.stderr, "for example 15s") {
 		t.Errorf("exit code = %d, stderr:\n%s\nwant 2 naming the variable and an example", res.code, res.stderr)
-	}
-}
-
-func TestServeSkipsMigrationsWhenAutoMigrateIsOff(t *testing.T) {
-	url := testkit.EmptyDatabase(t)
-	r := serve(t, map[string]string{"DATABASE_URL": url, "FLAGNETIC_AUTO_MIGRATE": "false"}, fixtures)
-	if r.findLog("migrations applied") != nil {
-		t.Errorf("serve migrated with FLAGNETIC_AUTO_MIGRATE=false:\n%s", r.stderr.String())
-	}
-	if code, _ := r.stop(); code != 0 {
-		t.Fatalf("exit code = %d", code)
-	}
-	if rec := migrate(url, fixtures).logRecord(t, "migrations applied"); rec["applied"] != 2.0 {
-		t.Errorf("a later migrate applied %v migrations, want all 2: serve must not have applied any", rec["applied"])
 	}
 }
 

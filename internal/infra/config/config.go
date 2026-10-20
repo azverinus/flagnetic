@@ -52,6 +52,7 @@ type Config struct {
 	// DBMaxConns is the pool size, or 0 when it was not set: then
 	// pool_max_conns of DatabaseURL applies, or postgres.DefaultMaxConns.
 	DBMaxConns    int
+	ShutdownDrain time.Duration
 	ShutdownGrace time.Duration
 	LogLevel      slog.Level
 	LogFormat     LogFormat
@@ -161,11 +162,27 @@ func Settings() []Setting {
 			defaultElsewhere: true,
 		},
 		{
+			Name:        "FLAGNETIC_SHUTDOWN_DRAIN",
+			Key:         "shutdown_drain",
+			Default:     "5s",
+			Unit:        "duration",
+			Description: "How long a replica told to stop keeps serving while `/readyz` answers 503, so load balancers route away from it before it stops accepting requests. `0` skips the drain.",
+			Example:     "5s",
+			apply: func(cfg *Config, v string) error {
+				d, err := time.ParseDuration(v)
+				if err != nil || d < 0 {
+					return errors.New("not a non-negative duration")
+				}
+				cfg.ShutdownDrain = d
+				return nil
+			},
+		},
+		{
 			Name:        "FLAGNETIC_SHUTDOWN_GRACE",
 			Key:         "shutdown_grace",
 			Default:     "15s",
 			Unit:        "duration",
-			Description: "How long in-flight requests may run once the replica stops accepting new ones; then they are cancelled.",
+			Description: "How long in-flight requests may run once the drain is over and the replica stops accepting new ones; then they are cancelled.",
 			Example:     "15s",
 			apply: func(cfg *Config, v string) error {
 				d, err := time.ParseDuration(v)

@@ -1,6 +1,7 @@
 package testkit
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -19,7 +20,20 @@ type Server struct {
 }
 
 type serverOptions struct {
-	pool *pgxpool.Pool
+	pool   *pgxpool.Pool
+	routes []route
+}
+
+type route struct {
+	pattern string
+	build   func(*flaghttp.Server) http.Handler
+}
+
+// WithRoute mounts the handler build returns on pattern, for a test to
+// exercise the edge through routes of its own. build receives the server, to
+// answer errors through it or log with its logger.
+func WithRoute(pattern string, build func(*flaghttp.Server) http.Handler) ServerOption {
+	return func(o *serverOptions) { o.routes = append(o.routes, route{pattern, build}) }
 }
 
 // ServerOption changes what the in-process server is built with.
@@ -43,6 +57,9 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	}
 	logs := NewLogSink()
 	h := flaghttp.New(flaghttp.Options{Logger: logs.Logger(), DB: o.pool})
+	for _, r := range o.routes {
+		h.Handle(r.pattern, r.build(h))
+	}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
 	return &Server{URL: srv.URL, Logs: logs}
