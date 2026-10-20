@@ -7,4 +7,5 @@ var (
 	WithMigrations       = withMigrations
 	WithServerVersionNum = withServerVersionNum
 	WithRoute            = withRoute
+	WithWorker           = withWorker
 )

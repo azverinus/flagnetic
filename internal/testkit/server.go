@@ -1,16 +1,23 @@
 package testkit
 
 import (
+	"bufio"
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 )
 
 // Server is a replica's public handler served in-process, for black-box HTTP
@@ -21,7 +28,41 @@ type Server struct {
 	// Logs captures everything the server logs.
 	Logs *LogSink
 
-	metrics http.Handler
+	metrics   http.Handler
+	runner    *worker.Runner
+	listeners *postgres.Listeners
+}
+
+// Listen starts a notification listener of the server's replica, reported on
+// its registry, until the test ends.
+func (s *Server) Listen(channel string, h pglisten.Handler, opts pglisten.Options) {
+	s.listeners.Start(channel, h, opts)
+}
+
+// Metric returns the value of one sample of a scrape, named as it is written,
+// such as `flagnetic_listener_up{channel="rulesets"}`, or -1 when the scrape
+// has none.
+func Metric(t testing.TB, scrape, series string) float64 {
+	t.Helper()
+	sc := bufio.NewScanner(strings.NewReader(scrape))
+	for sc.Scan() {
+		if v, ok := strings.CutPrefix(sc.Text(), series+" "); ok {
+			f, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				t.Fatalf("%s: %v", series, err)
+			}
+			return f
+		}
+	}
+	return -1
+}
+
+// Tick runs one round of the worker called name, through the runner's
+// wrapper. The in-process server never starts the workers' timers: a test
+// drives every round it wants, when it wants.
+func (s *Server) Tick(t testing.TB, name string) error {
+	t.Helper()
+	return s.runner.Tick(t.Context(), name)
 }
 
 // Scrape returns the server's metrics in the Prometheus text format, as the
@@ -37,9 +78,10 @@ func (s *Server) Scrape(t testing.TB) string {
 }
 
 type serverOptions struct {
-	pool   *pgxpool.Pool
-	edge   []func(*flaghttp.Options)
-	routes []route
+	workers []worker.Worker
+	pool    *pgxpool.Pool
+	edge    []func(*flaghttp.Options)
+	routes  []route
 }
 
 type route struct {
@@ -53,6 +95,11 @@ type route struct {
 // answer errors through it or log with its logger.
 func WithRoute(pattern string, build func(*flaghttp.Server) http.Handler, opts ...flaghttp.RouteOption) ServerOption {
 	return func(o *serverOptions) { o.routes = append(o.routes, route{pattern, build, opts}) }
+}
+
+// WithWorker registers w with the server's runner, for Tick.
+func WithWorker(w worker.Worker) ServerOption {
+	return func(o *serverOptions) { o.workers = append(o.workers, w) }
 }
 
 // WithEdge changes the edge's options, which otherwise are the defaults of
@@ -88,6 +135,12 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	for _, change := range o.edge {
 		change(&edge)
 	}
+	runner := worker.NewRunner(logs.Logger(), reg)
+	for _, w := range o.workers {
+		if err := runner.Register(w); err != nil {
+			t.Fatal(err)
+		}
+	}
 	h := flaghttp.New(edge)
 	for _, r := range o.routes {
 		h.Handle(r.pattern, r.build(h), r.opts...)
@@ -96,7 +149,9 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	srv.Config = h.HTTPServer()
 	srv.Start()
 	t.Cleanup(srv.Close)
-	return &Server{URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg)}
+	listeners := postgres.NewListeners(runner.PanicHook(context.Background()), o.pool, logs.Logger(), reg)
+	t.Cleanup(func() { listeners.Stop(10 * time.Second) })
+	return &Server{URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg), runner: runner, listeners: listeners}
 }
 
 // defaults returns the configuration a replica has when nothing is set.

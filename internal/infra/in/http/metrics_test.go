@@ -1,10 +1,8 @@
 package http_test
 
 import (
-	"bufio"
 	"io"
 	nethttp "net/http"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -12,23 +10,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
-// metric returns the value of the sample named series, such as
-// `flagnetic_http_requests_total{code="200",method="GET",route="unmatched"}`,
-// or -1 when the scrape has none.
-func metric(t *testing.T, scrape, series string) float64 {
-	t.Helper()
-	sc := bufio.NewScanner(strings.NewReader(scrape))
-	for sc.Scan() {
-		if v, ok := strings.CutPrefix(sc.Text(), series+" "); ok {
-			f, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				t.Fatalf("%s: %v", series, err)
-			}
-			return f
-		}
-	}
-	return -1
-}
+func metric(t *testing.T, scrape, series string) float64 { return testkit.Metric(t, scrape, series) }
 
 var okRoute = testkit.WithRoute("GET /test/flags/{key}", func(*flaghttp.Server) nethttp.Handler {
 	return nethttp.HandlerFunc(func(w nethttp.ResponseWriter, _ *nethttp.Request) { _, _ = io.WriteString(w, "ok") })

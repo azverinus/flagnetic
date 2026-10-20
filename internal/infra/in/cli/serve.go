@@ -13,10 +13,16 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
 )
+
+// workerStopBound is how long the stop waits for worker rounds, and for
+// notification listeners, to end once cancelled. Each round is bounded by its own timeout too; this keeps the stop
+// finite even for a round that ignores its context.
+const workerStopBound = 10 * time.Second
 
 // poolCloseBound is how long the stop waits for the pool to close once every
 // request has been cancelled. Code that ignores its context could hold a
@@ -46,6 +52,13 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	// The registry every part of the replica registers its metrics on.
 	reg := metrics.NewRegistry()
 	reg.MustRegister(postgres.NewPoolCollector(pool))
+
+	runner := worker.NewRunner(log, reg)
+	for _, w := range o.workers {
+		if err = runner.Register(w); err != nil {
+			return fail(log, "start failed", err)
+		}
+	}
 
 	edgeOpts := flaghttp.OptionsFrom(cfg)
 	edgeOpts.Logger, edgeOpts.DB, edgeOpts.Metrics = log, pool, flaghttp.NewMetrics(reg)
@@ -87,6 +100,16 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	go func() { served <- srv.Serve(ln) }()
 	log.InfoContext(ctx, "listening", "addr", ln.Addr().String())
 
+	// Workers and notification listeners run on the replica's own context,
+	// never a request's: they outlive the stop signal until the requests are
+	// done, and stop before the metrics listener and the pool. Goroutines
+	// spawned from it have their panics counted.
+	replica := runner.PanicHook(kill)
+	runner.Start(replica)
+	defer runner.Stop(workerStopBound)
+	listeners := postgres.NewListeners(replica, pool, log, reg)
+	defer listeners.Stop(workerStopBound)
+
 	select {
 	case err := <-served:
 		return fail(log, "serving failed", err)
@@ -113,6 +136,8 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	if err := <-served; err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Warn("serving ended with an error", "error", err.Error())
 	}
+	runner.Stop(workerStopBound)
+	listeners.Stop(workerStopBound)
 	log.Info("stopped")
 	return exitOK
 }
@@ -127,6 +152,7 @@ func closePool(pool *pgxpool.Pool, log *slog.Logger) {
 	}()
 	select {
 	case <-closed:
+		log.Info("database pool closed")
 	case <-time.After(poolCloseBound):
 		log.Warn("stopped with database connections still held", "bound", poolCloseBound.String())
 	}
