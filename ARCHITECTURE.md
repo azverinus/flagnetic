@@ -32,7 +32,7 @@ internal/
   pkg/                  Code that knows nothing about Flagnetic (for example the transaction-in-context helper).
 ```
 
-**Dependencies point inwards.** `infra` may import `app` and `domain`; `app` may import `domain`; `domain` imports only `shared`, `eval` and the standard library, and never `pgx`, `net/http` or `database/sql`. `shared` imports only the standard library. `pkg` imports nothing from `internal`. These rules are enforced by `depguard` in CI (see `.golangci.yml`), so a violation fails the build rather than a review. The application rule covers handlers and not their tests: an application test wires the real PostgreSQL repositories from `infra`, because repositories are never faked. The domain rule covers tests too.
+**Dependencies point inwards.** `infra` may import `app` and `domain`; `app` may import `domain`; `domain` imports only `shared`, `eval` and the standard library, and never `pgx`, `net/http` or `database/sql`. `shared` imports only the standard library. `pkg` imports nothing from `internal` but other `pkg` packages, which know nothing about Flagnetic either. These rules are enforced by `depguard` in CI (see `.golangci.yml`), so a violation fails the build rather than a review. The application rule covers handlers and not their tests: an application test wires the real PostgreSQL repositories from `infra`, because repositories are never faked. The domain rule covers tests too.
 
 **Domain.** Rules that must always hold live here and nowhere else: a flag key's pattern, which variation a rule may serve, an experiment's status transitions, which permissions a grant may carry. Domain code does no I/O and reads no clock: time and IDs are passed in. It is tested with plain unit and property tests.
 

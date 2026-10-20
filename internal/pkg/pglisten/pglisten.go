@@ -16,12 +16,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/azverinus/flagnetic/internal/pkg/safego"
 )
 
 // Handler is told when listening starts and stops and receives every
@@ -92,7 +93,8 @@ var errDeaf = errors.New("the listener's own ping did not come back in time")
 // Run listens on channel over a connection of its own, made from cfg and
 // never taken from a pool, until ctx ends. It reconnects with backoff, reset
 // after every connection that got as far as listening. A panic in the handler
-// is recovered, logged with its stack and treated as a lost connection.
+// is recovered, logged with its stack, counted through the panic hook of ctx
+// (see safego) and treated as a lost connection.
 func Run(ctx context.Context, cfg *pgx.ConnConfig, channel string, h Handler, o Options) {
 	o = o.withDefaults()
 	l := listener{cfg: cfg, channel: channel, h: h, o: o}
@@ -123,14 +125,13 @@ type listener struct {
 	o       Options
 }
 
+// recovered runs one session under safego, so a panic in the handler is
+// logged with its stack and counted through the context's panic hook, under
+// the same name the listener's goroutine runs with.
 func (l listener) recovered(ctx context.Context) (listened bool, err error) {
-	defer func() {
-		if v := recover(); v != nil {
-			l.o.Logger.Error("recovered a panic", "name", "listener "+l.channel, "panic", fmt.Sprint(v), "stack", string(debug.Stack()))
-			err = fmt.Errorf("panic: %v", v)
-		}
-	}()
-	err = l.session(ctx, &listened)
+	err = safego.Call(ctx, "listener "+l.channel, l.o.Logger, func(ctx context.Context) error {
+		return l.session(ctx, &listened)
+	})
 	return listened, err
 }
 
