@@ -1,7 +1,9 @@
 package flagnetic
 
 // Version is the version of this SDK, sent in every request's User-Agent.
-const Version = "0.1.0"
+// release-please keeps it equal to the module's tag through the marker
+// below; 0.0.0 is a build from the repository before the first release.
+const Version = "0.0.0" // x-release-please-version
 
 // The schema_version range of the documents this SDK reads and the SDK API
 // path it speaks. A ruleset outside the range is a fallback chain failure,

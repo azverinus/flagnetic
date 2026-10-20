@@ -25,6 +25,9 @@ jobs:
       server_released: ${{ steps.release.outputs.release_created }}
       server_tag: ${{ steps.release.outputs.tag_name }}
       server_version: ${{ steps.release.outputs.version }}
+      sdk_go_released: ${{ steps.release.outputs['sdks/go--release_created'] }}
+      sdk_go_tag: ${{ steps.release.outputs['sdks/go--tag_name'] }}
+      sdk_go_version: ${{ steps.release.outputs['sdks/go--version'] }}
     steps:
       # A GitHub App token makes the release pull request trigger CI; without
       # the app the built-in token still works, but CI must be run by hand.
@@ -94,3 +97,24 @@ jobs:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+  # A Go module is published by its tag alone. The SDK reports its version in
+  # every User-Agent and summary envelope, so the tagged tree's Version must
+  # be the tag's; release-please keeps them in step, and this proves it.
+  sdk-go-version:
+    name: go sdk version
+    needs: release-please
+    if: needs.release-please.outputs.sdk_go_released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.sdk_go_tag }}
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Version equals the tag
+        working-directory: sdks/go
+        env:
+          FLAGNETIC_RELEASE_VERSION: ${{ needs.release-please.outputs.sdk_go_version }}
+        run: go test -count=1 -run 'TestVersionIsTheReleasedTagsVersion$' .

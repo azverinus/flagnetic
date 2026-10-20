@@ -227,12 +227,40 @@ jobs:
       - name: Scan reachable code
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
+  # What go get gives a consumer: each published module built and tested
+  # outside the workspace against the versions its go.mod requires. Skipped
+  # while it requires a module of this repository at v0.0.0, and failing
+  # when that skip would hide a broken release.
+  released:
+    name: released requirements ${{ matrix.dir }}
+    needs: modules
+    if: needs.modules.outputs.dirs != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.modules.outputs.dirs) }}
+    env:
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version: oldstable
+          cache-dependency-path: ${{ matrix.dir }}/go.mod
+      - name: Build and test against the released requirements
+        run: .github/scripts/check-released-requirements.sh "$DIR"
+        env:
+          DIR: ${{ matrix.dir }}
+
   # The one check branch protection requires. A job above may be skipped (a
   # module matrix with nothing to run, a job behind a condition), which is
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, tidy, workflows, docker, modules, module]
+    needs: [lint, test, vuln, tidy, workflows, docker, modules, module, released]
     if: always()
     runs-on: ubuntu-latest
     steps:
