@@ -30,11 +30,14 @@ jobs:
       # the app the built-in token still works, but CI must be run by hand.
       - name: App token
         id: app-token
-        if: vars.RELEASE_APP_ID != ''
+        if: vars.RELEASE_APP_CLIENT_ID != ''
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.RELEASE_APP_ID }}
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
       - name: release-please
         id: release
         uses: googleapis/release-please-action@v5
