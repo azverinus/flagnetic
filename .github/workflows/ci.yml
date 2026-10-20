@@ -211,6 +211,12 @@ jobs:
             tee /dev/stderr | grep -o 'kill_switch_propagation_ms=[0-9]*' |
             sed "s/kill_switch_propagation_ms=/Kill-switch propagation (go $GO): /; s/\$/ ms (target 2000 ms)/" \
             >> "$GITHUB_STEP_SUMMARY"
+      - name: Evaluation p99
+        # The race detector distorts timing, so the guarantee that an
+        # evaluation stays under 1 ms at p99 is measured without it; the
+        # test writes the numbers to the job summary.
+        if: matrix.dir == 'sdks/go'
+        run: go test -count=1 -run 'TestEvaluationStaysUnderAMillisecondAtP99$' .
       - name: Scan reachable code
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
