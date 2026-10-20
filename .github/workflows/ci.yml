@@ -81,9 +81,7 @@ jobs:
         with:
           go-version-file: go.mod
       - name: go.mod is tidy
-        run: |
-          go mod tidy
-          git diff --exit-code -- go.mod go.sum
+        run: go mod tidy -diff
       - name: Generated code is up to date
         run: |
           go generate ./...
@@ -99,6 +97,8 @@ jobs:
           go-version-file: go.mod
       - name: Lint the workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      - name: ci-ok needs every job
+        run: .github/scripts/check-ci-ok.sh
 
   docker:
     name: docker build
@@ -113,3 +113,94 @@ jobs:
           file: deploy/Dockerfile
           push: false
           build-args: VERSION=ci
+
+  # The Go modules of go.work besides the root one (the evaluator and the
+  # SDKs). The list is read from go.work, so a module joins CI through its
+  # `use` line alone.
+  modules:
+    name: list go modules
+    runs-on: ubuntu-latest
+    outputs:
+      dirs: ${{ steps.list.outputs.dirs }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - id: list
+        run: |
+          dirs="$(go work edit -json | jq -c '[.Use[].DiskPath | ltrimstr("./") | select(. != ".")]')"
+          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+          echo "Modules: $dirs"
+
+  # Each module is published on its own and promises to build with the oldest
+  # Go release still supported, so it is checked on that release and on the
+  # newest one, with the toolchain held to the one installed. The modules
+  # resolve each other through a workspace of their own: the committed go.work
+  # also holds the server, whose newer Go would refuse the oldest release.
+  module:
+    name: module ${{ matrix.dir }} (go ${{ matrix.go }})
+    needs: modules
+    if: needs.modules.outputs.dirs != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.modules.outputs.dirs) }}
+        go: [oldstable, stable]
+    env:
+      GOTOOLCHAIN: local
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: ${{ matrix.dir }}/go.mod
+      - name: Workspace of the published modules
+        working-directory: .
+        env:
+          DIRS: ${{ needs.modules.outputs.dirs }}
+        run: |
+          echo "GOWORK=$RUNNER_TEMP/go.work" >> "$GITHUB_ENV"
+          export GOWORK="$RUNNER_TEMP/go.work"
+          go work init
+          for dir in $(jq -r '.[]' <<< "$DIRS"); do
+            go work use "$GITHUB_WORKSPACE/$dir"
+          done
+          cat "$GOWORK"
+      - name: go.mod is tidy
+        run: go mod tidy -diff
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+          working-directory: ${{ matrix.dir }}
+          args: --config=${{ github.workspace }}/.golangci.yml
+      - name: Test with the race detector
+        run: go test -race ./...
+      - name: Scan reachable code
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+  # The one check branch protection requires. A job above may be skipped (a
+  # module matrix with nothing to run, a job behind a condition), which is
+  # fine; a failed or cancelled one is not.
+  ci-ok:
+    name: ci-ok
+    needs: [lint, test, vuln, tidy, workflows, docker, modules, module]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every needed job succeeded or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "a needed job ended with: $result" >&2; exit 1 ;;
+            esac
+          done
