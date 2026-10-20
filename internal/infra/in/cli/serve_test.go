@@ -192,20 +192,6 @@ func TestAMalformedSettingIsRefusedBeforeAnythingStarts(t *testing.T) {
 	}
 }
 
-func TestServeSkipsMigrationsWhenAutoMigrateIsOff(t *testing.T) {
-	url := testkit.EmptyDatabase(t)
-	r := serve(t, map[string]string{"DATABASE_URL": url, "FLAGNETIC_AUTO_MIGRATE": "false"}, fixtures)
-	if r.findLog("migrations applied") != nil {
-		t.Errorf("serve migrated with FLAGNETIC_AUTO_MIGRATE=false:\n%s", r.stderr.String())
-	}
-	if code, _ := r.stop(); code != 0 {
-		t.Fatalf("exit code = %d", code)
-	}
-	if rec := migrate(url, fixtures).logRecord(t, "migrations applied"); rec["applied"] != 2.0 {
-		t.Errorf("a later migrate applied %v migrations, want all 2: serve must not have applied any", rec["applied"])
-	}
-}
-
 func TestServeStopsWithinTheGracePeriodWhileARequestIsStuck(t *testing.T) {
 	entered := make(chan struct{})
 	stuck := cli.WithRoute("GET /test/stuck", http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {

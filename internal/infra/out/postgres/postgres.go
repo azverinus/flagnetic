@@ -141,3 +141,32 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, migrations fs.FS) (Migrati
 	}
 	return MigrationReport{Applied: len(results), Version: version}, nil
 }
+
+// SchemaVersions returns the version of the schema in the database, the last
+// migration applied (0 when none ever was), and the version of migrations,
+// its latest migration (0 for an empty set).
+func SchemaVersions(ctx context.Context, pool *pgxpool.Pool, migrations fs.FS) (database, binary int64, err error) {
+	files, err := fs.Glob(migrations, "*.sql")
+	if err != nil {
+		return 0, 0, fmt.Errorf("list the migrations: %w", err)
+	}
+	for _, f := range files {
+		if v, vErr := goose.NumericComponent(f); vErr == nil {
+			binary = max(binary, v)
+		}
+	}
+	// goose records every applied migration in this table, created by the
+	// first migrate; a database never migrated has none.
+	var migratedBefore bool
+	if err = pool.QueryRow(ctx, `SELECT to_regclass('goose_db_version') IS NOT NULL`).Scan(&migratedBefore); err != nil {
+		return 0, 0, fmt.Errorf("read the schema version: %w", err)
+	}
+	if !migratedBefore {
+		return 0, binary, nil
+	}
+	err = pool.QueryRow(ctx, `SELECT coalesce(max(version_id), 0) FROM goose_db_version WHERE is_applied`).Scan(&database)
+	if err != nil {
+		return 0, 0, fmt.Errorf("read the schema version: %w", err)
+	}
+	return database, binary, nil
+}

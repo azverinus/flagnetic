@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
 )
 
@@ -32,13 +34,16 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	log.InfoContext(ctx, "starting", "version", buildinfo.Version())
 	pool, err := openDatabase(ctx, cfg, log, o)
 	if err != nil {
-		return fail(log, "start failed", err)
+		return failStart(ctx, log, err)
 	}
 	defer closePool(pool, log)
 	if cfg.AutoMigrate {
-		if err = applyMigrations(ctx, pool, log, o); err != nil {
-			return fail(log, "start failed", err)
-		}
+		err = applyMigrations(ctx, pool, log, o)
+	} else {
+		err = checkSchema(ctx, pool, log, o)
+	}
+	if err != nil {
+		return failStart(ctx, log, err)
 	}
 
 	edge := flaghttp.New(flaghttp.Options{Logger: log, DB: pool})
@@ -109,4 +114,33 @@ func closePool(pool *pgxpool.Pool, log *slog.Logger) {
 	case <-time.After(poolCloseBound):
 		log.Warn("stopped with database connections still held", "bound", poolCloseBound.String())
 	}
+}
+
+// checkSchema compares the database's schema with the binary's migrations
+// when migrations run as a separate job. A schema behind the binary is
+// refused, since new code would meet an old schema. A schema ahead of it is
+// accepted with a warning: rolling a binary back after a migration that only
+// added to the schema must keep working.
+func checkSchema(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, o options) error {
+	database, binary, err := postgres.SchemaVersions(ctx, pool, o.migrations)
+	switch {
+	case err != nil:
+		return err
+	case database < binary:
+		return fmt.Errorf("the database schema is at version %d, behind this binary's version %d; "+
+			"run `flagnetic migrate` with this binary first, or set FLAGNETIC_AUTO_MIGRATE=true", database, binary)
+	case database > binary:
+		log.WarnContext(ctx, "database schema is ahead of this binary", "database_version", database, "binary_version", binary)
+	}
+	return nil
+}
+
+// failStart reports a start that did not complete. A start cut short by the
+// stop signal is a stop, not a failure.
+func failStart(ctx context.Context, log *slog.Logger, err error) int {
+	if ctx.Err() != nil {
+		log.Info("stopped before starting")
+		return exitOK
+	}
+	return fail(log, "start failed", err)
 }
