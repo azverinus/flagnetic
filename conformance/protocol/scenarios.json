@@ -1,0 +1,4374 @@
+{
+  "answers": {
+    "built_in": [
+      {
+        "default": "Built-in banner",
+        "flag": "banner_text",
+        "reason": "fallback",
+        "type": "string",
+        "value": "Built-in banner"
+      },
+      {
+        "default": false,
+        "flag": "checkout",
+        "reason": "fallback",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "default": 0,
+        "flag": "max_items",
+        "reason": "fallback",
+        "type": "number",
+        "value": 0
+      },
+      {
+        "default": false,
+        "flag": "new_search",
+        "reason": "fallback",
+        "type": "boolean",
+        "value": false
+      },
+      {
+        "default": {
+          "mode": "system"
+        },
+        "flag": "theme",
+        "reason": "fallback",
+        "type": "json",
+        "value": {
+          "mode": "system"
+        }
+      }
+    ],
+    "server/evaluation-after-kill-switch.json": [
+      {
+        "default": "Built-in banner",
+        "flag": "banner_text",
+        "reason": "targeting_match",
+        "type": "string",
+        "value": "Try free",
+        "variation": "short"
+      },
+      {
+        "default": false,
+        "flag": "checkout",
+        "reason": "off",
+        "type": "boolean",
+        "value": false,
+        "variation": "false"
+      },
+      {
+        "default": 0,
+        "flag": "max_items",
+        "reason": "targeting_match",
+        "type": "number",
+        "value": 10,
+        "variation": "few"
+      },
+      {
+        "default": false,
+        "flag": "new_search",
+        "reason": "targeting_match",
+        "type": "boolean",
+        "value": false,
+        "variation": "false"
+      },
+      {
+        "default": {
+          "mode": "system"
+        },
+        "flag": "theme",
+        "reason": "off",
+        "type": "json",
+        "value": {
+          "mode": "light"
+        },
+        "variation": "light"
+      }
+    ],
+    "server/evaluation-unprotected.json": [
+      {
+        "default": "Built-in banner",
+        "flag": "banner_text",
+        "reason": "targeting_match",
+        "type": "string",
+        "value": "Start your free trial",
+        "variation": "long"
+      },
+      {
+        "default": false,
+        "flag": "checkout",
+        "reason": "targeting_match",
+        "type": "boolean",
+        "value": true,
+        "variation": "true"
+      },
+      {
+        "default": 0,
+        "flag": "max_items",
+        "reason": "off",
+        "type": "number",
+        "value": 10,
+        "variation": "few"
+      },
+      {
+        "default": false,
+        "flag": "new_search",
+        "reason": "off",
+        "type": "boolean",
+        "value": false,
+        "variation": "false"
+      },
+      {
+        "default": {
+          "mode": "system"
+        },
+        "flag": "theme",
+        "reason": "off",
+        "type": "json",
+        "value": {
+          "mode": "light"
+        },
+        "variation": "light"
+      }
+    ],
+    "server/evaluation.json": [
+      {
+        "default": "Built-in banner",
+        "flag": "banner_text",
+        "reason": "targeting_match",
+        "type": "string",
+        "value": "Try free",
+        "variation": "short"
+      },
+      {
+        "default": false,
+        "flag": "checkout",
+        "reason": "targeting_match",
+        "type": "boolean",
+        "value": true,
+        "variation": "true"
+      },
+      {
+        "default": 0,
+        "flag": "max_items",
+        "reason": "targeting_match",
+        "type": "number",
+        "value": 10,
+        "variation": "few"
+      },
+      {
+        "default": false,
+        "flag": "new_search",
+        "reason": "targeting_match",
+        "type": "boolean",
+        "value": true,
+        "variation": "true"
+      },
+      {
+        "default": {
+          "mode": "system"
+        },
+        "flag": "theme",
+        "reason": "off",
+        "type": "json",
+        "value": {
+          "mode": "light"
+        },
+        "variation": "light"
+      }
+    ],
+    "server/ruleset-after-kill-switch.json": [
+      {
+        "default": "Built-in banner",
+        "flag": "banner_text",
+        "reason": "rule",
+        "type": "string",
+        "value": "Try free",
+        "variation": "short"
+      },
+      {
+        "default": false,
+        "flag": "checkout",
+        "reason": "off",
+        "type": "boolean",
+        "value": false,
+        "variation": "false"
+      },
+      {
+        "default": 0,
+        "flag": "max_items",
+        "reason": "fallthrough",
+        "type": "number",
+        "value": 10,
+        "variation": "few"
+      },
+      {
+        "default": false,
+        "flag": "new_search",
+        "reason": "prerequisite_failed",
+        "type": "boolean",
+        "value": false,
+        "variation": "false"
+      },
+      {
+        "default": {
+          "mode": "system"
+        },
+        "flag": "theme",
+        "reason": "off",
+        "type": "json",
+        "value": {
+          "mode": "light"
+        },
+        "variation": "light"
+      }
+    ],
+    "server/ruleset-unprotected.json": [
+      {
+        "default": "Built-in banner",
+        "flag": "banner_text",
+        "reason": "fallthrough",
+        "type": "string",
+        "value": "Start your free trial",
+        "variation": "long"
+      },
+      {
+        "default": false,
+        "flag": "checkout",
+        "reason": "fallthrough",
+        "type": "boolean",
+        "value": true,
+        "variation": "true"
+      },
+      {
+        "default": 0,
+        "flag": "max_items",
+        "reason": "off",
+        "type": "number",
+        "value": 10,
+        "variation": "few"
+      },
+      {
+        "default": false,
+        "flag": "new_search",
+        "reason": "off",
+        "type": "boolean",
+        "value": false,
+        "variation": "false"
+      },
+      {
+        "default": {
+          "mode": "system"
+        },
+        "flag": "theme",
+        "reason": "off",
+        "type": "json",
+        "value": {
+          "mode": "light"
+        },
+        "variation": "light"
+      }
+    ],
+    "server/ruleset.json": [
+      {
+        "default": "Built-in banner",
+        "flag": "banner_text",
+        "reason": "rule",
+        "type": "string",
+        "value": "Try free",
+        "variation": "short"
+      },
+      {
+        "default": false,
+        "flag": "checkout",
+        "reason": "rule",
+        "type": "boolean",
+        "value": true,
+        "variation": "true"
+      },
+      {
+        "default": 0,
+        "flag": "max_items",
+        "reason": "fallthrough",
+        "type": "number",
+        "value": 10,
+        "variation": "few"
+      },
+      {
+        "default": false,
+        "flag": "new_search",
+        "reason": "fallthrough",
+        "type": "boolean",
+        "value": true,
+        "variation": "true"
+      },
+      {
+        "default": {
+          "mode": "system"
+        },
+        "flag": "theme",
+        "reason": "off",
+        "type": "json",
+        "value": {
+          "mode": "light"
+        },
+        "variation": "light"
+      }
+    ]
+  },
+  "context": {
+    "attributes": {
+      "app_version": "1.18.0",
+      "country": "DE",
+      "favourite_colour": "green",
+      "plan": 42,
+      "platform": "linux"
+    },
+    "units": {
+      "anonymous": "d-8f1c",
+      "user": "u-1001"
+    }
+  },
+  "defaults": {
+    "banner_text": "Built-in banner",
+    "checkout": false,
+    "max_items": 0,
+    "new_search": false,
+    "theme": {
+      "mode": "system"
+    }
+  },
+  "scenarios": [
+    {
+      "covers": "fallback chain: no server → built-in defaults; server up → fresh; 500, corrupt JSON, empty body, {}, unsupported schema_version, lower version → the previous document still served",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: the fallback chain keeps the held document through every failure",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "built_in",
+            "stage": "built_in",
+            "stale_since": "set"
+          },
+          "note": "no server",
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "network_error": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the server is up",
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "500 without a body",
+          "request": {
+            "delay_ms": {
+              "max": 31000,
+              "min": 30000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "status": 500
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "503 with a problem",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/503-ruleset_unavailable.json",
+            "headers": {
+              "Content-Type": "application/problem+json"
+            },
+            "status": 503
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "truncated JSON",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "degradation/ruleset-truncated.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"3\"",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "empty body",
+          "request": {
+            "delay_ms": {
+              "max": 4000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"3\"",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "{}",
+          "request": {
+            "delay_ms": {
+              "max": 8000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "degradation/ruleset-empty-object.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"3\"",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "logs": {
+              "schema_unsupported": 1
+            },
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "a schema_version above the requested one",
+          "request": {
+            "delay_ms": {
+              "max": 16000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "degradation/ruleset-schema-version-above-requested.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"3\"",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "a lower version",
+          "request": {
+            "delay_ms": {
+              "max": 32000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "recovered",
+          "request": {
+            "delay_ms": {
+              "max": 64000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "fallback chain: construct from the persisted last good (client SDKs: last good loaded before the first network call)",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        },
+        "stored": "server/ruleset.json"
+      },
+      "mode": "server",
+      "name": "server: a stored last good document serves before the first request",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "last_good"
+          },
+          "note": "constructed"
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "network_error": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "fallback chain: 401 → last good kept and served, error surfaced, fetch retried with backoff capped at 15 minutes",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: a revoked key keeps the last good and retries at a capped backoff",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "logs": {
+              "key_revoked": 1
+            },
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 31000,
+              "min": 30000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 4000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 8000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 16000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 32000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 64000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 128000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 256000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 512000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 900000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "logs": {
+              "key_revoked": 1
+            },
+            "stage": "last_good"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 900000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the key is restored",
+          "request": {
+            "delay_ms": {
+              "max": 900000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: event → fetch",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: a stream event above the held version triggers a fetch",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "no_request": {
+            "for_ms": 3000,
+            "path": "/sdk/v1/ruleset"
+          }
+        },
+        {
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "a kill switch",
+          "stream_send": "event: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: disconnect → backoff reconnect with Last-Event-ID = held version",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: a dropped stream reconnects with Last-Event-ID and fetches",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "note": "closed by the server",
+          "stream_close": true
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/503-ruleset_unavailable.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Retry-After": "2",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 503
+          }
+        },
+        {
+          "note": "after an error: backoff",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "versions may have been missed",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "no_request": {
+            "for_ms": 3000,
+            "path": "/sdk/v1/ruleset"
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: 45 s of silence → reconnect",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: 45 seconds of silence reconnect the stream",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "no_request": {
+            "for_ms": 44000,
+            "path": "/sdk/v1/stream"
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "versions may have been missed",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: fetch below the event's version → retry 1, 2, 4 s; version never downgrades",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: a fetch below the event's version is retried after 1, 2 and 4 seconds and never downgrades",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "stream_send": "event: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "note": "the replica is behind",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "598",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 304
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 1000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 3000,
+              "min": 2000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "598",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 304
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 5000,
+              "min": 4000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"2\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "594",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "no_request": {
+            "for_ms": 10000,
+            "path": "/sdk/v1/ruleset"
+          }
+        },
+        {
+          "note": "closed by the server",
+          "stream_close": true
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Last-Event-ID": "2"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "a lower version never replaces the held one",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"2\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "If-None-Match sent; 304 keeps the document and marks it fresh",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: If-None-Match revalidates and 304 keeps the document fresh",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 31000,
+              "min": 30000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "598",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 304
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 31000,
+              "min": 30000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "status": 500
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "If-None-Match": "\"1\""
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "598",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 304
+          }
+        }
+      ]
+    },
+    {
+      "covers": "local overrides: ignored in a protected environment",
+      "given": {
+        "options": {
+          "allow_overrides": true,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: local overrides are refused in a protected environment",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "flag": "checkout",
+            "op": "set_override",
+            "value": false
+          },
+          "expect": {
+            "logs": {
+              "override_refused": 1
+            },
+            "refused": true
+          }
+        },
+        {
+          "call": {
+            "default": false,
+            "flag": "checkout",
+            "op": "evaluate",
+            "type": "boolean"
+          },
+          "expect": {
+            "result": {
+              "default": false,
+              "flag": "checkout",
+              "reason": "rule",
+              "type": "boolean",
+              "value": true,
+              "variation": "true"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "covers": "local overrides: refused without the option",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: local overrides are refused without the option",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/ruleset-unprotected.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-unprotected.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "flag": "checkout",
+            "op": "set_override",
+            "value": false
+          },
+          "expect": {
+            "logs": {
+              "override_refused": 1
+            },
+            "refused": true
+          }
+        },
+        {
+          "call": {
+            "default": false,
+            "flag": "checkout",
+            "op": "evaluate",
+            "type": "boolean"
+          },
+          "expect": {
+            "result": {
+              "default": false,
+              "flag": "checkout",
+              "reason": "fallthrough",
+              "type": "boolean",
+              "value": true,
+              "variation": "true"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "covers": "local overrides: reason local_override; no exposure; counted in the summary",
+      "given": {
+        "options": {
+          "allow_overrides": true,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": true,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: a local override serves local_override, emits no exposure and is counted",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/ruleset-unprotected.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset-unprotected.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "flag": "banner_text",
+            "op": "set_override",
+            "value": "Local banner"
+          },
+          "expect": {
+            "logs": {
+              "override_set": 1
+            },
+            "refused": false
+          }
+        },
+        {
+          "call": {
+            "default": "Built-in banner",
+            "flag": "banner_text",
+            "op": "evaluate",
+            "type": "string"
+          },
+          "expect": {
+            "result": {
+              "default": "Built-in banner",
+              "flag": "banner_text",
+              "reason": "local_override",
+              "type": "string",
+              "value": "Local banner"
+            }
+          }
+        },
+        {
+          "call": {
+            "flag": "banner_text",
+            "op": "exposure"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "events": {
+              "absent_strings": [
+                "Local banner"
+              ],
+              "summary_counts": [
+                {
+                  "count": 1,
+                  "flag": "banner_text",
+                  "reason": "local_override",
+                  "variation": null
+                }
+              ],
+              "summary_ruleset_version": 1,
+              "types": [
+                "evaluation_summary"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/events-accepted.json",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "status": 202
+          }
+        }
+      ]
+    },
+    {
+      "covers": "offline mode: the mock server records zero requests; events discarded and counted",
+      "given": {
+        "offline": "server/ruleset.json",
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: offline mode makes no request",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh"
+          }
+        },
+        {
+          "call": {
+            "op": "alias"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "expect": {
+            "recorded": {
+              "alias": 1
+            },
+            "stage": "fresh"
+          },
+          "no_request": {
+            "for_ms": 60000
+          }
+        }
+      ]
+    },
+    {
+      "covers": "events: identical event_id on 5xx retry; rejected events not retried",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: events are retried on 5xx and 429 with the same IDs and never after a rejection",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "op": "alias",
+            "times": 2
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "events": {
+              "types": [
+                "alias",
+                "alias"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "status": 500
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "events": {
+              "same_ids_as_step": 3,
+              "types": [
+                "alias",
+                "alias"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/problems/429-rate_limited.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "RateLimit-Limit": "1",
+              "RateLimit-Remaining": "0",
+              "RateLimit-Reset": "60",
+              "Retry-After": "60",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 429
+          }
+        },
+        {
+          "note": "Retry-After: 1; an SDK may honour it or back off",
+          "request": {
+            "delay_ms": {
+              "max": 3000,
+              "min": 0
+            },
+            "events": {
+              "same_ids_as_step": 3,
+              "types": [
+                "alias",
+                "alias"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/events-one-rejected.json",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "status": 202
+          }
+        },
+        {
+          "call": {
+            "op": "alias"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "events": {
+              "excludes_ids_of_step": 3,
+              "types": [
+                "alias"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/events-accepted.json",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "status": 202
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "no_request": {
+            "for_ms": 10000,
+            "path": "/sdk/v1/events"
+          }
+        }
+      ]
+    },
+    {
+      "covers": "summaries: counts equal evaluations, fallback included; no unit ID in the body",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": true,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "server",
+      "name": "server: the evaluation summary counts every evaluation, fallback included",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/ruleset.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "absent_headers": [
+              "If-None-Match"
+            ],
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/ruleset"
+          },
+          "respond": {
+            "body": "server/ruleset.json",
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"1\"",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "default": false,
+            "flag": "checkout",
+            "op": "evaluate",
+            "times": 3,
+            "type": "boolean"
+          },
+          "expect": {
+            "result": {
+              "default": false,
+              "flag": "checkout",
+              "reason": "rule",
+              "type": "boolean",
+              "value": true,
+              "variation": "true"
+            }
+          }
+        },
+        {
+          "call": {
+            "default": "none",
+            "flag": "missing_flag",
+            "op": "evaluate",
+            "times": 2,
+            "type": "string"
+          },
+          "expect": {
+            "result": {
+              "default": "none",
+              "flag": "missing_flag",
+              "reason": "fallback",
+              "type": "string",
+              "value": "none"
+            }
+          },
+          "note": "absent"
+        },
+        {
+          "call": {
+            "default": false,
+            "flag": "theme",
+            "op": "evaluate",
+            "type": "boolean"
+          },
+          "expect": {
+            "result": {
+              "default": false,
+              "flag": "theme",
+              "reason": "fallback",
+              "type": "boolean",
+              "value": false
+            }
+          },
+          "note": "a type mismatch"
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "events": {
+              "absent_strings": [
+                "u-1001",
+                "d-8f1c"
+              ],
+              "summary_counts": [
+                {
+                  "count": 3,
+                  "flag": "checkout",
+                  "reason": "rule",
+                  "variation": "true"
+                },
+                {
+                  "count": 2,
+                  "flag": "missing_flag",
+                  "reason": "fallback",
+                  "variation": null
+                },
+                {
+                  "count": 1,
+                  "flag": "theme",
+                  "reason": "fallback",
+                  "variation": null
+                }
+              ],
+              "summary_ruleset_version": 1,
+              "types": [
+                "evaluation_summary"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/events-accepted.json",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "status": 202
+          }
+        }
+      ]
+    },
+    {
+      "covers": "fallback chain: no server → built-in defaults; server up → fresh; 500, corrupt JSON, empty body, {}, unsupported schema_version, lower version → the previous document still served",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: the fallback chain keeps the held document through every failure",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "built_in",
+            "stage": "built_in",
+            "stale_since": "set"
+          },
+          "note": "no server",
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "network_error": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the server is up",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "500 without a body",
+          "request": {
+            "delay_ms": {
+              "max": 31000,
+              "min": 30000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "status": 500
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "503 with a problem",
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/503-ruleset_unavailable.json",
+            "headers": {
+              "Content-Type": "application/problem+json"
+            },
+            "status": 503
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "truncated JSON",
+          "request": {
+            "delay_ms": {
+              "max": 4000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "degradation/evaluation-truncated.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "empty body",
+          "request": {
+            "delay_ms": {
+              "max": 8000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "{}",
+          "request": {
+            "delay_ms": {
+              "max": 16000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "degradation/evaluation-empty-object.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "logs": {
+              "schema_unsupported": 1
+            },
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "a schema_version above the requested one",
+          "request": {
+            "delay_ms": {
+              "max": 32000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "degradation/evaluation-schema-version-above-requested.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "note": "a lower version",
+          "request": {
+            "delay_ms": {
+              "max": 64000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "recovered",
+          "request": {
+            "delay_ms": {
+              "max": 128000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "fallback chain: construct from the persisted last good (client SDKs: last good loaded before the first network call)",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        },
+        "stored": "server/evaluation.json"
+      },
+      "mode": "client",
+      "name": "client: a stored last good document serves before the first request",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "last_good"
+          },
+          "note": "constructed"
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "network_error": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "fallback chain: 401 → last good kept and served, error surfaced, fetch retried with backoff capped at 15 minutes",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: a revoked key keeps the last good and retries at a capped backoff",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "logs": {
+              "key_revoked": 1
+            },
+            "stage": "last_good",
+            "stale_since": "set"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 31000,
+              "min": 30000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 4000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 8000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 16000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 32000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 64000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 128000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 256000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 512000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 900000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 900000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "logs": {
+              "key_revoked": 1
+            },
+            "stage": "last_good"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 900000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/problems/401-sdk_key_revoked.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "Vary": "Accept-Encoding",
+              "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+            },
+            "status": 401
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the key is restored",
+          "request": {
+            "delay_ms": {
+              "max": 900000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: event → fetch",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: a stream event above the held version triggers a fetch",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "no_request": {
+            "for_ms": 3000,
+            "path": "/sdk/v1/evaluate"
+          }
+        },
+        {
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "note": "a kill switch",
+          "stream_send": "event: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: disconnect → backoff reconnect with Last-Event-ID = held version",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: a dropped stream reconnects with Last-Event-ID and fetches",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "note": "closed by the server",
+          "stream_close": true
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "body": "server/problems/503-ruleset_unavailable.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "RateLimit-Limit": "600",
+              "RateLimit-Remaining": "599",
+              "Retry-After": "2",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 503
+          }
+        },
+        {
+          "note": "after an error: backoff",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "versions may have been missed",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "no_request": {
+            "for_ms": 3000,
+            "path": "/sdk/v1/evaluate"
+          }
+        }
+      ]
+    },
+    {
+      "covers": "stream: 45 s of silence → reconnect",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: 45 seconds of silence reconnect the stream",
+      "steps": [
+        {
+          "request": {
+            "absent_headers": [
+              "Last-Event-ID"
+            ],
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "advance_ms": 15000
+        },
+        {
+          "stream_send": ": hb\n\n"
+        },
+        {
+          "no_request": {
+            "for_ms": 44000,
+            "path": "/sdk/v1/stream"
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "headers": {
+              "Last-Event-ID": "1"
+            },
+            "method": "GET",
+            "path": "/sdk/v1/stream"
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "versions may have been missed",
+          "request": {
+            "delay_ms": {
+              "max": 1000,
+              "min": 0
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    },
+    {
+      "covers": "local overrides: ignored in a protected environment",
+      "given": {
+        "options": {
+          "allow_overrides": true,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: local overrides are refused in a protected environment",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "flag": "checkout",
+            "op": "set_override",
+            "value": false
+          },
+          "expect": {
+            "logs": {
+              "override_refused": 1
+            },
+            "refused": true
+          }
+        },
+        {
+          "call": {
+            "default": false,
+            "flag": "checkout",
+            "op": "evaluate",
+            "type": "boolean"
+          },
+          "expect": {
+            "result": {
+              "default": false,
+              "flag": "checkout",
+              "reason": "targeting_match",
+              "type": "boolean",
+              "value": true,
+              "variation": "true"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "covers": "local overrides: refused without the option",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: local overrides are refused without the option",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/evaluation-unprotected.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-unprotected.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "flag": "checkout",
+            "op": "set_override",
+            "value": false
+          },
+          "expect": {
+            "logs": {
+              "override_refused": 1
+            },
+            "refused": true
+          }
+        },
+        {
+          "call": {
+            "default": false,
+            "flag": "checkout",
+            "op": "evaluate",
+            "type": "boolean"
+          },
+          "expect": {
+            "result": {
+              "default": false,
+              "flag": "checkout",
+              "reason": "targeting_match",
+              "type": "boolean",
+              "value": true,
+              "variation": "true"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "covers": "local overrides: reason local_override; no exposure; counted in the summary",
+      "given": {
+        "options": {
+          "allow_overrides": true,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": true,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: a local override serves local_override, emits no exposure and is counted",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/evaluation-unprotected.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-unprotected.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "flag": "banner_text",
+            "op": "set_override",
+            "value": "Local banner"
+          },
+          "expect": {
+            "logs": {
+              "override_set": 1
+            },
+            "refused": false
+          }
+        },
+        {
+          "call": {
+            "default": "Built-in banner",
+            "flag": "banner_text",
+            "op": "evaluate",
+            "type": "string"
+          },
+          "expect": {
+            "result": {
+              "default": "Built-in banner",
+              "flag": "banner_text",
+              "reason": "local_override",
+              "type": "string",
+              "value": "Local banner"
+            }
+          }
+        },
+        {
+          "call": {
+            "flag": "banner_text",
+            "op": "exposure"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "events": {
+              "absent_strings": [
+                "Local banner"
+              ],
+              "summary_counts": [
+                {
+                  "count": 1,
+                  "flag": "banner_text",
+                  "reason": "local_override",
+                  "variation": null
+                }
+              ],
+              "summary_ruleset_version": 1,
+              "types": [
+                "evaluation_summary"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/events-accepted.json",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "status": 202
+          }
+        }
+      ]
+    },
+    {
+      "covers": "offline mode: the mock server records zero requests; events discarded and counted",
+      "given": {
+        "offline": "server/evaluation.json",
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: offline mode makes no request",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh"
+          }
+        },
+        {
+          "call": {
+            "op": "alias"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "expect": {
+            "recorded": {
+              "alias": 1
+            },
+            "stage": "fresh"
+          },
+          "no_request": {
+            "for_ms": 60000
+          }
+        }
+      ]
+    },
+    {
+      "covers": "events: identical event_id on 5xx retry; rejected events not retried",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: events are retried on 5xx and 429 with the same IDs and never after a rejection",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "op": "alias",
+            "times": 2
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "events": {
+              "types": [
+                "alias",
+                "alias"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "status": 500
+          }
+        },
+        {
+          "request": {
+            "delay_ms": {
+              "max": 2000,
+              "min": 0
+            },
+            "events": {
+              "same_ids_as_step": 3,
+              "types": [
+                "alias",
+                "alias"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/problems/429-rate_limited.json",
+            "headers": {
+              "Content-Type": "application/problem+json",
+              "RateLimit-Limit": "1",
+              "RateLimit-Remaining": "0",
+              "RateLimit-Reset": "60",
+              "Retry-After": "60",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 429
+          }
+        },
+        {
+          "note": "Retry-After: 1; an SDK may honour it or back off",
+          "request": {
+            "delay_ms": {
+              "max": 5000,
+              "min": 0
+            },
+            "events": {
+              "same_ids_as_step": 3,
+              "types": [
+                "alias",
+                "alias"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/events-one-rejected.json",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "status": 202
+          }
+        },
+        {
+          "call": {
+            "op": "alias"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "events": {
+              "excludes_ids_of_step": 3,
+              "types": [
+                "alias"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/events-accepted.json",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "status": 202
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "no_request": {
+            "for_ms": 10000,
+            "path": "/sdk/v1/events"
+          }
+        }
+      ]
+    },
+    {
+      "covers": "summaries: counts equal evaluations, fallback included; no unit ID in the body",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": true,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "mode": "client",
+      "name": "client: the evaluation summary counts every evaluation, fallback included",
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "call": {
+            "default": false,
+            "flag": "checkout",
+            "op": "evaluate",
+            "times": 3,
+            "type": "boolean"
+          },
+          "expect": {
+            "result": {
+              "default": false,
+              "flag": "checkout",
+              "reason": "targeting_match",
+              "type": "boolean",
+              "value": true,
+              "variation": "true"
+            }
+          }
+        },
+        {
+          "call": {
+            "default": "none",
+            "flag": "missing_flag",
+            "op": "evaluate",
+            "times": 2,
+            "type": "string"
+          },
+          "expect": {
+            "result": {
+              "default": "none",
+              "flag": "missing_flag",
+              "reason": "fallback",
+              "type": "string",
+              "value": "none"
+            }
+          },
+          "note": "absent"
+        },
+        {
+          "call": {
+            "default": false,
+            "flag": "theme",
+            "op": "evaluate",
+            "type": "boolean"
+          },
+          "expect": {
+            "result": {
+              "default": false,
+              "flag": "theme",
+              "reason": "fallback",
+              "type": "boolean",
+              "value": false
+            }
+          },
+          "note": "a type mismatch"
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "events": {
+              "absent_strings": [
+                "u-1001",
+                "d-8f1c"
+              ],
+              "summary_counts": [
+                {
+                  "count": 3,
+                  "flag": "checkout",
+                  "reason": "targeting_match",
+                  "variation": "true"
+                },
+                {
+                  "count": 2,
+                  "flag": "missing_flag",
+                  "reason": "fallback",
+                  "variation": null
+                },
+                {
+                  "count": 1,
+                  "flag": "theme",
+                  "reason": "fallback",
+                  "variation": null
+                }
+              ],
+              "summary_ruleset_version": 1,
+              "types": [
+                "evaluation_summary"
+              ]
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/events"
+          },
+          "respond": {
+            "body": "server/events-accepted.json",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "status": 202
+          }
+        }
+      ]
+    }
+  ]
+}

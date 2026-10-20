@@ -1,0 +1,12 @@
+retry: 3000
+
+event: ruleset
+id: 1
+data: {"version":1}
+
+: hb
+
+event: ruleset
+id: 2
+data: {"version":2}
+

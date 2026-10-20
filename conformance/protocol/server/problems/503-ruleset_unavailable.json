@@ -1,0 +1,8 @@
+{
+  "code": "ruleset_unavailable",
+  "detail": "this replica has not loaded the environment's ruleset yet; retry later",
+  "status": 503,
+  "title": "Ruleset unavailable",
+  "type": "urn:flagnetic:problem:ruleset_unavailable"
+}
+

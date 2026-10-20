@@ -1,0 +1,8 @@
+{
+  "code": "sdk_key_missing",
+  "detail": "an SDK key is required in Authorization: Bearer",
+  "status": 401,
+  "title": "SDK key missing",
+  "type": "urn:flagnetic:problem:sdk_key_missing"
+}
+

@@ -1,0 +1,8 @@
+{
+  "code": "unsupported_media_type",
+  "detail": "the body must be application/json",
+  "status": 415,
+  "title": "Unsupported media type",
+  "type": "urn:flagnetic:problem:unsupported_media_type"
+}
+

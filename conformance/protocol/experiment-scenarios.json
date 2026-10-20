@@ -1,0 +1,818 @@
+{
+  "answers": {
+    "server/ruleset-experiment.json": [
+      {
+        "flag": "pricing",
+        "type": "string",
+        "default": "Built-in price",
+        "value": "new",
+        "variation": "treatment",
+        "reason": "experiment",
+        "experiment": {
+          "key": "pricing_test",
+          "variation": "treatment",
+          "unit_type": "user",
+          "unit_id": "u-1001",
+          "inclusion_salt": "pricing-in-7f3a",
+          "variation_salt": "pricing-var-c41e",
+          "inclusion_bucket": 6716,
+          "variation_bucket": 272,
+          "override": false
+        }
+      },
+      {
+        "flag": "recommendations",
+        "type": "boolean",
+        "default": false,
+        "value": true,
+        "variation": "on",
+        "reason": "experiment",
+        "experiment": {
+          "key": "recommendations_test",
+          "variation": "on",
+          "unit_type": "user",
+          "unit_id": "u-1001",
+          "inclusion_salt": "reco-in-2b9d",
+          "variation_salt": "reco-var-5e17",
+          "inclusion_bucket": 5983,
+          "variation_bucket": 3252,
+          "override": false
+        }
+      }
+    ],
+    "server/evaluation-experiment.json": [
+      {
+        "flag": "pricing",
+        "type": "string",
+        "default": "Built-in price",
+        "value": "new",
+        "variation": "treatment",
+        "reason": "experiment",
+        "experiment": {
+          "key": "pricing_test",
+          "variation": "treatment",
+          "unit_type": "user",
+          "unit_id": "u-1001",
+          "inclusion_salt": "pricing-in-7f3a",
+          "variation_salt": "pricing-var-c41e",
+          "inclusion_bucket": 6716,
+          "variation_bucket": 272,
+          "override": false
+        }
+      },
+      {
+        "flag": "recommendations",
+        "type": "boolean",
+        "default": false,
+        "value": true,
+        "variation": "on",
+        "reason": "experiment",
+        "experiment": {
+          "key": "recommendations_test",
+          "variation": "on",
+          "unit_type": "user",
+          "unit_id": "u-1001",
+          "inclusion_salt": "reco-in-2b9d",
+          "variation_salt": "reco-var-5e17",
+          "inclusion_bucket": 5983,
+          "variation_bucket": 3252,
+          "override": false
+        }
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "name": "server: an answer carries the experiment block",
+      "mode": "server",
+      "covers": "experiments: a running experiment's assignment is served with reason experiment and the experiment block an exposure needs",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": false,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/ruleset",
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"3\"",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "body": "server/ruleset-experiment.json"
+          },
+          "expect": {
+            "stage": "fresh",
+            "answers_of": "server/ruleset-experiment.json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "server: an explicit exposure is sent with its envelope",
+      "mode": "server",
+      "covers": "experiments: Exposure after an evaluation carrying an experiment block sends one exposure naming the experiment, the flag, the variation and the unit",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/ruleset",
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"3\"",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "body": "server/ruleset-experiment.json"
+          },
+          "expect": {
+            "stage": "fresh"
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "pricing",
+            "type": "string",
+            "default": "Built-in price"
+          }
+        },
+        {
+          "call": {
+            "op": "exposure",
+            "flag": "pricing"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "events": {
+              "types": [
+                "exposure"
+              ],
+              "exposures": [
+                {
+                  "experiment_key": "pricing_test",
+                  "flag_key": "pricing",
+                  "variation_key": "treatment",
+                  "unit_type": "user",
+                  "unit_id": "u-1001",
+                  "evaluation_reason": "experiment",
+                  "override": false,
+                  "platform": "linux",
+                  "app_version": "1.18.0",
+                  "ruleset_version": 3
+                }
+              ]
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "server: an evaluation alone records no exposure",
+      "mode": "server",
+      "covers": "experiments: evaluating a flag in a running experiment is not an exposure; without Exposure and without automatic_exposure nothing is sent",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/ruleset",
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"3\"",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "body": "server/ruleset-experiment.json"
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "pricing",
+            "type": "string",
+            "default": "Built-in price",
+            "times": 3
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "no_request": {
+            "path": "/sdk/v1/events",
+            "for_ms": 1000
+          }
+        }
+      ]
+    },
+    {
+      "name": "server: automatic exposure follows the flag's setting",
+      "mode": "server",
+      "covers": "experiments: a flag with automatic_exposure records an exposure after an evaluation carrying an experiment block, with no Exposure call",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/ruleset",
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"3\"",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "body": "server/ruleset-experiment.json"
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "recommendations",
+            "type": "boolean",
+            "default": false
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "events": {
+              "types": [
+                "exposure"
+              ],
+              "exposures": [
+                {
+                  "experiment_key": "recommendations_test",
+                  "flag_key": "recommendations",
+                  "variation_key": "on",
+                  "unit_type": "user",
+                  "unit_id": "u-1001",
+                  "evaluation_reason": "experiment",
+                  "override": false,
+                  "ruleset_version": 3
+                }
+              ]
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "server: repeated exposures of one assignment are sent once",
+      "mode": "server",
+      "covers": "experiments: repeats per experiment, unit and variation are suppressed for at least the flush interval, explicit and automatic alike",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/ruleset",
+            "headers": {
+              "Authorization": "Bearer <sdk key>"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "ETag": "\"3\"",
+              "Vary": "Authorization, Accept-Encoding"
+            },
+            "body": "server/ruleset-experiment.json"
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "pricing",
+            "type": "string",
+            "default": "Built-in price"
+          }
+        },
+        {
+          "call": {
+            "op": "exposure",
+            "flag": "pricing",
+            "times": 3
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "recommendations",
+            "type": "boolean",
+            "default": false,
+            "times": 3
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "events": {
+              "types": [
+                "exposure",
+                "exposure"
+              ],
+              "exposures": [
+                {
+                  "experiment_key": "pricing_test",
+                  "variation_key": "treatment",
+                  "unit_id": "u-1001"
+                },
+                {
+                  "experiment_key": "recommendations_test",
+                  "variation_key": "on",
+                  "unit_id": "u-1001"
+                }
+              ]
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: an answer carries the experiment block",
+      "mode": "client",
+      "covers": "experiments: a client key's evaluate response carries the reason experiment and the experiment block, which a client-mode SDK serves as it is",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": false,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation-experiment.json"
+          },
+          "expect": {
+            "stage": "fresh",
+            "answers_of": "server/evaluation-experiment.json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: an explicit exposure is sent with its envelope",
+      "mode": "client",
+      "covers": "experiments: Exposure after reading a value that carries an experiment block sends one exposure from the response's block",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation-experiment.json"
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "pricing",
+            "type": "string",
+            "default": "Built-in price"
+          }
+        },
+        {
+          "call": {
+            "op": "exposure",
+            "flag": "pricing"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "events": {
+              "types": [
+                "exposure"
+              ],
+              "exposures": [
+                {
+                  "experiment_key": "pricing_test",
+                  "flag_key": "pricing",
+                  "variation_key": "treatment",
+                  "unit_type": "user",
+                  "unit_id": "u-1001",
+                  "evaluation_reason": "experiment",
+                  "override": false,
+                  "ruleset_version": 3
+                }
+              ]
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: automatic exposure follows the flag's setting",
+      "mode": "client",
+      "covers": "experiments: a flag whose evaluate answer has automatic_exposure records an exposure when its value is read, with no Exposure call",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation-experiment.json"
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "recommendations",
+            "type": "boolean",
+            "default": false,
+            "times": 3
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "events": {
+              "types": [
+                "exposure"
+              ],
+              "exposures": [
+                {
+                  "experiment_key": "recommendations_test",
+                  "flag_key": "recommendations",
+                  "variation_key": "on",
+                  "unit_type": "user",
+                  "unit_id": "u-1001",
+                  "evaluation_reason": "experiment",
+                  "override": false,
+                  "ruleset_version": 3
+                }
+              ]
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: an evaluation alone records no exposure",
+      "mode": "client",
+      "covers": "experiments: reading a value that carries an experiment block is not an exposure; without Exposure and without automatic_exposure nothing is sent",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation-experiment.json"
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "pricing",
+            "type": "string",
+            "default": "Built-in price",
+            "times": 3
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "no_request": {
+            "path": "/sdk/v1/events",
+            "for_ms": 1000
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: repeated exposures of one assignment are sent once",
+      "mode": "client",
+      "covers": "experiments: repeats per experiment, unit and variation are suppressed for at least the flush interval, explicit and automatic alike",
+      "given": {
+        "options": {
+          "poll_interval_ms": 3600000,
+          "flush_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation-experiment.json"
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "pricing",
+            "type": "string",
+            "default": "Built-in price"
+          }
+        },
+        {
+          "call": {
+            "op": "exposure",
+            "flag": "pricing",
+            "times": 3
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "recommendations",
+            "type": "boolean",
+            "default": false,
+            "times": 3
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "events": {
+              "types": [
+                "exposure",
+                "exposure"
+              ],
+              "exposures": [
+                {
+                  "experiment_key": "pricing_test",
+                  "variation_key": "treatment",
+                  "unit_id": "u-1001"
+                },
+                {
+                  "experiment_key": "recommendations_test",
+                  "variation_key": "on",
+                  "unit_id": "u-1001"
+                }
+              ]
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        }
+      ]
+    }
+  ]
+}

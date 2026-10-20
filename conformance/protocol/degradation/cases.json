@@ -1,0 +1,1281 @@
+{
+  "cases": [
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "rule",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallthrough",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-empty-body",
+      "outcome": "keep_held",
+      "response": {
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"3\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "an empty body is not a ruleset"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "rule",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallthrough",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-empty-object",
+      "outcome": "keep_held",
+      "response": {
+        "body": "degradation/ruleset-empty-object.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"3\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "{} lacks schema_version, version and scope"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "rule",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallthrough",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-truncated",
+      "outcome": "keep_held",
+      "response": {
+        "body": "degradation/ruleset-truncated.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"3\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "the JSON does not parse"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "rule",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallthrough",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-schema-version-above-requested",
+      "outcome": "keep_held",
+      "response": {
+        "body": "degradation/ruleset-schema-version-above-requested.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"3\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "schema_version 2 is above the Flagnetic-Schema-Version the SDK sent (absent: 1)"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "rule",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallthrough",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-unknown-fields",
+      "outcome": "accept",
+      "response": {
+        "body": "degradation/ruleset-unknown-fields.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"3\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "unknown fields are ignored at every level"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "fallback",
+          "type": "string",
+          "value": "Built-in banner"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "rule",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallthrough",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-unknown-operator",
+      "outcome": "accept",
+      "response": {
+        "body": "degradation/ruleset-unknown-operator.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"3\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "an unknown operator is an evaluation error (inconsistent_ruleset) where it is reached: the built-in default with reason fallback",
+      "logs": {
+        "rule_unsupported": 1
+      }
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "fallback",
+          "type": "boolean",
+          "value": false
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallback",
+          "type": "boolean",
+          "value": false
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-unknown-condition-kind",
+      "outcome": "accept",
+      "response": {
+        "body": "degradation/ruleset-unknown-condition-kind.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"3\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "an unknown condition kind is an evaluation error where it is reached, and a prerequisite's error is its dependent's",
+      "logs": {
+        "rule_unsupported": 1
+      }
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "fallback",
+          "type": "boolean",
+          "value": false
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallback",
+          "type": "boolean",
+          "value": false
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-unknown-rule-kind",
+      "outcome": "accept",
+      "response": {
+        "body": "degradation/ruleset-unknown-rule-kind.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"3\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "a rule serving an unknown kind is an evaluation error when it matches, and a prerequisite's error is its dependent's",
+      "logs": {
+        "rule_unsupported": 1
+      }
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "rule",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallthrough",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "fallback",
+          "type": "json",
+          "value": {
+            "mode": "system"
+          }
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-unknown-flag-type",
+      "outcome": "accept",
+      "response": {
+        "body": "degradation/ruleset-unknown-flag-type.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"3\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "a flag of an unknown type is absent"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "off",
+          "type": "boolean",
+          "value": false,
+          "variation": "false"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "prerequisite_failed",
+          "type": "boolean",
+          "value": false,
+          "variation": "false"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset-after-kill-switch.json",
+      "name": "ruleset-lower-version",
+      "outcome": "keep_held",
+      "response": {
+        "body": "server/ruleset.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"1\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "a held ruleset is never replaced by a lower version"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "rule",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "rule",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "fallthrough",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "fallthrough",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "GET /sdk/v1/ruleset",
+      "held": "server/ruleset.json",
+      "name": "ruleset-evaluate-response",
+      "outcome": "keep_held",
+      "response": {
+        "body": "server/evaluation.json",
+        "headers": {
+          "Cache-Control": "private, no-cache",
+          "Content-Type": "application/json",
+          "ETag": "\"1\"",
+          "Vary": "Authorization, Accept-Encoding"
+        },
+        "status": 200
+      },
+      "why": "an evaluate response is not a ruleset: it has no version and no scope"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "targeting_match",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "targeting_match",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "POST /sdk/v1/evaluate",
+      "held": "server/evaluation.json",
+      "name": "evaluation-empty-body",
+      "outcome": "keep_held",
+      "response": {
+        "headers": {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      },
+      "why": "an empty body is not an evaluate response"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "targeting_match",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "targeting_match",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "POST /sdk/v1/evaluate",
+      "held": "server/evaluation.json",
+      "name": "evaluation-empty-object",
+      "outcome": "keep_held",
+      "response": {
+        "body": "degradation/evaluation-empty-object.json",
+        "headers": {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      },
+      "why": "{} lacks schema_version, ruleset_version and flags"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "targeting_match",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "targeting_match",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "POST /sdk/v1/evaluate",
+      "held": "server/evaluation.json",
+      "name": "evaluation-truncated",
+      "outcome": "keep_held",
+      "response": {
+        "body": "degradation/evaluation-truncated.json",
+        "headers": {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      },
+      "why": "the JSON does not parse"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "targeting_match",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "targeting_match",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "POST /sdk/v1/evaluate",
+      "held": "server/evaluation.json",
+      "name": "evaluation-schema-version-above-requested",
+      "outcome": "keep_held",
+      "response": {
+        "body": "degradation/evaluation-schema-version-above-requested.json",
+        "headers": {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      },
+      "why": "schema_version 2 is above the Flagnetic-Schema-Version the SDK sent (absent: 1)"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "targeting_match",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "targeting_match",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "POST /sdk/v1/evaluate",
+      "held": "server/evaluation.json",
+      "name": "evaluation-unknown-fields",
+      "outcome": "accept",
+      "response": {
+        "body": "degradation/evaluation-unknown-fields.json",
+        "headers": {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      },
+      "why": "unknown fields are ignored at every level"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "targeting_match",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "targeting_match",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "fallback",
+          "type": "json",
+          "value": {
+            "mode": "system"
+          }
+        }
+      ],
+      "endpoint": "POST /sdk/v1/evaluate",
+      "held": "server/evaluation.json",
+      "name": "evaluation-unknown-flag-type",
+      "outcome": "accept",
+      "response": {
+        "body": "degradation/evaluation-unknown-flag-type.json",
+        "headers": {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      },
+      "why": "a flag of an unknown type is absent"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "targeting_match",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "targeting_match",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "future_reason",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "POST /sdk/v1/evaluate",
+      "held": "server/evaluation.json",
+      "name": "evaluation-unknown-reason",
+      "outcome": "accept",
+      "response": {
+        "body": "degradation/evaluation-unknown-reason.json",
+        "headers": {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      },
+      "why": "an unknown evaluation reason is passed through as a string with the served value"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "targeting_match",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "off",
+          "type": "boolean",
+          "value": false,
+          "variation": "false"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "targeting_match",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": false,
+          "variation": "false"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "POST /sdk/v1/evaluate",
+      "held": "server/evaluation-after-kill-switch.json",
+      "name": "evaluation-lower-ruleset-version",
+      "outcome": "keep_held",
+      "response": {
+        "body": "server/evaluation.json",
+        "headers": {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      },
+      "why": "a held evaluate response is never replaced by one computed from a lower ruleset version"
+    },
+    {
+      "answers": [
+        {
+          "default": "Built-in banner",
+          "flag": "banner_text",
+          "reason": "targeting_match",
+          "type": "string",
+          "value": "Try free",
+          "variation": "short"
+        },
+        {
+          "default": false,
+          "flag": "checkout",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": 0,
+          "flag": "max_items",
+          "reason": "targeting_match",
+          "type": "number",
+          "value": 10,
+          "variation": "few"
+        },
+        {
+          "default": false,
+          "flag": "new_search",
+          "reason": "targeting_match",
+          "type": "boolean",
+          "value": true,
+          "variation": "true"
+        },
+        {
+          "default": {
+            "mode": "system"
+          },
+          "flag": "theme",
+          "reason": "off",
+          "type": "json",
+          "value": {
+            "mode": "light"
+          },
+          "variation": "light"
+        }
+      ],
+      "endpoint": "POST /sdk/v1/evaluate",
+      "held": "server/evaluation.json",
+      "name": "evaluation-ruleset",
+      "outcome": "keep_held",
+      "response": {
+        "body": "server/ruleset.json",
+        "headers": {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      },
+      "why": "a ruleset is not an evaluate response: it has no ruleset_version and its flags are a list"
+    },
+    {
+      "endpoint": "POST /sdk/v1/events",
+      "name": "events-unknown-event-type",
+      "outcome": "never_retry_rejected",
+      "response": {
+        "body": "server/events-mixed.json",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 202
+      },
+      "why": "the server rejects an event type it does not know per event (event_type_unknown), as it rejects invalid events; the batch was answered, so nothing is retried"
+    }
+  ],
+  "context": {
+    "attributes": {
+      "app_version": "1.18.0",
+      "country": "DE",
+      "favourite_colour": "green",
+      "plan": 42,
+      "platform": "linux"
+    },
+    "units": {
+      "anonymous": "d-8f1c",
+      "user": "u-1001"
+    }
+  },
+  "defaults": {
+    "banner_text": "Built-in banner",
+    "checkout": false,
+    "max_items": 0,
+    "new_search": false,
+    "theme": {
+      "mode": "system"
+    }
+  }
+}

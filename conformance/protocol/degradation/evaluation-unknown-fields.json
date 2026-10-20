@@ -1,0 +1,68 @@
+{
+  "environment": {
+    "key": "production",
+    "protected": true
+  },
+  "flags": {
+    "banner_text": {
+      "automatic_exposure": true,
+      "override_influenced": false,
+      "reason": "targeting_match",
+      "type": "string",
+      "value": "Try free",
+      "variation": "short"
+    },
+    "checkout": {
+      "automatic_exposure": false,
+      "future_flag_field": 1,
+      "override_influenced": false,
+      "reason": "targeting_match",
+      "type": "boolean",
+      "value": true,
+      "variation": "true"
+    },
+    "max_items": {
+      "automatic_exposure": false,
+      "override_influenced": false,
+      "reason": "targeting_match",
+      "type": "number",
+      "value": 10,
+      "variation": "few"
+    },
+    "new_search": {
+      "automatic_exposure": false,
+      "override_influenced": false,
+      "reason": "targeting_match",
+      "type": "boolean",
+      "value": true,
+      "variation": "true"
+    },
+    "theme": {
+      "automatic_exposure": false,
+      "override_influenced": false,
+      "reason": "off",
+      "type": "json",
+      "value": {
+        "mode": "light"
+      },
+      "variation": "light"
+    }
+  },
+  "future_field": {
+    "anything": [
+      "goes"
+    ]
+  },
+  "ignored_attributes": [
+    {
+      "code": "undeclared",
+      "name": "favourite_colour"
+    },
+    {
+      "code": "type_mismatch",
+      "name": "plan"
+    }
+  ],
+  "ruleset_version": 1,
+  "schema_version": 1
+}

@@ -108,7 +108,7 @@ tasks:
     desc: Fail if the go.mod of any module is not tidy
     cmds:
       - for: { var: MODULES, split: "\n" }
-        cmd: cd '{{.ITEM}}' && go mod tidy -diff
+        cmd: .github/scripts/check-tidy.sh '{{.ITEM}}'
 
   # --- Local database ---
 

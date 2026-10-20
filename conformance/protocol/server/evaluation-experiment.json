@@ -1,0 +1,58 @@
+{
+  "environment": {
+    "key": "staging",
+    "protected": false
+  },
+  "flags": {
+    "pricing": {
+      "automatic_exposure": false,
+      "experiment": {
+        "inclusion_bucket": 6716,
+        "inclusion_salt": "pricing-in-7f3a",
+        "key": "pricing_test",
+        "override": false,
+        "unit_id": "u-1001",
+        "unit_type": "user",
+        "variation": "treatment",
+        "variation_bucket": 272,
+        "variation_salt": "pricing-var-c41e"
+      },
+      "override_influenced": false,
+      "reason": "experiment",
+      "type": "string",
+      "value": "new",
+      "variation": "treatment"
+    },
+    "recommendations": {
+      "automatic_exposure": true,
+      "experiment": {
+        "inclusion_bucket": 5983,
+        "inclusion_salt": "reco-in-2b9d",
+        "key": "recommendations_test",
+        "override": false,
+        "unit_id": "u-1001",
+        "unit_type": "user",
+        "variation": "on",
+        "variation_bucket": 3252,
+        "variation_salt": "reco-var-5e17"
+      },
+      "override_influenced": false,
+      "reason": "experiment",
+      "type": "boolean",
+      "value": true,
+      "variation": "on"
+    }
+  },
+  "ignored_attributes": [
+    {
+      "code": "undeclared",
+      "name": "favourite_colour"
+    },
+    {
+      "code": "type_mismatch",
+      "name": "plan"
+    }
+  ],
+  "ruleset_version": 3,
+  "schema_version": 1
+}

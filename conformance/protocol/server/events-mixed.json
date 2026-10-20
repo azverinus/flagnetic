@@ -1,0 +1,32 @@
+{
+  "accepted": 2,
+  "dropped_rows": 1,
+  "duplicates": 1,
+  "rejected": [
+    {
+      "code": "event_type_unknown",
+      "detail": "this server does not know events of type \"future_event\"",
+      "event_id": "01a0b91b-c500-7000-8000-000000000004",
+      "index": 3
+    },
+    {
+      "code": "event_id_invalid",
+      "detail": "event_id must be a lowercase UUIDv7",
+      "event_id": "not-a-uuid",
+      "index": 4
+    },
+    {
+      "code": "event_invalid",
+      "detail": "from_unit_id is missing",
+      "event_id": "01a0b91b-c500-7000-8000-000000000005",
+      "index": 5
+    },
+    {
+      "code": "out_of_window",
+      "detail": "the event_id time is older than the raw retention",
+      "event_id": "01a01976-a100-7000-8000-000000000006",
+      "index": 6
+    }
+  ]
+}
+

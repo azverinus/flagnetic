@@ -1,0 +1,27 @@
+{
+  "environment": {
+    "key": "production",
+    "protected": true
+  },
+  "flags": {
+    "banner_text": {
+      "automatic_exposure": true,
+      "override_influenced": false,
+      "reason": "targeting_match",
+      "type": "string",
+      "value": "Try free",
+      "variation": "short"
+    },
+    "checkout": {
+      "automatic_exposure": false,
+      "override_influenced": false,
+      "reason": "targeting_match",
+      "type": "boolean",
+      "value": true,
+      "variation": "true"
+    },
+    "max_items": {
+      "automatic_exposure": false,
+      "override_influenced": false,
+      "reason": "targeting_match",
+      "typ

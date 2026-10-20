@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "version": 1,
+  "scope": "server",
+  "environment": {
+    "key": "staging",
+    "protected": false
+  },
+  "unit_types": [
+    "anonymous",
+    "user"
+  ],
+  "attributes": [
+    {
+      "key": "app_id",
+      "type": "string"
+    },
+    {
+      "key": "app_version",
+      "type": "semver"
+    },
+    {
+      "key": "build_number",
+      "type": "number"
+    },
+    {
+      "key": "country",
+      "type": "string"
+    },
+    {
+      "key": "locale",
+      "type": "string"
+    },
+    {
+      "key": "os",
+      "type": "string"
+    },
+    {
+      "key": "os_version",
+      "type": "semver"
+    },
+    {
+      "key": "plan",
+      "type": "string"
+    },
+    {
+      "key": "platform",
+      "type": "string"
+    },
+    {
+      "key": "sdk",
+      "type": "string"
+    },
+    {
+      "key": "sdk_version",
+      "type": "semver"
+    }
+  ],
+  "segments": [
+    {
+      "key": "employees",
+      "private": true,
+      "conditions": [
+        {
+          "kind": "attribute",
+          "attribute": "user",
+          "op": "in",
+          "value": [
+            "u-1001",
+            "u-1002"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pro",
+      "private": false,
+      "conditions": [
+        {
+          "kind": "attribute",
+          "attribute": "plan",
+          "op": "eq",
+          "value": "pro"
+        }
+      ]
+    }
+  ],
+  "flags": [
+    {
+      "key": "banner_text",
+      "type": "string",
+      "automatic_exposure": true,
+      "variations": [
+        {
+          "key": "short",
+          "value": "Try free"
+        },
+        {
+          "key": "long",
+          "value": "Start your free trial"
+        }
+      ],
+      "on": true,
+      "off_variation": "short",
+      "fallthrough": "long"
+    },
+    {
+      "key": "checkout",
+      "type": "boolean",
+      "automatic_exposure": false,
+      "variations": [
+        {
+          "key": "true",
+          "value": true
+        },
+        {
+          "key": "false",
+          "value": false
+        }
+      ],
+      "on": true,
+      "off_variation": "false",
+      "fallthrough": "true"
+    },
+    {
+      "key": "max_items",
+      "type": "number",
+      "automatic_exposure": false,
+      "variations": [
+        {
+          "key": "few",
+          "value": 10
+        },
+        {
+          "key": "many",
+          "value": 50
+        }
+      ],
+      "on": false,
+      "off_variation": "few",
+      "fallthrough": "few"
+    },
+    {
+      "key": "new_search",
+      "type": "boolean",
+      "automatic_exposure": false,
+      "variations": [
+        {
+          "key": "true",
+          "value": true
+        },
+        {
+          "key": "false",
+          "value": false
+        }
+      ],
+      "on": false,
+      "off_variation": "false",
+      "fallthrough": "true"
+    },
+    {
+      "key": "theme",
+      "type": "json",
+      "automatic_exposure": false,
+      "variations": [
+        {
+          "key": "light",
+          "value": {
+            "mode": "light"
+          }
+        },
+        {
+          "key": "dark",
+          "value": {
+            "mode": "dark",
+            "contrast": "high"
+          }
+        }
+      ],
+      "on": false,
+      "off_variation": "light",
+      "fallthrough": "light"
+    }
+  ]
+}

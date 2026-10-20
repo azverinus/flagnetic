@@ -181,7 +181,7 @@ jobs:
           done
           cat "$GOWORK"
       - name: go.mod is tidy
-        run: go mod tidy -diff
+        run: '"$GITHUB_WORKSPACE/.github/scripts/check-tidy.sh" .'
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14.0
@@ -199,6 +199,18 @@ jobs:
             echo "### Coverage of $MODULE (go $GO)"
             "$GITHUB_WORKSPACE/.github/scripts/check-coverage.sh" "$MODULE" coverage.out "$GITHUB_WORKSPACE/.github/coverage-floors"
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Kill-switch propagation
+        # The Go SDK promises that a kill switch reaches the change
+        # callback within two seconds; the measured time goes next to it.
+        if: matrix.dir == 'sdks/go'
+        env:
+          GO: ${{ matrix.go }}
+        run: |
+          set -o pipefail
+          go test -count=1 -v -run 'TestEventAboveTheHeldVersionReachesTheChangeCallbackWithinTwoSeconds$' . |
+            tee /dev/stderr | grep -o 'kill_switch_propagation_ms=[0-9]*' |
+            sed "s/kill_switch_propagation_ms=/Kill-switch propagation (go $GO): /; s/\$/ ms (target 2000 ms)/" \
+            >> "$GITHUB_STEP_SUMMARY"
       - name: Scan reachable code
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 

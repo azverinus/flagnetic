@@ -1,0 +1,8 @@
+{
+  "code": "key_kind_not_allowed",
+  "detail": "the ruleset is served to server keys only; a client key uses remote evaluation",
+  "status": 403,
+  "title": "Key kind not allowed",
+  "type": "urn:flagnetic:problem:key_kind_not_allowed"
+}
+
