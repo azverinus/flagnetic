@@ -1,0 +1,20 @@
+{
+  "code": "context_invalid",
+  "detail": "the context breaks a limit; errors names every field at fault",
+  "errors": [
+    {
+      "code": "string_too_long",
+      "detail": "a string is at most 256 characters",
+      "field": "context.attributes.country"
+    },
+    {
+      "code": "unit_id_too_long",
+      "detail": "a unit ID is at most 256 bytes",
+      "field": "context.units.user"
+    }
+  ],
+  "status": 422,
+  "title": "Context invalid",
+  "type": "urn:flagnetic:problem:context_invalid"
+}
+

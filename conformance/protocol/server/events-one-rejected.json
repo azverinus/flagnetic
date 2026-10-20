@@ -1,0 +1,14 @@
+{
+  "accepted": 1,
+  "dropped_rows": 0,
+  "duplicates": 0,
+  "rejected": [
+    {
+      "code": "event_invalid",
+      "detail": "from_unit_id is missing",
+      "event_id": "01a0b91b-c500-7000-8000-000000000008",
+      "index": 1
+    }
+  ]
+}
+

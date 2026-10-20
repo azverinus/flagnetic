@@ -1,0 +1,865 @@
+[
+  {
+    "name": "ruleset",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <server key>"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "private, no-cache",
+        "Content-Type": "application/json",
+        "ETag": "\"1\"",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "599",
+        "Vary": "Authorization, Accept-Encoding"
+      },
+      "body": "server/ruleset.json"
+    }
+  },
+  {
+    "name": "ruleset not modified",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <server key>",
+        "If-None-Match": "\"1\""
+      }
+    },
+    "response": {
+      "status": 304,
+      "headers": {
+        "Cache-Control": "private, no-cache",
+        "ETag": "\"1\"",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "598",
+        "Vary": "Authorization, Accept-Encoding"
+      }
+    }
+  },
+  {
+    "name": "ruleset with a stale ETag",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <server key>",
+        "If-None-Match": "\"0\""
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "private, no-cache",
+        "Content-Type": "application/json",
+        "ETag": "\"1\"",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "597",
+        "Vary": "Authorization, Accept-Encoding"
+      },
+      "body": "server/ruleset.json"
+    }
+  },
+  {
+    "name": "ruleset for a newer schema",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <server key>",
+        "Flagnetic-Schema-Version": "99"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "private, no-cache",
+        "Content-Type": "application/json",
+        "ETag": "\"1\"",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "596",
+        "Vary": "Authorization, Accept-Encoding"
+      },
+      "body": "server/ruleset.json"
+    }
+  },
+  {
+    "name": "ruleset of an unprotected environment",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <staging server key>"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "private, no-cache",
+        "Content-Type": "application/json",
+        "ETag": "\"1\"",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "599",
+        "Vary": "Authorization, Accept-Encoding"
+      },
+      "body": "server/ruleset-unprotected.json"
+    }
+  },
+  {
+    "name": "evaluation",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/evaluate",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "context": {
+          "attributes": {
+            "app_version": "1.18.0",
+            "country": "DE",
+            "favourite_colour": "green",
+            "plan": 42,
+            "platform": "linux"
+          },
+          "units": {
+            "anonymous": "d-8f1c",
+            "user": "u-1001"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Type": "application/json",
+        "RateLimit-Limit": "120",
+        "RateLimit-Remaining": "119",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/evaluation.json"
+    }
+  },
+  {
+    "name": "evaluation of an unprotected environment",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/evaluate",
+      "headers": {
+        "Authorization": "Bearer <staging client key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "context": {
+          "attributes": {
+            "app_version": "1.18.0",
+            "country": "DE",
+            "favourite_colour": "green",
+            "plan": 42,
+            "platform": "linux"
+          },
+          "units": {
+            "anonymous": "d-8f1c",
+            "user": "u-1001"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Type": "application/json",
+        "RateLimit-Limit": "120",
+        "RateLimit-Remaining": "119",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/evaluation-unprotected.json"
+    }
+  },
+  {
+    "name": "events",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/events",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "events": [
+          {
+            "type": "alias",
+            "event_id": "01a0b91b-c500-7000-8000-000000000001",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "from_unit_type": "anonymous",
+            "from_unit_id": "d-8f1c",
+            "to_unit_type": "user",
+            "to_unit_id": "u-1001"
+          }
+        ],
+        "schema_version": 1,
+        "sdk": {
+          "name": "flagnetic-dart",
+          "platform": "linux",
+          "version": "1.0.0"
+        },
+        "sent_at": "2026-09-19T10:00:00Z"
+      }
+    },
+    "response": {
+      "status": 202,
+      "headers": {
+        "Content-Type": "application/json",
+        "RateLimit-Limit": "60",
+        "RateLimit-Remaining": "59",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/events-accepted.json"
+    }
+  },
+  {
+    "name": "events with a duplicate and rejections",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/events",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "events": [
+          {
+            "type": "alias",
+            "event_id": "01a0b91b-c500-7000-8000-000000000001",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "from_unit_type": "anonymous",
+            "from_unit_id": "d-8f1c",
+            "to_unit_type": "user",
+            "to_unit_id": "u-1001"
+          },
+          {
+            "type": "alias",
+            "event_id": "01a0b91b-c500-7000-8000-000000000002",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "from_unit_type": "anonymous",
+            "from_unit_id": "d-8f1c",
+            "to_unit_type": "user",
+            "to_unit_id": "u-1001"
+          },
+          {
+            "type": "evaluation_summary",
+            "event_id": "01a0b91b-c500-7000-8000-000000000003",
+            "interval_start": "2026-09-19T09:59:00Z",
+            "interval_end": "2026-09-19T10:00:00Z",
+            "ruleset_version": 1,
+            "app_version": "1.18.0",
+            "counts": [
+              {
+                "flag": "checkout",
+                "variation": "true",
+                "reason": "rule",
+                "count": 3
+              },
+              {
+                "flag": "banner_text",
+                "variation": null,
+                "reason": "fallback",
+                "count": 2
+              },
+              {
+                "flag": "retired_flag",
+                "variation": "on",
+                "reason": "fallthrough",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "type": "future_event",
+            "event_id": "01a0b91b-c500-7000-8000-000000000004",
+            "occurred_at": "2026-09-19T10:00:00Z"
+          },
+          {
+            "type": "alias",
+            "event_id": "not-a-uuid",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "from_unit_type": "anonymous",
+            "from_unit_id": "d-8f1c",
+            "to_unit_type": "user",
+            "to_unit_id": "u-1001"
+          },
+          {
+            "type": "alias",
+            "event_id": "01a0b91b-c500-7000-8000-000000000005",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "from_unit_type": "anonymous",
+            "to_unit_type": "user",
+            "to_unit_id": "u-1001"
+          },
+          {
+            "type": "alias",
+            "event_id": "01a01976-a100-7000-8000-000000000006",
+            "occurred_at": "2026-08-19T10:00:00Z",
+            "from_unit_type": "anonymous",
+            "from_unit_id": "d-8f1c",
+            "to_unit_type": "user",
+            "to_unit_id": "u-1001"
+          }
+        ],
+        "schema_version": 1,
+        "sdk": {
+          "name": "flagnetic-dart",
+          "platform": "linux",
+          "version": "1.0.0"
+        },
+        "sent_at": "2026-09-19T10:00:00Z"
+      }
+    },
+    "response": {
+      "status": 202,
+      "headers": {
+        "Content-Type": "application/json",
+        "RateLimit-Limit": "60",
+        "RateLimit-Remaining": "58",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/events-mixed.json"
+    }
+  },
+  {
+    "name": "events with one rejection",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/events",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "events": [
+          {
+            "type": "alias",
+            "event_id": "01a0b91b-c500-7000-8000-000000000007",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "from_unit_type": "anonymous",
+            "from_unit_id": "d-8f1c",
+            "to_unit_type": "user",
+            "to_unit_id": "u-1001"
+          },
+          {
+            "type": "alias",
+            "event_id": "01a0b91b-c500-7000-8000-000000000008",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "from_unit_type": "anonymous",
+            "to_unit_type": "user",
+            "to_unit_id": "u-1001"
+          }
+        ],
+        "schema_version": 1,
+        "sdk": {
+          "name": "flagnetic-dart",
+          "platform": "linux",
+          "version": "1.0.0"
+        },
+        "sent_at": "2026-09-19T10:00:00Z"
+      }
+    },
+    "response": {
+      "status": 202,
+      "headers": {
+        "Content-Type": "application/json",
+        "RateLimit-Limit": "60",
+        "RateLimit-Remaining": "57",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/events-one-rejected.json"
+    }
+  },
+  {
+    "name": "truncated JSON",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/evaluate",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "application/json"
+      },
+      "raw_body": "{\"context\": {\"units\": {\"user\": \"u-1"
+    },
+    "response": {
+      "status": 400,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "RateLimit-Limit": "120",
+        "RateLimit-Remaining": "118",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/400-malformed_body.json"
+    }
+  },
+  {
+    "name": "no key",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset"
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "Vary": "Accept-Encoding",
+        "WWW-Authenticate": "Bearer"
+      },
+      "body": "server/problems/401-sdk_key_missing.json"
+    }
+  },
+  {
+    "name": "unknown key",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <unknown server key>"
+      }
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "Vary": "Accept-Encoding",
+        "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_invalid\""
+      },
+      "body": "server/problems/401-sdk_key_invalid.json"
+    }
+  },
+  {
+    "name": "revoked key",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <revoked server key>"
+      }
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "Vary": "Accept-Encoding",
+        "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_revoked\""
+      },
+      "body": "server/problems/401-sdk_key_revoked.json"
+    }
+  },
+  {
+    "name": "key past its rotation overlap",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <expired server key>"
+      }
+    },
+    "response": {
+      "status": 401,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "Vary": "Accept-Encoding",
+        "WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"sdk_key_expired\""
+      },
+      "body": "server/problems/401-sdk_key_expired.json"
+    }
+  },
+  {
+    "name": "client key at the ruleset",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <client key>"
+      }
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/403-key_kind_not_allowed.json"
+    }
+  },
+  {
+    "name": "server key in the query string",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/stream?sdk_key=<server key>"
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/403-server_key_in_query.json"
+    }
+  },
+  {
+    "name": "origin not allowed",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/evaluate",
+      "headers": {
+        "Authorization": "Bearer <client key allowing https://app.example.com>",
+        "Content-Type": "application/json",
+        "Origin": "https://elsewhere.example.com"
+      },
+      "body": {
+        "context": {
+          "attributes": {
+            "app_version": "1.18.0",
+            "country": "DE",
+            "favourite_colour": "green",
+            "plan": 42,
+            "platform": "linux"
+          },
+          "units": {
+            "anonymous": "d-8f1c",
+            "user": "u-1001"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "Vary": "Origin"
+      },
+      "body": "server/problems/403-origin_not_allowed.json"
+    }
+  },
+  {
+    "name": "server key from a browser",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <server key>",
+        "Origin": "https://app.example.com"
+      }
+    },
+    "response": {
+      "status": 403,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/403-server_key_from_browser.json"
+    }
+  },
+  {
+    "name": "unknown path",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/rulesets",
+      "headers": {
+        "Authorization": "Bearer <server key>"
+      }
+    },
+    "response": {
+      "status": 404,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/404-not_found.json"
+    }
+  },
+  {
+    "name": "wrong method",
+    "request": {
+      "method": "DELETE",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <server key>"
+      }
+    },
+    "response": {
+      "status": 405,
+      "headers": {
+        "Allow": "GET, HEAD, OPTIONS",
+        "Content-Type": "application/problem+json",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/405-method_not_allowed.json"
+    }
+  },
+  {
+    "name": "schema below the lowest served",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <server key>",
+        "Flagnetic-Schema-Version": "0"
+      }
+    },
+    "response": {
+      "status": 406,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "595",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/406-schema_version_unsupported.json"
+    }
+  },
+  {
+    "name": "body over 32 KiB",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/evaluate",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "application/json"
+      },
+      "body_note": "33807 bytes"
+    },
+    "response": {
+      "status": 413,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "RateLimit-Limit": "120",
+        "RateLimit-Remaining": "117",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/413-body_too_large.json"
+    }
+  },
+  {
+    "name": "not JSON",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/evaluate",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "text/plain"
+      },
+      "body": {
+        "context": {}
+      }
+    },
+    "response": {
+      "status": 415,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "RateLimit-Limit": "120",
+        "RateLimit-Remaining": "116",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/415-unsupported_media_type.json"
+    }
+  },
+  {
+    "name": "context over the limits",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/evaluate",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "context": {
+          "units": {
+            "user": "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"
+          },
+          "attributes": {
+            "country": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 422,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "RateLimit-Limit": "120",
+        "RateLimit-Remaining": "115",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/422-context_invalid.json"
+    }
+  },
+  {
+    "name": "rate limited",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/evaluate",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "context": {
+          "attributes": {
+            "app_version": "1.18.0",
+            "country": "DE",
+            "favourite_colour": "green",
+            "plan": 42,
+            "platform": "linux"
+          },
+          "units": {
+            "anonymous": "d-8f1c",
+            "user": "u-1001"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 429,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "RateLimit-Limit": "1",
+        "RateLimit-Remaining": "0",
+        "RateLimit-Reset": "60",
+        "Retry-After": "60",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/429-rate_limited.json"
+    }
+  },
+  {
+    "name": "stream",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/stream",
+      "headers": {
+        "Authorization": "Bearer <client key>"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "no-cache",
+        "Content-Type": "text/event-stream",
+        "RateLimit-Limit": "10",
+        "RateLimit-Remaining": "9",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/stream.txt"
+    }
+  },
+  {
+    "name": "ruleset after a kill switch",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <server key>",
+        "If-None-Match": "\"1\""
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "private, no-cache",
+        "Content-Type": "application/json",
+        "ETag": "\"2\"",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "594",
+        "Vary": "Authorization, Accept-Encoding"
+      },
+      "body": "server/ruleset-after-kill-switch.json"
+    }
+  },
+  {
+    "name": "evaluation after a kill switch",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/evaluate",
+      "headers": {
+        "Authorization": "Bearer <client key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "context": {
+          "attributes": {
+            "app_version": "1.18.0",
+            "country": "DE",
+            "favourite_colour": "green",
+            "plan": 42,
+            "platform": "linux"
+          },
+          "units": {
+            "anonymous": "d-8f1c",
+            "user": "u-1001"
+          }
+        }
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "no-store",
+        "Content-Type": "application/json",
+        "RateLimit-Limit": "120",
+        "RateLimit-Remaining": "114",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/evaluation-after-kill-switch.json"
+    }
+  },
+  {
+    "name": "stream holding the current version",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/stream",
+      "headers": {
+        "Authorization": "Bearer <server key>",
+        "Last-Event-ID": "2"
+      }
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Cache-Control": "no-cache",
+        "Content-Type": "text/event-stream",
+        "RateLimit-Limit": "1000",
+        "RateLimit-Remaining": "999",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/stream-caught-up.txt"
+    }
+  },
+  {
+    "name": "ruleset on a replica that has not loaded it",
+    "request": {
+      "method": "GET",
+      "path": "/sdk/v1/ruleset",
+      "headers": {
+        "Authorization": "Bearer <server key>"
+      }
+    },
+    "response": {
+      "status": 503,
+      "headers": {
+        "Content-Type": "application/problem+json",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "599",
+        "Retry-After": "2",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/problems/503-ruleset_unavailable.json"
+    }
+  }
+]

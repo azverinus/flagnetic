@@ -1,0 +1,8 @@
+{
+  "code": "not_found",
+  "detail": "no SDK API resource at /sdk/v1/rulesets",
+  "status": 404,
+  "title": "Not found",
+  "type": "urn:flagnetic:problem:not_found"
+}
+

@@ -1,0 +1,8 @@
+{
+  "code": "sdk_key_revoked",
+  "detail": "the SDK key was revoked",
+  "status": 401,
+  "title": "SDK key revoked",
+  "type": "urn:flagnetic:problem:sdk_key_revoked"
+}
+

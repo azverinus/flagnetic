@@ -1,0 +1,8 @@
+{
+  "code": "server_key_from_browser",
+  "detail": "a server key is never used from a browser; use a client key there and rotate this one",
+  "status": 403,
+  "title": "Server key from browser",
+  "type": "urn:flagnetic:problem:server_key_from_browser"
+}
+

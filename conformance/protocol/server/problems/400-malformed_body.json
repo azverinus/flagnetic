@@ -1,0 +1,8 @@
+{
+  "code": "malformed_body",
+  "detail": "the body is not a request: unexpected end of JSON input",
+  "status": 400,
+  "title": "Malformed body",
+  "type": "urn:flagnetic:problem:malformed_body"
+}
+

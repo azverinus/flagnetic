@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "version": 1,
+  "scope": "server",
+  "environment": {
+    "key": "production",
+    "protected": true
+  },
+  "unit_types": [
+    "anonymous",
+    "user"
+  ],
+  "attributes": [
+    {
+      "key": "app_id",
+      "type": "string"
+    },
+    {
+      "key": "app_version",
+      "type": "semver"
+    },
+    {
+      "key": "build_number",
+      "type": "number"
+    },
+    {
+      "key": "country",
+      "type": "string"
+    },
+    {
+      "key": "locale",
+      "type": "string"
+    },
+    {
+      "key": "os",
+      "type": "string"
+    },
+    {
+      "key": "os_version",
+      "type": "semver"
+    },
+    {
+      "key": "plan",
+      "type": "string"
+    },
+    {
+      "key": "platform",
+      "type": "string"
+    },
+    {
+      "key": "sdk",
+      "type": "string"
+    },
+    {
+      "key": "sdk_version",
+      "type": "semver"
+    }
+  ],
+  "segments": [
+    {
+      "key": "employees",
+      "private": true,
+      "conditions": [
+        {
+          "kind": "attribute",
+          "attribute": "user",
+          "op": "in",
+          "value": [
+            "u-1001",
+            "u-1002"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pro",
+      "private": false,
+      "conditions": [
+        {
+          "kind": "attribute",
+          "attribute": "plan",
+          "op": "eq",
+          "value": "pro"
+        }
+      ]
+    }
+  ],
+  "flags": [
+    {
+      "key": "banner_text",
+      "type": "string",
+      "automatic_exposure": true,
+      "variations": [
+        {
+          "key": "short",
+          "value": "Try free"
+        },
+        {
+          "key": "long",
+          "value": "Start your free trial"
+        }
+      ],
+      "on": true,
+      "off_variation": "short",
+      "fallthrough": "long",
+      "rules": [
+        {
+          "id": "019961f0-0000-7000-8000-00000005e801",
+          "conditions": [
+            {
+              "kind": "attribute",
+              "attribute": "country",
+              "op": "eq",
+              "value": "DE"
+            }
+          ],
+          "serve": {
+            "kind": "variation",
+            "variation": "short"
+          }
+        }
+      ]
+    },
+    {
+      "key": "checkout",
+      "type": "boolean",
+      "automatic_exposure": false,
+      "variations": [
+        {
+          "key": "true",
+          "value": true
+        },
+        {
+          "key": "false",
+          "value": false
+        }
+      ],
+      "on": true,
+      "off_variation": "false",
+      "fallthrough": "false",
+      "overrides": [
+        {
+          "unit_type": "user",
+          "unit_id": "qa-7",
+          "variation": "true"
+        }
+      ],
+      "rules": [
+        {
+          "id": "019961f0-0000-7000-8000-000000064c01",
+          "conditions": [
+            {
+              "kind": "in_segment",
+              "segment": "employees"
+            }
+          ],
+          "serve": {
+            "kind": "variation",
+            "variation": "true"
+          }
+        },
+        {
+          "id": "019961f0-0000-7000-8000-000000064c02",
+          "conditions": [
+            {
+              "kind": "attribute",
+              "attribute": "app_version",
+              "op": "gte",
+              "value": "1.17.0"
+            }
+          ],
+          "serve": {
+            "kind": "rollout",
+            "variation": "true",
+            "unit_type": "user",
+            "percentage": 5000,
+            "salt": "k3f9s0d2m1x8q7wz"
+          }
+        }
+      ]
+    },
+    {
+      "key": "max_items",
+      "type": "number",
+      "automatic_exposure": false,
+      "variations": [
+        {
+          "key": "few",
+          "value": 10
+        },
+        {
+          "key": "many",
+          "value": 50
+        }
+      ],
+      "on": true,
+      "off_variation": "few",
+      "fallthrough": "few",
+      "rules": [
+        {
+          "id": "019961f0-0000-7000-8000-0000000a7401",
+          "conditions": [
+            {
+              "kind": "in_segment",
+              "segment": "pro"
+            }
+          ],
+          "serve": {
+            "kind": "variation",
+            "variation": "many"
+          }
+        }
+      ]
+    },
+    {
+      "key": "new_search",
+      "type": "boolean",
+      "automatic_exposure": false,
+      "variations": [
+        {
+          "key": "true",
+          "value": true
+        },
+        {
+          "key": "false",
+          "value": false
+        }
+      ],
+      "on": true,
+      "off_variation": "false",
+      "fallthrough": "true",
+      "prerequisites": [
+        {
+          "flag": "checkout",
+          "variation": "true"
+        }
+      ]
+    },
+    {
+      "key": "theme",
+      "type": "json",
+      "automatic_exposure": false,
+      "variations": [
+        {
+          "key": "light",
+          "value": {
+            "mode": "light"
+          }
+        },
+        {
+          "key": "dark",
+          "value": {
+            "mode": "dark",
+            "contrast": "high"
+          }
+        }
+      ],
+      "on": false,
+      "off_variation": "light",
+      "fallthrough": "dark"
+    }
+  ]
+}

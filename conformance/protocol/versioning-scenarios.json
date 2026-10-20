@@ -1,0 +1,370 @@
+{
+  "scenarios": [
+    {
+      "name": "server: a schema_version outside the supported range is a failure logged once",
+      "mode": "server",
+      "covers": "versioning: Flagnetic-Schema-Version carries the highest supported schema; a document outside the supported range → the fallback chain keeps the held document, schema_unsupported logged once",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "note": "a supported document",
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/ruleset",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Flagnetic-Schema-Version": "1"
+            },
+            "absent_headers": [
+              "If-None-Match"
+            ]
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "Vary": "Authorization, Accept-Encoding",
+              "ETag": "\"1\""
+            },
+            "body": "server/ruleset.json"
+          },
+          "expect": {
+            "stage": "fresh",
+            "stale_since": "unset",
+            "answers_of": "server/ruleset.json",
+            "logs": {
+              "schema_unsupported": 0
+            }
+          }
+        },
+        {
+          "note": "a schema_version above the one requested",
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/ruleset",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Flagnetic-Schema-Version": "1",
+              "If-None-Match": "\"1\""
+            },
+            "delay_ms": {
+              "min": 30000,
+              "max": 31000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "Vary": "Authorization, Accept-Encoding",
+              "ETag": "\"1\""
+            },
+            "body": "degradation/ruleset-schema-version-above-requested.json"
+          },
+          "expect": {
+            "stage": "last_good",
+            "stale_since": "set",
+            "answers_of": "server/ruleset.json",
+            "logs": {
+              "schema_unsupported": 1
+            }
+          }
+        },
+        {
+          "note": "the same document again: a failure again, not logged again",
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/ruleset",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Flagnetic-Schema-Version": "1",
+              "If-None-Match": "\"1\""
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "Vary": "Authorization, Accept-Encoding",
+              "ETag": "\"1\""
+            },
+            "body": "degradation/ruleset-schema-version-above-requested.json"
+          },
+          "expect": {
+            "stage": "last_good",
+            "stale_since": "set",
+            "answers_of": "server/ruleset.json",
+            "logs": {
+              "schema_unsupported": 1
+            }
+          }
+        },
+        {
+          "note": "a supported document ends the failure",
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/ruleset",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Flagnetic-Schema-Version": "1",
+              "If-None-Match": "\"1\""
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 2000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "private, no-cache",
+              "Content-Type": "application/json",
+              "Vary": "Authorization, Accept-Encoding",
+              "ETag": "\"2\""
+            },
+            "body": "server/ruleset-after-kill-switch.json"
+          },
+          "expect": {
+            "stage": "fresh",
+            "stale_since": "unset",
+            "answers_of": "server/ruleset-after-kill-switch.json",
+            "logs": {
+              "schema_unsupported": 1
+            }
+          }
+        },
+        {
+          "call": {
+            "op": "alias"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "note": "events carry the header too",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json",
+              "Flagnetic-Schema-Version": "1"
+            },
+            "events": {
+              "types": [
+                "alias"
+              ]
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: a schema_version outside the supported range is a failure logged once",
+      "mode": "client",
+      "covers": "versioning: Flagnetic-Schema-Version carries the highest supported schema; a document outside the supported range → the fallback chain keeps the held document, schema_unsupported logged once",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 30000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "note": "a supported document",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Flagnetic-Schema-Version": "1",
+              "Content-Type": "application/json"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation.json"
+          },
+          "expect": {
+            "stage": "fresh",
+            "stale_since": "unset",
+            "answers_of": "server/evaluation.json",
+            "logs": {
+              "schema_unsupported": 0
+            }
+          }
+        },
+        {
+          "note": "a schema_version above the one requested",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Flagnetic-Schema-Version": "1",
+              "Content-Type": "application/json"
+            },
+            "delay_ms": {
+              "min": 30000,
+              "max": 31000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "degradation/evaluation-schema-version-above-requested.json"
+          },
+          "expect": {
+            "stage": "last_good",
+            "stale_since": "set",
+            "answers_of": "server/evaluation.json",
+            "logs": {
+              "schema_unsupported": 1
+            }
+          }
+        },
+        {
+          "note": "the same document again: a failure again, not logged again",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Flagnetic-Schema-Version": "1",
+              "Content-Type": "application/json"
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 2000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "degradation/evaluation-schema-version-above-requested.json"
+          },
+          "expect": {
+            "stage": "last_good",
+            "stale_since": "set",
+            "answers_of": "server/evaluation.json",
+            "logs": {
+              "schema_unsupported": 1
+            }
+          }
+        },
+        {
+          "note": "a supported document ends the failure",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Flagnetic-Schema-Version": "1",
+              "Content-Type": "application/json"
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 4000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation-after-kill-switch.json"
+          },
+          "expect": {
+            "stage": "fresh",
+            "stale_since": "unset",
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "logs": {
+              "schema_unsupported": 1
+            }
+          }
+        },
+        {
+          "call": {
+            "op": "alias"
+          }
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "note": "events carry the header too",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json",
+              "Flagnetic-Schema-Version": "1"
+            },
+            "events": {
+              "types": [
+                "alias"
+              ]
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        }
+      ]
+    }
+  ]
+}
