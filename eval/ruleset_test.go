@@ -2,6 +2,7 @@ package eval_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -138,5 +139,59 @@ func TestServerOnlyFlagEncodesWithoutConfiguration(t *testing.T) {
 	var back eval.Flag
 	if err := json.Unmarshal(got, &back); err != nil || !back.On || back.Rules[0].ID != "r1" {
 		t.Errorf("configured flag does not round-trip: %s, %v", got, err)
+	}
+}
+
+// TestUnsupportedRulesNamesOnlyUnknownOperatorsKindsAndServes: a known
+// operator on the wrong type, a known condition kind where it does not
+// belong, or a missing operator or kind is a defect of the ruleset rather
+// than something a newer server sent, and an unknown flag type or unknown
+// field keeps its treatment; none of them is reported. An unknown operator is reported even on an attribute
+// the document does not declare.
+func TestUnsupportedRulesNamesOnlyUnknownOperatorsKindsAndServes(t *testing.T) {
+	rs := decode(t, []byte(`{"schema_version":1,"version":1,"scope":"server","unit_types":["user"],
+		"attributes":[{"key":"plan","type":"string"}],
+		"segments":[{"key":"nested","private":false,"conditions":[{"kind":"in_segment","segment":"other"}]}],
+		"flags":[
+		  {"key":"wrong_type","type":"boolean","on":true,"off_variation":"f","fallthrough":"f",
+		   "variations":[{"key":"f","value":false}],
+		   "rules":[{"id":"r1","conditions":[{"kind":"attribute","attribute":"plan","op":"lt","value":"a"}],"serve":{"kind":"variation","variation":"f"}}]},
+		  {"key":"future_type","type":"duration","on":true,"off_variation":"f","fallthrough":"f","future_field":1,
+		   "variations":[{"key":"f","value":"1s"}]},
+		  {"key":"segment_defect","type":"boolean","on":true,"off_variation":"f","fallthrough":"f",
+		   "variations":[{"key":"f","value":false}],
+		   "rules":[{"id":"r1","conditions":[{"kind":"in_segment","segment":"nested"}],"serve":{"kind":"variation","variation":"f"}}]},
+		  {"key":"missing_names","type":"boolean","on":true,"off_variation":"f","fallthrough":"f",
+		   "variations":[{"key":"f","value":false}],
+		   "rules":[{"id":"r1","conditions":[{"kind":"attribute","attribute":"plan","value":"a"},{"attribute":"plan"}],"serve":{}}]},
+		  {"key":"future_operator","type":"boolean","on":true,"off_variation":"f","fallthrough":"f",
+		   "variations":[{"key":"f","value":false}],
+		   "rules":[{"id":"r1","conditions":[{"kind":"attribute","attribute":"undeclared","op":"near","value":"a"}],"serve":{"kind":"variation","variation":"f"}}]}]}`))
+	got := rs.UnsupportedRules()
+	want := map[string][]eval.Construct{"future_operator": {{Kind: eval.ConstructOperator, Name: "near"}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("UnsupportedRules() = %+v, want %+v", got, want)
+	}
+}
+
+// TestUnsupportedRulesIsACopy: a decoded ruleset is immutable and shared
+// across goroutines, so a caller changing the report changes nothing.
+func TestUnsupportedRulesIsACopy(t *testing.T) {
+	rs := decode(t, []byte(`{"schema_version":1,"version":1,"scope":"server",
+		"flags":[{"key":"f","type":"boolean","on":true,"off_variation":"f","fallthrough":"f",
+		  "variations":[{"key":"f","value":false}],
+		  "rules":[{"id":"r1","conditions":[],"serve":{"kind":"bandit"}}]}]}`))
+	first := rs.UnsupportedRules()
+	first["f"][0].Name = "changed"
+	delete(first, "f")
+	if got := rs.UnsupportedRules(); len(got["f"]) != 1 || got["f"][0].Name != "bandit" {
+		t.Errorf("UnsupportedRules() after a caller changed its copy = %+v", got)
+	}
+}
+
+func TestAFullySupportedRulesetReportsNothing(t *testing.T) {
+	rs := decode(t, []byte(`{"schema_version":1,"version":1,"scope":"server"}`))
+	if got := rs.UnsupportedRules(); len(got) != 0 {
+		t.Errorf("UnsupportedRules() = %+v, want empty", got)
 	}
 }

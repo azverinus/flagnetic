@@ -310,6 +310,10 @@ _Avoid_: resolution, lookup, check
 Why a value was served: matched rule, rollout, experiment, override, prerequisite failed, off, fallthrough, error, local override, or fallback. The last two are produced only by SDKs. A client key sees targeting match in place of matched rule, rollout, fallthrough and prerequisite failed, which tells it only that targeting decided the value.
 _Avoid_: source, origin
 
+**Unsupported rule**:
+A rule holding an operator, condition kind or serve kind that an SDK's evaluator does not know, typically sent by a server newer than the SDK. The evaluator finds it when it decodes the ruleset; the SDK reports it once per flag and ruleset version, and wherever evaluating the flag reaches it, the flag serves the fallback with an error until the SDK is upgraded.
+_Avoid_: unknown rule, invalid rule, broken rule
+
 **Built-in default**:
 The value compiled into the client application, used when no ruleset has ever been received.
 _Avoid_: code default, hardcoded value

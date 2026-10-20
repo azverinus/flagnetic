@@ -1,0 +1,310 @@
+{
+  "name": "semver/unparsable-list-items",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "unit_types": [
+      "user"
+    ],
+    "attributes": [
+      {
+        "key": "app_version",
+        "type": "semver"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "in_valid_list",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "app_version",
+                "op": "in",
+                "value": [
+                  "1.2.0",
+                  "v1.3"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "in_list_with_unparsable_item",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "app_version",
+                "op": "in",
+                "value": [
+                  "1.2.0",
+                  "not-a-version"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "not_in_valid_list",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "app_version",
+                "op": "not_in",
+                "value": [
+                  "1.3.0"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "not_in_only_unparsable",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "app_version",
+                "op": "not_in",
+                "value": [
+                  "garbage"
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      },
+      {
+        "key": "not_in_list_with_unparsable_item",
+        "type": "boolean",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "true",
+            "value": true
+          },
+          {
+            "key": "false",
+            "value": false
+          }
+        ],
+        "on": true,
+        "off_variation": "false",
+        "fallthrough": "false",
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "app_version",
+                "op": "not_in",
+                "value": [
+                  "1.3.0",
+                  ""
+                ]
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "true"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "a version in a valid list matches",
+      "context": {
+        "attributes": {
+          "app_version": "1.2.0"
+        }
+      },
+      "flag": "in_valid_list",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "an unparsable item makes in not match, even for a listed version",
+      "context": {
+        "attributes": {
+          "app_version": "1.2.0"
+        }
+      },
+      "flag": "in_list_with_unparsable_item",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a version outside a valid list matches not_in",
+      "context": {
+        "attributes": {
+          "app_version": "1.2.0"
+        }
+      },
+      "flag": "not_in_valid_list",
+      "expect": {
+        "type": "boolean",
+        "value": true,
+        "variation": "true",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a list of only unparsable items makes not_in not match every version",
+      "context": {
+        "attributes": {
+          "app_version": "1.2.0"
+        }
+      },
+      "flag": "not_in_only_unparsable",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "an unparsable item makes not_in not match, even for an unlisted version",
+      "context": {
+        "attributes": {
+          "app_version": "1.2.0"
+        }
+      },
+      "flag": "not_in_list_with_unparsable_item",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "an absent attribute does not match not_in with an unparsable item",
+      "context": {},
+      "flag": "not_in_list_with_unparsable_item",
+      "expect": {
+        "type": "boolean",
+        "value": false,
+        "variation": "false",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

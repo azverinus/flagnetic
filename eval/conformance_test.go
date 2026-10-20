@@ -31,7 +31,10 @@ type murmurVectors struct {
 type fixture struct {
 	Name    string          `json:"name"`
 	Ruleset json.RawMessage `json:"ruleset"`
-	Cases   []struct {
+	// Unsupported is the decode report the ruleset must produce, by flag
+	// key; a fixture without it expects an empty report.
+	Unsupported map[string][]eval.Construct `json:"unsupported"`
+	Cases       []struct {
 		Name    string          `json:"name"`
 		Context eval.Context    `json:"context"`
 		Flag    string          `json:"flag"`
@@ -113,6 +116,9 @@ func runFixture(t *testing.T, rel string, data []byte) {
 	rs, err := eval.Decode(f.Ruleset)
 	if err != nil {
 		t.Fatalf("decode ruleset: %v", err)
+	}
+	if got := rs.UnsupportedRules(); !(len(got) == 0 && len(f.Unsupported) == 0) && !reflect.DeepEqual(got, f.Unsupported) {
+		t.Errorf("unsupported rules\n got:  %s\n want: %s", mustJSON(got), mustJSON(f.Unsupported))
 	}
 	if len(f.Cases) == 0 {
 		t.Fatal("no cases")

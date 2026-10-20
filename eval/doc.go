@@ -19,7 +19,7 @@
 //	rs, err := eval.Decode(document)
 //	r := rs.Evaluate(eval.Context{
 //		Units:      map[string]string{"user": "u-1001"},
-//		Attributes: map[string]any{"app_version": "1.18.0"},
+//		Attributes: map[string]any{"plan": "pro", "app_version": "1.18.0"},
 //	}, "new_checkout")
 //
 // A decoded Ruleset is immutable and safe for concurrent use.
@@ -57,6 +57,11 @@
 //     the document, or a condition that cannot be evaluated, is error
 //     inconsistent_ruleset, only when evaluation reaches it.
 //
+// An operator, condition kind or serve kind this evaluator does not know,
+// typically sent by a server newer than it, is an unsupported rule: Decode
+// reports it per flag through Ruleset.UnsupportedRules, so an SDK can say
+// once that it must be upgraded, and evaluating it is step 7.
+//
 // override_influenced is true when an override decided the result or any
 // prerequisite sub-evaluation consulted on the way (flag-level or
 // condition, held or failed) was override-influenced. Only what was
@@ -67,14 +72,15 @@
 //
 // An absent attribute, null, or a value of the wrong type makes every
 // operator false except not_exists, which is then true. There is no
-// coercion: "5" is not a number. An unparseable semver or date is a value
-// of the wrong type in a context and makes the condition false in a
-// condition value. Strings compare byte-wise on UTF-8, case-sensitive;
-// numbers are IEEE 754 doubles; regular expressions are RE2 syntax and
-// search anywhere in the string unless anchored. A unit type named as an
-// attribute is a string attribute holding that unit's ID.
+// coercion: "5" is not a number. An unparsable semver or date in a context
+// is a value of the wrong type. In a condition value it makes the condition
+// false, and so does one unparsable item of an in or not_in list. Strings
+// compare byte-wise on UTF-8, case-sensitive; numbers are IEEE 754 doubles;
+// regular expressions are RE2 syntax and search anywhere in the string
+// unless anchored. A unit type named as an attribute is a string attribute
+// holding that unit's ID.
 //
-// # Bucketing
+// # Buckets
 //
 // Bucket is MurmurHash3 x86 32-bit, seed 0, over the UTF-8 bytes of
 // "{salt}.{unit_id}", read unsigned, mod 10000. It equals ClickHouse

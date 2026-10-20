@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 )
 
 // SchemaVersion is the ruleset schema version this evaluator reads.
@@ -53,6 +54,35 @@ func (rs *Ruleset) Flag(key string) (*Flag, bool) {
 		return nil, false
 	}
 	return f.Flag, true
+}
+
+// ConstructKind says what an unsupported construct is.
+type ConstructKind string
+
+// Kinds of construct a ruleset may hold that this evaluator does not know.
+const (
+	ConstructOperator      ConstructKind = "operator"
+	ConstructConditionKind ConstructKind = "condition_kind"
+	ConstructServeKind     ConstructKind = "serve_kind"
+)
+
+// Construct is one operator, condition kind or serve kind of a ruleset
+// that this evaluator does not know.
+type Construct struct {
+	Kind ConstructKind `json:"kind"`
+	Name string        `json:"name"`
+}
+
+// UnsupportedRules reports, by flag key, the constructs each flag holds
+// that this evaluator does not know, in document order, each once. A flag
+// holds what its rules hold and what the segments its rules name hold.
+// It is empty for a ruleset this evaluator fully supports.
+func (rs *Ruleset) UnsupportedRules() map[string][]Construct {
+	out := make(map[string][]Construct, len(rs.index.unsupported))
+	for key, constructs := range rs.index.unsupported {
+		out[key] = slices.Clone(constructs)
+	}
+	return out
 }
 
 // Attribute is a declared attribute with its type.
@@ -224,6 +254,9 @@ var errInconsistent = errors.New("inconsistent ruleset")
 type index struct {
 	flags    map[string]*compiledFlag
 	segments map[string]*compiledSegment
+	// unsupported holds, by flag key, the constructs of flags that hold one
+	// this evaluator does not know.
+	unsupported map[string][]Construct
 }
 
 type compiledFlag struct {
@@ -233,7 +266,26 @@ type compiledFlag struct {
 }
 
 type compiledSegment struct {
-	conditions []compiledCondition
+	conditions  []compiledCondition
+	unsupported []Construct
+}
+
+// conditionKinds is every condition kind this evaluator knows. A segment
+// holds only attribute conditions; another known kind there is a defect of
+// the ruleset, an unknown one is an unsupported construct.
+var conditionKinds = map[string]bool{
+	ConditionAttribute: true, ConditionInSegment: true, ConditionNotInSegment: true, ConditionPrerequisite: true,
+}
+
+// serveKinds is every serve kind this evaluator knows.
+var serveKinds = map[string]bool{ServeVariation: true, ServeRollout: true, ServeExperiment: true}
+
+// addConstruct appends c to list unless c is nil or list already holds it.
+func addConstruct(list []Construct, c *Construct) []Construct {
+	if c == nil || slices.Contains(list, *c) {
+		return list
+	}
+	return append(list, *c)
 }
 
 func buildIndex(rs *Ruleset) *index {
@@ -249,8 +301,9 @@ func buildIndex(rs *Ruleset) *index {
 	c := compiler{types: types, units: units}
 
 	idx := &index{
-		flags:    make(map[string]*compiledFlag, len(rs.Flags)),
-		segments: make(map[string]*compiledSegment, len(rs.Segments)),
+		flags:       make(map[string]*compiledFlag, len(rs.Flags)),
+		segments:    make(map[string]*compiledSegment, len(rs.Segments)),
+		unsupported: map[string][]Construct{},
 	}
 	for i := range rs.Segments {
 		s := &rs.Segments[i]
@@ -258,9 +311,13 @@ func buildIndex(rs *Ruleset) *index {
 		for j, cond := range s.Conditions {
 			if cond.Kind != ConditionAttribute {
 				cs.conditions[j] = compiledCondition{err: fmt.Errorf("%w: segment %q has a %q condition", errInconsistent, s.Key, cond.Kind)}
+				if !conditionKinds[cond.Kind] {
+					cs.unsupported = addConstruct(cs.unsupported, unsupported(ConstructConditionKind, cond.Kind))
+				}
 				continue
 			}
 			cs.conditions[j] = c.compile(cond)
+			cs.unsupported = addConstruct(cs.unsupported, cs.conditions[j].unsupported)
 		}
 		idx.segments[s.Key] = cs
 	}
@@ -274,12 +331,25 @@ func buildIndex(rs *Ruleset) *index {
 		for _, v := range f.Variations {
 			cf.variations[v.Key] = v.Value
 		}
+		var found []Construct
 		for j, r := range f.Rules {
 			conds := make([]compiledCondition, len(r.Conditions))
 			for k, cond := range r.Conditions {
 				conds[k] = c.compile(cond)
+				found = addConstruct(found, conds[k].unsupported)
+				if s, ok := idx.segments[conds[k].segment]; ok && conds[k].segment != "" {
+					for _, u := range s.unsupported {
+						found = addConstruct(found, &u)
+					}
+				}
 			}
 			cf.rules[j] = conds
+			if !serveKinds[r.Serve.Kind] {
+				found = addConstruct(found, unsupported(ConstructServeKind, r.Serve.Kind))
+			}
+		}
+		if len(found) > 0 {
+			idx.unsupported[f.Key] = found
 		}
 		idx.flags[f.Key] = cf
 	}

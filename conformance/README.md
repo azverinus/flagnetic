@@ -32,7 +32,7 @@ A runner decodes `ruleset`, evaluates `flag` for `context`, and compares its res
 | `type`, `automatic_exposure` | the flag is known: every result but an `error` with `flag_not_found` |
 | `value`, `variation` | a variation is served (absent for `error`) |
 | `reason` | always: `off`, `override`, `rule`, `rollout`, `experiment`, `fallthrough`, `prerequisite_failed`, `error` |
-| `rule_id` | reason `rule`, `rollout` or `experiment` |
+| `rule_id` | reason `rule`, `rollout` or `experiment`, and the rule's identifier is not empty |
 | `experiment` | reason `experiment`, and reason `override` when the shadow evaluation lands in a running experiment: `key`, `variation`, `unit_type`, `unit_id`, `inclusion_salt`, `variation_salt`, `inclusion_bucket`, `variation_bucket`, `override` |
 | `prerequisite` | reason `prerequisite_failed`: the flag-level prerequisite that failed |
 | `bucket` | reason `rollout` |
@@ -41,13 +41,31 @@ A runner decodes `ruleset`, evaluates `flag` for `context`, and compares its res
 
 Values compare as JSON (the number `5` equals `5.0`). Fixtures carry the ruleset's `schema_version`; when it is bumped, old fixtures stay.
 
+A fixture may also carry `unsupported`: the report the evaluator must produce when it decodes `ruleset`, by flag key, each flag's unknown constructs in document order and each once. A fixture without it expects an empty report.
+
+```json
+"unsupported": {
+  "unknown_operator": [ { "kind": "operator", "name": "glob_matches" } ]
+}
+```
+
+## Unsupported rules
+
+A server newer than an SDK may send an operator, a condition kind or a serve kind the SDK's evaluator does not know: an **unsupported rule**. Every SDK handles it the same way:
+
+- The evaluator finds it when it decodes the ruleset and reports, per flag, each unknown construct as `{kind, name}` with `kind` one of `operator`, `condition_kind`, `serve_kind`. A flag holds what its rules hold and what the segments its rules name hold. A known operator applied to a type it is not defined for, a known condition kind where it does not belong, an unknown flag type and an unknown field are not reported: the first two are defects of the ruleset, the last two keep their own treatment.
+- Evaluating the flag answers `error` with `inconsistent_ruleset` when evaluation reaches the unknown construct, so the SDK serves the fallback. A flag that is off, or that matched an earlier rule, serves as usual. Every other flag evaluates normally.
+- The SDK logs `rule_unsupported` once per flag and ruleset version, naming the flag and its constructs: evaluating the flag again, or receiving the same version again, logs nothing more; a new version that still holds it logs again. The fix is to upgrade the SDK.
+
+`unsupported/rules` pins the report and the evaluation results.
+
 The evaluator always returns the true reason. Which reasons a caller may see is decided where a result leaves the server, never in the evaluator or its fixtures.
 
 ## Semantics the fixtures pin
 
 Where prose leaves a choice, the fixture decides, and every implementation must agree.
 
-- An absent, `null` or wrong-typed attribute makes every operator false except `not_exists`, which is true. An unparseable semver or date in a context is wrong-typed; in a condition value it makes the condition false. A condition value of the wrong JSON type, an operator not defined for the type, or a regex outside RE2 is `inconsistent_ruleset`.
+- An absent, `null` or wrong-typed attribute makes every operator false except `not_exists`, which is true. An unparseable semver or date in a context is wrong-typed; in a condition value it makes the condition false, and so does one unparseable item of a semver `in` or `not_in` list (`not_in ["garbage"]` never matches every version). A condition value of the wrong JSON type, an operator not defined for the type, or a regex outside RE2 is `inconsistent_ruleset`.
 - Semver: optional lower-case `v`; one to three dot-separated integers of any size, leading zeros ignored (`1.05` equals `1.5.0`); pre-release and build identifiers are non-empty `[0-9A-Za-z-]` runs; pre-release numeric identifiers compare numerically, leading zeros ignored.
 - Dates: RFC 3339 with an offset, or integral Unix epoch milliseconds (a JSON number) in contexts; comparison is strict on instants.
 - `matches` searches anywhere in the string unless the pattern is anchored.

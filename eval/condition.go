@@ -17,6 +17,9 @@ import (
 type compiledCondition struct {
 	kind string
 	err  error
+	// unsupported is set, beside err, when the condition holds an operator
+	// or condition kind this evaluator does not know.
+	unsupported *Construct
 
 	// attribute
 	attribute string
@@ -35,10 +38,28 @@ type compiler struct {
 	units map[string]bool
 }
 
+// operators is every operator this evaluator knows, for any attribute type.
+// An operator outside it is an unsupported construct, typically sent by a
+// server newer than the evaluator; a known operator applied to a type it is
+// not defined for is a defect of the ruleset instead.
+var operators = map[string]bool{
+	"eq": true, "neq": true, "lt": true, "lte": true, "gt": true, "gte": true,
+	"in": true, "not_in": true, "contains": true, "not_contains": true,
+	"starts_with": true, "ends_with": true, "matches": true,
+	"before": true, "after": true,
+	"contains_any": true, "contains_all": true, "is_empty": true,
+	"exists": true, "not_exists": true,
+}
+
 func (c compiler) compile(cond Condition) compiledCondition {
 	cc := compiledCondition{kind: cond.Kind}
 	switch cond.Kind {
 	case ConditionAttribute:
+		if !operators[cond.Op] {
+			cc.err = fmt.Errorf("%w: unknown operator %q", errInconsistent, cond.Op)
+			cc.unsupported = unsupported(ConstructOperator, cond.Op)
+			return cc
+		}
 		typ, ok := c.types[cond.Attribute]
 		if !ok {
 			cc.err = fmt.Errorf("%w: attribute %q is not declared", errInconsistent, cond.Attribute)
@@ -56,8 +77,19 @@ func (c compiler) compile(cond Condition) compiledCondition {
 		cc.flag, cc.variation = cond.Flag, cond.Variation
 	default:
 		cc.err = fmt.Errorf("%w: unknown condition kind %q", errInconsistent, cond.Kind)
+		cc.unsupported = unsupported(ConstructConditionKind, cond.Kind)
 	}
 	return cc
+}
+
+// unsupported is the construct of a kind with a name this evaluator does
+// not know, or nil for a missing name: no server sends that, so it is a
+// defect of the ruleset rather than a reason to upgrade.
+func unsupported(kind ConstructKind, name string) *Construct {
+	if name == "" {
+		return nil
+	}
+	return &Construct{Kind: kind, Name: name}
 }
 
 // CheckOperator returns why this evaluator cannot apply op with value to an
@@ -65,7 +97,7 @@ func (c compiler) compile(cond Condition) compiledCondition {
 // value must have the JSON type op needs (a string, number, boolean or list
 // as decoded by encoding/json). It is the operator table the server
 // validates conditions against on write. It does not reject what the
-// evaluator treats as a false condition, such as an unparseable semantic
+// evaluator treats as a false condition, such as an unparsable semantic
 // version or date in the value.
 func CheckOperator(typ AttributeType, op string, value any) error {
 	_, err := compileOperator(typ, op, value)
@@ -202,7 +234,7 @@ func operatorTest(typ AttributeType, op string, value any) (func(any) bool, erro
 			}
 			want, ok := ParseSemver(s)
 			if !ok {
-				// An unparseable version makes the condition false.
+				// An unparsable version makes the condition false.
 				return func(any) bool { return false }, nil
 			}
 			return compare(op, func(x any) int { return x.(Semver).Compare(want) }), nil
@@ -211,11 +243,16 @@ func operatorTest(typ AttributeType, op string, value any) (func(any) bool, erro
 			if !ok {
 				return nil, fmt.Errorf("operator %q needs a list of strings", op)
 			}
-			var set []Semver
+			set := make([]Semver, 0, len(list))
 			for _, s := range list {
-				if v, ok := ParseSemver(s); ok {
-					set = append(set, v)
+				v, ok := ParseSemver(s)
+				if !ok {
+					// An unparsable version makes the condition false, as it
+					// does for eq and neq: skipping it instead would make
+					// not_in ["garbage"] match every version.
+					return func(any) bool { return false }, nil
 				}
+				set = append(set, v)
 			}
 			negate := op == "not_in"
 			return func(x any) bool {
@@ -232,7 +269,7 @@ func operatorTest(typ AttributeType, op string, value any) (func(any) bool, erro
 			}
 			want, ok := parseRFC3339(s)
 			if !ok {
-				// An unparseable date makes the condition false.
+				// An unparsable date makes the condition false.
 				return func(any) bool { return false }, nil
 			}
 			if op == "before" {
