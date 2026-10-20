@@ -1,0 +1,89 @@
+# Architecture
+
+This document is the map for contributors: what lives where, which way dependencies point, and why. It describes the target shape; the code is being assembled into it slice by slice, so some directories below do not exist yet.
+
+## The system in one paragraph
+
+Flagnetic is one Go binary with an embedded web console, backed by PostgreSQL and nothing else. SDKs download a **ruleset** (the flags, segments and experiments of one environment) and evaluate it in memory, so a flag check never makes a network call. The server keeps rulesets current over polling and server-sent events, ingests exposures and evaluation summaries from SDKs, and offers a management API that everything in the console is built on.
+
+## Repository layout
+
+```
+api/            OpenAPI documents: management, SDK and SCIM APIs. The contracts are written first; code is generated from them.
+cmd/flagnetic/  The binary's entry point and composition root.
+internal/       The server (layers below).
+eval/           The reference evaluator: its own Go module, standard library only, shared by the server and the Go SDK.
+conformance/    Language-neutral evaluation fixtures and SDK protocol scenarios every SDK must pass.
+sdks/           SDKs, one directory per language, each released on its own tag.
+web/            The console (React), built into the binary.
+e2e/            End-to-end harness that runs the real binary against each SDK.
+docs/           User and operator documentation.
+```
+
+## Layers of the server
+
+```
+internal/
+  domain/<context>/     Entities, value objects, invariants. Plain Go.
+  app/<context>/        Use cases: command and query handlers, and the ports they need.
+  infra/in/...          Inbound adapters: HTTP APIs, SSO callbacks, workers, CLI.
+  infra/out/...         Outbound adapters: PostgreSQL repositories, mail, ClickHouse, object storage, outbound HTTP.
+  shared/               Kernel types every layer may use: error kinds, IDs, clock.
+  pkg/                  Code that knows nothing about Flagnetic (for example the transaction-in-context helper).
+```
+
+**Dependencies point inwards.** `infra` may import `app` and `domain`; `app` may import `domain`; `domain` imports only `shared`, `eval` and the standard library, and never `pgx`, `net/http` or `database/sql`. `pkg` imports nothing from `internal`. These rules are enforced by `depguard` in CI (see `.golangci.yml`), so a violation fails the build rather than a review.
+
+**Domain.** Rules that must always hold live here and nowhere else: a flag key's pattern, which variation a rule may serve, an experiment's status transitions, which permissions a grant may carry. Domain code does no I/O and reads no clock: time and IDs are passed in. It is tested with plain unit and property tests.
+
+**Application.** One handler per use case, a struct holding exactly the dependencies it uses, rather than a service with twenty methods. Commands change state, queries read it. A handler declares the ports it needs as small interfaces next to itself (the consumer defines the interface), loads aggregates through repositories, calls the domain, and saves. Command and query types are the application's own; generated OpenAPI types never reach this layer.
+
+**Infrastructure.** Inbound adapters translate a request into a command or query and a result back into a response; they hold no rules. Outbound adapters implement ports: one PostgreSQL repository package per context, with hand-written SQL.
+
+Data crosses layers as: HTTP DTO → command → domain model → result → HTTP DTO.
+
+## Bounded contexts
+
+| Context | Owns |
+|---|---|
+| workspace | projects, environments, unit types, declared and discovered attributes |
+| access | members, sessions, tokens, permissions, roles, grants, SSO and SCIM identities |
+| flags | flags, variations, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch |
+| segments | segments and their conditions |
+| experiments | experiments, their status machine, assignment, the sample-ratio check |
+| delivery | rulesets, their versions and materialization, SDK keys |
+| events | exposures, aliases, evaluation summaries, rollups, retention |
+| governance | protected environments, change requests, scheduled changes, the audit log, webhooks, notices |
+| integrations | sinks to ClickHouse, object storage and webhooks; import and export |
+
+A context reaches another only through an application port, never by importing the other context's adapters.
+
+## Transactions
+
+A command handler is the unit of work. It wraps its work in `Transactor.Within(ctx, fn)`; repositories take the transaction from the context, or use the pool outside one. No port or domain type mentions the database driver. A command that touches several aggregates (applying a change request writes a flag configuration, its audit entry and an outbox row) does it all inside one `Within`. Row locks are explicit repository methods, so the lock order of a use case is visible in its handler. Side effects outside the database (webhooks, mail, sinks) go through an outbox written in the same transaction and delivered by workers.
+
+## Errors
+
+Domain and application code return errors of a small set of kinds from `internal/shared/errors` (not found, conflict, invalid, forbidden, precondition failed, unavailable), each with a stable machine-readable code. The HTTP adapter maps kinds to status codes and writes RFC 9457 problem documents in one place. Nothing below the adapter knows about HTTP.
+
+## Contracts
+
+The OpenAPI documents in `api/` are the source of truth for the management, SDK and SCIM APIs; servers and the console's client are generated from them, and CI fails if generated code is stale. The SDK protocol and ruleset format are versioned: once an SDK is released, `/sdk/v1` and the ruleset `schema_version` only change additively, because a mobile app in a store keeps calling the server for years.
+
+## Evaluation
+
+`eval/` is the reference evaluator. Every SDK implements the same semantics and proves it against `conformance/fixtures` (inputs, rulesets, expected results) and `conformance/protocol` (scripted exchanges with a mock server). A change to evaluation lands as a fixture first; every evaluator stays red until it passes. Bucketing is a published formula (MurmurHash3 over salt and unit), so anyone can recompute a unit's variation.
+
+## Tests
+
+- **Domain**: unit and property tests, no I/O.
+- **PostgreSQL adapters and application handlers**: against a real PostgreSQL (testcontainers locally, a service container in CI), one migrated schema per package. Repositories are never faked.
+- **HTTP APIs**: black-box acceptance tests through the generated clients against an in-process server.
+- **Evaluators**: the conformance fixtures. **SDKs**: a mock server per the protocol scenarios, plus one end-to-end run against the real binary.
+- **Console**: Vitest for components, Playwright against a running server.
+
+Tests observe state through the API or a repository's query, never by reading tables. Coverage floors per layer are enforced in CI.
+
+## Background work
+
+Workers (ruleset notifications, rollups, retention, webhook and sink delivery, scheduled changes) run in every replica under one runner that recovers panics and exports metrics. Replicas coordinate through PostgreSQL: advisory locks, `FOR UPDATE SKIP LOCKED` leases, and `LISTEN/NOTIFY`.

@@ -1,0 +1,130 @@
+# Developer commands. Install Task (https://taskfile.dev), then `task` lists them.
+#
+# `task check` runs locally what CI runs on every pull request. Tests start a
+# PostgreSQL through testcontainers unless DATABASE_URL is set; `task db:up`
+# gives you a long-lived one instead (copy .env.example to .env).
+version: "3"
+
+dotenv: [".env"]
+
+vars:
+  BIN: bin/flagnetic
+  DB_CONTAINER: flagnetic-dev-postgres
+  DB_PORT: '{{.DB_PORT | default "5432"}}'
+  # Tools run at pinned versions through `go run`, so nothing needs installing
+  # beyond Go and Task; they are built with the toolchain go.mod pins.
+  GOLANGCI_LINT: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+  GOVULNCHECK: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4
+  ACTIONLINT: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+  GOTESTSUM: go run gotest.tools/gotestsum@v1.13.0
+
+tasks:
+  default:
+    silent: true
+    cmds:
+      - task --list
+
+  # --- Build ---
+
+  build:
+    desc: Build the binary into bin/flagnetic
+    cmds:
+      - go build -trimpath -o {{.BIN}} ./cmd/flagnetic
+
+  run:
+    desc: Build and run the binary (pass arguments after --)
+    deps: [build]
+    cmds:
+      - ./{{.BIN}} {{.CLI_ARGS}}
+
+  docker:build:
+    desc: Build the production image flagnetic:dev
+    cmds:
+      - docker build -f deploy/Dockerfile --build-arg VERSION=dev -t flagnetic:dev .
+
+  generate:
+    desc: Regenerate code from api/*.yaml
+    cmds:
+      - go generate ./...
+
+  # --- Checks (what CI runs) ---
+
+  check:
+    desc: Run every CI check locally (lint, tests, vulnerabilities, tidy)
+    cmds:
+      - task: lint
+      - task: test
+      - task: vuln
+      - task: tidy
+
+  lint:
+    desc: Lint Go code (layer rules included) and the CI workflows
+    cmds:
+      - '{{.GOLANGCI_LINT}} run ./...'
+      - '{{.ACTIONLINT}}'
+
+  fmt:
+    desc: Format Go code
+    cmds:
+      - '{{.GOLANGCI_LINT}} fmt ./...'
+
+  test:
+    desc: Run the Go tests with the race detector
+    cmds:
+      - '{{.GOTESTSUM}} --format pkgname -- -race ./...'
+
+  test:cover:
+    desc: Run the Go tests and open the coverage report
+    cmds:
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -func=coverage.out | tail -n 1
+      - go tool cover -html=coverage.out
+
+  vuln:
+    desc: Scan reachable code for known vulnerabilities
+    cmds:
+      - '{{.GOVULNCHECK}} ./...'
+
+  tidy:
+    desc: Tidy go.mod and fail if it changed
+    cmds:
+      - go mod tidy
+      - git diff --exit-code -- go.mod $(ls go.sum 2>/dev/null)
+
+  # --- Local database ---
+
+  db:up:
+    desc: Start a development PostgreSQL in Docker (DB_PORT, default 5432)
+    run: once
+    status:
+      - docker ps --filter name=^{{.DB_CONTAINER}}$ --filter status=running -q | grep -q .
+    cmds:
+      - docker start {{.DB_CONTAINER}} 2>/dev/null ||
+        docker run -d --name {{.DB_CONTAINER}}
+          -e POSTGRES_DB=flagnetic -e POSTGRES_USER=flagnetic -e POSTGRES_PASSWORD=flagnetic
+          -p 127.0.0.1:{{.DB_PORT}}:5432 -v flagnetic-dev-postgres:/var/lib/postgresql/data
+          postgres:17-alpine
+      - until docker exec {{.DB_CONTAINER}} pg_isready -U flagnetic -d flagnetic >/dev/null 2>&1; do sleep 0.5; done
+
+  db:down:
+    desc: Stop the development PostgreSQL (data is kept)
+    cmds:
+      - docker stop {{.DB_CONTAINER}}
+
+  db:reset:
+    desc: Delete the development PostgreSQL and its data
+    prompt: This deletes the development database. Continue?
+    cmds:
+      - docker rm -f {{.DB_CONTAINER}} 2>/dev/null || true
+      - docker volume rm flagnetic-dev-postgres 2>/dev/null || true
+
+  db:psql:
+    desc: Open psql in the development PostgreSQL
+    interactive: true
+    cmds:
+      - docker exec -it {{.DB_CONTAINER}} psql -U flagnetic -d flagnetic
+
+  clean:
+    desc: Remove build output
+    cmds:
+      - rm -rf bin coverage.out

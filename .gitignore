@@ -1,0 +1,22 @@
+# Private workbench and agent notes: never committed.
+/.workbench/
+/CLAUDE.local.md
+/.claude/settings.local.json
+/.claude/worktrees/
+
+# Build output
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+go.work.sum
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local environment
+.env
