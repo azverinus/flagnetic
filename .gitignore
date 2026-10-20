@@ -1,5 +1,5 @@
-# Private workbench and agent notes: never committed.
-/.workbench/
+# Private notes and agent material: never committed.
+/.scratch/
 /CLAUDE.local.md
 /.claude/settings.local.json
 /.claude/worktrees/
