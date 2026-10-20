@@ -1,0 +1,93 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - depguard
+    - errorlint
+    - gosec
+    - misspell
+    - noctx
+    - revive
+    - unconvert
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        # Field order follows meaning, not padding.
+        - fieldalignment
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    # The layer rules of ARCHITECTURE.md: dependencies point inwards.
+    depguard:
+      rules:
+        domain:
+          files:
+            - "**/internal/domain/**"
+          deny:
+            - pkg: github.com/azverinus/flagnetic/internal/app
+              desc: the domain layer must not depend on the application layer
+            - pkg: github.com/azverinus/flagnetic/internal/infra
+              desc: the domain layer must not depend on infrastructure
+            - pkg: github.com/azverinus/flagnetic/internal/pkg
+              desc: the domain layer uses only the standard library, eval and shared
+            - pkg: github.com/jackc/pgx
+              desc: persistence belongs in infra/out/postgres
+            - pkg: database/sql
+              desc: persistence belongs in infra/out/postgres
+            - pkg: net/http
+              desc: transport belongs in infra
+            - pkg: os/exec
+              desc: the domain layer performs no I/O
+        app:
+          files:
+            - "**/internal/app/**"
+          deny:
+            - pkg: github.com/azverinus/flagnetic/internal/infra
+              desc: the application layer declares ports; infra implements them
+            - pkg: github.com/jackc/pgx
+              desc: persistence belongs in infra/out/postgres; use the Transactor port
+            - pkg: database/sql
+              desc: persistence belongs in infra/out/postgres
+            - pkg: net/http
+              desc: transport belongs in infra
+        shared:
+          files:
+            - "**/internal/shared/**"
+          deny:
+            - pkg: github.com/azverinus/flagnetic/internal/domain
+              desc: shared is the kernel; it depends on no layer
+            - pkg: github.com/azverinus/flagnetic/internal/app
+              desc: shared is the kernel; it depends on no layer
+            - pkg: github.com/azverinus/flagnetic/internal/infra
+              desc: shared is the kernel; it depends on no layer
+        pkg:
+          files:
+            - "**/internal/pkg/**"
+          deny:
+            - pkg: github.com/azverinus/flagnetic/internal/domain
+              desc: pkg knows nothing about Flagnetic
+            - pkg: github.com/azverinus/flagnetic/internal/app
+              desc: pkg knows nothing about Flagnetic
+            - pkg: github.com/azverinus/flagnetic/internal/infra
+              desc: pkg knows nothing about Flagnetic
+            - pkg: github.com/azverinus/flagnetic/internal/shared
+              desc: pkg knows nothing about Flagnetic
+  exclusions:
+    generated: strict
+    rules:
+      - path: _test\.go
+        linters: [bodyclose, gosec, noctx]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/azverinus/flagnetic
