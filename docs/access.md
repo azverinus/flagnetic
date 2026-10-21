@@ -15,6 +15,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `grant.manage` | making and removing grants | `project:admin` |
 | `project_token.manage` | listing, creating and revoking project tokens | `project:admin` |
 | `flag.edit` | creating flags and changing their definition | `flags:write` |
+| `flag.archive` | archiving, restoring and deleting flags | `flags:write` |
 
 A refusal for a missing permission answers `403 forbidden` and names the permission in the problem's `permission` member, so a script can ask for exactly that. An unknown project answers `404 not_found` before any permission is judged.
 
@@ -31,6 +32,7 @@ A role is a fixed list of permissions. The four built-in roles are the same on e
 | `grant.manage` | | | | ✓ |
 | `project_token.manage` | | | | ✓ |
 | `flag.edit` | | ✓ | ✓ | ✓ |
+| `flag.archive` | | | ✓ | ✓ |
 
 `GET /roles` lists every role with its permissions, so a client can explain which roles hold a permission a caller lacks. Later releases add permissions as features arrive and write them into the built-in roles.
 

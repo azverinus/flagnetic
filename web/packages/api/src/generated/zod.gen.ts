@@ -983,6 +983,7 @@ export const zListFlagsPath = z.object({
 });
 
 export const zListFlagsQuery = z.object({
+  archived: z.boolean().optional().default(false),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });
@@ -1002,6 +1003,20 @@ export const zCreateFlagPath = z.object({
  * Created, with its configuration in every environment.
  */
 export const zCreateFlagResponse = zFlag;
+
+export const zDeleteFlagHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zDeleteFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteFlagResponse = z.void();
 
 export const zGetFlagPath = z.object({
   project: z.string(),
@@ -1028,6 +1043,34 @@ export const zUpdateFlagPath = z.object({
  * The flag as changed.
  */
 export const zUpdateFlagResponse = zFlag;
+
+export const zArchiveFlagHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zArchiveFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+});
+
+/**
+ * The flag as it is now.
+ */
+export const zArchiveFlagResponse = zFlag;
+
+export const zRestoreFlagHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zRestoreFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+});
+
+/**
+ * The flag as it is now.
+ */
+export const zRestoreFlagResponse = zFlag;
 
 export const zListProjectMembersPath = z.object({
   project: z.string(),

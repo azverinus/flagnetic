@@ -340,13 +340,13 @@ func TestProjectMeAnswersGrantsAndPermissionsNarrowedByScopes(t *testing.T) {
 		want  []string
 	}{
 		"an instance admin holds every permission": {testkit.InstanceAdminToken(t),
-			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit"}},
+			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit", "flag.archive"}},
 		"a maintainer's project token, narrowed to read": {
 			testkit.ProjectToken(t, testkit.Pool(t), projectIDOf(p), access.RoleMaintainer, access.ScopeRead),
 			[]string{"project.read"}},
 		"an owner's project token never changes who has access": {
 			testkit.ProjectToken(t, testkit.Pool(t), projectIDOf(p), access.RoleOwner),
-			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "flag.edit"}},
+			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "flag.edit", "flag.archive"}},
 	} {
 		res, err := testkit.Client(t, srv, tc.token).GetProjectMeWithResponse(t.Context(), p.Key)
 		if err != nil {
@@ -377,8 +377,8 @@ func TestEveryRoleIsListedWithItsPermissions(t *testing.T) {
 		t.Fatalf("GET /roles = %d %s", res.StatusCode(), res.Body)
 	}
 	want := []management.Role{
-		{Name: "owner", Permissions: []string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit"}},
-		{Name: "maintainer", Permissions: []string{"project.read", "environment.manage", "declaration.manage", "flag.edit"}},
+		{Name: "owner", Permissions: []string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit", "flag.archive"}},
+		{Name: "maintainer", Permissions: []string{"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive"}},
 		{Name: "developer", Permissions: []string{"project.read", "flag.edit"}},
 		{Name: "viewer", Permissions: []string{"project.read"}},
 	}

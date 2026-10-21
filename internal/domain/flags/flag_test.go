@@ -331,3 +331,28 @@ func TestRemovingAVariationIsRefusedWhileAConfigurationServesIt(t *testing.T) {
 		t.Errorf("ErrInUse = %v, want in_use", e)
 	}
 }
+
+func TestArchivingHidesAFlagUntilItIsRestoredAndOnlyAnArchivedFlagIsDeleted(t *testing.T) {
+	f, _ := flags.NewFlag(input("f", flags.TypeBoolean))
+	if e, ok := apperrors.From(f.CanDelete()); !ok || e.Kind != apperrors.KindConflict || e.Code != "not_archived" {
+		t.Errorf("deleting an active flag = %v, want not_archived", f.CanDelete())
+	}
+	later := now.Add(time.Hour)
+	archived, changed := f.Archive(later)
+	if !changed || archived.ArchivedAt == nil || !archived.ArchivedAt.Equal(later) || archived.Version != 2 {
+		t.Fatalf("archived = %+v, %t, want archived at %v at version 2", archived, changed, later)
+	}
+	if err := archived.CanDelete(); err != nil {
+		t.Errorf("deleting an archived flag = %v", err)
+	}
+	if again, twice := archived.Archive(later.Add(time.Hour)); twice || again.Version != 2 || !again.ArchivedAt.Equal(later) {
+		t.Errorf("archiving again = %+v, %t, want no change", again, twice)
+	}
+	restored, changed := archived.Restore(later)
+	if !changed || restored.ArchivedAt != nil || restored.Version != 3 {
+		t.Errorf("restored = %+v, %t, want active at version 3", restored, changed)
+	}
+	if _, twice := restored.Restore(later); twice {
+		t.Error("restoring an active flag changed it")
+	}
+}

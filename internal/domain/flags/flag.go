@@ -12,6 +12,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
@@ -447,4 +448,38 @@ func removed(before, after []Variation) []string {
 // HasVariation reports whether the flag has a variation with key.
 func (f Flag) HasVariation(key string) bool {
 	return slices.ContainsFunc(f.Variations, func(v Variation) bool { return v.Key == key })
+}
+
+// Archive returns the flag archived at now, hidden from SDKs in every
+// environment, and whether it changed: archiving an archived flag does not.
+func (f Flag) Archive(now time.Time) (Flag, bool) {
+	if f.ArchivedAt != nil {
+		return f, false
+	}
+	out := f
+	out.ArchivedAt, out.UpdatedAt, out.Version = &now, now, f.Version+1
+	return out, true
+}
+
+// Restore returns the flag brought back to SDKs at now, and whether it
+// changed: restoring a flag that is not archived does not.
+func (f Flag) Restore(now time.Time) (Flag, bool) {
+	if f.ArchivedAt == nil {
+		return f, false
+	}
+	out := f
+	out.ArchivedAt, out.UpdatedAt, out.Version = nil, now, f.Version+1
+	return out, true
+}
+
+// errNotArchived refuses to delete a flag that is not archived: deleting is
+// a deliberate second step, after the flag has left every ruleset.
+var errNotArchived = apperrors.Conflict("not_archived", "only an archived flag is deleted; archive it first")
+
+// CanDelete refuses to delete a flag that is not archived.
+func (f Flag) CanDelete() error {
+	if f.ArchivedAt == nil {
+		return errNotArchived
+	}
+	return nil
 }

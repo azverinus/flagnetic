@@ -53,6 +53,12 @@ func matrix(t *testing.T) []matrixRow {
 			}))
 			return res.StatusCode(), res.Body
 		}},
+		{"flag.archive", "archiveFlag", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			// No flag has the key, so a caller holding the permission is
+			// answered not_found, and one lacking it forbidden first.
+			res := do(c.ArchiveFlagWithResponse(t.Context(), p.Key, "absent", &management.ArchiveFlagParams{IfMatch: ptr("1")}))
+			return res.StatusCode(), res.Body
+		}},
 		{"grant.manage", "createGrant", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
 			res := do(c.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: target.ID.Bytes(), Role: "viewer"}))
 			if res.JSON201 != nil {
@@ -83,6 +89,7 @@ func TestThePermissionMatrixHoldsRowByRow(t *testing.T) {
 		"grant.manage":         {access.RoleOwner},
 		"project_token.manage": {access.RoleOwner},
 		"flag.edit":            {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
+		"flag.archive":         {access.RoleMaintainer, access.RoleOwner},
 	}
 	callers := map[string]*management.ClientWithResponses{
 		"instance admin": testkit.Client(t, srv, testkit.InstanceAdminToken(t)),
@@ -118,8 +125,8 @@ func TestProjectMeAnswersGrantsAndPermissionsPerRole(t *testing.T) {
 	for role, want := range map[access.RoleName][]string{
 		access.RoleViewer:     {"project.read"},
 		access.RoleDeveloper:  {"project.read", "flag.edit"},
-		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit"},
-		access.RoleOwner:      {"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit"},
+		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive"},
+		access.RoleOwner:      {"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit", "flag.archive"},
 	} {
 		got := projectMe(t, testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), role)), p.Key)
 		if !slices.Equal(got.Permissions, want) || !slices.Equal(rolesOf(got.Grants), []string{string(role)}) {

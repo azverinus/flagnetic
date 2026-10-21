@@ -871,6 +871,12 @@ paths:
       x-permission: project.read
       tags: [flags]
       parameters:
+        - name: archived
+          in: query
+          description: Lists the archived flags instead of the others.
+          schema:
+            type: boolean
+            default: false
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -994,6 +1000,105 @@ paths:
           $ref: "#/components/responses/VersionMismatch"
         "422":
           $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+    delete:
+      operationId: deleteFlag
+      summary: Delete an archived flag
+      description: |
+        Deletes the flag with its configuration in every environment. Only
+        an archived flag is deleted (`not_archived` otherwise), so deleting
+        is a deliberate second step after archiving.
+      x-permission: flag.archive
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/flags/{flag}/archive:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/FlagKey"
+    post:
+      operationId: archiveFlag
+      summary: Archive a flag
+      description: |
+        Hides the flag from SDKs in every environment, keeping its
+        definition and configurations until it is restored or deleted.
+        Archiving an archived flag changes nothing.
+      x-permission: flag.archive
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The flag as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flag"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/flags/{flag}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/FlagKey"
+    post:
+      operationId: restoreFlag
+      summary: Restore an archived flag
+      description: Brings an archived flag back to SDKs as it was archived. Restoring a flag that is not archived changes nothing.
+      x-permission: flag.archive
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The flag as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flag"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/members:

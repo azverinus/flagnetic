@@ -204,7 +204,7 @@ func TestAMembersPermissionsAreTheUnionOfTheirGrantsAndRemovingOneKeepsTheOthers
 
 	grant(t, admin, p.Key, m.ID, "developer")
 	maintainer := grant(t, admin, p.Key, m.ID, "maintainer")
-	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read", "environment.manage", "declaration.manage", "flag.edit"}) ||
+	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive"}) ||
 		!slices.Equal(rolesOf(got.Grants), []string{"developer", "maintainer"}) {
 		t.Errorf("with two grants: %+v, want the union of developer and maintainer", got)
 	}

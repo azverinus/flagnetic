@@ -24,7 +24,7 @@ const (
 
 // ListFlags answers a page of the project's flags by key.
 func (a *api) ListFlags(ctx context.Context, req ListFlagsRequestObject) (ListFlagsResponseObject, error) {
-	page := appflags.FlagPage{Limit: defaultFlagLimit}
+	page := appflags.FlagPage{Limit: defaultFlagLimit, Archived: valueOr(req.Params.Archived, false)}
 	if l := req.Params.Limit; l != nil {
 		if *l < 1 || *l > maxFlagLimit {
 			return nil, flaghttp.InvalidRequest(fmt.Sprintf("limit must be between 1 and %d", maxFlagLimit))
@@ -196,4 +196,49 @@ func configurationOut(ec flags.EnvironmentConfiguration) FlagConfiguration {
 		Environment: ec.Environment, On: c.On, OffVariation: c.OffVariation, Fallthrough: c.Fallthrough,
 		UpdatedAt: c.UpdatedAt, Version: c.Version,
 	}
+}
+
+// flagCommand returns the command naming flag of the request's project,
+// based on the version header names.
+func flagCommand(ctx context.Context, flag string, header *IfMatch) (appflags.FlagCommand, error) {
+	expected, err := ifMatch(header)
+	return appflags.FlagCommand{Project: projectID(ctx), Key: flag, Expected: expected, Request: requestOf(ctx)}, err
+}
+
+// ArchiveFlag hides a flag from SDKs in every environment.
+func (a *api) ArchiveFlag(ctx context.Context, req ArchiveFlagRequestObject) (ArchiveFlagResponseObject, error) {
+	cmd, err := flagCommand(ctx, req.Flag, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	v, err := a.h.ArchiveFlag.Handle(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	return ArchiveFlag200JSONResponse{Body: flagOut(v), Headers: ArchiveFlag200ResponseHeaders{ETag: etag(v.Flag.Version)}}, nil
+}
+
+// RestoreFlag brings an archived flag back.
+func (a *api) RestoreFlag(ctx context.Context, req RestoreFlagRequestObject) (RestoreFlagResponseObject, error) {
+	cmd, err := flagCommand(ctx, req.Flag, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	v, err := a.h.RestoreFlag.Handle(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	return RestoreFlag200JSONResponse{Body: flagOut(v), Headers: RestoreFlag200ResponseHeaders{ETag: etag(v.Flag.Version)}}, nil
+}
+
+// DeleteFlag deletes an archived flag.
+func (a *api) DeleteFlag(ctx context.Context, req DeleteFlagRequestObject) (DeleteFlagResponseObject, error) {
+	cmd, err := flagCommand(ctx, req.Flag, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.h.DeleteFlag.Handle(ctx, cmd); err != nil {
+		return nil, err
+	}
+	return DeleteFlag204Response{}, nil
 }

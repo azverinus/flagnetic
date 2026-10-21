@@ -6,6 +6,9 @@ import type {
   AcceptInvitationData,
   AcceptInvitationErrors,
   AcceptInvitationResponses,
+  ArchiveFlagData,
+  ArchiveFlagErrors,
+  ArchiveFlagResponses,
   CreateAttributeData,
   CreateAttributeErrors,
   CreateAttributeResponses,
@@ -39,6 +42,9 @@ import type {
   DeleteEnvironmentData,
   DeleteEnvironmentErrors,
   DeleteEnvironmentResponses,
+  DeleteFlagData,
+  DeleteFlagErrors,
+  DeleteFlagResponses,
   DeleteGrantData,
   DeleteGrantErrors,
   DeleteGrantResponses,
@@ -138,6 +144,9 @@ import type {
   ReissueInvitationData,
   ReissueInvitationErrors,
   ReissueInvitationResponses,
+  RestoreFlagData,
+  RestoreFlagErrors,
+  RestoreFlagResponses,
   RevokeMemberSessionsData,
   RevokeMemberSessionsErrors,
   RevokeMemberSessionsResponses,
@@ -1002,6 +1011,30 @@ export const createFlag = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Delete an archived flag
+ *
+ * Deletes the flag with its configuration in every environment. Only
+ * an archived flag is deleted (`not_archived` otherwise), so deleting
+ * is a deliberate second step after archiving.
+ *
+ */
+export const deleteFlag = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteFlagData, ThrowOnError>,
+): RequestResult<DeleteFlagResponses, DeleteFlagErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteFlagResponses, DeleteFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}",
+    ...options,
+  });
+
+/**
  * A flag with its configuration in every environment
  */
 export const getFlag = <ThrowOnError extends boolean = false>(
@@ -1049,6 +1082,51 @@ export const updateFlag = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Archive a flag
+ *
+ * Hides the flag from SDKs in every environment, keeping its
+ * definition and configurations until it is restored or deleted.
+ * Archiving an archived flag changes nothing.
+ *
+ */
+export const archiveFlag = <ThrowOnError extends boolean = false>(
+  options: Options<ArchiveFlagData, ThrowOnError>,
+): RequestResult<ArchiveFlagResponses, ArchiveFlagErrors, ThrowOnError> =>
+  (options.client ?? client).post<ArchiveFlagResponses, ArchiveFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/archive",
+    ...options,
+  });
+
+/**
+ * Restore an archived flag
+ *
+ * Brings an archived flag back to SDKs as it was archived. Restoring a flag that is not archived changes nothing.
+ */
+export const restoreFlag = <ThrowOnError extends boolean = false>(
+  options: Options<RestoreFlagData, ThrowOnError>,
+): RequestResult<RestoreFlagResponses, RestoreFlagErrors, ThrowOnError> =>
+  (options.client ?? client).post<RestoreFlagResponses, RestoreFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/restore",
+    ...options,
   });
 
 /**

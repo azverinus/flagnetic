@@ -154,12 +154,18 @@ func (s *Store) FlagByKey(ctx context.Context, project workspace.ProjectID, key 
 	return f, nil
 }
 
-// Flags returns at most limit of project's flags with a key after after, by
-// key in byte order.
-func (s *Store) Flags(ctx context.Context, project workspace.ProjectID, after string, limit int) ([]flags.Flag, error) {
+// Flags returns at most limit of project's flags, archived or not as
+// archived says, with a key after after, by key in byte order.
+func (s *Store) Flags(ctx context.Context, project workspace.ProjectID, archived bool, after string, limit int) ([]flags.Flag, error) {
 	return s.flags(ctx, `SELECT `+flagColumns+` FROM flags
-		WHERE project_id = $1 AND key COLLATE "C" > $2
-		ORDER BY key COLLATE "C" LIMIT $3`, project.Bytes(), after, limit)
+		WHERE project_id = $1 AND (archived_at IS NOT NULL) = $2 AND key COLLATE "C" > $3
+		ORDER BY key COLLATE "C" LIMIT $4`, project.Bytes(), archived, after, limit)
+}
+
+// DeleteFlag deletes the flag with its configurations.
+func (s *Store) DeleteFlag(ctx context.Context, flag flags.FlagID) error {
+	_, err := s.db(ctx).Exec(ctx, `DELETE FROM flags WHERE id = $1`, flag.Bytes())
+	return err
 }
 
 // ProjectFlags returns every flag of project, archived ones included.

@@ -85,10 +85,13 @@ type Handlers struct {
 	UpdateAttribute *appworkspace.UpdateAttribute
 	DeleteAttribute *appworkspace.DeleteAttribute
 
-	ListFlags  *appflags.ListFlags
-	CreateFlag *appflags.CreateFlag
-	GetFlag    *appflags.GetFlag
-	UpdateFlag *appflags.UpdateFlag
+	ListFlags   *appflags.ListFlags
+	CreateFlag  *appflags.CreateFlag
+	GetFlag     *appflags.GetFlag
+	UpdateFlag  *appflags.UpdateFlag
+	ArchiveFlag *appflags.ArchiveFlag
+	RestoreFlag *appflags.RestoreFlag
+	DeleteFlag  *appflags.DeleteFlag
 
 	ListAuditEntries *appgovernance.ListAuditEntries
 	GetAuditEntry    *appgovernance.GetAuditEntry

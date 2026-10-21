@@ -180,6 +180,8 @@ func TestANewEnvironmentConfiguresEveryExistingFlag(t *testing.T) {
 	createFlag(t, admin, p.Key, management.FlagCreate{Key: "limit", Type: management.FlagTypeNumber, Name: "Limit",
 		Variations: variations("low", "5", "high", "50")})
 	createFlag(t, admin, p.Key, management.FlagCreate{Key: "beta", Type: management.FlagTypeBoolean, Name: "Beta"})
+	archived := do(admin.ArchiveFlagWithResponse(t.Context(), p.Key, "beta", &management.ArchiveFlagParams{IfMatch: ifMatch(1)}))
+	status(t, "archive beta", archived.StatusCode(), archived.Body, http.StatusOK)
 
 	created := do(admin.CreateEnvironmentWithResponse(t.Context(), p.Key, management.EnvironmentCreate{Key: "qa", Name: "QA"}))
 	status(t, "create qa", created.StatusCode(), created.Body, http.StatusCreated)
@@ -558,5 +560,234 @@ func TestFlagEndpointsOfAnUnknownProjectAreNotFound(t *testing.T) {
 		}
 		status, body = call(p.Key, "x")
 		assertProblem(t, name+" of an unknown flag", status, body, http.StatusNotFound, "not_found")
+	}
+}
+
+func archive(t *testing.T, c *management.ClientWithResponses, project, key string, version int64) *management.ArchiveFlagResponse {
+	t.Helper()
+	return do(c.ArchiveFlagWithResponse(t.Context(), project, key, &management.ArchiveFlagParams{IfMatch: ifMatch(version)}))
+}
+
+func restore(t *testing.T, c *management.ClientWithResponses, project, key string, version int64) *management.RestoreFlagResponse {
+	t.Helper()
+	return do(c.RestoreFlagWithResponse(t.Context(), project, key, &management.RestoreFlagParams{IfMatch: ifMatch(version)}))
+}
+
+func deleteFlag(t *testing.T, c *management.ClientWithResponses, project, key string, version int64) *management.DeleteFlagResponse {
+	t.Helper()
+	return do(c.DeleteFlagWithResponse(t.Context(), project, key, &management.DeleteFlagParams{IfMatch: ifMatch(version)}))
+}
+
+func listedKeys(t *testing.T, c *management.ClientWithResponses, project string, archived bool) []string {
+	t.Helper()
+	res := do(c.ListFlagsWithResponse(t.Context(), project, &management.ListFlagsParams{Archived: &archived}))
+	if res.JSON200 == nil {
+		t.Fatalf("GET flags = %d %s", res.StatusCode(), res.Body)
+	}
+	var keys []string
+	for _, f := range res.JSON200.Items {
+		keys = append(keys, f.Key)
+	}
+	return keys
+}
+
+func TestArchivingRestoringAndDeletingFlags(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	createFlag(t, admin, p.Key, management.FlagCreate{Key: "base", Type: management.FlagTypeBoolean, Name: "Base"})
+	createFlag(t, admin, p.Key, management.FlagCreate{Key: "retired", Type: management.FlagTypeBoolean, Name: "Retired"})
+
+	active := deleteFlag(t, admin, p.Key, "retired", 1)
+	assertProblem(t, "deleting an active flag", active.StatusCode(), active.Body, http.StatusConflict, "not_archived")
+	archived := archive(t, admin, p.Key, "retired", 1)
+	if archived.JSON200 == nil || archived.JSON200.ArchivedAt == nil || archived.JSON200.Version != 2 ||
+		archived.HTTPResponse.Header.Get("ETag") != `"2"` || len(archived.JSON200.Environments) != 3 {
+		t.Fatalf("archive = %d %s", archived.StatusCode(), archived.Body)
+	}
+	if got := listedKeys(t, admin, p.Key, false); !slices.Equal(got, []string{"base"}) {
+		t.Errorf("listed = %v, want the active flag alone", got)
+	}
+	if got := listedKeys(t, admin, p.Key, true); !slices.Equal(got, []string{"retired"}) {
+		t.Errorf("listed archived = %v, want the archived flag alone", got)
+	}
+	if again := archive(t, admin, p.Key, "retired", 2); again.JSON200 == nil || again.JSON200.Version != 2 {
+		t.Errorf("archiving again = %d %s, want it as it is", again.StatusCode(), again.Body)
+	}
+	restored := restore(t, admin, p.Key, "retired", 2)
+	if restored.JSON200 == nil || restored.JSON200.ArchivedAt != nil || restored.JSON200.Version != 3 {
+		t.Fatalf("restore = %d %s", restored.StatusCode(), restored.Body)
+	}
+	archive(t, admin, p.Key, "retired", 3)
+	if res := deleteFlag(t, admin, p.Key, "retired", 4); res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("delete = %d %s", res.StatusCode(), res.Body)
+	}
+	gone := map[string]int{
+		"get":     do(admin.GetFlagWithResponse(t.Context(), p.Key, "retired")).StatusCode(),
+		"restore": restore(t, admin, p.Key, "retired", 4).StatusCode(),
+		"archive": archive(t, admin, p.Key, "retired", 4).StatusCode(),
+		"delete":  deleteFlag(t, admin, p.Key, "retired", 4).StatusCode(),
+	}
+	for name, got := range gone {
+		if got != http.StatusNotFound {
+			t.Errorf("%s of a deleted flag = %d, want 404", name, got)
+		}
+	}
+	again := createFlag(t, admin, p.Key, management.FlagCreate{Key: "retired", Type: management.FlagTypeString, Name: "Again",
+		Variations: variations("v", `"v"`)})
+	if again.Version != 1 || again.Type != management.FlagTypeString {
+		t.Errorf("the key reused = %s", raw(again))
+	}
+}
+
+func TestArchivingRestoringAndDeletingNeedTheCurrentVersionInIfMatch(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	createFlag(t, admin, p.Key, management.FlagCreate{Key: "f", Type: management.FlagTypeBoolean, Name: "F"})
+
+	missing := map[string]*http.Response{
+		"archive": do(admin.ArchiveFlagWithResponse(t.Context(), p.Key, "f", nil)).HTTPResponse,
+		"restore": do(admin.RestoreFlagWithResponse(t.Context(), p.Key, "f", nil)).HTTPResponse,
+		"delete":  do(admin.DeleteFlagWithResponse(t.Context(), p.Key, "f", nil)).HTTPResponse,
+	}
+	for name, res := range missing {
+		if res.StatusCode != http.StatusPreconditionRequired {
+			t.Errorf("%s without If-Match = %d, want 428", name, res.StatusCode)
+		}
+	}
+	stale := archive(t, admin, p.Key, "f", 7)
+	assertProblem(t, "archive at a stale version", stale.StatusCode(), stale.Body, http.StatusPreconditionFailed, "version_mismatch")
+	archive(t, admin, p.Key, "f", 1)
+	staleRestore := restore(t, admin, p.Key, "f", 1)
+	assertProblem(t, "restore at a stale version", staleRestore.StatusCode(), staleRestore.Body, http.StatusPreconditionFailed, "version_mismatch")
+	staleDelete := deleteFlag(t, admin, p.Key, "f", 1)
+	assertProblem(t, "delete at a stale version", staleDelete.StatusCode(), staleDelete.Body, http.StatusPreconditionFailed, "version_mismatch")
+	if f := getFlag(t, admin, p.Key, "f"); f.ArchivedAt == nil || f.Version != 2 {
+		t.Errorf("after refusals: %s, want it archived at version 2", raw(f))
+	}
+}
+
+func TestEveryAcceptedFlagDefinitionWriteBumpsTheRulesetVersionOnce(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	version := int64(1)
+	steps := []struct {
+		name   string
+		write  func() (int, []byte, *management.Flag)
+		status int
+		bumps  bool
+	}{
+		{"create", func() (int, []byte, *management.Flag) {
+			res := do(admin.CreateFlagWithResponse(t.Context(), p.Key, management.FlagCreate{Key: "copy", Type: management.FlagTypeString,
+				Name: "Copy", Variations: variations("a", `"A"`, "b", `"B"`)}))
+			return res.StatusCode(), res.Body, res.JSON201
+		}, http.StatusCreated, true},
+	}
+	patch := func(name string, body management.FlagPatch, want int, bumps bool) {
+		steps = append(steps, struct {
+			name   string
+			write  func() (int, []byte, *management.Flag)
+			status int
+			bumps  bool
+		}{name, func() (int, []byte, *management.Flag) {
+			res := updateFlag(t, admin, p.Key, "copy", version, body)
+			return res.StatusCode(), res.Body, res.JSON200
+		}, want, bumps})
+	}
+	lifecycle := func(name string, write func() (int, []byte, *management.Flag), want int, bumps bool) {
+		steps = append(steps, struct {
+			name   string
+			write  func() (int, []byte, *management.Flag)
+			status int
+			bumps  bool
+		}{name, write, want, bumps})
+	}
+	patch("a name, description and tags", management.FlagPatch{Name: ptr("Copy 2"), Description: ptr("d"), Tags: &[]string{"t"}}, http.StatusOK, false)
+	patch("a lifetime", management.FlagPatch{Lifetime: ptr(management.LifetimePermanent)}, http.StatusOK, false)
+	patch("nothing", management.FlagPatch{Name: ptr("Copy 2")}, http.StatusOK, false)
+	patch("a variation's name", management.FlagPatch{Variations: &[]management.VariationInput{
+		{Key: "a", Value: value(`"A"`), Name: ptr("Ay")}, {Key: "b", Value: value(`"B"`)}}}, http.StatusOK, false)
+	patch("a variation's value", management.FlagPatch{Variations: variations("a", `"AA"`, "b", `"B"`)}, http.StatusOK, true)
+	patch("automatic exposure", management.FlagPatch{AutomaticExposure: ptr(true)}, http.StatusOK, true)
+	patch("a key", management.FlagPatch{Key: ptr("other")}, http.StatusUnprocessableEntity, false)
+	archiveStep := func() (int, []byte, *management.Flag) {
+		res := archive(t, admin, p.Key, "copy", version)
+		return res.StatusCode(), res.Body, res.JSON200
+	}
+	restoreStep := func() (int, []byte, *management.Flag) {
+		res := restore(t, admin, p.Key, "copy", version)
+		return res.StatusCode(), res.Body, res.JSON200
+	}
+	lifecycle("archive", archiveStep, http.StatusOK, true)
+	lifecycle("archive again", archiveStep, http.StatusOK, false)
+	lifecycle("restore", restoreStep, http.StatusOK, true)
+	lifecycle("restore again", restoreStep, http.StatusOK, false)
+	lifecycle("archive once more", archiveStep, http.StatusOK, true)
+	lifecycle("delete", func() (int, []byte, *management.Flag) {
+		res := deleteFlag(t, admin, p.Key, "copy", version)
+		return res.StatusCode(), res.Body, nil
+	}, http.StatusNoContent, false)
+
+	for _, s := range steps {
+		before := rulesetVersions(t, p)
+		got, body, f := s.write()
+		if got != s.status {
+			t.Fatalf("%s = %d %s, want %d", s.name, got, body, s.status)
+		}
+		if f != nil {
+			version = f.Version
+		}
+		want := []string(nil)
+		if s.bumps {
+			want = everyEnvironment
+		}
+		if b := bumped(t, s.name, before, rulesetVersions(t, p)); !slices.Equal(b, want) {
+			t.Errorf("%s bumped %v, want %v", s.name, b, want)
+		}
+	}
+}
+
+func TestEveryFlagDefinitionWriteRecordsOneAuditEntry(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	f := createFlag(t, admin, p.Key, management.FlagCreate{Key: "banner", Type: management.FlagTypeBoolean, Name: "Banner"})
+	updateFlag(t, admin, p.Key, "banner", 1, management.FlagPatch{Name: ptr("Top banner")})
+	updateFlag(t, admin, p.Key, "banner", 2, management.FlagPatch{Name: ptr("Top banner")})
+	updateFlag(t, admin, p.Key, "banner", 2, management.FlagPatch{Type: ptr("string")})
+	updateFlag(t, admin, p.Key, "banner", 9, management.FlagPatch{Name: ptr("Stale")})
+	deleteFlag(t, admin, p.Key, "banner", 2)
+	archive(t, admin, p.Key, "banner", 2)
+	restore(t, admin, p.Key, "banner", 3)
+	archive(t, admin, p.Key, "banner", 4)
+	archive(t, admin, p.Key, "banner", 5)
+	if res := deleteFlag(t, admin, p.Key, "banner", 5); res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("delete = %d %s", res.StatusCode(), res.Body)
+	}
+
+	res := do(admin.ListProjectAuditEntriesWithResponse(t.Context(), p.Key, &management.ListProjectAuditEntriesParams{EntityId: ptr(f.Id.String())}))
+	if res.JSON200 == nil {
+		t.Fatalf("GET audit = %d %s", res.StatusCode(), res.Body)
+	}
+	var got []string
+	entries := res.JSON200.Items
+	slices.Reverse(entries)
+	for _, e := range entries {
+		got = append(got, e.Action+" "+e.Entity.Key)
+		if e.EnvironmentId != nil {
+			t.Errorf("%s addresses an environment, want none", e.Action)
+		}
+	}
+	want := []string{"flag.created banner", "flag.updated banner", "flag.archived banner", "flag.restored banner",
+		"flag.archived banner", "flag.deleted banner"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("actions = %v, want %v: refusals and no-ops record nothing", got, want)
+	}
+	deleted := entries[len(entries)-1]
+	before, _ := json.Marshal(deleted.Before)
+	if deleted.After != nil || !strings.Contains(string(before), `"environments":[{`) || !strings.Contains(string(before), `"version":5`) {
+		t.Errorf("flag.deleted before %s after %v, want the definition and every configuration before, nothing after", before, deleted.After)
 	}
 }

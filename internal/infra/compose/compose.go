@@ -83,6 +83,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// on, through the delivery context.
 	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(d.Pool))
 	owners := appaccess.NewOwnership(accessStore)
+	archival := appflags.ArchivalDeps{Tx: tx, Projects: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	sessionKey := o.Keyring.Key(secret.UseSessionCookie)
 	// Every request judging a session reads the settings: the replica keeps
 	// a copy, which a notification of each change drops.
@@ -163,6 +164,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		UpdateFlag: appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
 			Tx: tx, Projects: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
+
+		ArchiveFlag: appflags.NewArchiveFlag(archival),
+		RestoreFlag: appflags.NewRestoreFlag(archival),
+		DeleteFlag:  appflags.NewDeleteFlag(tx, ws, flagStore, flagRec),
 
 		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
