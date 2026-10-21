@@ -2,7 +2,7 @@ import type { ApiToken } from "@flagnetic/api";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { TokenPolicy } from "@/lib/personal-tokens";
 import { fakeServer, problem } from "@/test/fake-server";
@@ -154,15 +154,30 @@ describe("the personal access tokens", () => {
   });
 
   it("show a token that expires while the page is open as expired", async () => {
-    const soon = new Date(Date.now() + 1_000).toISOString();
-    fakeServer({
-      "GET /me/tokens": { status: 200, body: { items: [{ ...token, expires_at: soon }] } },
-    });
-    renderWithProviders(<TokenList instanceAdmin={false} policy={yearAhead} />);
+    // The clock stands still until the test moves it past the expiry, so a
+    // slow render cannot let the token expire before it is first shown.
+    // Only Date is faked: the page's timers and the queries' polling stay
+    // real. The page's timer first fires while the clock still stands before
+    // the expiry, as a timer firing early would, and must schedule itself
+    // again to find the expiry passed once the clock moves.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const opened = Date.now();
+      const soon = new Date(opened + 50).toISOString();
+      fakeServer({
+        "GET /me/tokens": { status: 200, body: { items: [{ ...token, expires_at: soon }] } },
+      });
+      renderWithProviders(<TokenList instanceAdmin={false} policy={yearAhead} />);
 
-    const row = await screen.findByRole("row", { name: /reporting script/ });
-    expect(row).toHaveTextContent("Active");
-    await waitFor(() => expect(row).toHaveTextContent("Expired"), { timeout: 3_000 });
+      const row = await screen.findByRole("row", { name: /reporting script/ });
+      expect(row).toHaveTextContent("Active");
+      await act(() => new Promise((resolve) => setTimeout(resolve, 200)));
+      expect(row).toHaveTextContent("Active");
+      vi.setSystemTime(opened + 1_000);
+      await waitFor(() => expect(row).toHaveTextContent("Expired"), { timeout: 3_000 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("explain an expiry beyond the instance's bound under its field", async () => {

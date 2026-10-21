@@ -23,6 +23,8 @@ export function useNowPassing(instants: readonly (string | null)[]): Date {
       Math.min(Math.max(next - Date.now(), 0), longestTimer),
     );
     return () => clearTimeout(timer);
-  }, [next]);
+    // A timer that fired early moved now but left next as it was; depending
+    // on now as well is what schedules the timer again.
+  }, [next, now]);
   return now;
 }
