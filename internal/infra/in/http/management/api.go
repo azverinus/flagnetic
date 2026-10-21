@@ -49,6 +49,11 @@ type Handlers struct {
 	ListPersonalTokens  *appaccess.ListPersonalTokens
 	CreatePersonalToken *appaccess.CreatePersonalToken
 	RevokePersonalToken *appaccess.RevokePersonalToken
+	ListProjectMembers  *appaccess.ListProjectMembers
+	CountProjectMembers *appaccess.CountProjectMembers
+	ListGrants          *appaccess.ListGrants
+	CreateGrant         *appaccess.CreateGrant
+	DeleteGrant         *appaccess.DeleteGrant
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
 
@@ -175,6 +180,7 @@ func callerOf(ctx context.Context) access.Caller {
 // with what the caller holds there.
 type addressed struct {
 	project     workspace.Project
+	grants      []access.Grant
 	permissions []access.Permission
 }
 
@@ -259,11 +265,11 @@ func (a *api) address(ctx context.Context, caller access.Caller, key string) (*a
 	if err != nil {
 		return nil, err
 	}
-	perms, err := a.h.ProjectPermissions.Handle(ctx, caller, p.ID)
+	held, err := a.h.ProjectPermissions.Handle(ctx, caller, p.ID)
 	if err != nil {
 		return nil, err
 	}
-	return &addressed{project: p, permissions: perms}, nil
+	return &addressed{project: p, grants: held.Grants, permissions: held.Permissions}, nil
 }
 
 // errUnauthenticated answers a request that presents no credential.

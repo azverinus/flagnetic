@@ -102,9 +102,13 @@ func (s *Store) SetInstanceAdmin(ctx context.Context, member access.MemberID, in
 
 // memberViewQuery reads members as an instance admin sees them, with the
 // projects each holds a grant in counted in the same statement, so a page
-// of members costs one query whatever its length. A member holds no grant
-// in any project until grants can be made, so each counts none.
-const memberViewQuery = `SELECT ` + memberColumns + `, m.last_sign_in_at, 0 AS project_count FROM members m`
+// of members costs one query whatever its length. An invited member counts
+// none: they work in no project until they join. A deactivated member keeps
+// their count, since their grants stay.
+const memberViewQuery = `SELECT ` + memberColumns + `, m.last_sign_in_at,
+	CASE WHEN m.status = 'invited' THEN 0
+	     ELSE (SELECT count(DISTINCT g.project_id) FROM grants g WHERE g.member_id = m.id) END AS project_count
+	FROM members m`
 
 func scanMemberView(row pgx.Row) (appaccess.MemberView, error) {
 	dest, member := scanMember()

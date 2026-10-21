@@ -858,6 +858,113 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /projects/{project}/members:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listProjectMembers
+      summary: The members holding grants in a project
+      description: Every member holding a grant in the project, ordered by email, with their grants side by side, oldest first.
+      x-permission: project.read
+      tags: [grants]
+      responses:
+        "200":
+          description: The members and their grants.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMemberList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/grants:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listGrants
+      summary: The grants of a project
+      description: Every grant of the project, oldest first.
+      x-permission: project.read
+      tags: [grants]
+      responses:
+        "200":
+          description: The grants.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrantList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createGrant
+      summary: Grant a member a role in a project
+      description: |
+        Grants the member one of the built-in roles in the project, beside
+        any grants they hold already; they act with the union of their
+        grants' permissions. An invited member may be granted roles before
+        they join. A role holding a permission the caller lacks in the
+        project is refused `role_not_allowed`, naming it in `permission`;
+        the same member and role twice `already_granted`; a deactivated
+        member `member_deactivated`; an unknown member or role
+        `invalid_grant`. Only a member grants: a project token never changes
+        who has access.
+      x-permission: grant.manage
+      tags: [grants]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantCreate"
+      responses:
+        "201":
+          description: The grant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Grant"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/grants/{grant}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/GrantID"
+    delete:
+      operationId: deleteGrant
+      summary: Remove one grant
+      description: |
+        Removes one grant, leaving the member's others. The grant of a role
+        holding a permission the caller lacks in the project is refused
+        `role_not_allowed`. Removing the last owner's grant is allowed: an
+        instance admin holds every permission in every project.
+      x-permission: grant.manage
+      tags: [grants]
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/audit:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -1415,6 +1522,13 @@ components:
       description: The member's identifier.
       schema:
         type: string
+    GrantID:
+      name: grant
+      in: path
+      required: true
+      description: The grant's identifier.
+      schema:
+        type: string
     TokenID:
       name: token
       in: path
@@ -1758,7 +1872,7 @@ components:
       maxLength: 2000
     Project:
       type: object
-      required: [id, key, name, description]
+      required: [id, key, name, description, member_count]
       properties:
         id:
           type: string
@@ -1769,6 +1883,9 @@ components:
           $ref: "#/components/schemas/Name"
         description:
           $ref: "#/components/schemas/Description"
+        member_count:
+          type: integer
+          description: How many active members hold a grant in the project.
     ProjectList:
       type: object
       required: [items]
@@ -1976,7 +2093,7 @@ components:
     Grant:
       type: object
       description: One role held by one member in one project.
-      required: [id, member, role, source, created_at]
+      required: [id, member, role, source, created_by, created_at]
       properties:
         id:
           type: string
@@ -1997,6 +2114,52 @@ components:
         created_at:
           type: string
           format: date-time
+    GrantList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Grant"
+    GrantCreate:
+      type: object
+      required: [member, role]
+      properties:
+        member:
+          type: string
+          format: uuid
+          description: The member to grant the role to.
+        role:
+          type: string
+          description: One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+    ProjectMember:
+      type: object
+      description: A member holding grants in a project, with those grants.
+      required: [member, email, display_name, status, grants]
+      properties:
+        member:
+          type: string
+          format: uuid
+        email:
+          type: string
+        display_name:
+          type: string
+        status:
+          $ref: "#/components/schemas/MemberStatus"
+        grants:
+          type: array
+          description: The member's grants in the project, oldest first.
+          items:
+            $ref: "#/components/schemas/Grant"
+    ProjectMemberList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectMember"
     ProjectMe:
       type: object
       required: [grants, permissions]
