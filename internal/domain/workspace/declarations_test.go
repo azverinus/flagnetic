@@ -66,8 +66,8 @@ func TestTheLastEnvironmentCannotBeDeleted(t *testing.T) {
 }
 
 func TestAUnitTypeHasAKeyANameAndADescription(t *testing.T) {
-	u, err := workspace.NewUnitType(id.New[workspace.UnitType](ids()), newProjectID(), "therapist", "Therapist", "Who treats.", now)
-	if err != nil || u.Key != "therapist" || u.Description != "Who treats." {
+	u, err := workspace.NewUnitType(id.New[workspace.UnitType](ids()), newProjectID(), "organization", "Organization", "A customer account.", now)
+	if err != nil || u.Key != "organization" || u.Description != "A customer account." {
 		t.Fatalf("unit type = %+v, %v", u, err)
 	}
 	_, err = workspace.NewUnitType(id.New[workspace.UnitType](ids()), newProjectID(), "a b", "", strings.Repeat("x", 2001), now)
@@ -80,7 +80,7 @@ func TestAUnitTypeHasAKeyANameAndADescription(t *testing.T) {
 		t.Errorf("a new key: refusal = %v", refused)
 	}
 	changed, ok, err := u.Change(workspace.UnitTypeChange{Description: &empty}, now.Add(time.Hour))
-	if err != nil || !ok || changed.Description != "" || changed.Name != "Therapist" {
+	if err != nil || !ok || changed.Description != "" || changed.Name != "Organization" {
 		t.Errorf("changed = %+v %v %v", changed, ok, err)
 	}
 }

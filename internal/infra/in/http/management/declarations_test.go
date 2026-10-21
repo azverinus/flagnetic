@@ -139,16 +139,16 @@ func TestUnitTypeLifecycle(t *testing.T) {
 	p := createProject(t, admin, projectKey()).Key
 
 	created := do(admin.CreateUnitTypeWithResponse(t.Context(), p, management.UnitTypeCreate{
-		Key: "therapist", Name: "Therapist", Description: ptr("Who treats."),
+		Key: "organization", Name: "Organization", Description: ptr("A customer account."),
 	}))
 	if !status(t, "create", created.StatusCode(), created.Body, http.StatusCreated) {
 		return
 	}
 	u := *created.JSON201
-	if u.Key != "therapist" || u.Name != "Therapist" || u.Description != "Who treats." {
+	if u.Key != "organization" || u.Name != "Organization" || u.Description != "A customer account." {
 		t.Errorf("created = %+v", u)
 	}
-	got := do(admin.GetUnitTypeWithResponse(t.Context(), p, "therapist"))
+	got := do(admin.GetUnitTypeWithResponse(t.Context(), p, "organization"))
 	if got.JSON200 == nil || *got.JSON200 != u {
 		t.Errorf("GET = %d %s", got.StatusCode(), got.Body)
 	}
@@ -157,23 +157,23 @@ func TestUnitTypeLifecycle(t *testing.T) {
 	for _, x := range list.JSON200.Items {
 		keys = append(keys, x.Key)
 	}
-	if !slices.Equal(keys, []string{"anonymous", "therapist", "user"}) {
+	if !slices.Equal(keys, []string{"anonymous", "organization", "user"}) {
 		t.Errorf("unit types = %v", keys)
 	}
-	patched := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "therapist", management.UnitTypePatch{
-		Name: ptr("Clinician"), Description: ptr(""),
+	patched := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "organization", management.UnitTypePatch{
+		Name: ptr("Company"), Description: ptr(""),
 	}))
-	want := management.UnitType{Id: u.Id, Key: "therapist", Name: "Clinician", Description: ""}
+	want := management.UnitType{Id: u.Id, Key: "organization", Name: "Company", Description: ""}
 	if patched.JSON200 == nil || *patched.JSON200 != want {
 		t.Errorf("PATCH = %d %s, want %+v", patched.StatusCode(), patched.Body, want)
 	}
-	deleted := do(admin.DeleteUnitTypeWithResponse(t.Context(), p, "therapist"))
+	deleted := do(admin.DeleteUnitTypeWithResponse(t.Context(), p, "organization"))
 	status(t, "delete", deleted.StatusCode(), deleted.Body, http.StatusNoContent)
-	gone := do(admin.GetUnitTypeWithResponse(t.Context(), p, "therapist"))
+	gone := do(admin.GetUnitTypeWithResponse(t.Context(), p, "organization"))
 	assertProblem(t, "GET deleted", gone.StatusCode(), gone.Body, http.StatusNotFound, "not_found")
-	patchGone := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "therapist", management.UnitTypePatch{Name: ptr("x")}))
+	patchGone := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "organization", management.UnitTypePatch{Name: ptr("x")}))
 	assertProblem(t, "PATCH deleted", patchGone.StatusCode(), patchGone.Body, http.StatusNotFound, "not_found")
-	again := do(admin.DeleteUnitTypeWithResponse(t.Context(), p, "therapist"))
+	again := do(admin.DeleteUnitTypeWithResponse(t.Context(), p, "organization"))
 	assertProblem(t, "delete again", again.StatusCode(), again.Body, http.StatusNotFound, "not_found")
 }
 
