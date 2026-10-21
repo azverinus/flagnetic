@@ -6,22 +6,39 @@ Who may do what in a Flagnetic instance: permissions, the roles that list them, 
 
 Every operation of the management API declares the one thing it needs in the OpenAPI document (`x-permission`): a permission of the catalog, judged in the project the operation addresses, or one of `public` (anyone), `member` (any credential acting for a member) and `instance_admin`. A permission is named `entity.verb`.
 
-| Permission | Allows | Token scope |
-|---|---|---|
-| `project.read` | every ordinary read in a project, its audit log included | `read` |
-| `project.update` | renaming a project and changing its description | `project:admin` |
-| `environment.manage` | creating, renaming and deleting environments | `project:admin` |
-| `declaration.manage` | declaring, renaming and deleting unit types and attributes | `flags:write` |
-| `grant.manage` | making and removing grants | `project:admin` |
-| `project_token.manage` | listing, creating and revoking project tokens | `project:admin` |
-| `flag.edit` | creating flags and changing their definition | `flags:write` |
-| `flag.archive` | archiving, restoring and deleting flags | `flags:write` |
-| `flag_configuration.update` | replacing a flag's configuration in an environment, setting and removing single overrides, regenerating a rollout's salt | `flags:write` |
-| `flag_configuration.kill` | switching a flag off in an environment with the kill switch | `flags:write` |
-| `segment.edit` | creating segments and changing them | `flags:write` |
-| `segment.delete` | deleting segments | `flags:write` |
+| Permission | Allows | Token scope | Members only |
+|---|---|---|---|
+| `project.read` | every ordinary read in a project, its audit log included | `read` | |
+| `project.update` | renaming a project and changing its description | `project:admin` | |
+| `environment.manage` | creating, renaming and deleting environments | `project:admin` | |
+| `declaration.manage` | declaring, renaming and deleting unit types and attributes | `flags:write` | |
+| `grant.manage` | making and removing grants | `project:admin` | ✓ |
+| `project_token.manage` | listing, creating and revoking project tokens | `project:admin` | ✓ |
+| `flag.edit` | creating flags and changing their definition | `flags:write` | |
+| `flag.archive` | archiving, restoring and deleting flags | `flags:write` | |
+| `flag_configuration.update` | replacing a flag's configuration in an environment, setting and removing single overrides, regenerating a rollout's salt | `flags:write` | |
+| `flag_configuration.kill` | switching a flag off in an environment with the kill switch | `flags:write` | |
+| `segment.edit` | creating segments and changing them | `flags:write` | |
+| `segment.delete` | deleting segments | `flags:write` | |
+
+A permission marked members only changes who has access to a project, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)).
 
 A refusal for a missing permission answers `403 forbidden` and names the permission in the problem's `permission` member, so a script can ask for exactly that. An unknown project answers `404 not_found` before any permission is judged.
+
+### How a request is judged
+
+Before an operation's handler runs, one check in front of every operation judges the request, in this order, and the first refusal is the answer:
+
+1. **Credential.** An `Authorization` header is an API token presented as a bearer, judged instead of any session cookie; a malformed, unknown, expired or revoked one is refused `401` even on a public operation. Without one, the session cookie is the credential, and one whose session has ended is refused `401 session_expired` and cleared. A token anywhere else, such as the query string, is never read, since URLs end up in logs and browser histories. Only a public operation is open without a credential (`401 unauthenticated` otherwise), and a public operation ignores a session cookie, so an ended session never stands between a member and signing in again.
+2. **Origin.** A request signed in by the session cookie that the browser says comes from an origin other than the console's is refused `403 cross_origin`, a read as much as a write and a subdomain of the same site as much as an unrelated one.
+3. **Project token reach.** A project token reaches its own project and `GET /me` alone (`403 forbidden`).
+4. **Session.** An operation only a signed-in member may perform refuses any API token `403 session_required`.
+5. **Scope.** A token lacking the scope the operation's permission falls under is refused `403 insufficient_scope`.
+6. **Project.** An operation addressing an unknown project answers `404 not_found`.
+7. **Permission.** A caller without the permission in the project is refused `403 forbidden`, naming it.
+8. **Body.** An operation that opens a session (signing in, accepting an invitation) refuses a body not sent as `application/json` with `415 unsupported_media_type`, since that is what a form on another site would send.
+
+The refusals of steps 1 to 7 are counted per operation and code in the metric `flagnetic_management_refusals_total`, so a sudden run of one code (a revoked token still in use, say) shows on a dashboard.
 
 ## Roles
 
@@ -57,7 +74,7 @@ The console's project members screen lists every member holding a grant with eac
 
 ## API tokens and scopes
 
-A script authenticates with an API token in the `Authorization` header as a bearer. A token carries scopes, which only narrow what it may do: each permission falls under one scope, and a token exercises a permission only when it carries that scope. The scopes are `read`, `flags:write`, `experiments:write`, `project:admin` and `instance:admin`; a token carries `read` alone unless asked for more, and `read` beside every write scope. A scope the token lacks is refused `403 insufficient_scope` before its project is looked up. The operations of the instance (`instance_admin`) need an instance admin, whose token carries `instance:admin` to change anything there and `read` to read. A session is narrowed by no scope.
+A script authenticates with an API token in the `Authorization` header as a bearer. A token carries scopes, which only narrow what it may do: each permission falls under one scope, and a token exercises a permission only when it carries that scope. The scopes are `read`, `flags:write`, `experiments:write`, `project:admin` and `instance:admin`; a token carries `read` alone unless asked for more, and `read` beside every write scope. A scope the token lacks is refused `403 insufficient_scope` before an unknown project is reported, so the refusal is the same whether the project exists or not. The operations of the instance (`instance_admin`) need an instance admin, whose token carries `instance:admin` to change anything there and `read` to read. A session is narrowed by no scope.
 
 A token's expiry lies in the future and at most the instance's maximum token lifetime ahead (365 days on a fresh instance); an instance admin can lower that lifetime or require every token to expire in the auth settings. Every caller reads both from `GET /me` (`max_token_lifetime_seconds`, `require_token_expiry`), and the console offers only the expiries they allow. Without an expiry a token never expires. An expired token is refused `401 token_expired`, a revoked one `401 token_revoked`, an unknown one `401 invalid_token`, each named in `WWW-Authenticate`. A token's value is shown once, when it is created; afterwards only its hint (its prefix and first four characters) and when and from where it was last used, recorded at most once a minute.
 
@@ -80,3 +97,18 @@ A signed-in member renames themself and chooses the console's language with `PAT
 `POST /me/password` changes the password: it takes the current one and the new one, which the password policy must accept (`422 weak_password` at `/new_password`). Every other session of the member is revoked, so a device that learned the old password is signed out; the one making the change stays signed in. The change is recorded as `password.changed` with the number of sessions it revoked. The new password is checked first, so a weak one is refused without the current one being checked or counted. A wrong current password is refused `422 invalid_credentials`, with a violation at `/current_password`, and counts as a failed sign-in of the member's email and address, as at the sign-in page: the fifth wrong attempt locks the email, and the next attempt, here or at sign-in, is refused `429 locked` until the lock ends. A session left open on a shared device therefore cannot be used to guess the password.
 
 The console's personal settings do all of this, list the devices the member is signed in on and sign them out, and create, show once and revoke their personal access tokens.
+
+## In the console
+
+The console reads what the member may do in a project from `GET /projects/{project}/me` and which roles hold each permission from `GET /roles`, and never infers anything from a role's name. The project navigation shows only the screens the member can obtain something from. An action they lack the permission for is either left out or shown disabled with the reason, such as "Needs the permission to manage environments, held by Owner and Maintainer.": a tooltip by pointer and by keyboard focus, and the action's description for a screen reader, so the member knows whom to ask. This only spares a member a refusal; the server judges every request the same way whatever the console showed.
+
+## The audit log
+
+Every change is recorded as an audit entry inside the transaction that makes it, so a change that is rolled back leaves no entry and a committed one always has one. An entry holds when it happened, the project it belongs to (none for a change to the instance, such as a sign-in or an auth settings change), the environment it addressed if any, the actor, the action (`entity.verb`, such as `environment.updated`), the entity with its kind, identifier and key as they were, the values before and after, and the ID of the request that made the change. The actor is a member, an API token (with the member a personal access token acts for), the CLI or the system, named as they were called when the change was made. Secrets never reach an entry: they are written `[redacted]`, and a token appears by its hint. Entries keep no link to their project that would delete them with it, so they outlive what they record. Nothing writes to the log through the API.
+
+- `GET /projects/{project}/audit` lists a project's entries for anyone holding `project.read` there, and `GET /projects/{project}/audit/{entry}` reads one.
+- `GET /audit` lists every entry of the instance for an instance admin, with a `project` filter taking a project's identifier.
+- Filters: `actor` (a member's identifier: their own changes and those of their personal access tokens), `actor_kind`, `action`, `entity_kind`, `entity_id` (which follows an entity whatever key it had), `environment`, `from` and `to` (both included), and `q`, text found in the action, the entity's key or the actor's name, whatever its case.
+- Newest first, 50 entries a page unless `limit` asks for up to 200; the answer's `next_cursor` fetches the next page.
+
+The console shows both logs, the project's under **Audit log** in the project navigation and the instance's under **Audit log** in the instance navigation, with these filters and each entry's values before and after.

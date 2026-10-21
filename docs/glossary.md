@@ -53,7 +53,7 @@ What the instance sends a member through the SMTP server an instance admin confi
 _Avoid_: email (the member's address), notification, message
 
 **API token**:
-The credential a member or a script presents to the management API as a bearer token. A personal access token acts for one member; a project token holds one fixed role in one project and dies with it. Scopes narrow what either may do and never add to it. Only a member signed in to a session creates one; no token creates another. Its value is shown once and stored only as a hash.
+The credential a member or a script presents to the management API as a bearer token. A personal access token acts for one member; a project token holds one fixed role in one project, dies with it, and never changes who has access to it. Scopes narrow what either may do and never add to it. Only a member signed in to a session creates one; no token creates another. Its value is shown once and stored only as a hash.
 _Avoid_: API key, access key, bearer token, SDK key (reserved for SDKs)
 
 **SCIM token**:
@@ -109,8 +109,8 @@ A named set of permissions, which takes effect only through a grant in a project
 _Avoid_: permission level, access group, policy
 
 **Permission**:
-One action a role allows, named after the action. A member's permissions in a project are the union of those of every grant they hold there: holding more grants never takes a permission away, and there is no deny.
-_Avoid_: capability (what a caller may do once protection and the other rules are applied), scope (reserved for an API token), right, privilege
+One action a role allows, named after the entity and the action (`environment.manage`). An operation requires one of them, or instead only that its caller be anyone (`public`), a member (`member`) or the instance admin (`instance_admin`); every permission falls under one scope of an API token. A member's permissions in a project are the union of those of every grant they hold there, narrowed by the scopes of the credential in use: holding more grants never takes a permission away, and there is no deny.
+_Avoid_: capability (what a caller may do once protection and the other rules are applied), scope (reserved for an API token), right, privilege, minimum role (a single ladder of roles, where each role holds everything below it)
 
 **Grant**:
 One role held by one member in one project, made by hand or by an auth provider's group mapping, which owns it and replaces its grants as a set. A member may hold several grants in a project, from one source or several, and grants from different sources sit side by side. A caller may make or remove a grant only of a role whose every permission they hold there themselves.
@@ -426,9 +426,5 @@ One event sent to one subscription, carrying a status and every attempt made at 
 _Avoid_: send, call, dispatch, webhook (that is the subscription)
 
 **Capability**:
-One thing a caller may do, named after the action rather than after the role that allows it, and answered per project and per environment. The UI reads capabilities and never infers what to show from a role name.
+One thing a caller may do, named after the action rather than after the role that allows it, and answered per project and per environment. Until capabilities are answered, the console reads the caller's permissions in a project from `GET /projects/{project}/me`, and never infers what to show from a role name.
 _Avoid_: permission (reserved for what a role allows), grant (a role held in a project), scope (reserved for an API token)
-
-**Minimum role**:
-The weakest role that may call one operation, declared on the operation itself. An environment's protected attribute may raise it.
-_Avoid_: required permission, access level

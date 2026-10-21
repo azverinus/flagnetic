@@ -13,12 +13,30 @@ import { admin, readState } from "./instance";
 
 export type Credentials = { email: string; password: string };
 
-/** Signs in through the sign-in page and waits until the console has left it. */
-export async function signIn(page: Page, who: Credentials = admin): Promise<void> {
+/** The labels of the sign-in page in the language a spec reads it in. */
+export type SignInWords = { email: string; password: string; submit: string };
+
+const english: SignInWords = { email: "Email", password: "Password", submit: "Sign in" };
+
+/** Fills in and sends the sign-in page, leaving the page wherever the answer takes it. */
+export async function submitSignIn(
+  page: Page,
+  who: Credentials,
+  words: SignInWords = english,
+): Promise<void> {
   await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(who.email);
-  await page.getByLabel("Password").fill(who.password);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByLabel(words.email).fill(who.email);
+  await page.getByLabel(words.password).fill(who.password);
+  await page.getByRole("button", { name: words.submit }).click();
+}
+
+/** Signs in through the sign-in page and waits until the console has left it. */
+export async function signIn(
+  page: Page,
+  who: Credentials = admin,
+  words: SignInWords = english,
+): Promise<void> {
+  await submitSignIn(page, who, words);
   await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
 }
 

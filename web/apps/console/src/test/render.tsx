@@ -52,7 +52,7 @@ export function renderWithProviders(
 export async function renderWithRouter(
   ui: () => ReactNode,
   path = "/",
-): Promise<RenderResult & { router: AnyRouter }> {
+): Promise<RenderResult & { router: AnyRouter; queryClient: QueryClient }> {
   const root = createRootRoute({ component: Outlet });
   const page = createRoute({ getParentRoute: () => root, path: "/", component: () => <>{ui()}</> });
   const elsewhere = createRoute({
