@@ -98,3 +98,16 @@ func TestTheSessionFlagAndTheScopeAreRead(t *testing.T) {
 		t.Errorf("operation = %+v", op)
 	}
 }
+
+func TestOnlyReadingWhoTheCallerIsIsOpenToProjectTokens(t *testing.T) {
+	doc := "paths:\n  /me:\n    get:\n      operationId: getMe\n      x-permission: member\n    patch:\n      operationId: updateMe\n      x-permission: member\n      x-session-required: true\n  /roles:\n    get:\n      operationId: listRoles\n      x-permission: member\n"
+	ops, err := Read([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for pattern, want := range map[string]bool{"GET /me": true, "PATCH /me": false, "GET /roles": false} {
+		if got := ops[pattern].OpenToProjectTokens; got != want {
+			t.Errorf("%s: open to project tokens = %v, want %v", pattern, got, want)
+		}
+	}
+}

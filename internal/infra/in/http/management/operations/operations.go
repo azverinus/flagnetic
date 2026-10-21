@@ -16,6 +16,10 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/access"
 )
 
+// whoAmI is the route of the one operation outside a project that a project
+// token reaches: reading which token it is.
+const whoAmI = "GET /me"
+
 // methods are the operation keys of an OpenAPI path item, in the order the
 // table lists them.
 var methods = []string{"get", "put", "post", "delete", "options", "head", "patch", "trace"}
@@ -55,15 +59,16 @@ func Read(doc []byte) (map[string]access.Operation, error) {
 			case o.Permission == "":
 				errs = append(errs, fmt.Errorf("%s (%s): no x-permission", where, o.OperationID))
 				continue
-			case !access.IsRequirement(o.Permission):
+			case !access.IsRequirement(access.Requirement(o.Permission)):
 				errs = append(errs, fmt.Errorf("%s (%s): x-permission %q is neither a permission of the catalog nor public, member or instance_admin",
 					where, o.OperationID, o.Permission))
 				continue
 			}
 			read := method == "get" || method == "head"
+			requirement := access.Requirement(o.Permission)
 			ops[where] = access.Operation{
-				Name: o.OperationID, Requirement: o.Permission, SessionRequired: o.SessionRequired,
-				Read: read, Scope: access.ScopeOf(o.Permission, read),
+				Name: o.OperationID, Requirement: requirement, SessionRequired: o.SessionRequired,
+				Read: read, Scope: access.ScopeOf(requirement, read), OpenToProjectTokens: where == whoAmI,
 			}
 		}
 	}
@@ -93,8 +98,8 @@ var Table = map[string]access.Operation{
 	slices.Sort(patterns)
 	for _, p := range patterns {
 		o := ops[p]
-		fmt.Fprintf(&b, "\t%q: {Name: %q, Requirement: %q, SessionRequired: %t, Read: %t, Scope: %q},\n",
-			p, o.Name, o.Requirement, o.SessionRequired, o.Read, string(o.Scope))
+		fmt.Fprintf(&b, "\t%q: {Name: %q, Requirement: %q, SessionRequired: %t, Read: %t, Scope: %q, OpenToProjectTokens: %t},\n",
+			p, o.Name, string(o.Requirement), o.SessionRequired, o.Read, string(o.Scope), o.OpenToProjectTokens)
 	}
 	b.WriteString("}\n")
 	return format.Source(b.Bytes())

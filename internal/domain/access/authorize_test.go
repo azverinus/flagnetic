@@ -50,12 +50,12 @@ func TestTheBuiltInRolesAreFixed(t *testing.T) {
 }
 
 func TestARequirementIsACatalogPermissionOrAReservedValue(t *testing.T) {
-	for _, r := range []string{"public", "member", "instance_admin"} {
+	for _, r := range []access.Requirement{access.RequirePublic, access.RequireMember, access.RequireInstanceAdmin} {
 		if !access.IsRequirement(r) {
 			t.Errorf("%s is not accepted", r)
 		}
 	}
-	for _, r := range []string{"", "owner", "project.delete", "PUBLIC"} {
+	for _, r := range []access.Requirement{"", "owner", "project.delete", "PUBLIC"} {
 		if access.IsRequirement(r) {
 			t.Errorf("%q is accepted", r)
 		}
@@ -64,7 +64,7 @@ func TestARequirementIsACatalogPermissionOrAReservedValue(t *testing.T) {
 
 func TestTheScopeOfAnOperationFollowsItsRequirement(t *testing.T) {
 	for _, tc := range []struct {
-		requirement string
+		requirement access.Requirement
 		read        bool
 		want        access.Scope
 	}{
@@ -80,8 +80,8 @@ func TestTheScopeOfAnOperationFollowsItsRequirement(t *testing.T) {
 	}
 }
 
-// caller returns a caller presenting a personal access token with scopes,
-// held by a member who is an instance admin or not.
+// tokenCaller returns a caller presenting a personal access token with
+// scopes, held by a member who is an instance admin or not.
 func tokenCaller(t *testing.T, instanceAdmin bool, scopes ...access.Scope) access.Caller {
 	t.Helper()
 	ids := newIDs()
@@ -111,7 +111,9 @@ func refusal(err error) string {
 }
 
 func TestTheSeamJudgesReachThenSessionThenScopeThenPermission(t *testing.T) {
-	getMe := access.Operation{Name: "getMe", Requirement: "member", Read: true}
+	getMe := access.Operation{Name: "getMe", Requirement: "member", Read: true, OpenToProjectTokens: true}
+	authMethods := access.Operation{Name: "listAuthMethods", Requirement: "public", Read: true}
+	updateProject := access.Operation{Name: "updateProject", Requirement: "project.update", Scope: access.ScopeProjectAdmin}
 	updateMe := access.Operation{Name: "updateMe", Requirement: "member", SessionRequired: true}
 	listMembers := access.Operation{Name: "listMembers", Requirement: "instance_admin", Read: true, Scope: access.ScopeRead}
 	updateMember := access.Operation{Name: "updateMember", Requirement: "instance_admin", Scope: access.ScopeInstanceAdmin}
@@ -133,6 +135,15 @@ func TestTheSeamJudgesReachThenSessionThenScopeThenPermission(t *testing.T) {
 		"an instance admin's admin token writes":        {tokenCaller(t, true, access.ScopeInstanceAdmin), updateMember, ""},
 		"a member is no instance admin":                 {tokenCaller(t, false, access.ScopeInstanceAdmin), updateMember, "forbidden"},
 		"a member reads what every member reads":        {tokenCaller(t, false), listRoles, ""},
+		"anyone calls a public operation":               {access.Caller{}, authMethods, ""},
+		"a token calls a public operation":              {tokenCaller(t, false), authMethods, ""},
+		"a project token calls a public operation":      {projectTokenCaller(), authMethods, ""},
+		"a scope is judged before a catalog permission": {tokenCaller(t, true), updateProject, "insufficient_scope"},
+		"a project token's project is judged later":     {projectTokenCaller(), updateProject, "forbidden"},
+		// Until a project is looked up and its grants judged, an operation
+		// needing a catalog permission is open to nobody, an instance admin
+		// included.
+		"a catalog permission is refused for now": {tokenCaller(t, true, access.AllScopes()...), updateProject, "forbidden"},
 	} {
 		if got := refusal(access.Authorize(tc.caller, tc.op)); got != tc.want {
 			t.Errorf("%s: refusal = %q, want %q", name, got, tc.want)
@@ -145,5 +156,13 @@ func TestARefusedPermissionIsNamed(t *testing.T) {
 	e, _ := apperrors.From(access.Authorize(tokenCaller(t, false, access.ScopeInstanceAdmin), op))
 	if e == nil || e.Extensions["permission"] != "instance_admin" {
 		t.Errorf("refusal = %+v, want the permission instance_admin named", e)
+	}
+}
+
+func TestACatalogPermissionIsRefusedNamingIt(t *testing.T) {
+	op := access.Operation{Name: "updateProject", Requirement: "project.update", Scope: access.ScopeProjectAdmin}
+	e, _ := apperrors.From(access.Authorize(tokenCaller(t, true, access.AllScopes()...), op))
+	if e == nil || e.Code != "forbidden" || e.Extensions["permission"] != "project.update" {
+		t.Errorf("refusal = %+v, want forbidden naming project.update", e)
 	}
 }

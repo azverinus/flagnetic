@@ -56,32 +56,43 @@ func PermissionNamed(name string) (PermissionSpec, bool) {
 	return PermissionSpec{}, false
 }
 
+// Requirement is what an operation requires of its caller: a catalog
+// permission, judged in the operation's project, or one of the reserved
+// values below.
+type Requirement string
+
 // The requirements an operation may declare besides a catalog permission.
 const (
-	// RequirePublic: anyone, without credentials.
-	RequirePublic = "public"
+	// RequirePublic: anyone, without credentials; a credential presented is
+	// still authenticated, and a bad one refused.
+	RequirePublic Requirement = "public"
 	// RequireMember: any credential acting for a member, whatever their
-	// grants; a project token only to read who it is.
-	RequireMember = "member"
+	// grants; a project token only where the operation is open to it.
+	RequireMember Requirement = "member"
 	// RequireInstanceAdmin: an instance admin, whose token must carry
 	// instance:admin to write and read to read.
-	RequireInstanceAdmin = "instance_admin"
+	RequireInstanceAdmin Requirement = "instance_admin"
 )
+
+// reserved reports whether r is one of the reserved values rather than a
+// catalog permission.
+func (r Requirement) reserved() bool {
+	return r == RequirePublic || r == RequireMember || r == RequireInstanceAdmin
+}
 
 // IsRequirement reports whether r is a requirement an operation may declare:
 // a catalog permission or one of the reserved values.
-func IsRequirement(r string) bool {
-	switch r {
-	case RequirePublic, RequireMember, RequireInstanceAdmin:
+func IsRequirement(r Requirement) bool {
+	if r.reserved() {
 		return true
 	}
-	_, ok := PermissionNamed(r)
+	_, ok := PermissionNamed(string(r))
 	return ok
 }
 
 // ScopeOf returns the scope a token needs for an operation requiring
 // requirement, a read operation or not; "" when any token will do.
-func ScopeOf(requirement string, read bool) Scope {
+func ScopeOf(requirement Requirement, read bool) Scope {
 	switch requirement {
 	case RequirePublic, RequireMember:
 		return ""
@@ -91,7 +102,7 @@ func ScopeOf(requirement string, read bool) Scope {
 		}
 		return ScopeInstanceAdmin
 	}
-	p, _ := PermissionNamed(requirement)
+	p, _ := PermissionNamed(string(requirement))
 	return p.Scope
 }
 

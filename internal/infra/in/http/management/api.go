@@ -6,6 +6,7 @@ package management
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -39,15 +40,7 @@ var _ StrictServerInterface = (*api)(nil)
 // Mount serves the management API on edge, each operation behind the
 // permission seam, and registers its metrics on reg.
 func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer) {
-	a := &api{
-		edge: edge,
-		h:    h,
-		refusals: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: metrics.Namespace, Subsystem: "management", Name: "refusals_total",
-			Help: "Requests the permission seam refused, by operation and problem code.",
-		}, []string{"operation", "code"}),
-	}
-	reg.MustRegister(a.refusals)
+	a := &api{edge: edge, h: h, refusals: newRefusals(reg)}
 	invalidRequest := func(w http.ResponseWriter, r *http.Request, err error) {
 		edge.WriteError(w, r, flaghttp.InvalidRequest(err.Error()))
 	}
@@ -60,6 +53,16 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer) {
 		BaseRouter:       router{a},
 		ErrorHandlerFunc: invalidRequest,
 	})
+}
+
+// newRefusals returns the counter of the seam's refusals, registered on reg.
+func newRefusals(reg prometheus.Registerer) *prometheus.CounterVec {
+	c := prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: metrics.Namespace, Subsystem: "management", Name: "refusals_total",
+		Help: "Requests the permission seam refused, by operation and problem code.",
+	}, []string{"operation", "code"})
+	reg.MustRegister(c)
+	return c
 }
 
 // router mounts each generated route on the edge behind the seam of its
@@ -91,16 +94,17 @@ func callerOf(ctx context.Context) access.Caller {
 
 // seam judges a request to op before its handler runs: it authenticates the
 // caller and authorizes them for op, and refuses the request otherwise. The
-// caller then travels in the request's context.
+// caller then travels in the request's context. A credential is
+// authenticated even for a public operation, so a bad one is refused there
+// as everywhere; only the absence of any credential is how anyone calls it.
 func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if op.Requirement == access.RequirePublic {
-			next.ServeHTTP(w, r)
-			return
-		}
 		caller, err := a.authenticate(r)
-		if err == nil {
+		switch {
+		case err == nil:
 			err = access.Authorize(caller, op)
+		case errors.Is(err, errUnauthenticated) && op.Requirement == access.RequirePublic:
+			err = nil
 		}
 		if err != nil {
 			a.refuse(w, r, op, err)
@@ -134,18 +138,15 @@ func (a *api) authenticate(r *http.Request) (access.Caller, error) {
 // operation and its code. A refused credential is named in WWW-Authenticate,
 // so tooling tells an expired token from a revoked one without the body.
 func (a *api) refuse(w http.ResponseWriter, r *http.Request, op access.Operation, err error) {
-	if e, ok := apperrors.From(err); ok {
-		switch e.Kind {
-		case apperrors.KindUnauthenticated:
+	if e, ok := apperrors.From(err); ok && (e.Kind == apperrors.KindUnauthenticated || e.Kind == apperrors.KindForbidden) {
+		if e.Kind == apperrors.KindUnauthenticated {
 			challenge := "Bearer"
 			if e.Code != errUnauthenticated.Code {
 				challenge = `Bearer error="invalid_token", error_description="` + e.Code + `"`
 			}
 			w.Header().Set("WWW-Authenticate", challenge)
-			a.refusals.WithLabelValues(op.Name, e.Code).Inc()
-		case apperrors.KindForbidden:
-			a.refusals.WithLabelValues(op.Name, e.Code).Inc()
 		}
+		a.refusals.WithLabelValues(op.Name, e.Code).Inc()
 	}
 	a.edge.WriteError(w, r, err)
 }

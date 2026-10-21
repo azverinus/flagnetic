@@ -40,11 +40,11 @@ func (c Caller) isProjectToken() bool { return c.Token != nil && c.Token.Kind ==
 // Operation is what one operation of the management API requires, as its
 // OpenAPI document declares it.
 type Operation struct {
-	// Name is the operation's identifier in the document.
+	// Name is the operation's identifier in the document, for counting its
+	// refusals.
 	Name string
-	// Requirement is a catalog permission or a reserved value (RequirePublic,
-	// RequireMember, RequireInstanceAdmin).
-	Requirement string
+	// Requirement is a catalog permission or a reserved value.
+	Requirement Requirement
 	// SessionRequired operations refuse every bearer token, so a leaked token
 	// can neither mint another credential nor lock its member out.
 	SessionRequired bool
@@ -52,19 +52,26 @@ type Operation struct {
 	Read bool
 	// Scope is the scope a token needs, as ScopeOf derives it; "" for none.
 	Scope Scope
+	// OpenToProjectTokens marks the one kind of operation outside a project
+	// a project token reaches: reading which token it is. Everywhere else a
+	// project token reaches its own project only.
+	OpenToProjectTokens bool
 }
-
-// whoAmI is the one operation outside its project a project token reaches:
-// reading which token it is.
-const whoAmI = "getMe"
 
 // Authorize judges an authenticated caller against op, in the order every
 // refusal is explained: a project token outside its reach, then a write that
 // needs a session, then a scope the token lacks, then the requirement
-// itself. Operations requiring a catalog permission are judged in their
-// project, once it is found.
+// itself. A public operation admits anyone.
+//
+// An operation requiring a catalog permission is judged in its project,
+// which this does not look up: a project token is let through to that
+// judgement, and the operation itself is refused here, so none is ever open
+// before its project's grants are judged.
 func Authorize(c Caller, op Operation) error {
-	if c.isProjectToken() && op.Name != whoAmI {
+	if op.Requirement == RequirePublic {
+		return nil
+	}
+	if c.isProjectToken() && op.Requirement.reserved() && !op.OpenToProjectTokens {
 		return apperrors.Forbidden("forbidden", "a project token reaches only its project")
 	}
 	if op.SessionRequired && c.Method != MethodSession {
@@ -73,9 +80,16 @@ func Authorize(c Caller, op Operation) error {
 	if !c.hasScope(op.Scope) {
 		return apperrors.Forbidden("insufficient_scope", "the API token does not carry the scope "+string(op.Scope))
 	}
-	if op.Requirement == RequireInstanceAdmin && (c.Member == nil || !c.Member.InstanceAdmin) {
-		return apperrors.Forbidden("forbidden", "this operation needs an instance admin").
-			WithExtension("permission", RequireInstanceAdmin)
+	switch op.Requirement {
+	case RequireMember:
+		return nil
+	case RequireInstanceAdmin:
+		if c.Member == nil || !c.Member.InstanceAdmin {
+			return apperrors.Forbidden("forbidden", "this operation needs an instance admin").
+				WithExtension("permission", string(RequireInstanceAdmin))
+		}
+		return nil
 	}
-	return nil
+	return apperrors.Forbidden("forbidden", "this operation needs the permission "+string(op.Requirement)+" in its project").
+		WithExtension("permission", string(op.Requirement))
 }
