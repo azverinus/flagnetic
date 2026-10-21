@@ -309,13 +309,13 @@ func CheckScopesHeld(c Caller, scopes []Scope) error {
 	return nil
 }
 
-// useInterval is how often a token's use is recorded at most: often enough
-// for a member to tell a token in use from one forgotten, rarely enough that
-// a busy script does not write on every request.
-const useInterval = time.Minute
+// TokenUseInterval is how often a token's use is recorded at most: often
+// enough for a member to tell a token in use from one forgotten, rarely
+// enough that a busy script does not write on every request.
+const TokenUseInterval = time.Minute
 
 // UseToRecord reports whether presenting the token at now is a use worth
 // recording: its first, or a minute or more after the last one recorded.
 func (t APIToken) UseToRecord(now time.Time) bool {
-	return t.LastUsedAt == nil || now.Sub(*t.LastUsedAt) >= useInterval
+	return t.LastUsedAt == nil || now.Sub(*t.LastUsedAt) >= TokenUseInterval
 }

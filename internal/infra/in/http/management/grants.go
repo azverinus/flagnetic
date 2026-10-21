@@ -14,7 +14,7 @@ import (
 // belongs to, with what the caller holds there.
 func projectRefOf(ctx context.Context) appaccess.ProjectRef {
 	in := projectOf(ctx)
-	return appaccess.ProjectRef{ID: in.project.ID, Key: in.project.Key, Held: in.permissions}
+	return appaccess.ProjectRef{ID: in.project.ID, Held: in.permissions}
 }
 
 // ListProjectMembers answers the members holding grants in the project.

@@ -149,25 +149,15 @@ func (h *RevokeProjectToken) Handle(ctx context.Context, cmd RevokeProjectTokenC
 		if err != nil {
 			return err
 		}
-		after := projectTokenDetail(token)
-		after["revoked_at"] = token.RevokedAt.UTC().Format(time.RFC3339)
-		return recordAll(ctx, h.audit, h.ids, now, cmd.Request, governance.Record{
-			Project: cmd.Project.ID, Action: "api_token.revoked", Entity: tokenEntity(token),
-			Before: map[string]any{"revoked_at": nil}, After: after,
-		})
+		return recordAll(ctx, h.audit, h.ids, now, cmd.Request, tokenRevoked(cmd.Project.ID, token, projectTokenDetail(token)))
 	})
 }
 
 // projectTokenDetail is what the audit log keeps of a project token: its
 // hint, never its value.
 func projectTokenDetail(t access.APIToken) map[string]any {
-	var expiresAt *string
-	if t.ExpiresAt != nil {
-		s := t.ExpiresAt.UTC().Format(time.RFC3339)
-		expiresAt = &s
-	}
 	return map[string]any{
-		"kind": t.Kind, "name": t.Name, "hint": t.Hint, "role": t.Role, "scopes": t.Scopes, "expires_at": expiresAt,
+		"kind": t.Kind, "name": t.Name, "hint": t.Hint, "role": t.Role, "scopes": t.Scopes, "expires_at": expiryOf(t),
 		"created_by": t.CreatedBy.String(),
 	}
 }

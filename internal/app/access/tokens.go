@@ -10,6 +10,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -191,21 +192,8 @@ func (h *RevokePersonalToken) Handle(ctx context.Context, cmd RevokePersonalToke
 		if err != nil {
 			return err
 		}
-		entry, err := governance.NewEntry(id.New[governance.Entry](h.ids), now, cmd.Request, tokenRevoked(token, holder))
-		if err != nil {
-			return err
-		}
-		return h.audit.Record(ctx, entry)
+		return recordAll(ctx, h.audit, h.ids, now, cmd.Request, tokenRevoked(workspace.ProjectID{}, token, tokenDetail(token, holder)))
 	})
-}
-
-// tokenRevoked records a revoked token by its hint, never its value.
-func tokenRevoked(t access.APIToken, holder access.Member) governance.Record {
-	after := tokenDetail(t, holder)
-	after["revoked_at"] = t.RevokedAt.UTC().Format(time.RFC3339)
-	return governance.Record{
-		Action: "api_token.revoked", Entity: tokenEntity(t), Before: map[string]any{"revoked_at": nil}, After: after,
-	}
 }
 
 // TokenUseStore records when and from where API tokens were last used.

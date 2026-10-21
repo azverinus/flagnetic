@@ -10,6 +10,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -222,13 +223,27 @@ func tokenEntity(t access.APIToken) governance.Entity {
 // tokenDetail is what the audit log keeps of a personal access token of
 // holder: its hint, never its value.
 func tokenDetail(t access.APIToken, holder access.Member) map[string]any {
-	var expiresAt *string
-	if t.ExpiresAt != nil {
-		s := t.ExpiresAt.UTC().Format(time.RFC3339)
-		expiresAt = &s
-	}
 	return map[string]any{
 		"kind": t.Kind, "name": t.Name, "hint": t.Hint, "member": holder.ID.String(),
-		"scopes": t.Scopes, "expires_at": expiresAt,
+		"scopes": t.Scopes, "expires_at": expiryOf(t),
+	}
+}
+
+// expiryOf is t's expiry as the audit log keeps it, nil for none.
+func expiryOf(t access.APIToken) *string {
+	if t.ExpiresAt == nil {
+		return nil
+	}
+	s := t.ExpiresAt.UTC().Format(time.RFC3339)
+	return &s
+}
+
+// tokenRevoked records revoking t, described by detail, in project (zero
+// for a personal access token, which belongs to no project).
+func tokenRevoked(project workspace.ProjectID, t access.APIToken, detail map[string]any) governance.Record {
+	detail["revoked_at"] = t.RevokedAt.UTC().Format(time.RFC3339)
+	return governance.Record{
+		Project: project, Action: "api_token.revoked", Entity: tokenEntity(t),
+		Before: map[string]any{"revoked_at": nil}, After: detail,
 	}
 }

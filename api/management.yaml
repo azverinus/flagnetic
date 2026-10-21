@@ -1756,7 +1756,7 @@ components:
           description: Seconds to wait before retrying, for a rate limit.
         permission:
           type: string
-          description: The permission the caller lacks, for `forbidden`.
+          description: The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
         errors:
           type: array
           items:

@@ -50,7 +50,7 @@ var ErrMemberDeactivated = apperrors.Conflict("member_deactivated", "the member 
 // is not deactivated; an invited member may hold grants before they join.
 func NewGrant(grantID GrantID, in NewGrantInput) (Grant, error) {
 	if _, ok := RoleNamed(in.Role); !ok {
-		return Grant{}, ErrUnknownRole("/role")
+		return Grant{}, UnknownRoleError("/role")
 	}
 	if in.Member.Status == MemberDeactivated {
 		return Grant{}, ErrMemberDeactivated
@@ -61,19 +61,21 @@ func NewGrant(grantID GrantID, in NewGrantInput) (Grant, error) {
 	}, nil
 }
 
-// ErrUnknownRole refuses a role that is none of the built-in ones, at
+// UnknownRoleError refuses a role that is none of the built-in ones, at
 // pointer.
-func ErrUnknownRole(pointer string) error {
+func UnknownRoleError(pointer string) error {
 	return apperrors.Invalid("invalid_grant", "the grant is not valid", apperrors.Violation{
 		Pointer: pointer, Code: "unknown_role", Detail: "the role is none of owner, maintainer, developer and viewer",
 	})
 }
 
 // CheckGrantorCap refuses handing out role, by making or removing a grant
-// of it or creating a project token holding it, unless held, the
-// permissions of whoever does it in the project, holds every permission of
-// the role; role_not_allowed names the first missing. So managing access
-// never escalates into more access than the manager has.
+// of it or by creating a project token holding it, when held, the
+// permissions the caller holds in the project, lacks any permission of the
+// role; role_not_allowed names the first one missing. So managing access
+// never escalates into more access than the manager has. held are the
+// effective permissions of the credential in use, narrowed by a token's
+// scopes: a credential cannot hand out what it does not hold.
 func CheckGrantorCap(held []Permission, role Role) error {
 	for _, p := range role.Permissions {
 		if !slices.Contains(held, p) {

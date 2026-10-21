@@ -109,8 +109,8 @@ func (s *Store) RevokePersonalToken(ctx context.Context, member access.MemberID,
 }
 
 // RecordTokenUse records the use of token at at from ip unless a use less
-// than a minute before at is recorded already, so replicas recording the
-// same token's use coalesce on one write a minute.
+// than the domain's interval before at is recorded already, so replicas
+// recording the same token's use coalesce on one write per interval.
 func (s *Store) RecordTokenUse(ctx context.Context, token access.APITokenID, at time.Time, ip netip.Addr) error {
 	var addr *netip.Addr
 	if ip.IsValid() {
@@ -118,8 +118,8 @@ func (s *Store) RecordTokenUse(ctx context.Context, token access.APITokenID, at 
 	}
 	_, err := s.db(ctx).Exec(ctx, `
 		UPDATE api_tokens SET last_used_at = $2, last_used_ip = $3
-		WHERE id = $1 AND (last_used_at IS NULL OR last_used_at <= $2::timestamptz - interval '1 minute')`,
-		token.Bytes(), at, addr)
+		WHERE id = $1 AND (last_used_at IS NULL OR last_used_at <= $2::timestamptz - make_interval(secs => $4))`,
+		token.Bytes(), at, addr, access.TokenUseInterval.Seconds())
 	if err != nil {
 		return fmt.Errorf("recording the use of an API token: %w", err)
 	}

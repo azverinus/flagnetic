@@ -18,6 +18,9 @@ type GrantStore interface {
 	// and whether they hold a password; ErrNotFound when none has the
 	// identifier.
 	LockMember(ctx context.Context, member access.MemberID) (access.Member, bool, error)
+	// MemberByID returns the member with the identifier; ErrNotFound when
+	// none has it.
+	MemberByID(ctx context.Context, member access.MemberID) (access.Member, error)
 	// ProjectGrants returns every grant of project, oldest first.
 	ProjectGrants(ctx context.Context, project workspace.ProjectID) ([]access.Grant, error)
 	// CreateGrant stores g; one the member holds already from the same
@@ -36,8 +39,7 @@ var ErrGrantNotFound = apperrors.NotFound("not_found", "no grant of the project 
 // ProjectRef is the project a command addresses, as the request found it,
 // with what the caller holds there.
 type ProjectRef struct {
-	ID  workspace.ProjectID
-	Key string
+	ID workspace.ProjectID
 	// Held are the caller's effective permissions in the project, which
 	// cap the roles they may hand out.
 	Held []access.Permission
@@ -85,7 +87,7 @@ func NewCreateGrant(tx Transactor, store GrantStore, audit AuditLog, c clock.Clo
 func (h *CreateGrant) Handle(ctx context.Context, cmd CreateGrantCommand) (access.Grant, error) {
 	role, ok := access.RoleNamed(cmd.Role)
 	if !ok {
-		return access.Grant{}, access.ErrUnknownRole("/role")
+		return access.Grant{}, access.UnknownRoleError("/role")
 	}
 	if err := access.CheckGrantorCap(cmd.Project.Held, role); err != nil {
 		return access.Grant{}, err
@@ -169,7 +171,9 @@ func (h *DeleteGrant) Handle(ctx context.Context, cmd DeleteGrantCommand) error 
 		if err = access.CheckGrantorCap(cmd.Project.Held, role); err != nil {
 			return err
 		}
-		member, _, err := h.store.LockMember(ctx, grant.Member)
+		// Read for the audit entry's key only: removing a grant needs no
+		// lock on its member, whatever their status.
+		member, err := h.store.MemberByID(ctx, grant.Member)
 		if err != nil {
 			return err
 		}

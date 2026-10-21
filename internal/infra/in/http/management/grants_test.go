@@ -252,3 +252,25 @@ func TestGrantWritesAreAudited(t *testing.T) {
 		}
 	}
 }
+
+// A credential cannot hand out what it does not hold: an owner's token
+// narrowed by its scopes is capped by what the scopes leave it.
+func TestAScopedTokenGrantsOnlyRolesWithinWhatItsScopesLeaveIt(t *testing.T) {
+	srv := testkit.StartServer(t)
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	owner := testkit.NewMember(t, pool)
+	testkit.Grant(t, pool, projectIDOf(p), owner.ID, access.RoleOwner)
+	noFlags := testkit.Client(t, srv, testkit.PersonalToken(t, pool, owner.ID, "no flags", access.ScopeProjectAdmin))
+	m := testkit.NewMember(t, pool)
+
+	res := do(noFlags.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.ID.Bytes(), Role: "maintainer"}))
+	if pr := assertProblem(t, "maintainer without flags:write", res.StatusCode(), res.Body, http.StatusUnprocessableEntity,
+		"role_not_allowed"); pr.Permission == nil || *pr.Permission != "declaration.manage" {
+		t.Errorf("the refusal names %v, want declaration.manage", pr.Permission)
+	}
+	if res := do(noFlags.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.ID.Bytes(), Role: "developer"})); res.JSON201 == nil {
+		t.Errorf("developer = %d: %s", res.StatusCode(), res.Body)
+	}
+}
