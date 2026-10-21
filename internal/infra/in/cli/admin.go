@@ -25,9 +25,11 @@ Commands:
       Create the first instance admin with a password and an API token.
       The password is FLAGNETIC_ADMIN_PASSWORD, or one generated and printed
       once on standard error. The token, carrying every scope and no expiry,
-      is printed on standard output, or written to the --token-file (mode
-      0600) instead. Refused once an instance admin exists; with --if-absent
-      that is a success that does nothing.
+      is printed on standard output, or written to the --token-file instead:
+      a new file of mode 0600, created before anything else, so a path that
+      exists or cannot be created stops the command with nothing created.
+      Refused once an instance admin exists; with --if-absent that is a
+      success that does nothing.
 `
 
 // commandLine carries what a command reads besides its configuration.
@@ -61,7 +63,7 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 	fs.SetOutput(cl.stderr)
 	email := fs.String("email", "", "email of the instance admin (required)")
 	name := fs.String("name", "", "display name of the instance admin; the email's local part when absent")
-	tokenFile := fs.String("token-file", "", "write the token to this file, mode 0600, instead of standard output")
+	tokenFile := fs.String("token-file", "", "write the token to this new file, mode 0600, instead of standard output")
 	ifAbsent := fs.Bool("if-absent", false, "succeed without doing anything when an instance admin exists")
 	if err := fs.Parse(cl.args); err != nil {
 		return exitUsage
@@ -80,8 +82,30 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 		return fail(log, "admin bootstrap failed", err)
 	}
 
+	deps := compose.NewDeps(pool, clock.System{})
+	if *ifAbsent {
+		// Asked first, so a provisioning step rerun on every deploy finds
+		// nothing to do before it touches the token file it wrote last time.
+		exists, existsErr := compose.InstanceAdminExists(deps).Handle(ctx)
+		if err = existsErr; err != nil {
+			return fail(log, "admin bootstrap failed", err)
+		}
+		if exists {
+			fmt.Fprintln(cl.stderr, "admin bootstrap: an instance admin exists; nothing done")
+			return exitOK
+		}
+	}
+	var out *secretFile
+	if *tokenFile != "" {
+		if out, err = createSecretFile(*tokenFile); err != nil {
+			fmt.Fprintf(cl.stderr, "admin bootstrap: cannot create the token file: %v; nothing was created\n", err)
+			return exitFailure
+		}
+		defer out.discard()
+	}
+
 	password, _ := cl.lookupEnv("FLAGNETIC_ADMIN_PASSWORD")
-	res, err := compose.Bootstrap(compose.NewDeps(pool, clock.System{})).Handle(ctx, appaccess.BootstrapCommand{
+	res, err := compose.Bootstrap(deps).Handle(ctx, appaccess.BootstrapCommand{
 		Email: *email, DisplayName: *name, Password: secret.New(password),
 		Request: governance.Request{Actor: governance.CLIActor("admin bootstrap")},
 	})
@@ -105,12 +129,12 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 	if !res.GeneratedPassword.IsZero() {
 		fmt.Fprintf(cl.stderr, "The instance admin's password is shown once; store it now:\nPassword: %s\n", res.GeneratedPassword.Reveal())
 	}
-	if *tokenFile != "" {
-		if err := writeSecretFile(*tokenFile, res.Token.Reveal()+"\n"); err != nil {
-			// The admin exists now and the token is shown nowhere else, so
-			// it is printed rather than lost.
-			fmt.Fprintf(cl.stderr, "admin bootstrap: writing the token file: %v\nThe token is printed instead:\n", err)
-			fmt.Fprintln(cl.stdout, res.Token.Reveal())
+	if out != nil {
+		if err := out.write(res.Token.Reveal() + "\n"); err != nil {
+			// The operator chose a file to keep the token out of logs, so it
+			// is not printed instead: the instance admin signs in with their
+			// password and creates another token.
+			fmt.Fprintf(cl.stderr, "admin bootstrap: the instance admin was created, but writing the token to %s failed: %v\n", *tokenFile, err)
 			return exitFailure
 		}
 		fmt.Fprintf(cl.stderr, "Instance admin created. Their API token is in %s.\n", *tokenFile)
@@ -130,17 +154,45 @@ func describe(e *apperrors.Error) string {
 	return s
 }
 
-// writeSecretFile writes content to path, readable by its owner alone, even
-// when the file existed with a wider mode.
-func writeSecretFile(path, content string) (err error) {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //nolint:gosec // the operator names the file
+// secretFile is a file a secret is written to, created before anything the
+// secret belongs to, so a path that cannot take it stops the command before
+// it creates anything.
+type secretFile struct {
+	f    *os.File
+	kept bool
+}
+
+// createSecretFile creates path, readable by its owner alone. A path that
+// exists, a symbolic link included, is refused: overwriting a file the
+// operator did not mean, or following a link someone else placed, could hand
+// the secret to another reader.
+func createSecretFile(path string) (*secretFile, error) {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:gosec // the operator names the file
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer func() { err = errors.Join(err, f.Close()) }()
-	if err = f.Chmod(0o600); err != nil {
-		return err
+	// The mode is set again since the process's umask applies to creation.
+	if err := f.Chmod(0o600); err != nil {
+		return nil, errors.Join(err, f.Close(), os.Remove(path))
 	}
-	_, err = f.WriteString(content)
-	return err
+	return &secretFile{f: f}, nil
+}
+
+// write writes content to the file and closes it; a file that did not take
+// all of it is removed, so no partial secret is left behind.
+func (s *secretFile) write(content string) error {
+	_, err := s.f.WriteString(content)
+	if err = errors.Join(err, s.f.Sync(), s.f.Close()); err != nil {
+		return errors.Join(err, os.Remove(s.f.Name()))
+	}
+	s.kept = true
+	return nil
+}
+
+// discard removes the file unless a secret was written to it.
+func (s *secretFile) discard() {
+	if !s.kept {
+		_ = s.f.Close()
+		_ = os.Remove(s.f.Name())
+	}
 }

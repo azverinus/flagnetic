@@ -108,6 +108,33 @@ func TestAdminBootstrapIfAbsentWritesTheTokenFileOnce(t *testing.T) {
 	}
 }
 
+func TestAdminBootstrapCreatesNothingWhenItCannotCreateTheTokenFile(t *testing.T) {
+	env := map[string]string{"DATABASE_URL": testkit.EmptyDatabase(t), "FLAGNETIC_ADMIN_PASSWORD": "a long enough password"}
+	if r := migrate(env["DATABASE_URL"]); r.code != 0 {
+		t.Fatalf("migrate: %s", r.stderr)
+	}
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "existing")
+	if err := os.WriteFile(existing, []byte("kept\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, file := range map[string]string{
+		"a file that exists":       existing,
+		"a directory that doesn't": filepath.Join(dir, "missing", "token"),
+	} {
+		r := bootstrap(env, "--email", "first@example.com", "--token-file", file)
+		if r.code != 1 || r.stdout != "" || strings.Contains(r.stderr, "fn_pat_") || !strings.Contains(r.stderr, file) {
+			t.Errorf("%s: exit code = %d, stdout = %q, stderr:\n%s\nwant 1, the file named and the token nowhere", name, r.code, r.stdout, r.stderr)
+		}
+	}
+	if kept, _ := os.ReadFile(existing); string(kept) != "kept\n" {
+		t.Errorf("the existing file was changed: %q", kept)
+	}
+	if r := bootstrap(env, "--email", "first@example.com"); r.code != 0 {
+		t.Errorf("a bootstrap after the refusals: exit code = %d, want 0 since nothing was created; stderr:\n%s", r.code, r.stderr)
+	}
+}
+
 func TestAdminBootstrapPrintsAGeneratedPasswordOnce(t *testing.T) {
 	env := map[string]string{"DATABASE_URL": testkit.EmptyDatabase(t)}
 	if r := migrate(env["DATABASE_URL"]); r.code != 0 {
