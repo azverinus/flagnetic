@@ -27,8 +27,24 @@ msgstr ""
 msgid "{count, plural, one {second} other {seconds}}"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "{holder} no longer holds {role} in this project and keeps their other roles here."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "{holder} no longer holds any role in this project and leaves its members. They stay a member of the instance."
+msgstr ""
+
+#: src/components/grant-form.tsx
+msgid "{label}: {status}"
+msgstr ""
+
 #: src/components/member-credentials.tsx
 msgid "{live, plural, one {Revoke # session} other {Revoke # sessions}}"
+msgstr ""
+
+#: src/components/grant-form.tsx
+msgid "{name} ({email})"
 msgstr ""
 
 #: src/components/member-actions.tsx
@@ -92,6 +108,10 @@ msgstr ""
 msgid "A key never changes once it is set."
 msgstr ""
 
+#: src/lib/project-members.ts
+msgid "A member without a grant here"
+msgstr ""
+
 #: src/components/invitation-link-dialog.tsx
 msgid "A new invitation link for {name}"
 msgstr ""
@@ -106,6 +126,14 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "A project owner or an instance admin can grant you a role in it."
+msgstr ""
+
+#: src/components/project-token-list.tsx
+msgid "A project token belongs to the project, not to whoever created it: it keeps working when they leave. Only a signed-in session creates one."
+msgstr ""
+
+#: src/components/token-create-form.tsx
+msgid "A project token does what its role allows in this project, narrowed to its scopes, and never manages who has access. Every write scope includes read."
 msgstr ""
 
 #: src/components/member-credentials.tsx
@@ -334,8 +362,25 @@ msgstr ""
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr ""
 
+#: src/components/grant-form.tsx
+msgid "Choose a member"
+msgstr ""
+
+#: src/components/grant-form.tsx
+msgid "Choose a member."
+msgstr ""
+
 #: src/components/invitation-acceptance.tsx
 msgid "Choose a password."
+msgstr ""
+
+#: src/components/role-field.tsx
+msgid "Choose a role"
+msgstr ""
+
+#: src/components/grant-form.tsx
+#: src/components/token-create-form.tsx
+msgid "Choose a role."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -356,6 +401,14 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered languages."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered members."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered roles."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -427,6 +480,10 @@ msgstr ""
 
 #: src/components/token-list.tsx
 msgid "Created"
+msgstr ""
+
+#: src/components/project-token-list.tsx
+msgid "Created by"
 msgstr ""
 
 #: src/components/password-form.tsx
@@ -705,8 +762,28 @@ msgstr ""
 msgid "Grant"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Grant a role"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Grant a role to {name}"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Grant members of the instance the roles their work in it needs."
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Grant removed"
+msgstr ""
+
+#: src/components/grant-form.tsx
+msgid "Grant role"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Grants"
 msgstr ""
 
 #: src/routes/_signed-in/admin/auth-settings.tsx
@@ -837,6 +914,14 @@ msgstr ""
 msgid "Leave without saving?"
 msgstr ""
 
+#: src/lib/project-members.ts
+msgid "Lets the holder {list}."
+msgstr ""
+
+#: src/lib/project-members.ts
+msgid "Lets the holder do nothing yet."
+msgstr ""
+
 #: src/components/personal-menu.tsx
 #: src/components/theme-choice.tsx
 msgid "Light"
@@ -894,6 +979,21 @@ msgstr ""
 msgid "manage who has access"
 msgstr ""
 
+#. A grant made by hand.
+#: src/lib/project-members.ts
+msgid "Manual, granted by {by} on {when}"
+msgstr ""
+
+#. A grant made by hand.
+#: src/lib/project-members.ts
+msgid "Manual, granted on {when}"
+msgstr ""
+
+#. A grant made by hand.
+#: src/lib/project-members.ts
+msgid "Manual, granted on {when} by a member without a grant here"
+msgstr ""
+
 #: src/components/auth-settings-form.tsx
 msgid "Maximum token lifetime"
 msgstr ""
@@ -901,9 +1001,11 @@ msgstr ""
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
 #: src/components/audit-log.tsx
+#: src/components/grant-form.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
+#: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Member"
 msgstr ""
 
@@ -939,7 +1041,12 @@ msgstr ""
 #: src/components/projects-table.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 #: src/routes/_signed-in/admin/members/route.tsx
+#: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Members"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Members of the project"
 msgstr ""
 
 #: src/components/projects-table.tsx
@@ -993,6 +1100,10 @@ msgstr ""
 msgid "New project"
 msgstr ""
 
+#: src/components/project-token-list.tsx
+msgid "New project token"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "New unit type"
 msgstr ""
@@ -1042,6 +1153,10 @@ msgstr ""
 msgid "No way to sign in is enabled on this instance. Ask its operator."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Nobody holds a role in this project yet."
+msgstr ""
+
 #. An audit entry's value before a creation or after a deletion.
 #: src/components/audit-entry-sheet.tsx
 msgid "none"
@@ -1054,6 +1169,10 @@ msgstr ""
 
 #: src/routes/_signed-in/$.tsx
 msgid "Not found"
+msgstr ""
+
+#: src/lib/project-members.ts
+msgid "Not recorded"
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -1154,6 +1273,12 @@ msgstr ""
 msgid "Project not found"
 msgstr ""
 
+#: src/components/navigation.tsx
+#: src/components/project-token-list.tsx
+#: src/routes/_signed-in/projects/$project/tokens.tsx
+msgid "Project tokens"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Project updated"
 msgstr ""
@@ -1183,8 +1308,20 @@ msgstr ""
 msgid "Read everything you can read."
 msgstr ""
 
+#: src/components/grant-form.tsx
+msgid "Reading the members…"
+msgstr ""
+
 #: src/components/project-audit.tsx
 msgid "Recent activity"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Remove {role} from {holder}"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Remove grant"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments.tsx
@@ -1248,6 +1385,11 @@ msgstr ""
 msgid "Revoked"
 msgstr ""
 
+#: src/components/project-token-list.tsx
+#: src/components/role-field.tsx
+msgid "Role"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Role granted"
 msgstr ""
@@ -1280,6 +1422,10 @@ msgstr ""
 #. An attribute type.
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Semantic version"
+msgstr ""
+
+#: src/components/project-token-list.tsx
+msgid "Send it as a bearer token in the Authorization header. Keep it where only the pipeline that uses it can read it."
 msgstr ""
 
 #: src/components/token-list.tsx
@@ -1467,6 +1613,10 @@ msgid "The kinds of unit a flag is served to, such as a user or a device. A key 
 msgstr ""
 
 #: src/lib/problem-messages.ts
+msgid "The member already holds this role in the project."
+msgstr ""
+
+#: src/lib/problem-messages.ts
 msgid "The member is deactivated. Reactivate them first."
 msgstr ""
 
@@ -1478,12 +1628,20 @@ msgstr ""
 msgid "The member whose API token is {token}"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "The members holding a role in this project. A member may hold several, and can do whatever any of them allows."
+msgstr ""
+
 #: src/components/project-audit.tsx
 msgid "The most recent changes in this project"
 msgstr ""
 
 #: src/components/password-form.tsx
 msgid "The new passwords do not match."
+msgstr ""
+
+#: src/components/project-token-list.tsx
+msgid "The new project token"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -1520,6 +1678,14 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "The request was refused."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The role includes a permission you do not hold yourself here."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The role includes the permission to {name}, which you do not hold yourself here."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -1647,6 +1813,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "This project has no attribute yet."
+msgstr ""
+
+#: src/components/project-token-list.tsx
+msgid "This project has no token yet."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
@@ -1820,6 +1990,10 @@ msgstr ""
 
 #: src/components/session-list.tsx
 msgid "You are signed in on this device only."
+msgstr ""
+
+#: src/components/grant-form.tsx
+msgid "You can grant further roles to the members of this project. An instance admin grants a first role to anyone else."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/route.tsx

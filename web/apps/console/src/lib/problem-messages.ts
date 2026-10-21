@@ -91,6 +91,18 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`Only an invited member has an invitation to replace.`);
     case "member_deactivated":
       return i18n._(msg`The member is deactivated. Reactivate them first.`);
+    case "already_granted":
+      return i18n._(msg`The member already holds this role in the project.`);
+    case "role_not_allowed": {
+      const permission = error.problem.permission;
+      if (typeof permission === "string") {
+        const name = permissionName(i18n, permission);
+        return i18n._(
+          msg`The role includes the permission to ${name}, which you do not hold yourself here.`,
+        );
+      }
+      return i18n._(msg`The role includes a permission you do not hold yourself here.`);
+    }
     case "invitation_gone":
       return i18n._(
         msg`This invitation link no longer works: it was used, replaced by a newer one, or it expired.`,
@@ -145,6 +157,10 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
     case "invalid_credentials":
       // Only a password change names a field with it: the current password.
       return i18n._(msg`That is not your current password.`);
+    case "unknown_member":
+      return i18n._(msg`Choose one of the offered members.`);
+    case "unknown_role":
+      return i18n._(msg`Choose one of the offered roles.`);
     case "unknown_locale":
       return i18n._(msg`Choose one of the offered languages.`);
     case "scope_not_allowed":

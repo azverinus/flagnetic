@@ -1,16 +1,18 @@
-import { type CreatedApiToken, createMyToken, type Scope } from "@flagnetic/api";
+import type { Role, Scope } from "@flagnetic/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
+import type { QueryKey } from "@tanstack/react-query";
 import { useEffect, useId, useMemo } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import { RoleField } from "@/components/role-field";
 import { DialogForm } from "@/components/ui/dialog-form";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectItem } from "@/components/ui/select";
 import { formatLifetime } from "@/i18n/format";
-import { ApiError, unwrap } from "@/lib/errors";
+import { ApiError } from "@/lib/errors";
 import { nameSchema } from "@/lib/forms";
 import { useListMutation } from "@/lib/mutations";
 import {
@@ -19,52 +21,78 @@ import {
   expiresAt,
   expiryChoices,
   impliesRead,
-  offeredScopes,
   scopeDescription,
   type TokenPolicy,
   withImpliedRead,
 } from "@/lib/personal-tokens";
 import { violationsByPointer } from "@/lib/problem-messages";
-import { myTokensQuery } from "@/lib/queries";
 
-export type TokenCreateFormProps = {
-  /** Whether the member is an instance admin, who alone may give a token `instance:admin`. */
-  instanceAdmin: boolean;
+/** What a new token of either kind is created with. */
+export type TokenRequest = {
+  name: string;
+  scopes: Scope[];
+  expires_at: string | null;
+};
+
+/** A token created, with its value, to be shown this once. */
+type Created = { value: string };
+
+/**
+ * The kind of token the form creates: a personal access token acts for
+ * its member, a project token holds one of the project's roles.
+ */
+export type TokenKind =
+  | {
+      kind: "personal";
+      /** Creates the token; the answer carries its value. */
+      create: (request: TokenRequest) => Promise<Created>;
+    }
+  | {
+      kind: "project";
+      /** Every role, in the server's order; the token holds one of them. */
+      roles: readonly Role[];
+      /** Creates the token holding the chosen role; the answer carries its value. */
+      create: (request: TokenRequest & { role: string }) => Promise<Created>;
+    };
+
+export type TokenCreateFormProps = TokenKind & {
+  /** The scopes the token may be given, in the server's order. */
+  scopes: readonly Scope[];
   /** The instance's bound on a token's expiry, which the expiries offered follow. */
   policy: TokenPolicy;
+  /** The list the token joins, read again once it is created. */
+  list: QueryKey;
   onCancel: () => void;
   /** The token created, with its value, to be shown this once. */
-  onCreated: (created: CreatedApiToken) => void;
+  onCreated: (created: Created) => void;
 };
 
 /**
- * A new personal access token: its name, its scopes and its expiry, offered
- * only as far ahead as the instance allows.
+ * A new API token: its name, for a project token its role, its scopes and
+ * its expiry, offered only as far ahead as the instance allows.
  */
-export function TokenCreateForm({
-  instanceAdmin,
-  policy,
-  onCancel,
-  onCreated,
-}: TokenCreateFormProps) {
+export function TokenCreateForm(props: TokenCreateFormProps) {
+  const { scopes, policy, list, onCancel, onCreated } = props;
+  const roles = props.kind === "project" ? props.roles : undefined;
   const { i18n, t } = useLingui();
   const { maxLifetimeSeconds: max, expiryRequired } = policy;
   const choices = useMemo(
     () => expiryChoices({ maxLifetimeSeconds: max, expiryRequired }),
     [max, expiryRequired],
   );
-  const scopes = offeredScopes(instanceAdmin);
   const scopesHint = useId();
 
   const schema = z.object({
     name: nameSchema(i18n),
+    // Nothing is chosen first, so a project token's role is always picked on purpose.
+    role: props.kind === "project" ? z.string().min(1, t`Choose a role.`) : z.string(),
     scopes: z.array(z.string()),
     expiry: z.string(),
   });
   type Values = z.infer<typeof schema>;
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", scopes: ["read"], expiry: defaultExpiry(choices) },
+    defaultValues: { name: "", role: "", scopes: ["read"], expiry: defaultExpiry(choices) },
   });
   // The policy can change while the form is open, when the caller is read
   // again; an expiry it no longer offers would show as nothing chosen.
@@ -73,17 +101,17 @@ export function TokenCreateForm({
     if (!choices.includes(expiry as ExpiryChoice)) form.setValue("expiry", defaultExpiry(choices));
   }, [choices, expiry, form]);
   const create = useListMutation(
-    (values: Values) =>
-      unwrap(
-        createMyToken({
-          body: {
-            name: values.name,
-            scopes: withImpliedRead(values.scopes as Scope[]),
-            expires_at: expiresAt(values.expiry as ExpiryChoice, new Date(), policy),
-          },
-        }),
-      ),
-    myTokensQuery.queryKey,
+    (values: Values) => {
+      const request: TokenRequest = {
+        name: values.name,
+        scopes: withImpliedRead(values.scopes as Scope[]),
+        expires_at: expiresAt(values.expiry as ExpiryChoice, new Date(), policy),
+      };
+      return props.kind === "project"
+        ? props.create({ ...request, role: values.role })
+        : props.create(request);
+    },
+    list,
     () => undefined,
     // The answer carries the token's value.
     { secret: true },
@@ -125,6 +153,23 @@ export function TokenCreateForm({
       >
         <Input autoComplete="off" autoFocus {...form.register("name")} />
       </Field>
+      {roles ? (
+        <Controller
+          control={form.control}
+          name="role"
+          render={({ field }) => (
+            <RoleField
+              roles={roles}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              ref={field.ref}
+              error={errors.role?.message}
+              refusal={create.error}
+            />
+          )}
+        />
+      ) : null}
       <Controller
         control={form.control}
         name="scopes"
@@ -134,10 +179,17 @@ export function TokenCreateForm({
               <Trans>Scopes</Trans>
             </legend>
             <p id={scopesHint} className="text-sm text-muted-foreground">
-              <Trans>
-                A token does only what you can do yourself, narrowed to its scopes. Every write
-                scope includes read.
-              </Trans>
+              {props.kind === "project" ? (
+                <Trans>
+                  A project token does what its role allows in this project, narrowed to its scopes,
+                  and never manages who has access. Every write scope includes read.
+                </Trans>
+              ) : (
+                <Trans>
+                  A token does only what you can do yourself, narrowed to its scopes. Every write
+                  scope includes read.
+                </Trans>
+              )}
             </p>
             {scopes.map((scope) => {
               const implied = scope === "read" && anyWrite;

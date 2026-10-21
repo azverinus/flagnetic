@@ -53,6 +53,8 @@ A grant is one role held by one member in one project. A project owner grants a 
 - An instance admin holds every permission in every project without a grant, and is every project's backstop: a project's creator receives no grant, and removing the last owner's grant is allowed.
 - A member sees in `GET /projects` the projects where they hold a grant; an instance admin sees every project.
 
+The console's project members screen lists every member holding a grant with each grant's role, source, maker and time, and lets an owner grant a role and remove one grant at a time. Reading every member of the instance is an instance admin's alone, so an instance admin grants a role to anyone, while an owner who is not one grants further roles to the project's own members.
+
 ## API tokens and scopes
 
 A script authenticates with an API token in the `Authorization` header as a bearer. A token carries scopes, which only narrow what it may do: each permission falls under one scope, and a token exercises a permission only when it carries that scope. The scopes are `read`, `flags:write`, `experiments:write`, `project:admin` and `instance:admin`; a token carries `read` alone unless asked for more, and `read` beside every write scope. A scope the token lacks is refused `403 insufficient_scope` before its project is looked up. The operations of the instance (`instance_admin`) need an instance admin, whose token carries `instance:admin` to change anything there and `read` to read. A session is narrowed by no scope.
@@ -65,7 +67,7 @@ A personal access token (`fn_pat_…`) acts for the member who created it, with 
 
 ### Project tokens
 
-A project token (`fn_prj_…`) belongs to a project rather than to a person, for a pipeline. An owner creates it holding one built-in role in the project, fixed for its life (`/projects/{project}/tokens`). Its permissions are its role's narrowed by its scopes, minus `grant.manage` and `project_token.manage`: whatever its role, a project token never changes who has access to the project. It reaches its own project and `GET /me` alone (`403 forbidden` anywhere else, the project list included), never carries `instance:admin`, and keeps working when the member who created it leaves.
+A project token (`fn_prj_…`) belongs to a project rather than to a person, for a pipeline. An owner creates it holding one built-in role in the project, fixed for its life (`/projects/{project}/tokens`). Its permissions are its role's narrowed by its scopes, minus `grant.manage` and `project_token.manage`: whatever its role, a project token never changes who has access to the project. It reaches its own project and `GET /me` alone (`403 forbidden` anywhere else, the project list included), never carries `instance:admin`, and keeps working when the member who created it leaves. The console's project tokens screen, shown to an owner, lists them with their role, scopes, expiry, creator and last use, creates one showing its value once, and revokes one.
 
 ### Only a session creates a credential
 

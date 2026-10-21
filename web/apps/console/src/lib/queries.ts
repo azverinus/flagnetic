@@ -17,6 +17,8 @@ import {
   type MemberStatus,
   listProjectAuditEntries,
   listProjectMembers,
+  listProjectTokens,
+  type ProjectToken,
   type AuditEntry,
   type AuditEntryList,
   type Member,
@@ -134,6 +136,14 @@ export function projectMembersQuery(project: string) {
   return queryOptions<ProjectMember[]>({
     queryKey: ["projects", project, "members"],
     queryFn: async () => (await unwrap(listProjectMembers({ path: { project } }))).items,
+  });
+}
+
+/** A project's tokens, revoked and expired ones included, the newest first. */
+export function projectTokensQuery(project: string) {
+  return queryOptions<ProjectToken[]>({
+    queryKey: ["projects", project, "tokens"],
+    queryFn: async () => (await unwrap(listProjectTokens({ path: { project } }))).items,
   });
 }
 
