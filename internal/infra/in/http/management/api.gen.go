@@ -120,6 +120,9 @@ type Violation struct {
 	Code   string `json:"code"`
 	Detail string `json:"detail"`
 
+	// Params The values of the rule broken, such as the bounds of a length, for a client to explain the violation in its own language.
+	Params *map[string]interface{} `json:"params,omitempty"`
+
 	// Pointer JSON Pointer into the request body.
 	Pointer string `json:"pointer"`
 }

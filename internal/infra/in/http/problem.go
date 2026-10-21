@@ -132,9 +132,10 @@ func (s *Server) WriteError(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 type problemViolation struct {
-	Pointer string `json:"pointer"`
-	Code    string `json:"code"`
-	Detail  string `json:"detail"`
+	Pointer string         `json:"pointer"`
+	Code    string         `json:"code"`
+	Detail  string         `json:"detail"`
+	Params  map[string]any `json:"params,omitempty"`
 }
 
 func (s *Server) writeProblem(w http.ResponseWriter, r *http.Request, p problem) {

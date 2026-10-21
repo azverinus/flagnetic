@@ -107,6 +107,10 @@ components:
           type: string
         detail:
           type: string
+        params:
+          type: object
+          additionalProperties: true
+          description: The values of the rule broken, such as the bounds of a length, for a client to explain the violation in its own language.
     MemberStatus:
       type: string
       enum: [invited, active, deactivated]
