@@ -10,8 +10,8 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ApiError, unwrap } from "@/lib/errors";
 import { problemMessage, retryWait } from "@/lib/problem-messages";
 import { authMethodsQuery } from "@/lib/queries";
@@ -31,7 +31,7 @@ export type SignInFormProps = {
 export function SignInForm({ ended, onSignedIn }: SignInFormProps) {
   const { i18n, t } = useLingui();
   const methods = useQuery(authMethodsQuery);
-  const ids = { email: useId(), password: useId(), error: useId() };
+  const refusalId = useId();
 
   // The generated schema gives the shape the server reads; the console adds
   // what a member must fill in, in their language.
@@ -70,7 +70,7 @@ export function SignInForm({ ended, onSignedIn }: SignInFormProps) {
     <form
       noValidate
       className="flex flex-col gap-4"
-      aria-describedby={refusal ? ids.error : undefined}
+      aria-describedby={refusal ? refusalId : undefined}
       onSubmit={form.handleSubmit((values) => submit.mutate(values))}
     >
       {ended && !refusal ? (
@@ -81,7 +81,7 @@ export function SignInForm({ ended, onSignedIn }: SignInFormProps) {
       ) : null}
       {refusal ? (
         <p
-          id={ids.error}
+          id={refusalId}
           role="alert"
           className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
         >
@@ -89,43 +89,12 @@ export function SignInForm({ ended, onSignedIn }: SignInFormProps) {
           {signInRefusalMessage(i18n, refusal)}
         </p>
       ) : null}
-      <div className="flex flex-col gap-2">
-        <Label htmlFor={ids.email}>
-          <Trans>Email</Trans>
-        </Label>
-        <Input
-          id={ids.email}
-          type="email"
-          autoComplete="username"
-          autoFocus
-          aria-invalid={errors.email ? true : undefined}
-          aria-describedby={errors.email ? `${ids.email}-error` : undefined}
-          {...form.register("email")}
-        />
-        {errors.email ? (
-          <p id={`${ids.email}-error`} className="text-sm text-destructive">
-            {errors.email.message}
-          </p>
-        ) : null}
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor={ids.password}>
-          <Trans>Password</Trans>
-        </Label>
-        <Input
-          id={ids.password}
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={errors.password ? true : undefined}
-          aria-describedby={errors.password ? `${ids.password}-error` : undefined}
-          {...form.register("password")}
-        />
-        {errors.password ? (
-          <p id={`${ids.password}-error`} className="text-sm text-destructive">
-            {errors.password.message}
-          </p>
-        ) : null}
-      </div>
+      <Field label={<Trans>Email</Trans>} error={errors.email?.message}>
+        <Input type="email" autoComplete="username" autoFocus {...form.register("email")} />
+      </Field>
+      <Field label={<Trans>Password</Trans>} error={errors.password?.message}>
+        <Input type="password" autoComplete="current-password" {...form.register("password")} />
+      </Field>
       <Button type="submit" disabled={submit.isPending}>
         {submit.isPending ? <Trans>Signing in…</Trans> : <Trans>Sign in</Trans>}
       </Button>
