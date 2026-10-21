@@ -555,7 +555,7 @@ type FlagCreate struct {
 	AutomaticExposure *bool        `json:"automatic_exposure,omitempty"`
 	Description       *Description `json:"description,omitempty"`
 
-	// ExpectedRemovalAt For a temporary flag only; 90 days from now when absent.
+	// ExpectedRemovalAt For a temporary flag only, which a flag is when `lifetime` is absent; 90 days from now when absent.
 	ExpectedRemovalAt *time.Time `json:"expected_removal_at,omitempty"`
 
 	// Key Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.

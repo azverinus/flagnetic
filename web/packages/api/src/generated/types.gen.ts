@@ -807,7 +807,7 @@ export type FlagCreate = {
   tags?: Array<string>;
   lifetime?: Lifetime;
   /**
-   * For a temporary flag only; 90 days from now when absent.
+   * For a temporary flag only, which a flag is when `lifetime` is absent; 90 days from now when absent.
    */
   expected_removal_at?: string;
   automatic_exposure?: boolean;

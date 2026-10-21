@@ -576,7 +576,7 @@ export const zFlagPatch = z.object({
   name: zName.optional(),
   description: zDescription.optional(),
   owner: z.uuid().optional(),
-  tags: z.array(z.string()).optional(),
+  tags: z.array(z.string().min(1).max(64)).max(50).optional(),
   lifetime: zLifetime.optional(),
   expected_removal_at: z.iso.datetime().optional(),
   automatic_exposure: z.boolean().optional(),
