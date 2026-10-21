@@ -242,10 +242,10 @@ func TestAUnitTypeWorksAsAStringAttributeInASegment(t *testing.T) {
 	if res := do(admin.CreateUnitTypeWithResponse(t.Context(), p.Key, management.UnitTypeCreate{Key: "organization", Name: "Organization"})); res.JSON201 == nil {
 		t.Fatalf("declaring organization = %d %s", res.StatusCode(), res.Body)
 	}
-	beta_testers := createSegment(t, admin, p.Key, management.SegmentCreate{Key: "beta_testers", Name: "Beta testers", Private: ptr(true),
+	testers := createSegment(t, admin, p.Key, management.SegmentCreate{Key: "beta_testers", Name: "Beta testers", Private: ptr(true),
 		Conditions: conditions(attr("user", "in", `["u-beta-1","u-beta-2"]`))})
-	if !beta_testers.Private {
-		t.Errorf("beta_testers = %s, want private", raw(beta_testers))
+	if !testers.Private {
+		t.Errorf("beta_testers = %s, want private", raw(testers))
 	}
 	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "beta_customers", Name: "Beta customers",
 		Conditions: conditions(attr("organization", "starts_with", `"org-"`), attr("anonymous", "not_exists", ""))})
