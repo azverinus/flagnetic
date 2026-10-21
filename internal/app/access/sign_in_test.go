@@ -197,3 +197,25 @@ func TestABusyAttemptLiftsTheLockItStarted(t *testing.T) {
 		t.Errorf("a wrong password after the busy attempt: %s, want invalid_credentials: the busy attempt guessed nothing and locked nothing", code)
 	}
 }
+
+func TestARefusedAttemptCostsItsSourceNothing(t *testing.T) {
+	h := newSignIn(t, password.NewHasher(password.DefaultParams))
+	m := testkit.NewMember(t, testkit.Pool(t))
+	from := anAddress()
+	attempt := func(email string) string {
+		_, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: email, Password: secret.New("not-the-password-9"), ClientIP: from})
+		return codeOf(err)
+	}
+	for range access.LockoutThreshold {
+		attempt(m.Email)
+	}
+	for i := range access.SourceFailureLimit {
+		if code := attempt(m.Email); code != "locked" {
+			t.Fatalf("attempt %d on the locked email: %s, want locked", i+1, code)
+		}
+	}
+	if code := attempt("nobody-" + m.Email); code != "invalid_credentials" {
+		t.Errorf("a wrong password on another email after %d locked refusals: %s, want invalid_credentials: a refusal checked no password and is no failure of its source",
+			access.SourceFailureLimit, code)
+	}
+}

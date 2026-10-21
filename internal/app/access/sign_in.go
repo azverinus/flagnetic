@@ -59,7 +59,7 @@ var ErrInvalidCredentials = apperrors.Unauthenticated("invalid_credentials", "th
 // SignIn opens a session for a member who proves who they are with their
 // email and password.
 type SignIn struct {
-	SignInDeps
+	d        SignInDeps
 	timeouts access.SessionTimeouts
 }
 
@@ -78,7 +78,7 @@ type SignInDeps struct {
 
 // NewSignIn returns the handler.
 func NewSignIn(d SignInDeps) *SignIn {
-	return &SignIn{SignInDeps: d, timeouts: access.DefaultSessionTimeouts}
+	return &SignIn{d: d, timeouts: access.DefaultSessionTimeouts}
 }
 
 // SignInCommand is one attempt to sign in.
@@ -116,27 +116,28 @@ const reasonWrongPassword = "wrong_password"
 // right. Failures of a known member are audited, attempts on unknown emails
 // are not: the log records people, not an attacker's input.
 func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, error) {
-	reserved, err := h.Store.ReserveAttempt(ctx, access.NewAttempt(cmd.Email, cmd.ClientIP, h.Clock.Now()))
+	reserved, err := h.d.Store.ReserveAttempt(ctx, access.NewAttempt(cmd.Email, cmd.ClientIP, h.d.Clock.Now()))
 	if err != nil {
 		return SignInResult{}, err
 	}
 	if refusal := reserved.Refusal(); refusal != nil {
 		// Refused before any hash: a locked email or a throttled source
-		// takes no hashing slot from the members signing in.
-		return SignInResult{}, refusal
+		// takes no hashing slot from the members signing in, and, since no
+		// password was checked, counts as no failure of its source either.
+		return SignInResult{}, h.release(ctx, reserved, refusal)
 	}
-	member, hash, err := h.Store.MemberByEmail(ctx, cmd.Email)
+	member, hash, err := h.d.Store.MemberByEmail(ctx, cmd.Email)
 	known := err == nil
 	if err != nil && !errors.Is(err, ErrNotFound) {
-		return SignInResult{}, err
+		return SignInResult{}, h.release(ctx, reserved, err)
 	}
 	ok, outdated := false, false
 	// No password this long is ever set, so it is refused before any hash:
 	// a huge password cannot cost one.
 	if utf8.RuneCountInString(cmd.Password.Reveal()) <= access.MaxPasswordLength {
-		if ok, outdated, err = h.Hasher.Verify(ctx, cmd.Password, hash); err != nil {
+		if ok, outdated, err = h.d.Hasher.Verify(ctx, cmd.Password, hash); err != nil {
 			// Busy, or the stored hash unreadable: nothing was guessed.
-			return SignInResult{}, errors.Join(err, h.Store.ReleaseAttempt(context.WithoutCancel(ctx), reserved))
+			return SignInResult{}, h.release(ctx, reserved, err)
 		}
 	}
 	switch {
@@ -156,9 +157,20 @@ func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, e
 	if err != nil {
 		// The password proved right, so whatever failed after was no wrong
 		// guess: a member who knows their password is never locked by it.
-		return SignInResult{}, errors.Join(err, h.Store.ReleaseAttempt(context.WithoutCancel(ctx), reserved))
+		return SignInResult{}, h.release(ctx, reserved, err)
 	}
 	return res, nil
+}
+
+// release takes back the failure reserved for an attempt that guessed
+// nothing, and returns why the attempt ended, err, with any error taking it
+// back. It runs even when the request was cancelled, so an abandoned attempt
+// leaves no failure behind, and in a unit of work of its own, so the source
+// and the email are taken back together.
+func (h *SignIn) release(ctx context.Context, reserved access.Reservation, err error) error {
+	return errors.Join(err, h.d.Tx.Within(context.WithoutCancel(ctx), func(ctx context.Context) error {
+		return h.d.Store.ReleaseAttempt(ctx, reserved)
+	}))
 }
 
 // succeed opens a session for member, whose password proved right, rehashing
@@ -170,23 +182,23 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.M
 		err    error
 	)
 	if outdated {
-		if rehash, err = h.Hasher.Hash(ctx, cmd.Password); err != nil {
+		if rehash, err = h.d.Hasher.Hash(ctx, cmd.Password); err != nil {
 			return SignInResult{}, err
 		}
 	}
-	now := h.Clock.Now()
-	session, cookie := access.NewSession(id.New[access.Session](h.IDs), access.NewSessionInput{
+	now := h.d.Clock.Now()
+	session, cookie := access.NewSession(id.New[access.Session](h.d.IDs), access.NewSessionInput{
 		Member: member.ID, Method: access.SignInLocal, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent,
 		Timeouts: h.timeouts, Now: now,
-	}, h.Random, h.Key)
-	entry, err := governance.NewEntry(id.New[governance.Entry](h.IDs), now, governance.Request{
+	}, h.d.Random, h.d.Key)
+	entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, governance.Request{
 		Actor: memberActor(member), ID: cmd.RequestID,
 	}, signInRecord("auth.signed_in", member, nil))
 	if err != nil {
 		return SignInResult{}, err
 	}
-	if err := h.Tx.Within(ctx, func(ctx context.Context) error {
-		if err := h.Store.ClearAttempt(ctx, reserved); err != nil {
+	if err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		if err := h.d.Store.ClearAttempt(ctx, reserved); err != nil {
 			return err
 		}
 		return h.open(ctx, session, rehash, entry)
@@ -201,23 +213,23 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.M
 // carries.
 func (h *SignIn) open(ctx context.Context, session access.Session, rehash string, entry governance.Entry) error {
 	if rehash != "" {
-		if err := h.Store.SetPasswordHash(ctx, session.Member, rehash, session.CreatedAt); err != nil {
+		if err := h.d.Store.SetPasswordHash(ctx, session.Member, rehash, session.CreatedAt); err != nil {
 			return err
 		}
 	}
-	if err := h.Store.RecordSignIn(ctx, session.Member, session.CreatedAt); err != nil {
+	if err := h.d.Store.RecordSignIn(ctx, session.Member, session.CreatedAt); err != nil {
 		return err
 	}
-	if err := h.Store.CreateSession(ctx, session); err != nil {
+	if err := h.d.Store.CreateSession(ctx, session); err != nil {
 		return err
 	}
-	return h.Audit.Record(ctx, entry)
+	return h.d.Audit.Record(ctx, entry)
 }
 
 // fail records the failed sign-in of member, with its true reason, and the
 // lockout the failure starts, and returns the refusal every failure gets.
 func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Member, reserved access.Reservation, reason string) error {
-	now := h.Clock.Now()
+	now := h.d.Clock.Now()
 	req := governance.Request{Actor: memberActor(member), ID: cmd.RequestID}
 	records := []governance.Record{signInRecord("auth.sign_in_failed", member, map[string]any{"reason": reason})}
 	if locks, wait := reserved.Locks(); locks {
@@ -229,13 +241,13 @@ func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Memb
 			},
 		})
 	}
-	err := h.Tx.Within(ctx, func(ctx context.Context) error {
+	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		for _, r := range records {
-			entry, err := governance.NewEntry(id.New[governance.Entry](h.IDs), now, req, r)
+			entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, req, r)
 			if err != nil {
 				return err
 			}
-			if err := h.Audit.Record(ctx, entry); err != nil {
+			if err := h.d.Audit.Record(ctx, entry); err != nil {
 				return err
 			}
 		}
