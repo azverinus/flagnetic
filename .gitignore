@@ -4,8 +4,9 @@
 /.claude/settings.local.json
 /.claude/worktrees/
 
-# Build output
+# Build output, and Task's record of what it built
 /bin/
+/.task/
 /dist/
 *.test
 *.out
@@ -20,3 +21,8 @@ go.work.sum
 
 # Local environment
 .env
+
+# The console's build, embedded by the binary; the marker keeps the
+# directory in a fresh clone.
+/internal/infra/in/http/console/dist/*
+!/internal/infra/in/http/console/dist/.gitkeep

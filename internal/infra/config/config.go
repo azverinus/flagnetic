@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +45,9 @@ const (
 	LogText LogFormat = "text"
 )
 
+// ConsoleLocales are the languages the console is translated into.
+var ConsoleLocales = []string{"en", "ru"}
+
 // Config is the configuration of one replica.
 type Config struct {
 	DatabaseURL secret.String
@@ -58,8 +62,11 @@ type Config struct {
 	// PasswordHashConcurrency bounds the password hashes a replica runs at
 	// once.
 	PasswordHashConcurrency int
-	ConfigFile              string
-	ListenAddr              string
+	// DefaultLocale is the console's language when neither the member nor
+	// the browser names one it offers.
+	DefaultLocale string
+	ConfigFile    string
+	ListenAddr    string
 	// MetricsListenAddr is "" when metrics are switched off.
 	MetricsListenAddr string
 	AutoMigrate       bool
@@ -190,6 +197,21 @@ func Settings() []Setting {
 					return errors.New("not a whole number of at least 1")
 				}
 				cfg.PasswordHashConcurrency = n
+				return nil
+			},
+		},
+		{
+			Name:    "FLAGNETIC_DEFAULT_LOCALE",
+			Key:     "default_locale",
+			Default: "en",
+			Description: "The console's language when the member has not chosen one and the browser asks for none the console offers: " +
+				"`en` (English) or `ru` (Russian).",
+			Example: "ru",
+			apply: func(cfg *Config, v string) error {
+				if !slices.Contains(ConsoleLocales, v) {
+					return errors.New("not a language the console offers")
+				}
+				cfg.DefaultLocale = v
 				return nil
 			},
 		},

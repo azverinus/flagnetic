@@ -89,6 +89,8 @@ type serverOptions struct {
 	pool    *pgxpool.Pool
 	edge    []func(*flaghttp.Options)
 	routes  []route
+	// console is the default locale of the console served, "" for none.
+	console string
 }
 
 type route struct {
@@ -140,6 +142,12 @@ func WithInsecureCookies() ServerOption {
 	return func(o *serverOptions) { o.web.InsecureCookies = true }
 }
 
+// WithConsole serves the embedded console too, as serve does, its entry
+// document naming defaultLocale.
+func WithConsole(defaultLocale string) ServerOption {
+	return func(o *serverOptions) { o.console = defaultLocale }
+}
+
 // defaultHashConcurrency is FLAGNETIC_PASSWORD_HASH_CONCURRENCY's default.
 const defaultHashConcurrency = 4
 
@@ -186,6 +194,11 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	})
 	for _, w := range background.Workers {
 		if err := runner.Register(w); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if o.console != "" {
+		if _, err := compose.Console(h, o.console); err != nil {
 			t.Fatal(err)
 		}
 	}

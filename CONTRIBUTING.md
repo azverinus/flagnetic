@@ -12,12 +12,19 @@ You need:
 - Docker, for the PostgreSQL that tests start through testcontainers
 - [Task](https://taskfile.dev)
 - [jq](https://jqlang.org), which the check scripts use to read `go.work` and `go.mod`
+- Node.js 22 or newer and [pnpm](https://pnpm.io) (the version in `web/package.json`), for the console in `web/`
 
 ```bash
 task check   # lint, tests and vulnerability scan: what CI runs
 ```
 
 Set `DATABASE_URL` to an existing PostgreSQL to skip testcontainers.
+
+`task build` builds the console, then the binary that embeds it. `go build` alone needs no Node: a binary built without the console serves a placeholder page in its place, and says so in its log. `task web:dev` serves the console with live reload on port 5173, sending API requests to a binary running on `FLAGNETIC_URL` (default `http://localhost:8080`).
+
+### Strings in the console
+
+Every string a member reads goes through [Lingui](https://lingui.dev), with the English text as its ID: `<Trans>` in JSX, `` t`...` `` from `useLingui()` for an attribute, `` msg`...` `` for a string defined outside a component. The lint rule `lingui/no-unlocalized-strings` fails on a string written any other way. After adding or changing one, run `task web:extract` and commit the catalogs in `web/apps/console/src/locales`; CI fails when extraction would change them, and when a language lacks a translation. Server errors are translated by their `code`, with the values they depend on read from the problem document and its violations' `params`, in `web/apps/console/src/lib/problem-messages.ts`.
 
 ## How the code is organised
 

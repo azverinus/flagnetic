@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Generated from the route files by `tsr generate`, which typecheck and
+# build run first.
+apps/console/src/routeTree.gen.ts
+
+# Playwright output and the harness's binary, clock file and state.
+playwright-report/
+test-results/
+.playwright/
+
+# Written by `lingui compile`, which CI runs only to prove the catalogs
+# complete; the build compiles the catalogs itself.
+apps/console/src/locales/*/messages.js

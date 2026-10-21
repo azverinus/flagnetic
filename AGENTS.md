@@ -13,10 +13,10 @@ task            # list tasks
 task check      # what CI runs on every push: lint, tests, vulnerability scan
 task lint       # golangci-lint in every module of go.work, including the layer rules
 task test       # go test -race in every module (starts PostgreSQL through testcontainers unless DATABASE_URL is set)
-task build      # bin/flagnetic
+task build      # bin/flagnetic, with the console built and embedded
 ```
 
-Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for PostgreSQL in tests, [Task](https://taskfile.dev), and [jq](https://jqlang.org) for the check scripts.
+Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for PostgreSQL in tests, [Task](https://taskfile.dev), [jq](https://jqlang.org) for the check scripts, and Node.js with pnpm for the console in `web/`.
 
 ## Rules
 

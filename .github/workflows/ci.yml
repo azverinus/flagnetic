@@ -95,6 +95,44 @@ jobs:
           go generate ./...
           git diff --exit-code
 
+  # The console: the client generated from the management API is current,
+  # the code typechecks, lints and tests, every string is translated and
+  # the catalogs are what extraction gives, and it builds.
+  console:
+    name: console
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generated client is up to date
+        run: |
+          pnpm generate
+          git diff --exit-code -- packages/api/src
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Format
+        run: pnpm format
+      - name: Test
+        run: pnpm test
+      - name: Catalogs are extracted and complete
+        run: pnpm i18n:check
+      - name: Build
+        run: pnpm build
+
   workflows:
     name: actionlint
     runs-on: ubuntu-latest
@@ -260,7 +298,7 @@ jobs:
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, tidy, workflows, docker, modules, module, released]
+    needs: [lint, test, vuln, tidy, console, workflows, docker, modules, module, released]
     if: always()
     runs-on: ubuntu-latest
     steps:

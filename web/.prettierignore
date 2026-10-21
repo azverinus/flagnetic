@@ -1,0 +1,6 @@
+dist
+node_modules
+pnpm-lock.yaml
+packages/api/src/generated
+apps/console/src/routeTree.gen.ts
+apps/console/src/locales

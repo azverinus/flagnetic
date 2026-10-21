@@ -93,6 +93,14 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 			return fail(log, "start failed", err)
 		}
 	}
+	built, err := compose.Console(edge, cfg.DefaultLocale)
+	if err != nil {
+		return fail(log, "start failed", fmt.Errorf("console: %w", err))
+	}
+	if !built {
+		log.WarnContext(ctx, "this binary was built without the console; a placeholder page is served instead",
+			"build", "task build")
+	}
 	for _, r := range o.routes {
 		edge.Handle(r.pattern, r.handler)
 	}

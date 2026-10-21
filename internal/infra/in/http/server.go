@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"path"
 	"runtime/debug"
 	"strings"
 	"sync/atomic"
@@ -101,6 +102,8 @@ type Server struct {
 	db          Pinger
 	opts        Options
 	draining    atomic.Bool
+	// console answers the paths no route owns, nil while none is mounted.
+	console http.Handler
 }
 
 // New returns the public handler with its probes mounted.
@@ -146,6 +149,48 @@ func (s *Server) SecretPath(path string) {
 		s.secretSeen[path] = true
 		s.secretPaths.Handle(path, http.NotFoundHandler())
 	}
+}
+
+// consoleRoute is the route the log and the metrics name a request the
+// console answered.
+const consoleRoute = "console"
+
+// reservedPrefixes are the paths that belong to the APIs and the probes. A
+// path under one that no route matches is answered as an unknown operation,
+// never with the console's entry document, so a client of an API never
+// receives HTML.
+var reservedPrefixes = []string{"/api", "/sdk", "/healthz", "/readyz", "/metrics"}
+
+// Console mounts h for every GET and HEAD request no route matches outside
+// the reserved prefixes: the console's own routes, rendered in the browser.
+// Any other method there is refused 405.
+func (s *Server) Console(h http.Handler) { s.console = h }
+
+// servesConsole reports whether a request no route matched is the console's.
+// A path that is not clean is left to the mux, which redirects it.
+func (s *Server) servesConsole(r *http.Request) bool {
+	if s.console == nil || r.URL.Path != cleanPath(r.URL.Path) {
+		return false
+	}
+	for _, prefix := range reservedPrefixes {
+		if r.URL.Path == prefix || strings.HasPrefix(r.URL.Path, prefix+"/") {
+			return false
+		}
+	}
+	return true
+}
+
+// cleanPath is path.Clean keeping a trailing slash, as the mux cleans paths
+// before it redirects.
+func cleanPath(p string) string {
+	if p == "" {
+		return "/"
+	}
+	clean := path.Clean(p)
+	if strings.HasSuffix(p, "/") && clean != "/" {
+		clean += "/"
+	}
+	return clean
 }
 
 // HTTPServer returns an http.Server serving the edge with its connection
@@ -194,6 +239,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	_, pattern := s.mux.Handler(r)
 	route, ok := s.patterns[pattern]
+	if !ok && s.servesConsole(r) {
+		st.route = consoleRoute
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			rw.Header().Set("Allow", "GET, HEAD")
+			s.writeProblem(rw, r, methodNotAllowedProblem())
+			return
+		}
+		s.console.ServeHTTP(rw, r)
+		return
+	}
 	if !ok {
 		// No route, or a wrong method.
 		st.route = "unmatched"

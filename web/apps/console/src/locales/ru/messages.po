@@ -1,0 +1,316 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-10-21 14:19+0300\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: ru\n"
+
+#: src/lib/problem-messages.ts
+msgid "At most {max} characters."
+msgstr "Не более {max} символов."
+
+#: src/components/breadcrumb.tsx
+msgid "Breadcrumb"
+msgstr "Навигационная цепочка"
+
+#: src/lib/problem-messages.ts
+msgid "Choose a stronger password."
+msgstr "Выберите более надёжный пароль."
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered scopes."
+msgstr "Выберите одну из предложенных областей доступа."
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered types."
+msgstr "Выберите один из предложенных типов."
+
+#: src/components/app-shell.tsx
+msgid "Collapse the sidebar"
+msgstr "Свернуть боковую панель"
+
+#: src/components/personal-menu.tsx
+msgid "Dark"
+msgstr "Тёмная"
+
+#: src/lib/problem-messages.ts
+msgid "edit the project"
+msgstr "изменять проект"
+
+#: src/components/sign-in-form.tsx
+msgid "Email"
+msgstr "Электронная почта"
+
+#: src/lib/problem-messages.ts
+msgid "Enter a name."
+msgstr "Введите название."
+
+#: src/lib/problem-messages.ts
+msgid "Enter a valid email address."
+msgstr "Введите корректный адрес электронной почты."
+
+#: src/lib/problem-messages.ts
+msgid "Enter a value from {min} to {max}."
+msgstr "Введите значение от {min} до {max}."
+
+#: src/components/sign-in-form.tsx
+msgid "Enter your email."
+msgstr "Введите адрес электронной почты."
+
+#: src/components/sign-in-form.tsx
+msgid "Enter your password."
+msgstr "Введите пароль."
+
+#: src/components/app-shell.tsx
+msgid "Expand the sidebar"
+msgstr "Развернуть боковую панель"
+
+#: src/components/not-found.tsx
+msgid "Go to the start page"
+msgstr "На стартовую страницу"
+
+#: src/components/app-shell.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "Home"
+msgstr "Главная"
+
+#: src/lib/problem-messages.ts
+msgid "It does not exist, or it was deleted."
+msgstr "Этого не существует, или это было удалено."
+
+#: src/components/personal-menu.tsx
+msgid "Light"
+msgstr "Светлая"
+
+#: src/components/app-shell.tsx
+msgid "Main"
+msgstr "Основное меню"
+
+#: src/lib/problem-messages.ts
+msgid "manage environments"
+msgstr "управлять окружениями"
+
+#: src/lib/problem-messages.ts
+msgid "manage project tokens"
+msgstr "управлять токенами проекта"
+
+#: src/lib/problem-messages.ts
+msgid "manage unit types and attributes"
+msgstr "управлять типами единиц и атрибутами"
+
+#: src/lib/problem-messages.ts
+msgid "manage who has access"
+msgstr "управлять доступом"
+
+#: src/components/sign-in-form.tsx
+msgid "No way to sign in is enabled on this instance. Ask its operator."
+msgstr "На этом экземпляре не включён ни один способ входа. Обратитесь к его администратору."
+
+#: src/routes/_signed-in/$.tsx
+msgid "Not found"
+msgstr "Не найдено"
+
+#: src/lib/problem-messages.ts
+msgid "One with this key already exists."
+msgstr "Объект с таким ключом уже существует."
+
+#: src/lib/problem-messages.ts
+msgid "Only a signed-in session can do this, not an API token."
+msgstr "Это можно сделать только в сеансе входа, а не с API-токеном."
+
+#: src/components/not-found.tsx
+msgid "Page not found"
+msgstr "Страница не найдена"
+
+#: src/components/sign-in-form.tsx
+msgid "Password"
+msgstr "Пароль"
+
+#: src/components/query-error.tsx
+#: src/lib/toast.ts
+msgid "Request ID: {requestId}"
+msgstr "ID запроса: {requestId}"
+
+#: src/lib/problem-messages.ts
+msgid "Required."
+msgstr "Обязательное поле."
+
+#: src/components/app-shell.tsx
+msgid "Sidebar"
+msgstr "Боковая панель"
+
+#: src/components/sign-in-form.tsx
+#: src/routes/sign-in.tsx
+msgid "Sign in"
+msgstr "Войти"
+
+#: src/components/personal-menu.tsx
+msgid "Sign out"
+msgstr "Выйти"
+
+#: src/components/sign-in-form.tsx
+msgid "Signing in…"
+msgstr "Вход…"
+
+#: src/components/app-shell.tsx
+msgid "Skip to content"
+msgstr "Перейти к содержимому"
+
+#: src/lib/problem-messages.ts
+msgid "Some fields need correcting."
+msgstr "Исправьте некоторые поля."
+
+#: src/lib/problem-messages.ts
+msgid "Something went wrong on the server."
+msgstr "На сервере что-то пошло не так."
+
+#: src/lib/problem-messages.ts
+msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
+msgstr "Начните со строчной латинской буквы; далее строчные буквы, цифры, - и _, всего не более 64."
+
+#: src/components/personal-menu.tsx
+msgid "System"
+msgstr "Как в системе"
+
+#: src/lib/problem-messages.ts
+msgid "The email or the password is not right."
+msgstr "Неверный адрес электронной почты или пароль."
+
+#: src/lib/problem-messages.ts
+msgid "The idle timeout cannot be longer than the absolute timeout."
+msgstr "Тайм-аут бездействия не может быть больше абсолютного тайм-аута."
+
+#: src/lib/problem-messages.ts
+msgid "The password is too short or too long."
+msgstr "Пароль слишком короткий или слишком длинный."
+
+#: src/lib/problem-messages.ts
+msgid "The password must not contain your email address."
+msgstr "Пароль не должен содержать ваш адрес электронной почты."
+
+#: src/lib/problem-messages.ts
+msgid "The request came from another site and was refused."
+msgstr "Запрос пришёл с другого сайта и был отклонён."
+
+#: src/lib/problem-messages.ts
+msgid "The request is too large."
+msgstr "Запрос слишком большой."
+
+#: src/lib/problem-messages.ts
+msgid "The request was not sent as JSON."
+msgstr "Запрос отправлен не в формате JSON."
+
+#: src/lib/problem-messages.ts
+msgid "The request was refused."
+msgstr "Запрос отклонён."
+
+#: src/lib/problem-messages.ts
+msgid "The server could not be reached. Check your connection and try again."
+msgstr "Не удалось связаться с сервером. Проверьте подключение и попробуйте ещё раз."
+
+#: src/lib/problem-messages.ts
+msgid "The server could not read the request."
+msgstr "Сервер не смог прочитать запрос."
+
+#: src/lib/problem-messages.ts
+msgid "The server is busy checking other passwords. Try again in a moment."
+msgstr "Сервер занят проверкой других паролей. Попробуйте ещё раз через несколько секунд."
+
+#: src/lib/problem-messages.ts
+msgid "The server is unavailable. Try again in {retry}."
+msgstr "Сервер недоступен. Попробуйте ещё раз через {retry}."
+
+#: src/lib/problem-messages.ts
+msgid "The server is unavailable. Try again in a moment."
+msgstr "Сервер недоступен. Попробуйте ещё раз через несколько секунд."
+
+#: src/lib/problem-messages.ts
+msgid "The token in use does not carry the scope this needs."
+msgstr "У используемого токена нет нужной для этого области доступа."
+
+#: src/lib/problem-messages.ts
+msgid "The value is out of range."
+msgstr "Значение вне допустимого диапазона."
+
+#: src/components/personal-menu.tsx
+msgid "Theme"
+msgstr "Тема"
+
+#: src/components/not-found.tsx
+msgid "There is nothing at this address. The link may be old or mistyped."
+msgstr "По этому адресу ничего нет. Возможно, ссылка устарела или в ней опечатка."
+
+#: src/lib/problem-messages.ts
+msgid "This key is reserved."
+msgstr "Этот ключ зарезервирован."
+
+#: src/lib/problem-messages.ts
+msgid "This password is too common. Choose another."
+msgstr "Этот пароль слишком распространён. Выберите другой."
+
+#: src/lib/problem-messages.ts
+msgid "Too long."
+msgstr "Слишком длинно."
+
+#: src/lib/problem-messages.ts
+msgid "Too many failed attempts for this email. Try again in {retry}."
+msgstr "Слишком много неудачных попыток для этого адреса. Попробуйте ещё раз через {retry}."
+
+#: src/lib/problem-messages.ts
+msgid "Too many failed attempts for this email. Try again later."
+msgstr "Слишком много неудачных попыток для этого адреса. Попробуйте позже."
+
+#: src/lib/problem-messages.ts
+msgid "Too many requests. Try again in {retry}."
+msgstr "Слишком много запросов. Попробуйте ещё раз через {retry}."
+
+#: src/lib/problem-messages.ts
+msgid "Too many requests. Try again later."
+msgstr "Слишком много запросов. Попробуйте позже."
+
+#: src/components/sign-in-form.tsx
+msgid "Too many sign-in attempts from your network. Try again in {retry}."
+msgstr "Слишком много попыток входа из вашей сети. Попробуйте ещё раз через {retry}."
+
+#: src/components/sign-in-form.tsx
+msgid "Too many sign-in attempts from your network. Try again later."
+msgstr "Слишком много попыток входа из вашей сети. Попробуйте позже."
+
+#: src/components/query-error.tsx
+msgid "Try again"
+msgstr "Попробовать ещё раз"
+
+#: src/lib/problem-messages.ts
+msgid "Use {min} to {max} characters."
+msgstr "Используйте от {min} до {max} символов."
+
+#: src/lib/problem-messages.ts
+msgid "view the project"
+msgstr "просматривать проект"
+
+#: src/routes/_signed-in/index.tsx
+msgid "Welcome, {name}"
+msgstr "Добро пожаловать, {name}"
+
+#: src/lib/problem-messages.ts
+msgid "You are not signed in."
+msgstr "Вы не вошли в систему."
+
+#: src/routes/_signed-in/index.tsx
+msgid "You are signed in to Flagnetic."
+msgstr "Вы вошли в Flagnetic."
+
+#: src/lib/problem-messages.ts
+msgid "You may not do this."
+msgstr "У вас нет права это делать."
+
+#: src/lib/problem-messages.ts
+msgid "You need the permission to {name}."
+msgstr "Нужно право {name}."
+
+#: src/components/sign-in-form.tsx
+#: src/lib/problem-messages.ts
+msgid "Your session has ended. Sign in again to continue."
+msgstr "Ваш сеанс завершён. Войдите снова, чтобы продолжить."
