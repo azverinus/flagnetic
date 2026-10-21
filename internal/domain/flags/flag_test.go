@@ -74,7 +74,7 @@ func TestABooleanFlagHasExactlyTrueAndFalseAndServesFalseWhenOff(t *testing.T) {
 	if f.Version != 1 || f.ArchivedAt != nil || f.AutomaticExposure {
 		t.Errorf("flag = %+v, want version 1, not archived, no automatic exposure", f)
 	}
-	c := flags.InitialConfiguration(f, id.New[workspace.Environment](ids), now)
+	c := flags.InitialConfiguration(f, id.New[workspace.Environment](ids), nil, now)
 	if c.On || c.OffVariation != "false" || c.Fallthrough != "true" || c.Version != 1 {
 		t.Errorf("configuration = %+v, want off serving false, falling through to true", c)
 	}
@@ -105,7 +105,7 @@ func TestAnotherTypeServesItsFirstVariationAndNamesVariationsAfterTheirKeys(t *t
 	if f.Variations[1].Name != "long" || f.Variations[1].Description != "Longer" || string(f.Variations[1].Value) != `"Pay for the session"` {
 		t.Errorf("long = %+v, want named after its key and stored compact", f.Variations[1])
 	}
-	c := flags.InitialConfiguration(f, id.New[workspace.Environment](ids), now)
+	c := flags.InitialConfiguration(f, id.New[workspace.Environment](ids), nil, now)
 	if c.On || c.OffVariation != "short" || c.Fallthrough != "short" {
 		t.Errorf("configuration = %+v, want off with the first variation everywhere", c)
 	}
@@ -312,16 +312,16 @@ func TestAFlagsKeyAndTypeNeverChange(t *testing.T) {
 
 func TestRemovingAVariationIsRefusedWhileAConfigurationServesIt(t *testing.T) {
 	f, _ := flags.NewFlag(input("copy", flags.TypeString, variation("a", `"A"`), variation("b", `"B"`), variation("c", `"C"`)))
-	staging := flags.InitialConfiguration(f, id.New[workspace.Environment](ids), now)
+	staging := flags.InitialConfiguration(f, id.New[workspace.Environment](ids), nil, now)
 	staging.Fallthrough = "b"
 	configs := []flags.EnvironmentConfiguration{
-		{Environment: "production", Configuration: flags.InitialConfiguration(f, id.New[workspace.Environment](ids), now)},
+		{Environment: "production", Configuration: flags.InitialConfiguration(f, id.New[workspace.Environment](ids), nil, now)},
 		{Environment: "staging", Configuration: staging},
 	}
-	if refs := flags.VariationReferences(f, []string{"c"}, configs); len(refs) != 0 {
+	if refs := flags.VariationReferences(f, []string{"c"}, configs, nil); len(refs) != 0 {
 		t.Errorf("c: references = %v, want none", refs)
 	}
-	refs := flags.VariationReferences(f, []string{"a", "b"}, configs)
+	refs := flags.VariationReferences(f, []string{"a", "b"}, configs, nil)
 	want := []flags.Reference{{Kind: "flag", Key: "copy", Environment: "production"}, {Kind: "flag", Key: "copy", Environment: "staging"}}
 	if !slices.Equal(refs, want) {
 		t.Errorf("references = %v, want %v", refs, want)

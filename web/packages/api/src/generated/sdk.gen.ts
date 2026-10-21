@@ -72,6 +72,9 @@ import type {
   GetEnvironmentData,
   GetEnvironmentErrors,
   GetEnvironmentResponses,
+  GetFlagConfigurationData,
+  GetFlagConfigurationErrors,
+  GetFlagConfigurationResponses,
   GetFlagData,
   GetFlagErrors,
   GetFlagResponses,
@@ -156,6 +159,9 @@ import type {
   ListUnitTypesData,
   ListUnitTypesErrors,
   ListUnitTypesResponses,
+  PutFlagConfigurationData,
+  PutFlagConfigurationErrors,
+  PutFlagConfigurationResponses,
   ReactivateMemberData,
   ReactivateMemberErrors,
   ReactivateMemberResponses,
@@ -1218,6 +1224,75 @@ export const restoreFlag = <ThrowOnError extends boolean = false>(
     ],
     url: "/projects/{project}/flags/{flag}/restore",
     ...options,
+  });
+
+/**
+ * A flag's configuration in one environment
+ */
+export const getFlagConfiguration = <ThrowOnError extends boolean = false>(
+  options: Options<GetFlagConfigurationData, ThrowOnError>,
+): RequestResult<GetFlagConfigurationResponses, GetFlagConfigurationErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetFlagConfigurationResponses,
+    GetFlagConfigurationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/environments/{environment}",
+    ...options,
+  });
+
+/**
+ * Replace a flag's configuration in one environment
+ *
+ * Replaces the whole configuration: on or off, the off and fallthrough
+ * variations, prerequisites, overrides and rules, in one change. Every
+ * name in it is checked against the project (`invalid_configuration`,
+ * with a JSON Pointer to each field to fix): variations of this flag
+ * and of the flags it requires, declared attributes and unit types,
+ * existing segments, flags that are not archived, prerequisite chains
+ * that are acyclic and at most 5 flags deep in the environment
+ * (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+ * flag keys in `params.path`), and the limits (`too_many` with
+ * `params.max`). A new rule omits `id` and is given one; a rule sent
+ * with an `id` is the rule of the current configuration it names
+ * (`unknown_rule` otherwise). A new rollout is given a salt, which
+ * then changes only through regenerating it. An override left as it
+ * was keeps the member who wrote it; any other is written by the
+ * caller. A configuration of an archived flag is not written
+ * (`archived`). A change to the values the configuration already has
+ * changes nothing and records nothing.
+ *
+ */
+export const putFlagConfiguration = <ThrowOnError extends boolean = false>(
+  options: Options<PutFlagConfigurationData, ThrowOnError>,
+): RequestResult<PutFlagConfigurationResponses, PutFlagConfigurationErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    PutFlagConfigurationResponses,
+    PutFlagConfigurationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/environments/{environment}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**

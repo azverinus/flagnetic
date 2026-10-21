@@ -1176,6 +1176,89 @@ paths:
           $ref: "#/components/responses/VersionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/flags/{flag}/environments/{environment}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/FlagKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+    get:
+      operationId: getFlagConfiguration
+      summary: A flag's configuration in one environment
+      x-permission: project.read
+      tags: [flags]
+      responses:
+        "200":
+          description: The configuration; its `ETag` is the configuration's version.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlagConfiguration"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: putFlagConfiguration
+      summary: Replace a flag's configuration in one environment
+      description: |
+        Replaces the whole configuration: on or off, the off and fallthrough
+        variations, prerequisites, overrides and rules, in one change. Every
+        name in it is checked against the project (`invalid_configuration`,
+        with a JSON Pointer to each field to fix): variations of this flag
+        and of the flags it requires, declared attributes and unit types,
+        existing segments, flags that are not archived, prerequisite chains
+        that are acyclic and at most 5 flags deep in the environment
+        (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+        flag keys in `params.path`), and the limits (`too_many` with
+        `params.max`). A new rule omits `id` and is given one; a rule sent
+        with an `id` is the rule of the current configuration it names
+        (`unknown_rule` otherwise). A new rollout is given a salt, which
+        then changes only through regenerating it. An override left as it
+        was keeps the member who wrote it; any other is written by the
+        caller. A configuration of an archived flag is not written
+        (`archived`). A change to the values the configuration already has
+        changes nothing and records nothing.
+      x-permission: flag_configuration.update
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlagConfigurationPut"
+      responses:
+        "200":
+          description: The configuration as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlagConfiguration"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/segments:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -3262,7 +3345,8 @@ components:
     FlagConfiguration:
       type: object
       description: What the flag serves in one environment.
-      required: [environment, on, off_variation, fallthrough, updated_at, version]
+      required: [environment, on, off_variation, fallthrough, prerequisites, overrides, rules, updated_at, updated_by,
+        version]
       properties:
         environment:
           $ref: "#/components/schemas/Key"
@@ -3270,15 +3354,164 @@ components:
           type: boolean
         off_variation:
           type: string
-          description: The variation served while the flag is off.
+          description: The variation served while the flag is off, and when a prerequisite fails.
         fallthrough:
           type: string
           description: The variation served when the flag is on and no rule matches.
+        prerequisites:
+          type: array
+          description: Flags that must serve the named variation for this flag to be evaluated; otherwise it serves its off variation.
+          items:
+            $ref: "#/components/schemas/Prerequisite"
+        overrides:
+          type: array
+          items:
+            $ref: "#/components/schemas/Override"
+        rules:
+          type: array
+          description: Checked in order; the first whose conditions all hold serves.
+          items:
+            $ref: "#/components/schemas/Rule"
         updated_at:
           type: string
           format: date-time
+        updated_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member whose write made the configuration what it is; null when a project token did.
         version:
           $ref: "#/components/schemas/Version"
+    Prerequisite:
+      type: object
+      required: [flag, variation]
+      properties:
+        flag:
+          type: string
+          description: The key of another flag of the project, not archived.
+        variation:
+          type: string
+          description: One of that flag's variations.
+    Override:
+      type: object
+      description: A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
+      required: [unit_type, unit_id, variation, note, added_by]
+      properties:
+        unit_type:
+          type: string
+        unit_id:
+          type: string
+        variation:
+          type: string
+        note:
+          type: string
+          nullable: true
+          description: Why the unit is pinned; null for none.
+        added_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member who last wrote the override; null when a project token did.
+    OverrideInput:
+      type: object
+      required: [unit_type, unit_id, variation]
+      properties:
+        unit_type:
+          type: string
+          description: A unit type the project declares.
+        unit_id:
+          type: string
+          minLength: 1
+          description: The unit's ID, of 1 to 256 bytes, unique per unit type in the configuration.
+        variation:
+          type: string
+        note:
+          type: string
+          nullable: true
+          description: At most 200 characters once trimmed; blank is none.
+    Rule:
+      type: object
+      required: [id, description, conditions, serve]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Given by the server to a new rule and kept across writes.
+        description:
+          type: string
+        conditions:
+          type: array
+          description: Every one must hold for the rule to match.
+          items:
+            $ref: "#/components/schemas/Condition"
+        serve:
+          $ref: "#/components/schemas/Serve"
+    RuleInput:
+      type: object
+      required: [serve]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The rule of the current configuration this one is; omitted for a new rule.
+        description:
+          $ref: "#/components/schemas/Description"
+        conditions:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/Condition"
+        serve:
+          $ref: "#/components/schemas/Serve"
+    Serve:
+      type: object
+      description: |
+        What a matching rule serves. `variation` serves `variation`;
+        `rollout` serves `variation` to `percentage` of the units of
+        `unit_type`, in basis points (0 to 10,000), the others continuing to
+        the next rule. A rollout's `salt` is given by the server and changes
+        only through regenerating it, so a write omits it or sends it
+        unchanged. Experiments are not available yet
+        (`experiment_not_available`).
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          description: "`variation` or `rollout`."
+        variation:
+          type: string
+        unit_type:
+          type: string
+        percentage:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        salt:
+          type: string
+    FlagConfigurationPut:
+      type: object
+      required: ["on", off_variation, fallthrough]
+      properties:
+        "on":
+          type: boolean
+        off_variation:
+          type: string
+        fallthrough:
+          type: string
+        prerequisites:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prerequisite"
+        overrides:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/OverrideInput"
+        rules:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/RuleInput"
     FlagList:
       type: object
       required: [items, next_cursor]

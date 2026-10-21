@@ -9,9 +9,12 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
-// SegmentDeleter deletes a segment.
+// SegmentDeleter deletes a segment no rule names.
 type SegmentDeleter interface {
 	SegmentByKey(ctx context.Context, project workspace.ProjectID, key string) (flags.Segment, error)
+	// SegmentUsages returns one reference per flag and environment whose
+	// rules name the segment key, archived flags included.
+	SegmentUsages(ctx context.Context, project workspace.ProjectID, key string) ([]flags.Reference, error)
 	DeleteSegment(ctx context.Context, segment flags.SegmentID) error
 }
 
@@ -39,7 +42,9 @@ type SegmentCommand struct {
 	Request  governance.Request
 }
 
-// Handle deletes the segment, which leaves every environment's ruleset.
+// Handle deletes the segment, which leaves every environment's ruleset. A
+// segment a rule names, an archived flag's included, is not deleted: the
+// rule would name nothing, and a restored flag would come back broken.
 func (h *DeleteSegment) Handle(ctx context.Context, cmd SegmentCommand) error {
 	now := h.d.Recorder.now()
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
@@ -52,6 +57,13 @@ func (h *DeleteSegment) Handle(ctx context.Context, cmd SegmentCommand) error {
 		}
 		if err = precondition.Check(cmd.Expected, s.Version); err != nil {
 			return err
+		}
+		usages, err := h.d.Store.SegmentUsages(ctx, cmd.Project, s.Key)
+		if err != nil {
+			return err
+		}
+		if len(usages) > 0 {
+			return flags.ErrInUse(usages)
 		}
 		if err = h.d.Store.DeleteSegment(ctx, s.ID); err != nil {
 			return err

@@ -45,14 +45,16 @@ var valuelessOperators = []string{"exists", "not_exists", "is_empty"}
 // unit's ID.
 type Declarations struct {
 	types map[string]eval.AttributeType
+	// units are the unit types, which rollouts and overrides name.
+	units map[string]bool
 }
 
 // NewDeclarations returns the declarations of a project with units and
 // attributes.
 func NewDeclarations(units []workspace.UnitType, attributes []workspace.Attribute) Declarations {
-	d := Declarations{types: make(map[string]eval.AttributeType, len(units)+len(attributes))}
+	d := Declarations{types: make(map[string]eval.AttributeType, len(units)+len(attributes)), units: make(map[string]bool, len(units))}
 	for _, u := range units {
-		d.types[u.Key] = eval.TypeString
+		d.types[u.Key], d.units[u.Key] = eval.TypeString, true
 	}
 	for _, a := range attributes {
 		d.types[a.Key] = eval.AttributeType(a.Type)

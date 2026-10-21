@@ -800,15 +800,125 @@ export type FlagConfiguration = {
   environment: Key;
   on: boolean;
   /**
-   * The variation served while the flag is off.
+   * The variation served while the flag is off, and when a prerequisite fails.
    */
   off_variation: string;
   /**
    * The variation served when the flag is on and no rule matches.
    */
   fallthrough: string;
+  /**
+   * Flags that must serve the named variation for this flag to be evaluated; otherwise it serves its off variation.
+   */
+  prerequisites: Array<Prerequisite>;
+  overrides: Array<Override>;
+  /**
+   * Checked in order; the first whose conditions all hold serves.
+   */
+  rules: Array<Rule>;
   updated_at: string;
+  /**
+   * The member whose write made the configuration what it is; null when a project token did.
+   */
+  updated_by: string | null;
   version: Version;
+};
+
+export type Prerequisite = {
+  /**
+   * The key of another flag of the project, not archived.
+   */
+  flag: string;
+  /**
+   * One of that flag's variations.
+   */
+  variation: string;
+};
+
+/**
+ * A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
+ */
+export type Override = {
+  unit_type: string;
+  unit_id: string;
+  variation: string;
+  /**
+   * Why the unit is pinned; null for none.
+   */
+  note: string | null;
+  /**
+   * The member who last wrote the override; null when a project token did.
+   */
+  added_by: string | null;
+};
+
+export type OverrideInput = {
+  /**
+   * A unit type the project declares.
+   */
+  unit_type: string;
+  /**
+   * The unit's ID, of 1 to 256 bytes, unique per unit type in the configuration.
+   */
+  unit_id: string;
+  variation: string;
+  /**
+   * At most 200 characters once trimmed; blank is none.
+   */
+  note?: string | null;
+};
+
+export type Rule = {
+  /**
+   * Given by the server to a new rule and kept across writes.
+   */
+  id: string;
+  description: string;
+  /**
+   * Every one must hold for the rule to match.
+   */
+  conditions: Array<Condition>;
+  serve: Serve;
+};
+
+export type RuleInput = {
+  /**
+   * The rule of the current configuration this one is; omitted for a new rule.
+   */
+  id?: string;
+  description?: Description;
+  conditions?: Array<Condition>;
+  serve: Serve;
+};
+
+/**
+ * What a matching rule serves. `variation` serves `variation`;
+ * `rollout` serves `variation` to `percentage` of the units of
+ * `unit_type`, in basis points (0 to 10,000), the others continuing to
+ * the next rule. A rollout's `salt` is given by the server and changes
+ * only through regenerating it, so a write omits it or sends it
+ * unchanged. Experiments are not available yet
+ * (`experiment_not_available`).
+ *
+ */
+export type Serve = {
+  /**
+   * `variation` or `rollout`.
+   */
+  kind: string;
+  variation?: string;
+  unit_type?: string;
+  percentage?: number;
+  salt?: string;
+};
+
+export type FlagConfigurationPut = {
+  on: boolean;
+  off_variation: string;
+  fallthrough: string;
+  prerequisites?: Array<Prerequisite>;
+  overrides?: Array<OverrideInput>;
+  rules?: Array<RuleInput>;
 };
 
 export type FlagList = {
@@ -3258,6 +3368,153 @@ export type RestoreFlagResponses = {
 };
 
 export type RestoreFlagResponse = RestoreFlagResponses[keyof RestoreFlagResponses];
+
+export type GetFlagConfigurationData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The flag's key.
+     */
+    flag: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/flags/{flag}/environments/{environment}";
+};
+
+export type GetFlagConfigurationErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetFlagConfigurationError =
+  GetFlagConfigurationErrors[keyof GetFlagConfigurationErrors];
+
+export type GetFlagConfigurationResponses = {
+  /**
+   * The configuration; its `ETag` is the configuration's version.
+   */
+  200: FlagConfiguration;
+};
+
+export type GetFlagConfigurationResponse =
+  GetFlagConfigurationResponses[keyof GetFlagConfigurationResponses];
+
+export type PutFlagConfigurationData = {
+  body: FlagConfigurationPut;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The flag's key.
+     */
+    flag: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/flags/{flag}/environments/{environment}";
+};
+
+export type PutFlagConfigurationErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type PutFlagConfigurationError =
+  PutFlagConfigurationErrors[keyof PutFlagConfigurationErrors];
+
+export type PutFlagConfigurationResponses = {
+  /**
+   * The configuration as it is now.
+   */
+  200: FlagConfiguration;
+};
+
+export type PutFlagConfigurationResponse =
+  PutFlagConfigurationResponses[keyof PutFlagConfigurationResponses];
 
 export type ListSegmentsData = {
   body?: never;

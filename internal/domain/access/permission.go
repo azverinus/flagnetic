@@ -58,6 +58,9 @@ const (
 	PermFlagEdit Permission = "flag.edit"
 	// PermFlagArchive archives, restores and deletes flags.
 	PermFlagArchive Permission = "flag.archive"
+	// PermFlagConfigurationUpdate replaces a flag's configuration in an
+	// environment.
+	PermFlagConfigurationUpdate Permission = "flag_configuration.update"
 	// PermSegmentEdit creates segments and changes them.
 	PermSegmentEdit Permission = "segment.edit"
 	// PermSegmentDelete deletes segments.
@@ -78,6 +81,7 @@ var catalog = []PermissionSpec{
 	{Name: PermProjectTokenManage, Scope: ScopeProjectAdmin, MembersOnly: true},
 	{Name: PermFlagEdit, Scope: ScopeFlagsWrite},
 	{Name: PermFlagArchive, Scope: ScopeFlagsWrite},
+	{Name: PermFlagConfigurationUpdate, Scope: ScopeFlagsWrite},
 	{Name: PermSegmentEdit, Scope: ScopeFlagsWrite},
 	{Name: PermSegmentDelete, Scope: ScopeFlagsWrite},
 }
@@ -167,13 +171,14 @@ type Role struct {
 var roles = []Role{
 	{Name: RoleOwner, Permissions: []Permission{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermDeclarationManage,
-		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermSegmentEdit, PermSegmentDelete,
+		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate, PermSegmentEdit,
+		PermSegmentDelete,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
-		PermSegmentEdit, PermSegmentDelete,
+		PermFlagConfigurationUpdate, PermSegmentEdit, PermSegmentDelete,
 	}},
-	{Name: RoleDeveloper, Permissions: []Permission{PermProjectRead, PermFlagEdit, PermSegmentEdit}},
+	{Name: RoleDeveloper, Permissions: []Permission{PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermSegmentEdit}},
 	{Name: RoleViewer, Permissions: []Permission{PermProjectRead}},
 }
 

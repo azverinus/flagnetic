@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -21,8 +22,10 @@ type EnvironmentCreator interface {
 // environments, such as every flag's configuration, as the environment is
 // created.
 type EnvironmentConfigurer interface {
-	// ConfigureEnvironment configures e, in the unit of work ctx carries.
-	ConfigureEnvironment(ctx context.Context, e workspace.Environment) error
+	// ConfigureEnvironment configures e as written by by, the member
+	// creating it (nil for a project token), in the unit of work ctx
+	// carries.
+	ConfigureEnvironment(ctx context.Context, e workspace.Environment, by *access.MemberID) error
 }
 
 // CreateEnvironment adds an environment to a project.
@@ -39,10 +42,12 @@ func NewCreateEnvironment(tx Transactor, store EnvironmentCreator, configure Env
 	return &CreateEnvironment{tx: tx, store: store, configure: configure, rec: rec}
 }
 
-// CreateEnvironmentCommand names the environment to add.
+// CreateEnvironmentCommand names the environment to add. Caller is the
+// member adding it, nil for a project token.
 type CreateEnvironmentCommand struct {
 	Project   workspace.ProjectID
 	Key, Name string
+	Caller    *access.MemberID
 	Request   governance.Request
 }
 
@@ -69,7 +74,7 @@ func (h *CreateEnvironment) Handle(ctx context.Context, cmd CreateEnvironmentCom
 		}
 		// Every flag exists in every environment, so the new one starts
 		// with each flag's configuration, switched off.
-		if err := h.configure.ConfigureEnvironment(ctx, e); err != nil {
+		if err := h.configure.ConfigureEnvironment(ctx, e, cmd.Caller); err != nil {
 			return err
 		}
 		return h.rec.record(ctx, now, cmd.Request, governance.Record{

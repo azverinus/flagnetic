@@ -542,13 +542,33 @@ type FlagConfiguration struct {
 	// Fallthrough The variation served when the flag is on and no rule matches.
 	Fallthrough string `json:"fallthrough"`
 
-	// OffVariation The variation served while the flag is off.
-	OffVariation string    `json:"off_variation"`
-	On           bool      `json:"on"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	// OffVariation The variation served while the flag is off, and when a prerequisite fails.
+	OffVariation string     `json:"off_variation"`
+	On           bool       `json:"on"`
+	Overrides    []Override `json:"overrides"`
+
+	// Prerequisites Flags that must serve the named variation for this flag to be evaluated; otherwise it serves its off variation.
+	Prerequisites []Prerequisite `json:"prerequisites"`
+
+	// Rules Checked in order; the first whose conditions all hold serves.
+	Rules     []Rule    `json:"rules"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// UpdatedBy The member whose write made the configuration what it is; null when a project token did.
+	UpdatedBy *openapi_types.UUID `json:"updated_by"`
 
 	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
 	Version Version `json:"version"`
+}
+
+// FlagConfigurationPut defines model for FlagConfigurationPut.
+type FlagConfigurationPut struct {
+	Fallthrough   string           `json:"fallthrough"`
+	OffVariation  string           `json:"off_variation"`
+	On            bool             `json:"on"`
+	Overrides     *[]OverrideInput `json:"overrides,omitempty"`
+	Prerequisites *[]Prerequisite  `json:"prerequisites,omitempty"`
+	Rules         *[]RuleInput     `json:"rules,omitempty"`
 }
 
 // FlagCreate defines model for FlagCreate.
@@ -796,6 +816,31 @@ type MemberStatus string
 // Name defines model for Name.
 type Name = string
 
+// Override A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
+type Override struct {
+	// AddedBy The member who last wrote the override; null when a project token did.
+	AddedBy *openapi_types.UUID `json:"added_by"`
+
+	// Note Why the unit is pinned; null for none.
+	Note      *string `json:"note"`
+	UnitId    string  `json:"unit_id"`
+	UnitType  string  `json:"unit_type"`
+	Variation string  `json:"variation"`
+}
+
+// OverrideInput defines model for OverrideInput.
+type OverrideInput struct {
+	// Note At most 200 characters once trimmed; blank is none.
+	Note *string `json:"note,omitempty"`
+
+	// UnitId The unit's ID, of 1 to 256 bytes, unique per unit type in the configuration.
+	UnitId string `json:"unit_id"`
+
+	// UnitType A unit type the project declares.
+	UnitType  string `json:"unit_type"`
+	Variation string `json:"variation"`
+}
+
 // PasswordChange defines model for PasswordChange.
 type PasswordChange struct {
 	CurrentPassword string `json:"current_password"`
@@ -806,6 +851,15 @@ type PasswordChange struct {
 
 // Permission A permission of the catalog, named entity.verb, such as `environment.manage`.
 type Permission = string
+
+// Prerequisite defines model for Prerequisite.
+type Prerequisite struct {
+	// Flag The key of another flag of the project, not archived.
+	Flag string `json:"flag"`
+
+	// Variation One of that flag's variations.
+	Variation string `json:"variation"`
+}
 
 // Problem A problem document (RFC 9457). Code-specific values are further members.
 type Problem struct {
@@ -970,6 +1024,43 @@ type RoleList struct {
 // RoleName defines model for RoleName.
 type RoleName string
 
+// Rule defines model for Rule.
+type Rule struct {
+	// Conditions Every one must hold for the rule to match.
+	Conditions  []Condition `json:"conditions"`
+	Description string      `json:"description"`
+
+	// Id Given by the server to a new rule and kept across writes.
+	Id openapi_types.UUID `json:"id"`
+
+	// Serve What a matching rule serves. `variation` serves `variation`;
+	// `rollout` serves `variation` to `percentage` of the units of
+	// `unit_type`, in basis points (0 to 10,000), the others continuing to
+	// the next rule. A rollout's `salt` is given by the server and changes
+	// only through regenerating it, so a write omits it or sends it
+	// unchanged. Experiments are not available yet
+	// (`experiment_not_available`).
+	Serve Serve `json:"serve"`
+}
+
+// RuleInput defines model for RuleInput.
+type RuleInput struct {
+	Conditions  *[]Condition `json:"conditions,omitempty"`
+	Description *Description `json:"description,omitempty"`
+
+	// Id The rule of the current configuration this one is; omitted for a new rule.
+	Id *openapi_types.UUID `json:"id,omitempty"`
+
+	// Serve What a matching rule serves. `variation` serves `variation`;
+	// `rollout` serves `variation` to `percentage` of the units of
+	// `unit_type`, in basis points (0 to 10,000), the others continuing to
+	// the next rule. A rollout's `salt` is given by the server and changes
+	// only through regenerating it, so a write omits it or sends it
+	// unchanged. Experiments are not available yet
+	// (`experiment_not_available`).
+	Serve Serve `json:"serve"`
+}
+
 // Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
 type Scope string
 
@@ -1017,6 +1108,22 @@ type SegmentPatch struct {
 	Key     *string `json:"key,omitempty"`
 	Name    *Name   `json:"name,omitempty"`
 	Private *bool   `json:"private,omitempty"`
+}
+
+// Serve What a matching rule serves. `variation` serves `variation`;
+// `rollout` serves `variation` to `percentage` of the units of
+// `unit_type`, in basis points (0 to 10,000), the others continuing to
+// the next rule. A rollout's `salt` is given by the server and changes
+// only through regenerating it, so a write omits it or sends it
+// unchanged. Experiments are not available yet
+// (`experiment_not_available`).
+type Serve struct {
+	// Kind `variation` or `rollout`.
+	Kind       string  `json:"kind"`
+	Percentage *int    `json:"percentage,omitempty"`
+	Salt       *string `json:"salt,omitempty"`
+	UnitType   *string `json:"unit_type,omitempty"`
+	Variation  *string `json:"variation,omitempty"`
 }
 
 // Session One device a member is signed in on.
@@ -1371,6 +1478,16 @@ type ArchiveFlagParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// PutFlagConfigurationParams defines parameters for PutFlagConfiguration.
+type PutFlagConfigurationParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // RestoreFlagParams defines parameters for RestoreFlag.
 type RestoreFlagParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
@@ -1448,6 +1565,9 @@ type CreateFlagJSONRequestBody = FlagCreate
 
 // UpdateFlagJSONRequestBody defines body for UpdateFlag for application/json ContentType.
 type UpdateFlagJSONRequestBody = FlagPatch
+
+// PutFlagConfigurationJSONRequestBody defines body for PutFlagConfiguration for application/json ContentType.
+type PutFlagConfigurationJSONRequestBody = FlagConfigurationPut
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody = GrantCreate
@@ -2204,6 +2324,61 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
 	ArchiveFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFlagConfiguration A flag's configuration in one environment
+	//
+	// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment} (the `GetFlagConfiguration` operationId).
+	GetFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFlagConfigurationWithBody Replace a flag's configuration in one environment
+	//
+	// Replaces the whole configuration: on or off, the off and fallthrough
+	// variations, prerequisites, overrides and rules, in one change. Every
+	// name in it is checked against the project (`invalid_configuration`,
+	// with a JSON Pointer to each field to fix): variations of this flag
+	// and of the flags it requires, declared attributes and unit types,
+	// existing segments, flags that are not archived, prerequisite chains
+	// that are acyclic and at most 5 flags deep in the environment
+	// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+	// flag keys in `params.path`), and the limits (`too_many` with
+	// `params.max`). A new rule omits `id` and is given one; a rule sent
+	// with an `id` is the rule of the current configuration it names
+	// (`unknown_rule` otherwise). A new rollout is given a salt, which
+	// then changes only through regenerating it. An override left as it
+	// was keeps the member who wrote it; any other is written by the
+	// caller. A configuration of an archived flag is not written
+	// (`archived`). A change to the values the configuration already has
+	// changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+	PutFlagConfigurationWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFlagConfiguration Replace a flag's configuration in one environment
+	//
+	// Replaces the whole configuration: on or off, the off and fallthrough
+	// variations, prerequisites, overrides and rules, in one change. Every
+	// name in it is checked against the project (`invalid_configuration`,
+	// with a JSON Pointer to each field to fix): variations of this flag
+	// and of the flags it requires, declared attributes and unit types,
+	// existing segments, flags that are not archived, prerequisite chains
+	// that are acyclic and at most 5 flags deep in the environment
+	// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+	// flag keys in `params.path`), and the limits (`too_many` with
+	// `params.max`). A new rule omits `id` and is given one; a rule sent
+	// with an `id` is the rule of the current configuration it names
+	// (`unknown_rule` otherwise). A new rollout is given a salt, which
+	// then changes only through regenerating it. An override left as it
+	// was keeps the member who wrote it; any other is written by the
+	// caller. A configuration of an archived flag is not written
+	// (`archived`). A change to the values the configuration already has
+	// changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+	PutFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RestoreFlag Restore an archived flag
 	//
@@ -3766,6 +3941,91 @@ func (c *Client) UpdateFlag(ctx context.Context, project ProjectKey, flag FlagKe
 // Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
 func (c *Client) ArchiveFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewArchiveFlagRequest(c.Server, project, flag, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFlagConfiguration A flag's configuration in one environment
+//
+// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment} (the `GetFlagConfiguration` operationId).
+func (c *Client) GetFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFlagConfigurationRequest(c.Server, project, flag, environment)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFlagConfigurationWithBody Replace a flag's configuration in one environment
+//
+// Replaces the whole configuration: on or off, the off and fallthrough
+// variations, prerequisites, overrides and rules, in one change. Every
+// name in it is checked against the project (`invalid_configuration`,
+// with a JSON Pointer to each field to fix): variations of this flag
+// and of the flags it requires, declared attributes and unit types,
+// existing segments, flags that are not archived, prerequisite chains
+// that are acyclic and at most 5 flags deep in the environment
+// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+// flag keys in `params.path`), and the limits (`too_many` with
+// `params.max`). A new rule omits `id` and is given one; a rule sent
+// with an `id` is the rule of the current configuration it names
+// (`unknown_rule` otherwise). A new rollout is given a salt, which
+// then changes only through regenerating it. An override left as it
+// was keeps the member who wrote it; any other is written by the
+// caller. A configuration of an archived flag is not written
+// (`archived`). A change to the values the configuration already has
+// changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+func (c *Client) PutFlagConfigurationWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFlagConfigurationRequestWithBody(c.Server, project, flag, environment, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFlagConfiguration Replace a flag's configuration in one environment
+//
+// Replaces the whole configuration: on or off, the off and fallthrough
+// variations, prerequisites, overrides and rules, in one change. Every
+// name in it is checked against the project (`invalid_configuration`,
+// with a JSON Pointer to each field to fix): variations of this flag
+// and of the flags it requires, declared attributes and unit types,
+// existing segments, flags that are not archived, prerequisite chains
+// that are acyclic and at most 5 flags deep in the environment
+// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+// flag keys in `params.path`), and the limits (`too_many` with
+// `params.max`). A new rule omits `id` and is given one; a rule sent
+// with an `id` is the rule of the current configuration it names
+// (`unknown_rule` otherwise). A new rollout is given a salt, which
+// then changes only through regenerating it. An override left as it
+// was keeps the member who wrote it; any other is written by the
+// caller. A configuration of an archived flag is not written
+// (`archived`). A change to the values the configuration already has
+// changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+func (c *Client) PutFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFlagConfigurationRequest(c.Server, project, flag, environment, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6633,6 +6893,130 @@ func NewArchiveFlagRequest(server string, project ProjectKey, flag FlagKey, para
 	return req, nil
 }
 
+// NewGetFlagConfigurationRequest constructs an http.Request for the GetFlagConfiguration method
+func NewGetFlagConfigurationRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutFlagConfigurationRequest calls the generic PutFlagConfiguration builder with application/json body
+func NewPutFlagConfigurationRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutFlagConfigurationRequestWithBody(server, project, flag, environment, params, "application/json", bodyReader)
+}
+
+// NewPutFlagConfigurationRequestWithBody constructs an http.Request for the PutFlagConfiguration method, with any body, and a specified content type
+func NewPutFlagConfigurationRequestWithBody(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewRestoreFlagRequest constructs an http.Request for the RestoreFlag method
 func NewRestoreFlagRequest(server string, project ProjectKey, flag FlagKey, params *RestoreFlagParams) (*http.Request, error) {
 	var err error
@@ -8312,6 +8696,63 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
 	ArchiveFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*ArchiveFlagResponse, error)
+
+	// GetFlagConfigurationWithResponse A flag's configuration in one environment
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment} (the `GetFlagConfiguration` operationId).
+	GetFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*GetFlagConfigurationResponse, error)
+
+	// PutFlagConfigurationWithBodyWithResponse Replace a flag's configuration in one environment
+	//
+	// Replaces the whole configuration: on or off, the off and fallthrough
+	// variations, prerequisites, overrides and rules, in one change. Every
+	// name in it is checked against the project (`invalid_configuration`,
+	// with a JSON Pointer to each field to fix): variations of this flag
+	// and of the flags it requires, declared attributes and unit types,
+	// existing segments, flags that are not archived, prerequisite chains
+	// that are acyclic and at most 5 flags deep in the environment
+	// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+	// flag keys in `params.path`), and the limits (`too_many` with
+	// `params.max`). A new rule omits `id` and is given one; a rule sent
+	// with an `id` is the rule of the current configuration it names
+	// (`unknown_rule` otherwise). A new rollout is given a salt, which
+	// then changes only through regenerating it. An override left as it
+	// was keeps the member who wrote it; any other is written by the
+	// caller. A configuration of an archived flag is not written
+	// (`archived`). A change to the values the configuration already has
+	// changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+	PutFlagConfigurationWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutFlagConfigurationResponse, error)
+
+	// PutFlagConfigurationWithResponse Replace a flag's configuration in one environment
+	//
+	// Replaces the whole configuration: on or off, the off and fallthrough
+	// variations, prerequisites, overrides and rules, in one change. Every
+	// name in it is checked against the project (`invalid_configuration`,
+	// with a JSON Pointer to each field to fix): variations of this flag
+	// and of the flags it requires, declared attributes and unit types,
+	// existing segments, flags that are not archived, prerequisite chains
+	// that are acyclic and at most 5 flags deep in the environment
+	// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+	// flag keys in `params.path`), and the limits (`too_many` with
+	// `params.max`). A new rule omits `id` and is given one; a rule sent
+	// with an `id` is the rule of the current configuration it names
+	// (`unknown_rule` otherwise). A new rollout is given a salt, which
+	// then changes only through regenerating it. An override left as it
+	// was keeps the member who wrote it; any other is written by the
+	// caller. A configuration of an archived flag is not written
+	// (`archived`). A change to the values the configuration already has
+	// changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+	PutFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*PutFlagConfigurationResponse, error)
 
 	// RestoreFlagWithResponse Restore an archived flag
 	//
@@ -12336,6 +12777,193 @@ func (r ArchiveFlagResponse) ContentType() string {
 	return ""
 }
 
+// GetFlagConfigurationResponse200Headers the declared response headers of an HTTP 200 response for GetFlagConfiguration
+type GetFlagConfigurationResponse200Headers struct {
+	ETag *string
+}
+
+// GetFlagConfigurationResponse401Headers the declared response headers of an HTTP 401 response for GetFlagConfiguration
+type GetFlagConfigurationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetFlagConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagConfiguration
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetFlagConfigurationResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetFlagConfigurationResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFlagConfigurationResponse) GetJSON200() *FlagConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetFlagConfigurationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetFlagConfigurationResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetFlagConfigurationResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFlagConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFlagConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFlagConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFlagConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutFlagConfigurationResponse200Headers the declared response headers of an HTTP 200 response for PutFlagConfiguration
+type PutFlagConfigurationResponse200Headers struct {
+	ETag *string
+}
+
+// PutFlagConfigurationResponse401Headers the declared response headers of an HTTP 401 response for PutFlagConfiguration
+type PutFlagConfigurationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type PutFlagConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagConfiguration
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *PutFlagConfigurationResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *PutFlagConfigurationResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutFlagConfigurationResponse) GetJSON200() *FlagConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r PutFlagConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutFlagConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutFlagConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutFlagConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // RestoreFlagResponse200Headers the declared response headers of an HTTP 200 response for RestoreFlag
 type RestoreFlagResponse200Headers struct {
 	ETag *string
@@ -15048,6 +15676,81 @@ func (c *ClientWithResponses) ArchiveFlagWithResponse(ctx context.Context, proje
 		return nil, err
 	}
 	return ParseArchiveFlagResponse(rsp)
+}
+
+// GetFlagConfigurationWithResponse A flag's configuration in one environment
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment} (the `GetFlagConfiguration` operationId).
+func (c *ClientWithResponses) GetFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*GetFlagConfigurationResponse, error) {
+	rsp, err := c.GetFlagConfiguration(ctx, project, flag, environment, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFlagConfigurationResponse(rsp)
+}
+
+// PutFlagConfigurationWithBodyWithResponse Replace a flag's configuration in one environment
+//
+// Replaces the whole configuration: on or off, the off and fallthrough
+// variations, prerequisites, overrides and rules, in one change. Every
+// name in it is checked against the project (`invalid_configuration`,
+// with a JSON Pointer to each field to fix): variations of this flag
+// and of the flags it requires, declared attributes and unit types,
+// existing segments, flags that are not archived, prerequisite chains
+// that are acyclic and at most 5 flags deep in the environment
+// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+// flag keys in `params.path`), and the limits (`too_many` with
+// `params.max`). A new rule omits `id` and is given one; a rule sent
+// with an `id` is the rule of the current configuration it names
+// (`unknown_rule` otherwise). A new rollout is given a salt, which
+// then changes only through regenerating it. An override left as it
+// was keeps the member who wrote it; any other is written by the
+// caller. A configuration of an archived flag is not written
+// (`archived`). A change to the values the configuration already has
+// changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+func (c *ClientWithResponses) PutFlagConfigurationWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutFlagConfigurationResponse, error) {
+	rsp, err := c.PutFlagConfigurationWithBody(ctx, project, flag, environment, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFlagConfigurationResponse(rsp)
+}
+
+// PutFlagConfigurationWithResponse Replace a flag's configuration in one environment
+//
+// Replaces the whole configuration: on or off, the off and fallthrough
+// variations, prerequisites, overrides and rules, in one change. Every
+// name in it is checked against the project (`invalid_configuration`,
+// with a JSON Pointer to each field to fix): variations of this flag
+// and of the flags it requires, declared attributes and unit types,
+// existing segments, flags that are not archived, prerequisite chains
+// that are acyclic and at most 5 flags deep in the environment
+// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+// flag keys in `params.path`), and the limits (`too_many` with
+// `params.max`). A new rule omits `id` and is given one; a rule sent
+// with an `id` is the rule of the current configuration it names
+// (`unknown_rule` otherwise). A new rollout is given a salt, which
+// then changes only through regenerating it. An override left as it
+// was keeps the member who wrote it; any other is written by the
+// caller. A configuration of an archived flag is not written
+// (`archived`). A change to the values the configuration already has
+// changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+func (c *ClientWithResponses) PutFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*PutFlagConfigurationResponse, error) {
+	rsp, err := c.PutFlagConfiguration(ctx, project, flag, environment, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFlagConfigurationResponse(rsp)
 }
 
 // RestoreFlagWithResponse Restore an archived flag
@@ -18856,6 +19559,181 @@ func ParseArchiveFlagResponse(rsp *http.Response) (*ArchiveFlagResponse, error) 
 	return response, nil
 }
 
+// ParseGetFlagConfigurationResponse parses an HTTP response from a GetFlagConfigurationWithResponse call
+func ParseGetFlagConfigurationResponse(rsp *http.Response) (*GetFlagConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFlagConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetFlagConfigurationResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetFlagConfigurationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePutFlagConfigurationResponse parses an HTTP response from a PutFlagConfigurationWithResponse call
+func ParsePutFlagConfigurationResponse(rsp *http.Response) (*PutFlagConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutFlagConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers PutFlagConfigurationResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers PutFlagConfigurationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseRestoreFlagResponse parses an HTTP response from a RestoreFlagWithResponse call
 func ParseRestoreFlagResponse(rsp *http.Response) (*RestoreFlagResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -20425,6 +21303,12 @@ type ServerInterface interface {
 	// ArchiveFlag Archive a flag
 	// (POST /projects/{project}/flags/{flag}/archive)
 	ArchiveFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params ArchiveFlagParams)
+	// GetFlagConfiguration A flag's configuration in one environment
+	// (GET /projects/{project}/flags/{flag}/environments/{environment})
+	GetFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey)
+	// PutFlagConfiguration Replace a flag's configuration in one environment
+	// (PUT /projects/{project}/flags/{flag}/environments/{environment})
+	PutFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params PutFlagConfigurationParams)
 	// RestoreFlag Restore an archived flag
 	// (POST /projects/{project}/flags/{flag}/restore)
 	RestoreFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params RestoreFlagParams)
@@ -22176,6 +23060,118 @@ func (siw *ServerInterfaceWrapper) ArchiveFlag(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// GetFlagConfiguration operation middleware
+func (siw *ServerInterfaceWrapper) GetFlagConfiguration(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFlagConfiguration(w, r, project, flag, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutFlagConfiguration operation middleware
+func (siw *ServerInterfaceWrapper) PutFlagConfiguration(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutFlagConfigurationParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutFlagConfiguration(w, r, project, flag, environment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RestoreFlag operation middleware
 func (siw *ServerInterfaceWrapper) RestoreFlag(w http.ResponseWriter, r *http.Request) {
 
@@ -23034,6 +24030,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/flags/{flag}", wrapper.UpdateFlag)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/archive", wrapper.ArchiveFlag)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/restore", wrapper.RestoreFlag)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}", wrapper.GetFlagConfiguration)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}", wrapper.PutFlagConfiguration)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/segments", wrapper.ListSegments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/segments", wrapper.CreateSegment)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/segments/{segment}", wrapper.DeleteSegment)
@@ -27393,6 +28391,258 @@ func (response ArchiveFlag428ApplicationProblemPlusJSONResponse) VisitArchiveFla
 	return err
 }
 
+type GetFlagConfigurationRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+}
+
+type GetFlagConfigurationResponseObject interface {
+	VisitGetFlagConfigurationResponse(w http.ResponseWriter) error
+}
+
+type GetFlagConfiguration200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetFlagConfiguration200JSONResponse struct {
+	Body    FlagConfiguration
+	Headers GetFlagConfiguration200ResponseHeaders
+}
+
+func (response GetFlagConfiguration200JSONResponse) VisitGetFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagConfiguration401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagConfiguration401ApplicationProblemPlusJSONResponse) VisitGetFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagConfiguration403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagConfiguration403ApplicationProblemPlusJSONResponse) VisitGetFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagConfiguration404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagConfiguration404ApplicationProblemPlusJSONResponse) VisitGetFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfigurationRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+	Params      PutFlagConfigurationParams
+	Body        *PutFlagConfigurationJSONRequestBody
+}
+
+type PutFlagConfigurationResponseObject interface {
+	VisitPutFlagConfigurationResponse(w http.ResponseWriter) error
+}
+
+type PutFlagConfiguration200ResponseHeaders struct {
+	ETag *string
+}
+
+type PutFlagConfiguration200JSONResponse struct {
+	Body    FlagConfiguration
+	Headers PutFlagConfiguration200ResponseHeaders
+}
+
+func (response PutFlagConfiguration200JSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration400ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration401ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration403ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration404ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration409ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration412ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration422ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration428ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RestoreFlagRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Flag    FlagKey    `json:"flag"`
@@ -29416,6 +30666,12 @@ type StrictServerInterface interface {
 	// ArchiveFlag Archive a flag
 	// (POST /projects/{project}/flags/{flag}/archive)
 	ArchiveFlag(ctx context.Context, request ArchiveFlagRequestObject) (ArchiveFlagResponseObject, error)
+	// GetFlagConfiguration A flag's configuration in one environment
+	// (GET /projects/{project}/flags/{flag}/environments/{environment})
+	GetFlagConfiguration(ctx context.Context, request GetFlagConfigurationRequestObject) (GetFlagConfigurationResponseObject, error)
+	// PutFlagConfiguration Replace a flag's configuration in one environment
+	// (PUT /projects/{project}/flags/{flag}/environments/{environment})
+	PutFlagConfiguration(ctx context.Context, request PutFlagConfigurationRequestObject) (PutFlagConfigurationResponseObject, error)
 	// RestoreFlag Restore an archived flag
 	// (POST /projects/{project}/flags/{flag}/restore)
 	RestoreFlag(ctx context.Context, request RestoreFlagRequestObject) (RestoreFlagResponseObject, error)
@@ -30914,6 +32170,70 @@ func (sh *strictHandler) ArchiveFlag(w http.ResponseWriter, r *http.Request, pro
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ArchiveFlagResponseObject); ok {
 		if err := validResponse.VisitArchiveFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFlagConfiguration operation middleware
+func (sh *strictHandler) GetFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey) {
+	var request GetFlagConfigurationRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFlagConfiguration(ctx, request.(GetFlagConfigurationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFlagConfiguration")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFlagConfigurationResponseObject); ok {
+		if err := validResponse.VisitGetFlagConfigurationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutFlagConfiguration operation middleware
+func (sh *strictHandler) PutFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params PutFlagConfigurationParams) {
+	var request PutFlagConfigurationRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+	request.Params = params
+
+	var body PutFlagConfigurationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutFlagConfiguration(ctx, request.(PutFlagConfigurationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutFlagConfiguration")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutFlagConfigurationResponseObject); ok {
+		if err := validResponse.VisitPutFlagConfigurationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

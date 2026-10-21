@@ -25,7 +25,7 @@ func (a *api) ListEnvironments(ctx context.Context, _ ListEnvironmentsRequestObj
 // CreateEnvironment appends an environment.
 func (a *api) CreateEnvironment(ctx context.Context, req CreateEnvironmentRequestObject) (CreateEnvironmentResponseObject, error) {
 	e, err := a.h.CreateEnvironment.Handle(ctx, appworkspace.CreateEnvironmentCommand{
-		Project: projectID(ctx), Key: req.Body.Key, Name: req.Body.Name, Request: requestOf(ctx),
+		Project: projectID(ctx), Key: req.Body.Key, Name: req.Body.Name, Caller: callerMember(ctx), Request: requestOf(ctx),
 	})
 	if err != nil {
 		return nil, err

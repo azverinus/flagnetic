@@ -356,6 +356,9 @@ type Changed struct {
 	// RemovedVariations are the keys of the variations the change removes,
 	// which nothing may still serve.
 	RemovedVariations []string
+	// Switched reports a change to a configuration whose only change to
+	// what a ruleset carries is switching the flag on or off.
+	Switched bool
 }
 
 // Change returns the flag with ch applied at now, its version incremented

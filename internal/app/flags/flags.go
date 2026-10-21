@@ -7,7 +7,9 @@ package flags
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"math/big"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -71,6 +73,8 @@ type Environments interface {
 type Rulesets interface {
 	// Project marks the ruleset of every environment of project changed.
 	Project(ctx context.Context, project workspace.ProjectID) error
+	// Environment marks the ruleset of environment changed.
+	Environment(ctx context.Context, environment workspace.EnvironmentID) error
 }
 
 // Owners judges who may own a flag.
@@ -100,6 +104,33 @@ func NewRecorder(audit AuditLog, c clock.Clock, ids *id.Source) Recorder {
 // the database keeps it, so what a write answers is what a later read does.
 func (rec Recorder) now() time.Time { return rec.clock.Now().UTC().Truncate(time.Microsecond) }
 
+// mint returns what a write draws for what it creates: rule identifiers
+// from the recorder's source, and salts of 16 random lower-case letters and
+// digits, which no one can guess a unit's bucket from before the rollout
+// exists.
+func (rec Recorder) mint() flags.Mint {
+	return flags.Mint{RuleID: func() flags.RuleID { return id.New[flags.Rule](rec.ids) }, Salt: newSalt}
+}
+
+// saltAlphabet is what a salt is drawn from: characters that read the same
+// in a URL, a log line and a spreadsheet.
+const saltAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+// newSalt returns a salt of 16 characters drawn uniformly from saltAlphabet.
+func newSalt() string {
+	b := make([]byte, 16)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(saltAlphabet))))
+		if err != nil {
+			// crypto/rand never fails on the platforms Go supports; a salt
+			// drawn from anything weaker would be guessable.
+			panic(err)
+		}
+		b[i] = saltAlphabet[n.Int64()]
+	}
+	return string(b)
+}
+
 // record writes the audit entry of r, made at now in req, in the unit of
 // work ctx carries.
 func (rec Recorder) record(ctx context.Context, now time.Time, req governance.Request, r governance.Record) error {
@@ -109,6 +140,10 @@ func (rec Recorder) record(ctx context.Context, now time.Time, req governance.Re
 	}
 	return rec.audit.Record(ctx, entry)
 }
+
+// errEnvironmentNotFound answers an environment key the project does not
+// have.
+var errEnvironmentNotFound = apperrors.NotFound("not_found", "the project has no environment with this key")
 
 // errFlagNotFound answers a flag key the project does not have.
 var errFlagNotFound = apperrors.NotFound("not_found", "the project has no flag with this key")
@@ -140,10 +175,34 @@ func definitionValues(f flags.Flag) map[string]any {
 }
 
 // configurationValues are what an audit entry records of a configuration:
-// the whole document with its version, which is what a revert restores.
+// the whole document with its version, which is what a revert restores,
+// rule identifiers, salts, notes and authors included.
 func configurationValues(c flags.Configuration) map[string]any {
+	prerequisites := make([]map[string]any, len(c.Prerequisites))
+	for i, p := range c.Prerequisites {
+		prerequisites[i] = map[string]any{"flag": p.Flag, "variation": p.Variation}
+	}
+	overrides := make([]map[string]any, len(c.Overrides))
+	for i, o := range c.Overrides {
+		overrides[i] = map[string]any{
+			"unit_type": o.UnitType, "unit_id": o.UnitID, "variation": o.Variation, "note": o.Note, "added_by": o.AddedBy,
+		}
+	}
+	rules := make([]map[string]any, len(c.Rules))
+	for i, r := range c.Rules {
+		conditions := make([]map[string]any, len(r.Conditions))
+		for j, cond := range r.Conditions {
+			conditions[j] = conditionValues(cond)
+		}
+		serve := map[string]any{"kind": r.Serve.Kind, "variation": r.Serve.Variation}
+		if r.Serve.Kind == flags.ServeRollout {
+			serve["unit_type"], serve["percentage"], serve["salt"] = r.Serve.UnitType, r.Serve.Percentage, r.Serve.Salt
+		}
+		rules[i] = map[string]any{"id": r.ID, "description": r.Description, "conditions": conditions, "serve": serve}
+	}
 	return map[string]any{
-		"on": c.On, "off_variation": c.OffVariation, "fallthrough": c.Fallthrough, "version": c.Version,
+		"on": c.On, "off_variation": c.OffVariation, "fallthrough": c.Fallthrough, "prerequisites": prerequisites,
+		"overrides": overrides, "rules": rules, "updated_by": c.UpdatedBy, "version": c.Version,
 	}
 }
 

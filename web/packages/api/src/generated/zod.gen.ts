@@ -551,26 +551,46 @@ export const zFlagDefinition = z.object({
   version: zVersion,
 });
 
-/**
- * What the flag serves in one environment.
- */
-export const zFlagConfiguration = z.object({
-  environment: zKey,
-  on: z.boolean(),
-  off_variation: z.string(),
-  fallthrough: z.string(),
-  updated_at: z.iso.datetime(),
-  version: zVersion,
+export const zPrerequisite = z.object({
+  flag: z.string(),
+  variation: z.string(),
 });
 
 /**
- * A flag's definition with its configuration in every environment, by the environments' order.
+ * A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
  */
-export const zFlag = zFlagDefinition.and(
-  z.object({
-    environments: z.array(zFlagConfiguration),
-  }),
-);
+export const zOverride = z.object({
+  unit_type: z.string(),
+  unit_id: z.string(),
+  variation: z.string(),
+  note: z.string().nullable(),
+  added_by: z.uuid().nullable(),
+});
+
+export const zOverrideInput = z.object({
+  unit_type: z.string(),
+  unit_id: z.string().min(1),
+  variation: z.string(),
+  note: z.string().nullish(),
+});
+
+/**
+ * What a matching rule serves. `variation` serves `variation`;
+ * `rollout` serves `variation` to `percentage` of the units of
+ * `unit_type`, in basis points (0 to 10,000), the others continuing to
+ * the next rule. A rollout's `salt` is given by the server and changes
+ * only through regenerating it, so a write omits it or sends it
+ * unchanged. Experiments are not available yet
+ * (`experiment_not_available`).
+ *
+ */
+export const zServe = z.object({
+  kind: z.string(),
+  variation: z.string().optional(),
+  unit_type: z.string().optional(),
+  percentage: z.int().gte(0).lte(10000).optional(),
+  salt: z.string().optional(),
+});
 
 export const zFlagList = z.object({
   items: z.array(zFlagDefinition),
@@ -623,6 +643,54 @@ export const zCondition = z.object({
   segment: z.string().optional(),
   flag: z.string().optional(),
   variation: z.string().optional(),
+});
+
+export const zRule = z.object({
+  id: z.uuid(),
+  description: z.string(),
+  conditions: z.array(zCondition),
+  serve: zServe,
+});
+
+/**
+ * What the flag serves in one environment.
+ */
+export const zFlagConfiguration = z.object({
+  environment: zKey,
+  on: z.boolean(),
+  off_variation: z.string(),
+  fallthrough: z.string(),
+  prerequisites: z.array(zPrerequisite),
+  overrides: z.array(zOverride),
+  rules: z.array(zRule),
+  updated_at: z.iso.datetime(),
+  updated_by: z.uuid().nullable(),
+  version: zVersion,
+});
+
+/**
+ * A flag's definition with its configuration in every environment, by the environments' order.
+ */
+export const zFlag = zFlagDefinition.and(
+  z.object({
+    environments: z.array(zFlagConfiguration),
+  }),
+);
+
+export const zRuleInput = z.object({
+  id: z.uuid().optional(),
+  description: zDescription.optional(),
+  conditions: z.array(zCondition).max(20).optional(),
+  serve: zServe,
+});
+
+export const zFlagConfigurationPut = z.object({
+  on: z.boolean(),
+  off_variation: z.string(),
+  fallthrough: z.string(),
+  prerequisites: z.array(zPrerequisite).optional(),
+  overrides: z.array(zOverrideInput).max(200).optional(),
+  rules: z.array(zRuleInput).max(50).optional(),
 });
 
 export const zSegment = z.object({
@@ -1164,6 +1232,34 @@ export const zRestoreFlagPath = z.object({
  * The flag as it is now.
  */
 export const zRestoreFlagResponse = zFlag;
+
+export const zGetFlagConfigurationPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The configuration; its `ETag` is the configuration's version.
+ */
+export const zGetFlagConfigurationResponse = zFlagConfiguration;
+
+export const zPutFlagConfigurationBody = zFlagConfigurationPut;
+
+export const zPutFlagConfigurationHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zPutFlagConfigurationPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zPutFlagConfigurationResponse = zFlagConfiguration;
 
 export const zListSegmentsPath = z.object({
   project: z.string(),
