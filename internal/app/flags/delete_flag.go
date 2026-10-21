@@ -34,7 +34,7 @@ func NewDeleteFlag(d DeleteFlagDeps) *DeleteFlag { return &DeleteFlag{d: d} }
 func (h *DeleteFlag) Handle(ctx context.Context, cmd FlagCommand) error {
 	now := h.d.Recorder.now()
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		if _, err := h.d.Projects.LockProject(ctx, cmd.Project); err != nil {
+		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
 		f, err := h.d.Store.FlagByKey(ctx, cmd.Project, cmd.Key)

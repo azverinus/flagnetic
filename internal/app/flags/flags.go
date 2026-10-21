@@ -37,8 +37,21 @@ type AuditLog interface {
 // the context takes this lock first and no other, so the writes of a
 // project are made one at a time in one lock order.
 type ProjectLocker interface {
-	// LockProject returns the project, or an error when there is none.
-	LockProject(ctx context.Context, project workspace.ProjectID) (workspace.Project, error)
+	// LockProject locks the project's row, or answers ErrNotFound when
+	// there is none.
+	LockProject(ctx context.Context, project workspace.ProjectID) error
+}
+
+// lockProject takes project's row lock through l. The request found the
+// project before the handler ran, so a project missing now was deleted in
+// between, and is answered as the unknown project a moment-later request
+// would have been told of, not as a failure of the server.
+func lockProject(ctx context.Context, l ProjectLocker, project workspace.ProjectID) error {
+	err := l.LockProject(ctx, project)
+	if errors.Is(err, ErrNotFound) {
+		return access.ErrProjectNotFound
+	}
+	return err
 }
 
 // Environments lists a project's environments.

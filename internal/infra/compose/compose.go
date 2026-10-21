@@ -83,7 +83,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// on, through the delivery context.
 	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(d.Pool))
 	owners := appaccess.NewOwnership(accessStore)
-	archival := appflags.ArchivalDeps{Tx: tx, Projects: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
+	archival := appflags.ArchivalDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	sessionKey := o.Keyring.Key(secret.UseSessionCookie)
 	// Every request judging a session reads the settings: the replica keeps
 	// a copy, which a notification of each change drops.
@@ -158,29 +158,29 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 
 		ListFlags: appflags.NewListFlags(flagStore),
 		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
-			Tx: tx, Projects: ws, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
+			Tx: tx, Projects: flagStore, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
 		GetFlag: appflags.NewGetFlag(flagStore),
 		UpdateFlag: appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
-			Tx: tx, Projects: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
+			Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
 
 		ArchiveFlag: appflags.NewArchiveFlag(archival),
 		RestoreFlag: appflags.NewRestoreFlag(archival),
 		DeleteFlag: appflags.NewDeleteFlag(appflags.DeleteFlagDeps{
-			Tx: tx, Projects: ws, Store: flagStore, Recorder: flagRec,
+			Tx: tx, Projects: flagStore, Store: flagStore, Recorder: flagRec,
 		}),
 
 		ListSegments: appflags.NewListSegments(flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),
 		CreateSegment: appflags.NewCreateSegment(appflags.CreateSegmentDeps{
-			Tx: tx, Projects: ws, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
 		UpdateSegment: appflags.NewUpdateSegment(appflags.UpdateSegmentDeps{
-			Tx: tx, Projects: ws, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
 		DeleteSegment: appflags.NewDeleteSegment(appflags.DeleteSegmentDeps{
-			Tx: tx, Projects: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
 		ListSegmentUsages: appflags.NewListSegmentUsages(flagStore),
 

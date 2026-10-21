@@ -43,7 +43,7 @@ type SegmentCommand struct {
 func (h *DeleteSegment) Handle(ctx context.Context, cmd SegmentCommand) error {
 	now := h.d.Recorder.now()
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		if _, err := h.d.Projects.LockProject(ctx, cmd.Project); err != nil {
+		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
 		s, err := h.d.Store.SegmentByKey(ctx, cmd.Project, cmd.Key)

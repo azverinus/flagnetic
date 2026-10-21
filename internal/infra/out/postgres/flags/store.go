@@ -30,6 +30,20 @@ type Store struct {
 // NewStore returns the repository on pool.
 func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
+// LockProject locks project's row for the unit of work, or answers
+// appflags.ErrNotFound when there is none.
+func (s *Store) LockProject(ctx context.Context, project workspace.ProjectID) error {
+	var one int
+	err := s.db(ctx).QueryRow(ctx, `SELECT 1 FROM projects WHERE id = $1 FOR UPDATE`, project.Bytes()).Scan(&one)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return appflags.ErrNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("locking a project: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) db(ctx context.Context) pgxtx.DB { return pgxtx.Querier(ctx, s.pool) }
 
 // keyTaken returns already_exists for a unique violation of a key, err

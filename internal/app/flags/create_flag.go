@@ -60,7 +60,7 @@ func (h *CreateFlag) Handle(ctx context.Context, cmd CreateFlagCommand) (FlagVie
 	now := h.d.Recorder.now()
 	var out FlagView
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		if _, err := h.d.Projects.LockProject(ctx, cmd.Project); err != nil {
+		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
 		owner, err := h.owner(ctx, cmd)

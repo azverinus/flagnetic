@@ -51,7 +51,7 @@ func archival(ctx context.Context, d ArchivalDeps, cmd FlagCommand, action strin
 	now := d.Recorder.now()
 	var out FlagView
 	err := d.Tx.Within(ctx, func(ctx context.Context) error {
-		if _, err := d.Projects.LockProject(ctx, cmd.Project); err != nil {
+		if err := lockProject(ctx, d.Projects, cmd.Project); err != nil {
 			return err
 		}
 		before, err := d.Store.FlagByKey(ctx, cmd.Project, cmd.Key)
