@@ -65,7 +65,19 @@ Both are recorded in the audit log with the CLI as their actor.
 
 ## Signing in to the console
 
-Members sign in with their email and password. A sign-in opens a session held by the server and referred to by the cookie `flagnetic_session` (`HttpOnly; SameSite=Lax`), signed under the secret key. A session ends at sign-out, after 24 hours without a request, or 30 days after it opened; a request with its cookie is then answered `401 session_expired` and the cookie is cleared.
+Members sign in with their email and password. A sign-in opens a session held by the server and referred to by the cookie `flagnetic_session` (`HttpOnly; SameSite=Lax`), signed under the secret key. A session ends at sign-out, after 24 hours without a request, or 30 days after it opened (the defaults; see below); a request with its cookie is then answered `401 session_expired` and the cookie is cleared.
+
+An instance admin changes the instance's auth settings at runtime (`/instance/auth-settings`); they live in the database, not in the configuration:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `session_idle_timeout_seconds` | 86400 (a day) | A session ends this long after its last request. |
+| `session_absolute_timeout_seconds` | 2592000 (30 days) | A session ends this long after it opened, however much it is used. |
+| `token_max_lifetime_seconds` | 31536000 (365 days) | The furthest ahead an API token may expire. |
+| `token_expiry_required` | false | Whether an API token must be created with an expiry. |
+| `password_min_length` | 12 | The fewest characters a password chosen from now on has; never below 12. |
+
+Durations are whole seconds from a minute to ten years, and the idle timeout is at most the absolute one. Every replica applies a change within a second: each keeps a copy of the settings and drops it when PostgreSQL notifies it of a change, and reads the settings from PostgreSQL on every use while its listener is down (`flagnetic_listener_up{channel="auth_settings"}` at 0). Live sessions are judged by the timeouts in force, so lowering one signs out every session already past it; raising the absolute timeout never lengthens a session opened under a lower one. Each change is recorded in the instance audit log as `auth_settings.updated`, with the settings before and after.
 
 - The cookie is `Secure` whenever the console is reached over HTTPS, and also over plain HTTP unless the host is `localhost` (or a loopback address), where browsers accept it without TLS. To try Flagnetic over plain HTTP on another host, set `FLAGNETIC_INSECURE_COOKIES=true`; never do so on a network you do not trust.
 - Sign-in accepts only a JSON body (`415 unsupported_media_type` otherwise), which a form on another site cannot send, so no page elsewhere can sign a visitor in as a member of its choosing.
@@ -81,7 +93,7 @@ Guessing passwords is slow, and cannot exhaust a replica:
 
 A member sees every device they are signed in on, with its address, browser and when it was last used, and signs out one of them, every other one, or all (`/me/sessions`). An instance admin does the same for any member (`/members/{member}/sessions`), to answer an incident. Only a session can sign its own member out: an API token is refused `403 session_required`, so a leaked token cannot lock its owner out. Every revocation is recorded in the instance audit log as `session.revoked`, naming the sessions it ended.
 
-Every replica runs the auth retention worker once an hour. It deletes ended sessions (revoked, idle or past their absolute timeout), an email's failed sign-ins a day after the last one once no lock holds it, and a source's failures once its fifteen-minute window is over, a thousand rows per transaction until nothing is left. One replica purges at a time; the others leave the work to it for that hour.
+Every replica runs the auth retention worker once an hour. It deletes ended sessions (revoked, or past the idle or absolute timeout in force), an email's failed sign-ins a day after the last one once no lock holds it, and a source's failures once its fifteen-minute window is over, a thousand rows per transaction until nothing is left. One replica purges at a time; the others leave the work to it for that hour.
 
 ## Probes
 

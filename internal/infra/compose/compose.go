@@ -22,6 +22,7 @@ import (
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
+	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -56,6 +57,14 @@ type Options struct {
 type Background struct {
 	// Workers are registered with the replica's runner.
 	Workers []worker.Worker
+	// Listeners are started on the replica's notification listeners.
+	Listeners []Listener
+}
+
+// Listener is a handler of the notifications of one channel.
+type Listener struct {
+	Channel string
+	Handler pglisten.Handler
 }
 
 // Management mounts the management API on edge, its metrics on reg, and
@@ -65,20 +74,25 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	rec := appworkspace.NewRecorder(auditLog, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
 	sessionKey := o.Keyring.Key(secret.UseSessionCookie)
+	// Every request judging a session reads the settings: the replica keeps
+	// a copy, which a notification of each change drops.
+	settings := pgaccess.NewAuthSettingsCache(d.Pool)
 	// One hasher serves every use case of the replica, so its bound is the
 	// replica's.
 	hasher := password.NewBoundedHasher(password.DefaultParams,
 		semaphore.NewWeighted(int64(o.PasswordHashConcurrency)), password.SlotWait)
 	management.Mount(edge, management.Handlers{
 		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, d.Clock),
-		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, d.Clock, sessionKey),
+		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{
-			Tx: tx, Store: accessStore, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
+			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
 		}),
 		SignOut:            appaccess.NewSignOut(tx, accessStore, auditLog, d.Clock, d.IDs),
-		ListSessions:       appaccess.NewListSessions(accessStore, d.Clock),
-		RevokeSessions:     appaccess.NewRevokeSessions(tx, accessStore, auditLog, d.Clock, d.IDs),
+		ListSessions:       appaccess.NewListSessions(accessStore, settings, d.Clock),
+		RevokeSessions:     appaccess.NewRevokeSessions(tx, accessStore, settings, auditLog, d.Clock, d.IDs),
+		GetAuthSettings:    appaccess.NewGetAuthSettings(settings),
+		UpdateAuthSettings: appaccess.NewUpdateAuthSettings(tx, accessStore, settings, auditLog, d.Clock, d.IDs),
 		ProjectPermissions: appaccess.NewProjectPermissions(),
 		WorkingProjects:    appaccess.NewWorkingProjects(),
 
@@ -109,7 +123,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
 	}, reg, o.Options)
 	return Background{
-		Workers: []worker.Worker{worker.AuthRetention(appaccess.NewPurgeAuthRecords(tx, accessStore, d.Clock), reg)},
+		Workers:   []worker.Worker{worker.AuthRetention(appaccess.NewPurgeAuthRecords(tx, accessStore, settings, d.Clock), reg)},
+		Listeners: []Listener{{Channel: pgaccess.AuthSettingsChannel, Handler: settings}},
 	}
 }
 

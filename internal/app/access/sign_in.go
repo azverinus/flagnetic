@@ -59,18 +59,19 @@ var ErrInvalidCredentials = apperrors.Unauthenticated("invalid_credentials", "th
 // SignIn opens a session for a member who proves who they are with their
 // email and password.
 type SignIn struct {
-	d        SignInDeps
-	timeouts access.SessionTimeouts
+	d SignInDeps
 }
 
 // SignInDeps are what signing in works with.
 type SignInDeps struct {
-	Tx     Transactor
-	Store  SignInStore
-	Hasher PasswordVerifier
-	Audit  AuditLog
-	Clock  clock.Clock
-	IDs    *id.Source
+	Tx    Transactor
+	Store SignInStore
+	// Settings give the timeouts a session opens with.
+	Settings AuthSettingsReader
+	Hasher   PasswordVerifier
+	Audit    AuditLog
+	Clock    clock.Clock
+	IDs      *id.Source
 	// Random draws session cookies, which are signed with Key.
 	Random io.Reader
 	Key    []byte
@@ -78,7 +79,7 @@ type SignInDeps struct {
 
 // NewSignIn returns the handler.
 func NewSignIn(d SignInDeps) *SignIn {
-	return &SignIn{d: d, timeouts: access.DefaultSessionTimeouts}
+	return &SignIn{d: d}
 }
 
 // SignInCommand is one attempt to sign in.
@@ -186,10 +187,14 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.M
 			return SignInResult{}, err
 		}
 	}
+	settings, err := h.d.Settings.AuthSettings(ctx)
+	if err != nil {
+		return SignInResult{}, err
+	}
 	now := h.d.Clock.Now()
 	session, cookie := access.NewSession(id.New[access.Session](h.d.IDs), access.NewSessionInput{
 		Member: member.ID, Method: access.SignInLocal, ClientIP: cmd.ClientIP, UserAgent: cmd.UserAgent,
-		Timeouts: h.timeouts, Now: now,
+		Timeouts: settings.SessionTimeouts(), Now: now,
 	}, h.d.Random, h.d.Key)
 	entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, governance.Request{
 		Actor: memberActor(member), ID: cmd.RequestID,

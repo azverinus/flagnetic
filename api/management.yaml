@@ -809,6 +809,56 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /instance/auth-settings:
+    get:
+      operationId: getAuthSettings
+      summary: The instance's auth settings
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The settings in force.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSettings"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: updateAuthSettings
+      summary: Change the instance's auth settings
+      description: |
+        Replaces every setting. Every replica applies a change within a
+        second, and live sessions are judged by lowered timeouts at once: a
+        session past a lowered idle or absolute timeout ends. A raised
+        absolute timeout never lengthens a session that opened under a lower
+        one. Refused `invalid_auth_settings` naming each field that breaks a
+        rule: every duration a whole number of seconds from 60 to 315360000
+        (ten years), the idle timeout at most the absolute one, the password
+        minimum length from 12 to 128.
+      x-permission: instance_admin
+      tags: [instance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthSettings"
+      responses:
+        "200":
+          description: The settings as changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSettings"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /audit:
     get:
       operationId: listAuditEntries
@@ -1309,6 +1359,29 @@ components:
         revoked:
           type: integer
           description: How many sessions were revoked.
+    AuthSettings:
+      type: object
+      description: The instance's rules for sessions, API tokens and passwords.
+      required: [session_idle_timeout_seconds, session_absolute_timeout_seconds, token_max_lifetime_seconds, token_expiry_required, password_min_length]
+      properties:
+        session_idle_timeout_seconds:
+          type: integer
+          format: int64
+          description: A session ends this long after its last request. 86400 (a day) on a fresh instance.
+        session_absolute_timeout_seconds:
+          type: integer
+          format: int64
+          description: A session ends this long after it opened, however much it is used. 2592000 (30 days) on a fresh instance.
+        token_max_lifetime_seconds:
+          type: integer
+          format: int64
+          description: The furthest ahead an API token may expire. 31536000 (365 days) on a fresh instance.
+        token_expiry_required:
+          type: boolean
+          description: Whether an API token must be created with an expiry. False on a fresh instance.
+        password_min_length:
+          type: integer
+          description: The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
     Grant:
       type: object
       description: One role held by one member in one project.

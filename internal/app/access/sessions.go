@@ -51,13 +51,13 @@ type SessionView struct {
 // ListSessions answers the devices a member is signed in on.
 type ListSessions struct {
 	store    MemberSessionStore
+	settings AuthSettingsReader
 	clock    clock.Clock
-	timeouts access.SessionTimeouts
 }
 
 // NewListSessions returns the query.
-func NewListSessions(store MemberSessionStore, c clock.Clock) *ListSessions {
-	return &ListSessions{store: store, clock: c, timeouts: access.DefaultSessionTimeouts}
+func NewListSessions(store MemberSessionStore, settings AuthSettingsReader, c clock.Clock) *ListSessions {
+	return &ListSessions{store: store, settings: settings, clock: c}
 }
 
 // Handle returns the live sessions of member, the caller's own when member
@@ -72,10 +72,15 @@ func (h *ListSessions) Handle(ctx context.Context, caller access.Caller, member 
 	if err != nil {
 		return nil, err
 	}
-	live := access.LiveSessions(sessions, holder, h.clock.Now(), h.timeouts)
+	settings, err := h.settings.AuthSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	timeouts := settings.SessionTimeouts()
+	live := access.LiveSessions(sessions, holder, h.clock.Now(), timeouts)
 	views := make([]SessionView, len(live))
 	for i, s := range live {
-		views[i] = SessionView{Session: s, End: s.End(h.timeouts), Current: caller.Session != nil && caller.Session.ID == s.ID}
+		views[i] = SessionView{Session: s, End: s.End(timeouts), Current: caller.Session != nil && caller.Session.ID == s.ID}
 	}
 	return views, nil
 }
@@ -119,15 +124,17 @@ type RevokeSessionsResult struct {
 type RevokeSessions struct {
 	tx       Transactor
 	store    SessionRevoker
+	settings AuthSettingsReader
 	audit    AuditLog
 	clock    clock.Clock
 	ids      *id.Source
-	timeouts access.SessionTimeouts
 }
 
 // NewRevokeSessions returns the handler.
-func NewRevokeSessions(tx Transactor, store SessionRevoker, audit AuditLog, c clock.Clock, ids *id.Source) *RevokeSessions {
-	return &RevokeSessions{tx: tx, store: store, audit: audit, clock: c, ids: ids, timeouts: access.DefaultSessionTimeouts}
+func NewRevokeSessions(tx Transactor, store SessionRevoker, settings AuthSettingsReader, audit AuditLog, c clock.Clock,
+	ids *id.Source,
+) *RevokeSessions {
+	return &RevokeSessions{tx: tx, store: store, settings: settings, audit: audit, clock: c, ids: ids}
 }
 
 // Handle revokes the live sessions cmd selects and records one
@@ -139,8 +146,12 @@ func (h *RevokeSessions) Handle(ctx context.Context, cmd RevokeSessionsCommand) 
 	if cmd.Member.IsZero() && cmd.Caller.Session == nil {
 		return RevokeSessionsResult{}, access.ErrSessionRequired
 	}
+	settings, err := h.settings.AuthSettings(ctx)
+	if err != nil {
+		return RevokeSessionsResult{}, err
+	}
 	var res RevokeSessionsResult
-	err := h.tx.Within(ctx, func(ctx context.Context) error {
+	if err := h.tx.Within(ctx, func(ctx context.Context) error {
 		holder, err := holderOf(ctx, h.store, cmd.Caller, cmd.Member)
 		if err != nil {
 			return err
@@ -150,7 +161,7 @@ func (h *RevokeSessions) Handle(ctx context.Context, cmd RevokeSessionsCommand) 
 			return err
 		}
 		now := h.clock.Now()
-		chosen, err := cmd.choose(access.LiveSessions(sessions, holder, now, h.timeouts))
+		chosen, err := cmd.choose(access.LiveSessions(sessions, holder, now, settings.SessionTimeouts()))
 		if err != nil || len(chosen) == 0 {
 			return err
 		}
@@ -163,8 +174,7 @@ func (h *RevokeSessions) Handle(ctx context.Context, cmd RevokeSessionsCommand) 
 			return err
 		}
 		return h.audit.Record(ctx, entry)
-	})
-	if err != nil {
+	}); err != nil {
 		return RevokeSessionsResult{}, err
 	}
 	return res, nil

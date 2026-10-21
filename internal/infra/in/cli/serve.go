@@ -19,6 +19,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
+	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
@@ -138,6 +139,9 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	defer runner.Stop(workerStopBound)
 	listeners := postgres.NewListeners(replica, pool, log, reg)
 	defer listeners.Stop(workerStopBound)
+	for _, l := range background.Listeners {
+		listeners.Start(l.Channel, l.Handler, pglisten.Options{})
+	}
 
 	select {
 	case err := <-served:

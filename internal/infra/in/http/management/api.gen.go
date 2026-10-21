@@ -283,6 +283,24 @@ type AuthMethods struct {
 	Providers []map[string]interface{} `json:"providers"`
 }
 
+// AuthSettings The instance's rules for sessions, API tokens and passwords.
+type AuthSettings struct {
+	// PasswordMinLength The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
+	PasswordMinLength int `json:"password_min_length"`
+
+	// SessionAbsoluteTimeoutSeconds A session ends this long after it opened, however much it is used. 2592000 (30 days) on a fresh instance.
+	SessionAbsoluteTimeoutSeconds int64 `json:"session_absolute_timeout_seconds"`
+
+	// SessionIdleTimeoutSeconds A session ends this long after its last request. 86400 (a day) on a fresh instance.
+	SessionIdleTimeoutSeconds int64 `json:"session_idle_timeout_seconds"`
+
+	// TokenExpiryRequired Whether an API token must be created with an expiry. False on a fresh instance.
+	TokenExpiryRequired bool `json:"token_expiry_required"`
+
+	// TokenMaxLifetimeSeconds The furthest ahead an API token may expire. 31536000 (365 days) on a fresh instance.
+	TokenMaxLifetimeSeconds int64 `json:"token_max_lifetime_seconds"`
+}
+
 // Credential defines model for Credential.
 type Credential struct {
 	Method CredentialMethod `json:"method"`
@@ -703,6 +721,9 @@ type ListProjectAuditEntriesParams struct {
 // SignInJSONRequestBody defines body for SignIn for application/json ContentType.
 type SignInJSONRequestBody = SignInRequest
 
+// UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
+type UpdateAuthSettingsJSONRequestBody = AuthSettings
+
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectCreate
 
@@ -861,6 +882,43 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 	SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuthSettings The instance's auth settings
+	//
+	// Corresponds with GET /instance/auth-settings (the `GetAuthSettings` operationId).
+	GetAuthSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAuthSettingsWithBody Change the instance's auth settings
+	//
+	// Replaces every setting. Every replica applies a change within a
+	// second, and live sessions are judged by lowered timeouts at once: a
+	// session past a lowered idle or absolute timeout ends. A raised
+	// absolute timeout never lengthens a session that opened under a lower
+	// one. Refused `invalid_auth_settings` naming each field that breaks a
+	// rule: every duration a whole number of seconds from 60 to 315360000
+	// (ten years), the idle timeout at most the absolute one, the password
+	// minimum length from 12 to 128.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+	UpdateAuthSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAuthSettings Change the instance's auth settings
+	//
+	// Replaces every setting. Every replica applies a change within a
+	// second, and live sessions are judged by lowered timeouts at once: a
+	// session past a lowered idle or absolute timeout ends. A raised
+	// absolute timeout never lengthens a session that opened under a lower
+	// one. Refused `invalid_auth_settings` naming each field that breaks a
+	// rule: every duration a whole number of seconds from 60 to 315360000
+	// (ten years), the idle timeout at most the absolute one, the password
+	// minimum length from 12 to 128.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+	UpdateAuthSettings(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetMe Who the caller is
 	//
@@ -1228,6 +1286,73 @@ func (c *Client) SignIn(ctx context.Context, body SignInJSONRequestBody, reqEdit
 // Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 func (c *Client) SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSignOutRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuthSettings The instance's auth settings
+//
+// Corresponds with GET /instance/auth-settings (the `GetAuthSettings` operationId).
+func (c *Client) GetAuthSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthSettingsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAuthSettingsWithBody Change the instance's auth settings
+//
+// Replaces every setting. Every replica applies a change within a
+// second, and live sessions are judged by lowered timeouts at once: a
+// session past a lowered idle or absolute timeout ends. A raised
+// absolute timeout never lengthens a session that opened under a lower
+// one. Refused `invalid_auth_settings` naming each field that breaks a
+// rule: every duration a whole number of seconds from 60 to 315360000
+// (ten years), the idle timeout at most the absolute one, the password
+// minimum length from 12 to 128.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+func (c *Client) UpdateAuthSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthSettingsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAuthSettings Change the instance's auth settings
+//
+// Replaces every setting. Every replica applies a change within a
+// second, and live sessions are judged by lowered timeouts at once: a
+// session past a lowered idle or absolute timeout ends. A raised
+// absolute timeout never lengthens a session that opened under a lower
+// one. Refused `invalid_auth_settings` naming each field that breaks a
+// rule: every duration a whole number of seconds from 60 to 315360000
+// (ten years), the idle timeout at most the absolute one, the password
+// minimum length from 12 to 128.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+func (c *Client) UpdateAuthSettings(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthSettingsRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2148,6 +2273,73 @@ func NewSignOutRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGetAuthSettingsRequest constructs an http.Request for the GetAuthSettings method
+func NewGetAuthSettingsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateAuthSettingsRequest calls the generic UpdateAuthSettings builder with application/json body
+func NewUpdateAuthSettingsRequest(server string, body UpdateAuthSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAuthSettingsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateAuthSettingsRequestWithBody constructs an http.Request for the UpdateAuthSettings method, with any body, and a specified content type
+func NewUpdateAuthSettingsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -3555,6 +3747,45 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 	SignOutWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignOutResponse, error)
 
+	// GetAuthSettingsWithResponse The instance's auth settings
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/auth-settings (the `GetAuthSettings` operationId).
+	GetAuthSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthSettingsResponse, error)
+
+	// UpdateAuthSettingsWithBodyWithResponse Change the instance's auth settings
+	//
+	// Replaces every setting. Every replica applies a change within a
+	// second, and live sessions are judged by lowered timeouts at once: a
+	// session past a lowered idle or absolute timeout ends. A raised
+	// absolute timeout never lengthens a session that opened under a lower
+	// one. Refused `invalid_auth_settings` naming each field that breaks a
+	// rule: every duration a whole number of seconds from 60 to 315360000
+	// (ten years), the idle timeout at most the absolute one, the password
+	// minimum length from 12 to 128.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+	UpdateAuthSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error)
+
+	// UpdateAuthSettingsWithResponse Change the instance's auth settings
+	//
+	// Replaces every setting. Every replica applies a change within a
+	// second, and live sessions are judged by lowered timeouts at once: a
+	// session past a lowered idle or absolute timeout ends. A raised
+	// absolute timeout never lengthens a session that opened under a lower
+	// one. Refused `invalid_auth_settings` naming each field that breaks a
+	// rule: every duration a whole number of seconds from 60 to 315360000
+	// (ten years), the idle timeout at most the absolute one, the password
+	// minimum length from 12 to 128.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+	UpdateAuthSettingsWithResponse(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error)
+
 	// GetMeWithResponse Who the caller is
 	//
 	// The member the credential in use acts for, the credential itself, and the address the request came from.
@@ -4166,6 +4397,137 @@ func (r SignOutResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SignOutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetAuthSettingsResponse401Headers the declared response headers of an HTTP 401 response for GetAuthSettings
+type GetAuthSettingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetAuthSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthSettings
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetAuthSettingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuthSettingsResponse) GetJSON200() *AuthSettings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetAuthSettingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetAuthSettingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuthSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuthSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateAuthSettingsResponse401Headers the declared response headers of an HTTP 401 response for UpdateAuthSettings
+type UpdateAuthSettingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateAuthSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthSettings
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateAuthSettingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateAuthSettingsResponse) GetJSON200() *AuthSettings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateAuthSettingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateAuthSettingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateAuthSettingsResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateAuthSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAuthSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAuthSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateAuthSettingsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -6326,6 +6688,63 @@ func (c *ClientWithResponses) SignOutWithResponse(ctx context.Context, reqEditor
 	return ParseSignOutResponse(rsp)
 }
 
+// GetAuthSettingsWithResponse The instance's auth settings
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/auth-settings (the `GetAuthSettings` operationId).
+func (c *ClientWithResponses) GetAuthSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthSettingsResponse, error) {
+	rsp, err := c.GetAuthSettings(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthSettingsResponse(rsp)
+}
+
+// UpdateAuthSettingsWithBodyWithResponse Change the instance's auth settings
+//
+// Replaces every setting. Every replica applies a change within a
+// second, and live sessions are judged by lowered timeouts at once: a
+// session past a lowered idle or absolute timeout ends. A raised
+// absolute timeout never lengthens a session that opened under a lower
+// one. Refused `invalid_auth_settings` naming each field that breaks a
+// rule: every duration a whole number of seconds from 60 to 315360000
+// (ten years), the idle timeout at most the absolute one, the password
+// minimum length from 12 to 128.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+func (c *ClientWithResponses) UpdateAuthSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error) {
+	rsp, err := c.UpdateAuthSettingsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthSettingsResponse(rsp)
+}
+
+// UpdateAuthSettingsWithResponse Change the instance's auth settings
+//
+// Replaces every setting. Every replica applies a change within a
+// second, and live sessions are judged by lowered timeouts at once: a
+// session past a lowered idle or absolute timeout ends. A raised
+// absolute timeout never lengthens a session that opened under a lower
+// one. Refused `invalid_auth_settings` naming each field that breaks a
+// rule: every duration a whole number of seconds from 60 to 315360000
+// (ten years), the idle timeout at most the absolute one, the password
+// minimum length from 12 to 128.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+func (c *ClientWithResponses) UpdateAuthSettingsWithResponse(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error) {
+	rsp, err := c.UpdateAuthSettings(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthSettingsResponse(rsp)
+}
+
 // GetMeWithResponse Who the caller is
 //
 // The member the credential in use acts for, the credential itself, and the address the request came from.
@@ -7130,6 +7549,119 @@ func ParseSignOutResponse(rsp *http.Response) (*SignOutResponse, error) {
 		response.Headers204 = &headers
 	case rsp.StatusCode == 401:
 		var headers SignOutResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthSettingsResponse parses an HTTP response from a GetAuthSettingsWithResponse call
+func ParseGetAuthSettingsResponse(rsp *http.Response) (*GetAuthSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthSettings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetAuthSettingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAuthSettingsResponse parses an HTTP response from a UpdateAuthSettingsWithResponse call
+func ParseUpdateAuthSettingsResponse(rsp *http.Response) (*UpdateAuthSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAuthSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthSettings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers UpdateAuthSettingsResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -8974,6 +9506,12 @@ type ServerInterface interface {
 	// SignOut Sign out
 	// (POST /auth/sign-out)
 	SignOut(w http.ResponseWriter, r *http.Request)
+	// GetAuthSettings The instance's auth settings
+	// (GET /instance/auth-settings)
+	GetAuthSettings(w http.ResponseWriter, r *http.Request)
+	// UpdateAuthSettings Change the instance's auth settings
+	// (PUT /instance/auth-settings)
+	UpdateAuthSettings(w http.ResponseWriter, r *http.Request)
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -9281,6 +9819,34 @@ func (siw *ServerInterfaceWrapper) SignOut(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SignOut(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuthSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAuthSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAuthSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAuthSettings(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10379,6 +10945,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit/{entry}", wrapper.GetProjectAuditEntry)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/sessions", wrapper.RevokeMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/sessions", wrapper.ListMemberSessions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-settings", wrapper.GetAuthSettings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-settings", wrapper.UpdateAuthSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit", wrapper.ListAuditEntries)
 
 	return m
@@ -10745,6 +11313,135 @@ func (response SignOut403ApplicationProblemPlusJSONResponse) VisitSignOutRespons
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthSettingsRequestObject struct {
+}
+
+type GetAuthSettingsResponseObject interface {
+	VisitGetAuthSettingsResponse(w http.ResponseWriter) error
+}
+
+type GetAuthSettings200JSONResponse AuthSettings
+
+func (response GetAuthSettings200JSONResponse) VisitGetAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthSettings401ApplicationProblemPlusJSONResponse) VisitGetAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthSettings403ApplicationProblemPlusJSONResponse) VisitGetAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthSettingsRequestObject struct {
+	Body *UpdateAuthSettingsJSONRequestBody
+}
+
+type UpdateAuthSettingsResponseObject interface {
+	VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error
+}
+
+type UpdateAuthSettings200JSONResponse AuthSettings
+
+func (response UpdateAuthSettings200JSONResponse) VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthSettings401ApplicationProblemPlusJSONResponse) VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthSettings403ApplicationProblemPlusJSONResponse) VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthSettings422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthSettings422ApplicationProblemPlusJSONResponse) VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -13042,6 +13739,12 @@ type StrictServerInterface interface {
 	// SignOut Sign out
 	// (POST /auth/sign-out)
 	SignOut(ctx context.Context, request SignOutRequestObject) (SignOutResponseObject, error)
+	// GetAuthSettings The instance's auth settings
+	// (GET /instance/auth-settings)
+	GetAuthSettings(ctx context.Context, request GetAuthSettingsRequestObject) (GetAuthSettingsResponseObject, error)
+	// UpdateAuthSettings Change the instance's auth settings
+	// (PUT /instance/auth-settings)
+	UpdateAuthSettings(ctx context.Context, request UpdateAuthSettingsRequestObject) (UpdateAuthSettingsResponseObject, error)
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -13268,6 +13971,61 @@ func (sh *strictHandler) SignOut(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SignOutResponseObject); ok {
 		if err := validResponse.VisitSignOutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuthSettings operation middleware
+func (sh *strictHandler) GetAuthSettings(w http.ResponseWriter, r *http.Request) {
+	var request GetAuthSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthSettings(ctx, request.(GetAuthSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthSettingsResponseObject); ok {
+		if err := validResponse.VisitGetAuthSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAuthSettings operation middleware
+func (sh *strictHandler) UpdateAuthSettings(w http.ResponseWriter, r *http.Request) {
+	var request UpdateAuthSettingsRequestObject
+
+	var body UpdateAuthSettingsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAuthSettings(ctx, request.(UpdateAuthSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAuthSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAuthSettingsResponseObject); ok {
+		if err := validResponse.VisitUpdateAuthSettingsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

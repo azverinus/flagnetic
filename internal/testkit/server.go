@@ -198,6 +198,9 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	t.Cleanup(srv.Close)
 	listeners := postgres.NewListeners(runner.PanicHook(context.Background()), o.pool, logs.Logger(), reg)
 	t.Cleanup(func() { listeners.Stop(10 * time.Second) })
+	for _, l := range background.Listeners {
+		listeners.Start(l.Channel, l.Handler, pglisten.Options{})
+	}
 	return &Server{URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg), runner: runner, listeners: listeners}
 }
 

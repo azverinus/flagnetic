@@ -41,13 +41,14 @@ type AuthPurged struct {
 type PurgeAuthRecords struct {
 	tx       Transactor
 	store    AuthRetentionStore
+	settings AuthSettingsReader
 	clock    clock.Clock
-	timeouts access.SessionTimeouts
 }
 
-// NewPurgeAuthRecords returns the handler.
-func NewPurgeAuthRecords(tx Transactor, store AuthRetentionStore, c clock.Clock) *PurgeAuthRecords {
-	return &PurgeAuthRecords{tx: tx, store: store, clock: c, timeouts: access.DefaultSessionTimeouts}
+// NewPurgeAuthRecords returns the handler, which ends sessions by the
+// timeouts settings holds.
+func NewPurgeAuthRecords(tx Transactor, store AuthRetentionStore, settings AuthSettingsReader, c clock.Clock) *PurgeAuthRecords {
+	return &PurgeAuthRecords{tx: tx, store: store, settings: settings, clock: c}
 }
 
 // errPurgingElsewhere stops a purge when another replica holds the lock: it
@@ -59,8 +60,12 @@ var errPurgingElsewhere = errors.New("access: another replica is purging")
 // another replica holds the lock it leaves the work to it and returns what
 // it purged so far.
 func (h *PurgeAuthRecords) Handle(ctx context.Context) (AuthPurged, error) {
+	settings, err := h.settings.AuthSettings(ctx)
+	if err != nil {
+		return AuthPurged{}, err
+	}
 	now := h.clock.Now()
-	sessions, failures := access.EndedSessionCutoffs(now, h.timeouts), access.AttemptCutoffs(now)
+	sessions, failures := access.EndedSessionCutoffs(now, settings.SessionTimeouts()), access.AttemptCutoffs(now)
 	var purged AuthPurged
 	for _, step := range []struct {
 		count *int

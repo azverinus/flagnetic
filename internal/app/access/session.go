@@ -27,15 +27,15 @@ var ErrNoSession = errors.New("access: not a session cookie")
 // AuthenticateSession resolves a session cookie into the member signed in.
 type AuthenticateSession struct {
 	store    SessionStore
+	settings AuthSettingsReader
 	clock    clock.Clock
 	key      []byte
-	timeouts access.SessionTimeouts
 }
 
 // NewAuthenticateSession returns the handler, which checks cookies' tags
-// under key.
-func NewAuthenticateSession(store SessionStore, c clock.Clock, key []byte) *AuthenticateSession {
-	return &AuthenticateSession{store: store, clock: c, key: key, timeouts: access.DefaultSessionTimeouts}
+// under key and judges sessions by the timeouts settings holds.
+func NewAuthenticateSession(store SessionStore, settings AuthSettingsReader, c clock.Clock, key []byte) *AuthenticateSession {
+	return &AuthenticateSession{store: store, settings: settings, clock: c, key: key}
 }
 
 // Handle returns the caller signed in to the session cookie names: ErrNoSession
@@ -54,8 +54,12 @@ func (h *AuthenticateSession) Handle(ctx context.Context, cookie string) (access
 	if err != nil {
 		return access.Caller{}, err
 	}
+	settings, err := h.settings.AuthSettings(ctx)
+	if err != nil {
+		return access.Caller{}, err
+	}
 	now := h.clock.Now()
-	if !session.Live(now, member, h.timeouts) {
+	if !session.Live(now, member, settings.SessionTimeouts()) {
 		return access.Caller{}, access.ErrSessionExpired
 	}
 	if session.NeedsTouch(now) {
