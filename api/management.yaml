@@ -719,7 +719,7 @@ paths:
       tags: [unit types]
       responses:
         "200":
-          description: The unit types, by key.
+          description: The unit types, by key, each with how many flags and segments name it.
           content:
             application/json:
               schema:
@@ -808,7 +808,10 @@ paths:
           $ref: "#/components/responses/Invalid"
     delete:
       operationId: deleteUnitType
-      description: Deletes the unit type.
+      description: |
+        Deletes the unit type. A unit type a rule's condition, a rollout,
+        an override or a segment still names, an archived flag's included,
+        is refused with `in_use` listing what names it.
       x-permission: declaration.manage
       tags: [unit types]
       responses:
@@ -820,6 +823,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /projects/{project}/attributes:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -830,7 +835,7 @@ paths:
       tags: [attributes]
       responses:
         "200":
-          description: The attributes, by key.
+          description: The attributes, by key, each with how many flags and segments name it.
           content:
             application/json:
               schema:
@@ -919,7 +924,11 @@ paths:
           $ref: "#/components/responses/Invalid"
     delete:
       operationId: deleteAttribute
-      description: Deletes a declared attribute; a standard attribute is refused with `standard_attribute`.
+      description: |
+        Deletes a declared attribute; a standard attribute is refused with
+        `standard_attribute`, and one a rule's condition or a segment still
+        names, an archived flag's included, with `in_use` listing what
+        names it.
       x-permission: declaration.manage
       tags: [attributes]
       responses:
@@ -1436,7 +1445,7 @@ paths:
       tags: [segments]
       responses:
         "200":
-          description: The segments, by key.
+          description: The segments, by key, each with how many flags' rules name it.
           content:
             application/json:
               schema:
@@ -3233,7 +3242,23 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/UnitType"
+            $ref: "#/components/schemas/UnitTypeListItem"
+    UnitTypeListItem:
+      allOf:
+        - $ref: "#/components/schemas/UnitType"
+        - type: object
+          required: [usage_count]
+          properties:
+            usage_count:
+              $ref: "#/components/schemas/DeclarationUsageCount"
+    DeclarationUsageCount:
+      type: integer
+      minimum: 0
+      description: |
+        How many flags (archived ones included, each counted once whatever
+        its environments) and segments name it, in a rule's condition, a
+        rollout, an override or a segment's condition. Deleting it is
+        refused while this is above zero.
     UnitTypeCreate:
       type: object
       required: [key, name]
@@ -3283,7 +3308,15 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Attribute"
+            $ref: "#/components/schemas/AttributeListItem"
+    AttributeListItem:
+      allOf:
+        - $ref: "#/components/schemas/Attribute"
+        - type: object
+          required: [usage_count]
+          properties:
+            usage_count:
+              $ref: "#/components/schemas/DeclarationUsageCount"
     AttributeCreate:
       type: object
       required: [key, type, name]
@@ -3873,7 +3906,20 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Segment"
+            $ref: "#/components/schemas/SegmentListItem"
+    SegmentListItem:
+      allOf:
+        - $ref: "#/components/schemas/Segment"
+        - type: object
+          required: [usage_count]
+          properties:
+            usage_count:
+              type: integer
+              minimum: 0
+              description: |
+                How many flags' rules name the segment, archived flags
+                included, each flag counted once whatever its environments.
+                Deleting it is refused while this is above zero.
     SegmentCreate:
       type: object
       required: [key, name]

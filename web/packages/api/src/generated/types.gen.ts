@@ -573,8 +573,21 @@ export type UnitType = {
 };
 
 export type UnitTypeList = {
-  items: Array<UnitType>;
+  items: Array<UnitTypeListItem>;
 };
+
+export type UnitTypeListItem = UnitType & {
+  usage_count: DeclarationUsageCount;
+};
+
+/**
+ * How many flags (archived ones included, each counted once whatever
+ * its environments) and segments name it, in a rule's condition, a
+ * rollout, an override or a segment's condition. Deleting it is
+ * refused while this is above zero.
+ *
+ */
+export type DeclarationUsageCount = number;
 
 export type UnitTypeCreate = {
   key: Key;
@@ -609,7 +622,11 @@ export type Attribute = {
 };
 
 export type AttributeList = {
-  items: Array<Attribute>;
+  items: Array<AttributeListItem>;
+};
+
+export type AttributeListItem = Attribute & {
+  usage_count: DeclarationUsageCount;
 };
 
 export type AttributeCreate = {
@@ -1053,7 +1070,17 @@ export type Segment = {
 };
 
 export type SegmentList = {
-  items: Array<Segment>;
+  items: Array<SegmentListItem>;
+};
+
+export type SegmentListItem = Segment & {
+  /**
+   * How many flags' rules name the segment, archived flags
+   * included, each flag counted once whatever its environments.
+   * Deleting it is refused while this is above zero.
+   *
+   */
+  usage_count: number;
 };
 
 export type SegmentCreate = {
@@ -2425,7 +2452,7 @@ export type ListUnitTypesError = ListUnitTypesErrors[keyof ListUnitTypesErrors];
 
 export type ListUnitTypesResponses = {
   /**
-   * The unit types, by key.
+   * The unit types, by key, each with how many flags and segments name it.
    */
   200: UnitTypeList;
 };
@@ -2527,6 +2554,10 @@ export type DeleteUnitTypeErrors = {
    * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
    */
   404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
 };
 
 export type DeleteUnitTypeError = DeleteUnitTypeErrors[keyof DeleteUnitTypeErrors];
@@ -2689,7 +2720,7 @@ export type ListAttributesError = ListAttributesErrors[keyof ListAttributesError
 
 export type ListAttributesResponses = {
   /**
-   * The attributes, by key.
+   * The attributes, by key, each with how many flags and segments name it.
    */
   200: AttributeList;
 };
@@ -3882,7 +3913,7 @@ export type ListSegmentsError = ListSegmentsErrors[keyof ListSegmentsErrors];
 
 export type ListSegmentsResponses = {
   /**
-   * The segments, by key.
+   * The segments, by key, each with how many flags' rules name it.
    */
   200: SegmentList;
 };

@@ -324,7 +324,29 @@ type AttributeCreate struct {
 
 // AttributeList defines model for AttributeList.
 type AttributeList struct {
-	Items []Attribute `json:"items"`
+	Items []AttributeListItem `json:"items"`
+}
+
+// AttributeListItem defines model for AttributeListItem.
+type AttributeListItem struct {
+	Description Description        `json:"description"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Key Names the entity in URLs, SDK calls and rules, and never changes.
+	Key  Key  `json:"key"`
+	Name Name `json:"name"`
+
+	// Standard Predeclared in every project; renamable, never deleted or retyped.
+	Standard bool `json:"standard"`
+
+	// Type The type of an attribute's values; `semver` is a semantic version, `list` a list of strings.
+	Type AttributeType `json:"type"`
+
+	// UsageCount How many flags (archived ones included, each counted once whatever
+	// its environments) and segments name it, in a rule's condition, a
+	// rollout, an override or a segment's condition. Deleting it is
+	// refused while this is above zero.
+	UsageCount DeclarationUsageCount `json:"usage_count"`
 }
 
 // AttributePatch defines model for AttributePatch.
@@ -466,6 +488,12 @@ type Credential struct {
 
 // CredentialMethod defines model for Credential.Method.
 type CredentialMethod string
+
+// DeclarationUsageCount How many flags (archived ones included, each counted once whatever
+// its environments) and segments name it, in a rule's condition, a
+// rollout, an override or a segment's condition. Deleting it is
+// refused while this is above zero.
+type DeclarationUsageCount = int
 
 // Description defines model for Description.
 type Description = string
@@ -1121,7 +1149,31 @@ type SegmentCreate struct {
 
 // SegmentList defines model for SegmentList.
 type SegmentList struct {
-	Items []Segment `json:"items"`
+	Items []SegmentListItem `json:"items"`
+}
+
+// SegmentListItem defines model for SegmentListItem.
+type SegmentListItem struct {
+	Conditions  []Condition        `json:"conditions"`
+	CreatedAt   time.Time          `json:"created_at"`
+	Description Description        `json:"description"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Key Names the entity in URLs, SDK calls and rules, and never changes.
+	Key  Key  `json:"key"`
+	Name Name `json:"name"`
+
+	// Private Its conditions never leave the server; only server-side evaluation uses it.
+	Private   bool      `json:"private"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// UsageCount How many flags' rules name the segment, archived flags
+	// included, each flag counted once whatever its environments.
+	// Deleting it is refused while this is above zero.
+	UsageCount int `json:"usage_count"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
 }
 
 // SegmentPatch defines model for SegmentPatch.
@@ -1215,7 +1267,23 @@ type UnitTypeCreate struct {
 
 // UnitTypeList defines model for UnitTypeList.
 type UnitTypeList struct {
-	Items []UnitType `json:"items"`
+	Items []UnitTypeListItem `json:"items"`
+}
+
+// UnitTypeListItem defines model for UnitTypeListItem.
+type UnitTypeListItem struct {
+	Description Description        `json:"description"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Key Names the entity in URLs, SDK calls and rules, and never changes.
+	Key  Key  `json:"key"`
+	Name Name `json:"name"`
+
+	// UsageCount How many flags (archived ones included, each counted once whatever
+	// its environments) and segments name it, in a rule's condition, a
+	// rollout, an override or a segment's condition. Deleting it is
+	// refused while this is above zero.
+	UsageCount DeclarationUsageCount `json:"usage_count"`
 }
 
 // UnitTypePatch defines model for UnitTypePatch.
@@ -2212,7 +2280,10 @@ type ClientInterface interface {
 
 	// DeleteAttribute performs a DELETE /projects/{project}/attributes/{attribute} (the `DeleteAttribute` operationId) request.
 	//
-	// Deletes a declared attribute; a standard attribute is refused with `standard_attribute`.
+	// Deletes a declared attribute; a standard attribute is refused with
+	// `standard_attribute`, and one a rule's condition or a segment still
+	// names, an archived flag's included, with `in_use` listing what
+	// names it.
 	DeleteAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAttribute performs a GET /projects/{project}/attributes/{attribute} (the `GetAttribute` operationId) request.
@@ -2728,7 +2799,9 @@ type ClientInterface interface {
 
 	// DeleteUnitType performs a DELETE /projects/{project}/unit-types/{unit_type} (the `DeleteUnitType` operationId) request.
 	//
-	// Deletes the unit type.
+	// Deletes the unit type. A unit type a rule's condition, a rollout,
+	// an override or a segment still names, an archived flag's included,
+	// is refused with `in_use` listing what names it.
 	DeleteUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetUnitType performs a GET /projects/{project}/unit-types/{unit_type} (the `GetUnitType` operationId) request.
@@ -3705,7 +3778,10 @@ func (c *Client) CreateAttribute(ctx context.Context, project ProjectKey, body C
 
 // DeleteAttribute performs a DELETE /projects/{project}/attributes/{attribute} (the `DeleteAttribute` operationId) request.
 //
-// Deletes a declared attribute; a standard attribute is refused with `standard_attribute`.
+// Deletes a declared attribute; a standard attribute is refused with
+// `standard_attribute`, and one a rule's condition or a segment still
+// names, an archived flag's included, with `in_use` listing what
+// names it.
 func (c *Client) DeleteAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteAttributeRequest(c.Server, project, attribute)
 	if err != nil {
@@ -4741,7 +4817,9 @@ func (c *Client) CreateUnitType(ctx context.Context, project ProjectKey, body Cr
 
 // DeleteUnitType performs a DELETE /projects/{project}/unit-types/{unit_type} (the `DeleteUnitType` operationId) request.
 //
-// Deletes the unit type.
+// Deletes the unit type. A unit type a rule's condition, a rollout,
+// an override or a segment still names, an archived flag's included,
+// is refused with `in_use` listing what names it.
 func (c *Client) DeleteUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteUnitTypeRequest(c.Server, project, unitType)
 	if err != nil {
@@ -9064,7 +9142,10 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteAttributeWithResponse performs a DELETE /projects/{project}/attributes/{attribute} (the `DeleteAttribute` operationId) request.
 	//
-	// Deletes a declared attribute; a standard attribute is refused with `standard_attribute`.
+	// Deletes a declared attribute; a standard attribute is refused with
+	// `standard_attribute`, and one a rule's condition or a segment still
+	// names, an archived flag's included, with `in_use` listing what
+	// names it.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DeleteAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*DeleteAttributeResponse, error)
@@ -9636,7 +9717,9 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteUnitTypeWithResponse performs a DELETE /projects/{project}/unit-types/{unit_type} (the `DeleteUnitType` operationId) request.
 	//
-	// Deletes the unit type.
+	// Deletes the unit type. A unit type a rule's condition, a rollout,
+	// an override or a segment still names, an archived flag's included,
+	// is refused with `in_use` listing what names it.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DeleteUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, reqEditors ...RequestEditorFn) (*DeleteUnitTypeResponse, error)
@@ -15295,6 +15378,8 @@ type DeleteUnitTypeResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *DeleteUnitTypeResponse401Headers
 }
@@ -15312,6 +15397,11 @@ func (r DeleteUnitTypeResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r DeleteUnitTypeResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteUnitTypeResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetBody returns the raw response body bytes
@@ -16367,7 +16457,10 @@ func (c *ClientWithResponses) CreateAttributeWithResponse(ctx context.Context, p
 
 // DeleteAttributeWithResponse performs a DELETE /projects/{project}/attributes/{attribute} (the `DeleteAttribute` operationId) request.
 //
-// Deletes a declared attribute; a standard attribute is refused with `standard_attribute`.
+// Deletes a declared attribute; a standard attribute is refused with
+// `standard_attribute`, and one a rule's condition or a segment still
+// names, an archived flag's included, with `in_use` listing what
+// names it.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DeleteAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*DeleteAttributeResponse, error) {
@@ -17251,7 +17344,9 @@ func (c *ClientWithResponses) CreateUnitTypeWithResponse(ctx context.Context, pr
 
 // DeleteUnitTypeWithResponse performs a DELETE /projects/{project}/unit-types/{unit_type} (the `DeleteUnitType` operationId) request.
 //
-// Deletes the unit type.
+// Deletes the unit type. A unit type a rule's condition, a rollout,
+// an override or a segment still names, an archived flag's included,
+// is refused with `in_use` listing what names it.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DeleteUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, reqEditors ...RequestEditorFn) (*DeleteUnitTypeResponse, error) {
@@ -22416,6 +22511,13 @@ func ParseDeleteUnitTypeResponse(rsp *http.Response) (*DeleteUnitTypeResponse, e
 			return nil, err
 		}
 		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
 
 	}
 
@@ -32532,6 +32634,22 @@ func (response DeleteUnitType404ApplicationProblemPlusJSONResponse) VisitDeleteU
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUnitType409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnitType409ApplicationProblemPlusJSONResponse) VisitDeleteUnitTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }

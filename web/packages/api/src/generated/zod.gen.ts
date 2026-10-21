@@ -379,8 +379,23 @@ export const zUnitType = z.object({
   description: zDescription,
 });
 
+/**
+ * How many flags (archived ones included, each counted once whatever
+ * its environments) and segments name it, in a rule's condition, a
+ * rollout, an override or a segment's condition. Deleting it is
+ * refused while this is above zero.
+ *
+ */
+export const zDeclarationUsageCount = z.int().gte(0);
+
+export const zUnitTypeListItem = zUnitType.and(
+  z.object({
+    usage_count: zDeclarationUsageCount,
+  }),
+);
+
 export const zUnitTypeList = z.object({
-  items: z.array(zUnitType),
+  items: z.array(zUnitTypeListItem),
 });
 
 export const zUnitTypeCreate = z.object({
@@ -409,8 +424,14 @@ export const zAttribute = z.object({
   standard: z.boolean(),
 });
 
+export const zAttributeListItem = zAttribute.and(
+  z.object({
+    usage_count: zDeclarationUsageCount,
+  }),
+);
+
 export const zAttributeList = z.object({
-  items: z.array(zAttribute),
+  items: z.array(zAttributeListItem),
 });
 
 export const zAttributeCreate = z.object({
@@ -720,8 +741,14 @@ export const zSegment = z.object({
   version: zVersion,
 });
 
+export const zSegmentListItem = zSegment.and(
+  z.object({
+    usage_count: z.int().gte(0),
+  }),
+);
+
 export const zSegmentList = z.object({
-  items: z.array(zSegment),
+  items: z.array(zSegmentListItem),
 });
 
 export const zSegmentCreate = z.object({
@@ -1060,7 +1087,7 @@ export const zListUnitTypesPath = z.object({
 });
 
 /**
- * The unit types, by key.
+ * The unit types, by key, each with how many flags and segments name it.
  */
 export const zListUnitTypesResponse = zUnitTypeList;
 
@@ -1112,7 +1139,7 @@ export const zListAttributesPath = z.object({
 });
 
 /**
- * The attributes, by key.
+ * The attributes, by key, each with how many flags and segments name it.
  */
 export const zListAttributesResponse = zAttributeList;
 
@@ -1343,7 +1370,7 @@ export const zListSegmentsPath = z.object({
 });
 
 /**
- * The segments, by key.
+ * The segments, by key, each with how many flags' rules name it.
  */
 export const zListSegmentsResponse = zSegmentList;
 

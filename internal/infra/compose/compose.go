@@ -85,6 +85,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(d.Pool))
 	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
+	// Deleting a unit type or attribute asks the flags context what still
+	// names it.
+	declarationGuard := appflags.NewDeclarationGuard(flagStore)
+	// The unit type and attribute lists count their usages through the
+	// flags context too.
+	declarationUsages := appflags.NewDeclarationUsages(flagStore)
 	sessionKey := o.Keyring.Key(secret.UseSessionCookie)
 	// Every request judging a session reads the settings: the replica keeps
 	// a copy, which a notification of each change drops.
@@ -149,17 +155,17 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		UpdateEnvironment: appworkspace.NewUpdateEnvironment(tx, ws, rec),
 		DeleteEnvironment: appworkspace.NewDeleteEnvironment(tx, ws, rec),
 
-		ListUnitTypes:  appworkspace.NewListUnitTypes(ws),
+		ListUnitTypes:  appworkspace.NewListUnitTypes(tx, ws, declarationUsages),
 		GetUnitType:    appworkspace.NewGetUnitType(ws),
-		CreateUnitType: appworkspace.NewCreateUnitType(tx, ws, rec),
+		CreateUnitType: appworkspace.NewCreateUnitType(tx, ws, rulesets, rec),
 		UpdateUnitType: appworkspace.NewUpdateUnitType(tx, ws, rec),
-		DeleteUnitType: appworkspace.NewDeleteUnitType(tx, ws, rec),
+		DeleteUnitType: appworkspace.NewDeleteUnitType(tx, ws, declarationGuard, rulesets, rec),
 
-		ListAttributes:  appworkspace.NewListAttributes(ws),
+		ListAttributes:  appworkspace.NewListAttributes(tx, ws, declarationUsages),
 		GetAttribute:    appworkspace.NewGetAttribute(ws),
-		CreateAttribute: appworkspace.NewCreateAttribute(tx, ws, rec),
+		CreateAttribute: appworkspace.NewCreateAttribute(tx, ws, rulesets, rec),
 		UpdateAttribute: appworkspace.NewUpdateAttribute(tx, ws, rec),
-		DeleteAttribute: appworkspace.NewDeleteAttribute(tx, ws, rec),
+		DeleteAttribute: appworkspace.NewDeleteAttribute(tx, ws, declarationGuard, rulesets, rec),
 
 		ListFlags: appflags.NewListFlags(flagStore),
 		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
@@ -191,7 +197,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RemoveOverride: appflags.NewRemoveOverride(configuration),
 		RegenerateSalt: appflags.NewRegenerateSalt(configuration),
 
-		ListSegments: appflags.NewListSegments(flagStore),
+		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),
 		CreateSegment: appflags.NewCreateSegment(appflags.CreateSegmentDeps{
 			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,

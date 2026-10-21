@@ -906,7 +906,10 @@ export const createUnitType = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Deletes the unit type.
+ * Deletes the unit type. A unit type a rule's condition, a rollout,
+ * an override or a segment still names, an archived flag's included,
+ * is refused with `in_use` listing what names it.
+ *
  */
 export const deleteUnitType = <ThrowOnError extends boolean = false>(
   options: Options<DeleteUnitTypeData, ThrowOnError>,
@@ -1008,7 +1011,11 @@ export const createAttribute = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Deletes a declared attribute; a standard attribute is refused with `standard_attribute`.
+ * Deletes a declared attribute; a standard attribute is refused with
+ * `standard_attribute`, and one a rule's condition or a segment still
+ * names, an archived flag's included, with `in_use` listing what
+ * names it.
+ *
  */
 export const deleteAttribute = <ThrowOnError extends boolean = false>(
   options: Options<DeleteAttributeData, ThrowOnError>,

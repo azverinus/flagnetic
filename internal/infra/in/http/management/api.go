@@ -75,13 +75,13 @@ type Handlers struct {
 	UpdateEnvironment *appworkspace.UpdateEnvironment
 	DeleteEnvironment *appworkspace.DeleteEnvironment
 
-	ListUnitTypes  *appworkspace.List[workspace.UnitType]
+	ListUnitTypes  *appworkspace.ListUsed[workspace.UnitType]
 	GetUnitType    *appworkspace.Get[workspace.UnitType]
 	CreateUnitType *appworkspace.CreateUnitType
 	UpdateUnitType *appworkspace.UpdateUnitType
 	DeleteUnitType *appworkspace.DeleteUnitType
 
-	ListAttributes  *appworkspace.List[workspace.Attribute]
+	ListAttributes  *appworkspace.ListUsed[workspace.Attribute]
 	GetAttribute    *appworkspace.Get[workspace.Attribute]
 	CreateAttribute *appworkspace.CreateAttribute
 	UpdateAttribute *appworkspace.UpdateAttribute

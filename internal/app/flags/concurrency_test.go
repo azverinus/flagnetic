@@ -9,6 +9,7 @@ import (
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
+	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -29,18 +30,20 @@ import (
 // app is the flags context's use cases on a real PostgreSQL, with a project
 // of its own in each round.
 type app struct {
-	t        *testing.T
-	ids      *id.Source
-	ws       *pgworkspace.Store
-	store    *pgflags.Store
-	admin    access.MemberID
-	req      governance.Request
-	create   *appflags.CreateFlag
-	update   *appflags.UpdateFlag
-	replace  *appflags.ReplaceConfiguration
-	segment  *appflags.CreateSegment
-	deleteSg *appflags.DeleteSegment
-	kill     *appflags.KillFlag
+	t         *testing.T
+	ids       *id.Source
+	ws        *pgworkspace.Store
+	store     *pgflags.Store
+	admin     access.MemberID
+	req       governance.Request
+	create    *appflags.CreateFlag
+	update    *appflags.UpdateFlag
+	replace   *appflags.ReplaceConfiguration
+	segment   *appflags.CreateSegment
+	deleteSg  *appflags.DeleteSegment
+	kill      *appflags.KillFlag
+	declare   *appworkspace.CreateAttribute
+	undeclare *appworkspace.DeleteAttribute
 }
 
 func newApp(t *testing.T) *app {
@@ -51,6 +54,7 @@ func newApp(t *testing.T) *app {
 	rec := appflags.NewRecorder(pggovernance.NewAuditLog(pool), c, ids)
 	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool))
 	owners := appaccess.NewOwnership(pgaccess.NewStore(pool))
+	wsRec := appworkspace.NewRecorder(pggovernance.NewAuditLog(pool), c, ids)
 	return &app{
 		t: t, ids: ids, ws: ws, store: store, admin: testkit.NewMember(t, pool, testkit.AsInstanceAdmin()).ID,
 		req: governance.Request{Actor: governance.CLIActor("test")},
@@ -72,6 +76,8 @@ func newApp(t *testing.T) *app {
 		kill: appflags.NewKillFlag(appflags.ConfigurationDeps{
 			Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec,
 		}),
+		declare:   appworkspace.NewCreateAttribute(tx, ws, rulesets, wsRec),
+		undeclare: appworkspace.NewDeleteAttribute(tx, ws, appflags.NewDeclarationGuard(store), rulesets, wsRec),
 	}
 }
 
@@ -213,6 +219,38 @@ func TestRemovingWhatAWriteStartsNamingNeverBothSucceed(t *testing.T) {
 		)
 		if !slices.Equal(codes, []string{"", "in_use"}) && !slices.Equal(codes, []string{"", "invalid_configuration"}) {
 			t.Fatalf("round %d: deleting a segment: refusals = %q, want exactly one accepted", round, codes)
+		}
+	}
+}
+
+// Deleting an attribute while a rule starts naming it never both succeed:
+// both take the project's lock, so whichever runs second sees what the
+// first did, and either the rule is refused naming an undeclared attribute
+// or the deletion is refused listing the rule.
+func TestDeletingAnAttributeWhileARuleStartsNamingItNeverBothSucceed(t *testing.T) {
+	a := newApp(t)
+	for round := range 10 {
+		p := a.project()
+		a.flag(p, "banner", flags.TypeBoolean)
+		if _, err := a.declare.Handle(t.Context(), appworkspace.CreateAttributeCommand{
+			Project: p, Key: "plan", Name: "Plan", Type: workspace.TypeString, Request: a.req,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		codes := race(
+			func() error {
+				return a.undeclare.Handle(t.Context(), appworkspace.DeleteAttributeCommand{Project: p, Key: "plan", Request: a.req})
+			},
+			func() error {
+				return a.put(t.Context(), p, "banner", flags.ConfigurationInput{OffVariation: "false", Fallthrough: "false",
+					Rules: []flags.RuleInput{{
+						Conditions: []flags.Condition{{Kind: flags.ConditionAttribute, Attribute: "plan", Op: "eq", Value: "pro"}},
+						Serve:      flags.ServeInput{Kind: flags.ServeVariation, Variation: "true"},
+					}}})
+			},
+		)
+		if !slices.Equal(codes, []string{"", "in_use"}) && !slices.Equal(codes, []string{"", "invalid_configuration"}) {
+			t.Fatalf("round %d: refusals = %q, want exactly one accepted", round, codes)
 		}
 	}
 }
