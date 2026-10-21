@@ -9,6 +9,9 @@ import type {
   ArchiveFlagData,
   ArchiveFlagErrors,
   ArchiveFlagResponses,
+  ChangeMyPasswordData,
+  ChangeMyPasswordErrors,
+  ChangeMyPasswordResponses,
   CreateAttributeData,
   CreateAttributeErrors,
   CreateAttributeResponses,
@@ -198,9 +201,12 @@ import type {
   UpdateFlagData,
   UpdateFlagErrors,
   UpdateFlagResponses,
+  UpdateMeData,
+  UpdateMeErrors,
   UpdateMemberData,
   UpdateMemberErrors,
   UpdateMemberResponses,
+  UpdateMeResponses,
   UpdateProjectData,
   UpdateProjectErrors,
   UpdateProjectResponses,
@@ -339,7 +345,7 @@ export const acceptInvitation = <ThrowOnError extends boolean = false>(
 /**
  * Who the caller is
  *
- * The member the credential in use acts for, the credential itself, and the address the request came from.
+ * The member the credential in use acts for, the credential itself, the address the request came from, and the instance's bound on an API token's expiry, which every caller may read.
  */
 export const getMe = <ThrowOnError extends boolean = false>(
   options?: Options<GetMeData, ThrowOnError>,
@@ -355,6 +361,73 @@ export const getMe = <ThrowOnError extends boolean = false>(
     ],
     url: "/me",
     ...options,
+  });
+
+/**
+ * Rename yourself or choose your console language
+ *
+ * Changes the fields sent and leaves the others as they are: the
+ * display name, and the console language, where null follows the
+ * browser. A change that changes nothing records no audit entry. Only
+ * a session may do this, so a leaked token cannot rename its owner.
+ *
+ */
+export const updateMe = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateMeData, ThrowOnError>,
+): RequestResult<UpdateMeResponses, UpdateMeErrors, ThrowOnError> =>
+  (options.client ?? client).patch<UpdateMeResponses, UpdateMeErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/me",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Change your password
+ *
+ * Sets a new password once the current one is proved, and revokes
+ * every other session of the caller, so a device that learned the old
+ * password is signed out; the session this request is signed in to
+ * stays. The new password is held to the password policy
+ * (`weak_password` at `/new_password`) before anything is hashed, so a
+ * weak new password is refused without the current one being checked
+ * or counted. A wrong current password is refused 422
+ * `invalid_credentials` with a violation at `/current_password` (not
+ * 401: the caller is signed in and stays so) and counts as a failure
+ * of the caller's email and address like a wrong sign-in: the fifth
+ * wrong attempt locks the email, and the attempts after it are refused
+ * `locked`, so a session cannot be used to guess the password. Only a
+ * session may do this.
+ *
+ */
+export const changeMyPassword = <ThrowOnError extends boolean = false>(
+  options: Options<ChangeMyPasswordData, ThrowOnError>,
+): RequestResult<ChangeMyPasswordResponses, ChangeMyPasswordErrors, ThrowOnError> =>
+  (options.client ?? client).post<ChangeMyPasswordResponses, ChangeMyPasswordErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/me/password",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**

@@ -126,8 +126,12 @@ func (a *api) SignIn(ctx context.Context, req SignInRequestObject) (SignInRespon
 	if err != nil {
 		return nil, err
 	}
+	me, err := a.meOf(ctx, res.Caller)
+	if err != nil {
+		return nil, err
+	}
 	cookie := sessionCookie(ctx, res.Cookie.Reveal())
-	return SignIn200JSONResponse{Body: meOf(ctx, res.Caller), Headers: SignIn200ResponseHeaders{SetCookie: &cookie}}, nil
+	return SignIn200JSONResponse{Body: me, Headers: SignIn200ResponseHeaders{SetCookie: &cookie}}, nil
 }
 
 // SignOut ends the caller's session and clears its cookie.
@@ -164,6 +168,10 @@ func (a *api) AcceptInvitation(ctx context.Context, req AcceptInvitationRequestO
 	if err != nil {
 		return nil, err
 	}
+	me, err := a.meOf(ctx, res.Caller)
+	if err != nil {
+		return nil, err
+	}
 	cookie := sessionCookie(ctx, res.Cookie.Reveal())
-	return AcceptInvitation200JSONResponse{Body: meOf(ctx, res.Caller), Headers: AcceptInvitation200ResponseHeaders{SetCookie: &cookie}}, nil
+	return AcceptInvitation200JSONResponse{Body: me, Headers: AcceptInvitation200ResponseHeaders{SetCookie: &cookie}}, nil
 }

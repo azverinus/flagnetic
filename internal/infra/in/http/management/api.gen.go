@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oapi-codegen/nullable"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
@@ -709,8 +710,14 @@ type Me struct {
 	ClientIp   string     `json:"client_ip"`
 	Credential Credential `json:"credential"`
 
+	// MaxTokenLifetimeSeconds The furthest ahead, in seconds, the instance lets an API token expire; null for no bound. Answered to every caller, so a client can offer only the expiries the instance accepts.
+	MaxTokenLifetimeSeconds *int64 `json:"max_token_lifetime_seconds"`
+
 	// Member The member the credential acts for; absent for a project token, which acts for none.
 	Member *MeMember `json:"member,omitempty"`
+
+	// RequireTokenExpiry Whether the instance refuses an API token that never expires.
+	RequireTokenExpiry bool `json:"require_token_expiry"`
 }
 
 // MeMember The member the credential acts for; absent for a project token, which acts for none.
@@ -723,6 +730,15 @@ type MeMember struct {
 	// Locale The console language the member chose; null follows the browser.
 	Locale *string      `json:"locale"`
 	Status MemberStatus `json:"status"`
+}
+
+// MePatch defines model for MePatch.
+type MePatch struct {
+	// DisplayName Not blank, at most 200 characters.
+	DisplayName *string `json:"display_name,omitempty"`
+
+	// Locale The console language, `en` or `ru`; null follows the browser. Absent leaves it as it is.
+	Locale nullable.Nullable[string] `json:"locale,omitempty"`
 }
 
 // Member A member as an instance admin sees them.
@@ -779,6 +795,14 @@ type MemberStatus string
 
 // Name defines model for Name.
 type Name = string
+
+// PasswordChange defines model for PasswordChange.
+type PasswordChange struct {
+	CurrentPassword string `json:"current_password"`
+
+	// NewPassword 12 to 128 characters, or the instance's minimum length; not containing the part of the email before the @, nor a common password.
+	NewPassword string `json:"new_password"`
+}
 
 // Permission A permission of the catalog, named entity.verb, such as `environment.manage`.
 type Permission = string
@@ -1386,6 +1410,12 @@ type SignInJSONRequestBody = SignInRequest
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
 
+// UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
+type UpdateMeJSONRequestBody = MePatch
+
+// ChangeMyPasswordJSONRequestBody defines body for ChangeMyPassword for application/json ContentType.
+type ChangeMyPasswordJSONRequestBody = PasswordChange
+
 // CreateMyTokenJSONRequestBody defines body for CreateMyToken for application/json ContentType.
 type CreateMyTokenJSONRequestBody = ApiTokenCreate
 
@@ -1657,10 +1687,76 @@ type ClientInterface interface {
 
 	// GetMe Who the caller is
 	//
-	// The member the credential in use acts for, the credential itself, and the address the request came from.
+	// The member the credential in use acts for, the credential itself, the address the request came from, and the instance's bound on an API token's expiry, which every caller may read.
 	//
 	// Corresponds with GET /me (the `GetMe` operationId).
 	GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMeWithBody Rename yourself or choose your console language
+	//
+	// Changes the fields sent and leaves the others as they are: the
+	// display name, and the console language, where null follows the
+	// browser. A change that changes nothing records no audit entry. Only
+	// a session may do this, so a leaked token cannot rename its owner.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /me (the `UpdateMe` operationId).
+	UpdateMeWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMe Rename yourself or choose your console language
+	//
+	// Changes the fields sent and leaves the others as they are: the
+	// display name, and the console language, where null follows the
+	// browser. A change that changes nothing records no audit entry. Only
+	// a session may do this, so a leaked token cannot rename its owner.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /me (the `UpdateMe` operationId).
+	UpdateMe(ctx context.Context, body UpdateMeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ChangeMyPasswordWithBody Change your password
+	//
+	// Sets a new password once the current one is proved, and revokes
+	// every other session of the caller, so a device that learned the old
+	// password is signed out; the session this request is signed in to
+	// stays. The new password is held to the password policy
+	// (`weak_password` at `/new_password`) before anything is hashed, so a
+	// weak new password is refused without the current one being checked
+	// or counted. A wrong current password is refused 422
+	// `invalid_credentials` with a violation at `/current_password` (not
+	// 401: the caller is signed in and stays so) and counts as a failure
+	// of the caller's email and address like a wrong sign-in: the fifth
+	// wrong attempt locks the email, and the attempts after it are refused
+	// `locked`, so a session cannot be used to guess the password. Only a
+	// session may do this.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/password (the `ChangeMyPassword` operationId).
+	ChangeMyPasswordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ChangeMyPassword Change your password
+	//
+	// Sets a new password once the current one is proved, and revokes
+	// every other session of the caller, so a device that learned the old
+	// password is signed out; the session this request is signed in to
+	// stays. The new password is held to the password policy
+	// (`weak_password` at `/new_password`) before anything is hashed, so a
+	// weak new password is refused without the current one being checked
+	// or counted. A wrong current password is refused 422
+	// `invalid_credentials` with a violation at `/current_password` (not
+	// 401: the caller is signed in and stays so) and counts as a failure
+	// of the caller's email and address like a wrong sign-in: the fifth
+	// wrong attempt locks the email, and the attempts after it are refused
+	// `locked`, so a session cannot be used to guess the password. Only a
+	// session may do this.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/password (the `ChangeMyPassword` operationId).
+	ChangeMyPassword(ctx context.Context, body ChangeMyPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RevokeMySessions Sign out every other device
 	//
@@ -2612,11 +2708,117 @@ func (c *Client) UpdateAuthSettings(ctx context.Context, body UpdateAuthSettings
 
 // GetMe Who the caller is
 //
-// The member the credential in use acts for, the credential itself, and the address the request came from.
+// The member the credential in use acts for, the credential itself, the address the request came from, and the instance's bound on an API token's expiry, which every caller may read.
 //
 // Corresponds with GET /me (the `GetMe` operationId).
 func (c *Client) GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMeRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateMeWithBody Rename yourself or choose your console language
+//
+// Changes the fields sent and leaves the others as they are: the
+// display name, and the console language, where null follows the
+// browser. A change that changes nothing records no audit entry. Only
+// a session may do this, so a leaked token cannot rename its owner.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /me (the `UpdateMe` operationId).
+func (c *Client) UpdateMeWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMeRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateMe Rename yourself or choose your console language
+//
+// Changes the fields sent and leaves the others as they are: the
+// display name, and the console language, where null follows the
+// browser. A change that changes nothing records no audit entry. Only
+// a session may do this, so a leaked token cannot rename its owner.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /me (the `UpdateMe` operationId).
+func (c *Client) UpdateMe(ctx context.Context, body UpdateMeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMeRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ChangeMyPasswordWithBody Change your password
+//
+// Sets a new password once the current one is proved, and revokes
+// every other session of the caller, so a device that learned the old
+// password is signed out; the session this request is signed in to
+// stays. The new password is held to the password policy
+// (`weak_password` at `/new_password`) before anything is hashed, so a
+// weak new password is refused without the current one being checked
+// or counted. A wrong current password is refused 422
+// `invalid_credentials` with a violation at `/current_password` (not
+// 401: the caller is signed in and stays so) and counts as a failure
+// of the caller's email and address like a wrong sign-in: the fifth
+// wrong attempt locks the email, and the attempts after it are refused
+// `locked`, so a session cannot be used to guess the password. Only a
+// session may do this.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /me/password (the `ChangeMyPassword` operationId).
+func (c *Client) ChangeMyPasswordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewChangeMyPasswordRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ChangeMyPassword Change your password
+//
+// Sets a new password once the current one is proved, and revokes
+// every other session of the caller, so a device that learned the old
+// password is signed out; the session this request is signed in to
+// stays. The new password is held to the password policy
+// (`weak_password` at `/new_password`) before anything is hashed, so a
+// weak new password is refused without the current one being checked
+// or counted. A wrong current password is refused 422
+// `invalid_credentials` with a violation at `/current_password` (not
+// 401: the caller is signed in and stays so) and counts as a failure
+// of the caller's email and address like a wrong sign-in: the fifth
+// wrong attempt locks the email, and the attempts after it are refused
+// `locked`, so a session cannot be used to guess the password. Only a
+// session may do this.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /me/password (the `ChangeMyPassword` operationId).
+func (c *Client) ChangeMyPassword(ctx context.Context, body ChangeMyPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewChangeMyPasswordRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4541,6 +4743,86 @@ func NewGetMeRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateMeRequest calls the generic UpdateMe builder with application/json body
+func NewUpdateMeRequest(server string, body UpdateMeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateMeRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateMeRequestWithBody constructs an http.Request for the UpdateMe method, with any body, and a specified content type
+func NewUpdateMeRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewChangeMyPasswordRequest calls the generic ChangeMyPassword builder with application/json body
+func NewChangeMyPasswordRequest(server string, body ChangeMyPasswordJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewChangeMyPasswordRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewChangeMyPasswordRequestWithBody constructs an http.Request for the ChangeMyPassword method, with any body, and a specified content type
+func NewChangeMyPasswordRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/password")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -7451,12 +7733,78 @@ type ClientWithResponsesInterface interface {
 
 	// GetMeWithResponse Who the caller is
 	//
-	// The member the credential in use acts for, the credential itself, and the address the request came from.
+	// The member the credential in use acts for, the credential itself, the address the request came from, and the instance's bound on an API token's expiry, which every caller may read.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /me (the `GetMe` operationId).
 	GetMeWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMeResponse, error)
+
+	// UpdateMeWithBodyWithResponse Rename yourself or choose your console language
+	//
+	// Changes the fields sent and leaves the others as they are: the
+	// display name, and the console language, where null follows the
+	// browser. A change that changes nothing records no audit entry. Only
+	// a session may do this, so a leaked token cannot rename its owner.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /me (the `UpdateMe` operationId).
+	UpdateMeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMeResponse, error)
+
+	// UpdateMeWithResponse Rename yourself or choose your console language
+	//
+	// Changes the fields sent and leaves the others as they are: the
+	// display name, and the console language, where null follows the
+	// browser. A change that changes nothing records no audit entry. Only
+	// a session may do this, so a leaked token cannot rename its owner.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /me (the `UpdateMe` operationId).
+	UpdateMeWithResponse(ctx context.Context, body UpdateMeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMeResponse, error)
+
+	// ChangeMyPasswordWithBodyWithResponse Change your password
+	//
+	// Sets a new password once the current one is proved, and revokes
+	// every other session of the caller, so a device that learned the old
+	// password is signed out; the session this request is signed in to
+	// stays. The new password is held to the password policy
+	// (`weak_password` at `/new_password`) before anything is hashed, so a
+	// weak new password is refused without the current one being checked
+	// or counted. A wrong current password is refused 422
+	// `invalid_credentials` with a violation at `/current_password` (not
+	// 401: the caller is signed in and stays so) and counts as a failure
+	// of the caller's email and address like a wrong sign-in: the fifth
+	// wrong attempt locks the email, and the attempts after it are refused
+	// `locked`, so a session cannot be used to guess the password. Only a
+	// session may do this.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /me/password (the `ChangeMyPassword` operationId).
+	ChangeMyPasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ChangeMyPasswordResponse, error)
+
+	// ChangeMyPasswordWithResponse Change your password
+	//
+	// Sets a new password once the current one is proved, and revokes
+	// every other session of the caller, so a device that learned the old
+	// password is signed out; the session this request is signed in to
+	// stays. The new password is held to the password policy
+	// (`weak_password` at `/new_password`) before anything is hashed, so a
+	// weak new password is refused without the current one being checked
+	// or counted. A wrong current password is refused 422
+	// `invalid_credentials` with a violation at `/current_password` (not
+	// 401: the caller is signed in and stays so) and counts as a failure
+	// of the caller's email and address like a wrong sign-in: the fifth
+	// wrong attempt locks the email, and the attempts after it are refused
+	// `locked`, so a session cannot be used to guess the password. Only a
+	// session may do this.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /me/password (the `ChangeMyPassword` operationId).
+	ChangeMyPasswordWithResponse(ctx context.Context, body ChangeMyPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*ChangeMyPasswordResponse, error)
 
 	// RevokeMySessionsWithResponse Sign out every other device
 	//
@@ -8922,6 +9270,179 @@ func (r GetMeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetMeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateMeResponse401Headers the declared response headers of an HTTP 401 response for UpdateMe
+type UpdateMeResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateMeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Me
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateMeResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateMeResponse) GetJSON200() *Me {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateMeResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateMeResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateMeResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateMeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateMeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateMeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateMeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ChangeMyPasswordResponse401Headers the declared response headers of an HTTP 401 response for ChangeMyPassword
+type ChangeMyPasswordResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+// ChangeMyPasswordResponse429Headers the declared response headers of an HTTP 429 response for ChangeMyPassword
+type ChangeMyPasswordResponse429Headers struct {
+	RetryAfter *int
+}
+
+// ChangeMyPasswordResponse503Headers the declared response headers of an HTTP 503 response for ChangeMyPassword
+type ChangeMyPasswordResponse503Headers struct {
+	RetryAfter *int
+}
+
+type ChangeMyPasswordResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *RequestTooLarge
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyAttempts
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *Busy
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ChangeMyPasswordResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *ChangeMyPasswordResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *ChangeMyPasswordResponse503Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ChangeMyPasswordResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ChangeMyPasswordResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ChangeMyPasswordResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r ChangeMyPasswordResponse) GetApplicationproblemJSON413() *RequestTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ChangeMyPasswordResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r ChangeMyPasswordResponse) GetApplicationproblemJSON429() *TooManyAttempts {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r ChangeMyPasswordResponse) GetApplicationproblemJSON503() *Busy {
+	return r.ApplicationproblemJSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ChangeMyPasswordResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ChangeMyPasswordResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ChangeMyPasswordResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ChangeMyPasswordResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -13619,7 +14140,7 @@ func (c *ClientWithResponses) UpdateAuthSettingsWithResponse(ctx context.Context
 
 // GetMeWithResponse Who the caller is
 //
-// The member the credential in use acts for, the credential itself, and the address the request came from.
+// The member the credential in use acts for, the credential itself, the address the request came from, and the instance's bound on an API token's expiry, which every caller may read.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -13630,6 +14151,96 @@ func (c *ClientWithResponses) GetMeWithResponse(ctx context.Context, reqEditors 
 		return nil, err
 	}
 	return ParseGetMeResponse(rsp)
+}
+
+// UpdateMeWithBodyWithResponse Rename yourself or choose your console language
+//
+// Changes the fields sent and leaves the others as they are: the
+// display name, and the console language, where null follows the
+// browser. A change that changes nothing records no audit entry. Only
+// a session may do this, so a leaked token cannot rename its owner.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /me (the `UpdateMe` operationId).
+func (c *ClientWithResponses) UpdateMeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMeResponse, error) {
+	rsp, err := c.UpdateMeWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMeResponse(rsp)
+}
+
+// UpdateMeWithResponse Rename yourself or choose your console language
+//
+// Changes the fields sent and leaves the others as they are: the
+// display name, and the console language, where null follows the
+// browser. A change that changes nothing records no audit entry. Only
+// a session may do this, so a leaked token cannot rename its owner.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /me (the `UpdateMe` operationId).
+func (c *ClientWithResponses) UpdateMeWithResponse(ctx context.Context, body UpdateMeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMeResponse, error) {
+	rsp, err := c.UpdateMe(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMeResponse(rsp)
+}
+
+// ChangeMyPasswordWithBodyWithResponse Change your password
+//
+// Sets a new password once the current one is proved, and revokes
+// every other session of the caller, so a device that learned the old
+// password is signed out; the session this request is signed in to
+// stays. The new password is held to the password policy
+// (`weak_password` at `/new_password`) before anything is hashed, so a
+// weak new password is refused without the current one being checked
+// or counted. A wrong current password is refused 422
+// `invalid_credentials` with a violation at `/current_password` (not
+// 401: the caller is signed in and stays so) and counts as a failure
+// of the caller's email and address like a wrong sign-in: the fifth
+// wrong attempt locks the email, and the attempts after it are refused
+// `locked`, so a session cannot be used to guess the password. Only a
+// session may do this.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/password (the `ChangeMyPassword` operationId).
+func (c *ClientWithResponses) ChangeMyPasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ChangeMyPasswordResponse, error) {
+	rsp, err := c.ChangeMyPasswordWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseChangeMyPasswordResponse(rsp)
+}
+
+// ChangeMyPasswordWithResponse Change your password
+//
+// Sets a new password once the current one is proved, and revokes
+// every other session of the caller, so a device that learned the old
+// password is signed out; the session this request is signed in to
+// stays. The new password is held to the password policy
+// (`weak_password` at `/new_password`) before anything is hashed, so a
+// weak new password is refused without the current one being checked
+// or counted. A wrong current password is refused 422
+// `invalid_credentials` with a violation at `/current_password` (not
+// 401: the caller is signed in and stays so) and counts as a failure
+// of the caller's email and address like a wrong sign-in: the fifth
+// wrong attempt locks the email, and the attempts after it are refused
+// `locked`, so a session cannot be used to guess the password. Only a
+// session may do this.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/password (the `ChangeMyPassword` operationId).
+func (c *ClientWithResponses) ChangeMyPasswordWithResponse(ctx context.Context, body ChangeMyPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*ChangeMyPasswordResponse, error) {
+	rsp, err := c.ChangeMyPassword(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseChangeMyPasswordResponse(rsp)
 }
 
 // RevokeMySessionsWithResponse Sign out every other device
@@ -15501,6 +16112,170 @@ func ParseGetMeResponse(rsp *http.Response) (*GetMeResponse, error) {
 			headers.WWWAuthenticate = &value
 		}
 		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateMeResponse parses an HTTP response from a UpdateMeWithResponse call
+func ParseUpdateMeResponse(rsp *http.Response) (*UpdateMeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateMeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Me
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers UpdateMeResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseChangeMyPasswordResponse parses an HTTP response from a ChangeMyPasswordWithResponse call
+func ParseChangeMyPasswordResponse(rsp *http.Response) (*ChangeMyPasswordResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ChangeMyPasswordResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest RequestTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyAttempts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Busy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ChangeMyPasswordResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers ChangeMyPasswordResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers ChangeMyPasswordResponse503Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -19527,6 +20302,12 @@ type ServerInterface interface {
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// UpdateMe Rename yourself or choose your console language
+	// (PATCH /me)
+	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// ChangeMyPassword Change your password
+	// (POST /me/password)
+	ChangeMyPassword(w http.ResponseWriter, r *http.Request)
 	// RevokeMySessions Sign out every other device
 	// (DELETE /me/sessions)
 	RevokeMySessions(w http.ResponseWriter, r *http.Request, params RevokeMySessionsParams)
@@ -20021,6 +20802,34 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMe operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeMyPassword operation middleware
+func (siw *ServerInterfaceWrapper) ChangeMyPassword(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeMyPassword(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -22189,6 +22998,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/invitations/{secret}", wrapper.GetInvitation)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/invitations/{secret}", wrapper.AcceptInvitation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/me", wrapper.UpdateMe)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/password", wrapper.ChangeMyPassword)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions", wrapper.RevokeMySessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sessions", wrapper.ListMySessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions/{session}", wrapper.RevokeMySession)
@@ -23035,6 +23846,216 @@ func (response GetMe403ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMeRequestObject struct {
+	Body *UpdateMeJSONRequestBody
+}
+
+type UpdateMeResponseObject interface {
+	VisitUpdateMeResponse(w http.ResponseWriter) error
+}
+
+type UpdateMe200JSONResponse Me
+
+func (response UpdateMe200JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMe401ApplicationProblemPlusJSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMe403ApplicationProblemPlusJSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMe422ApplicationProblemPlusJSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPasswordRequestObject struct {
+	Body *ChangeMyPasswordJSONRequestBody
+}
+
+type ChangeMyPasswordResponseObject interface {
+	VisitChangeMyPasswordResponse(w http.ResponseWriter) error
+}
+
+type ChangeMyPassword204Response struct {
+}
+
+func (response ChangeMyPassword204Response) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ChangeMyPassword400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword400ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword401ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword403ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword413ApplicationProblemPlusJSONResponse struct {
+	RequestTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword413ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword422ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword429ApplicationProblemPlusJSONResponse struct {
+	TooManyAttemptsApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword429ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangeMyPassword503ApplicationProblemPlusJSONResponse struct {
+	BusyApplicationProblemPlusJSONResponse
+}
+
+func (response ChangeMyPassword503ApplicationProblemPlusJSONResponse) VisitChangeMyPasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -28272,6 +29293,12 @@ type StrictServerInterface interface {
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// UpdateMe Rename yourself or choose your console language
+	// (PATCH /me)
+	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// ChangeMyPassword Change your password
+	// (POST /me/password)
+	ChangeMyPassword(ctx context.Context, request ChangeMyPasswordRequestObject) (ChangeMyPasswordResponseObject, error)
 	// RevokeMySessions Sign out every other device
 	// (DELETE /me/sessions)
 	RevokeMySessions(ctx context.Context, request RevokeMySessionsRequestObject) (RevokeMySessionsResponseObject, error)
@@ -28729,6 +29756,68 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMe operation middleware
+func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	var request UpdateMeRequestObject
+
+	var body UpdateMeJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMe(ctx, request.(UpdateMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
+		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangeMyPassword operation middleware
+func (sh *strictHandler) ChangeMyPassword(w http.ResponseWriter, r *http.Request) {
+	var request ChangeMyPasswordRequestObject
+
+	var body ChangeMyPasswordJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangeMyPassword(ctx, request.(ChangeMyPasswordRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangeMyPassword")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangeMyPasswordResponseObject); ok {
+		if err := validResponse.VisitChangeMyPasswordResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

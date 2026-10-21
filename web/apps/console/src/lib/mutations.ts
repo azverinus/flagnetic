@@ -6,8 +6,8 @@ import { type QueryKey, useMutation, useQueryClient } from "@tanstack/react-quer
  * was made, not toasted, and once it succeeds the list is read again
  * before `onDone`, so a closing dialog already shows the change.
  */
-export function useListMutation<Variables>(
-  mutationFn: (variables: Variables) => Promise<unknown>,
+export function useListMutation<Variables, Data = unknown>(
+  mutationFn: (variables: Variables) => Promise<Data>,
   list: QueryKey,
   onDone: () => void,
 ) {

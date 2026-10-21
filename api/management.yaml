@@ -206,7 +206,7 @@ paths:
     get:
       operationId: getMe
       summary: Who the caller is
-      description: The member the credential in use acts for, the credential itself, and the address the request came from.
+      description: The member the credential in use acts for, the credential itself, the address the request came from, and the instance's bound on an API token's expiry, which every caller may read.
       x-permission: member
       tags: [me]
       responses:
@@ -220,6 +220,81 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+    patch:
+      operationId: updateMe
+      summary: Rename yourself or choose your console language
+      description: |
+        Changes the fields sent and leaves the others as they are: the
+        display name, and the console language, where null follows the
+        browser. A change that changes nothing records no audit entry. Only
+        a session may do this, so a leaked token cannot rename its owner.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MePatch"
+      responses:
+        "200":
+          description: The caller as changed, as `GET /me` answers it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /me/password:
+    post:
+      operationId: changeMyPassword
+      summary: Change your password
+      description: |
+        Sets a new password once the current one is proved, and revokes
+        every other session of the caller, so a device that learned the old
+        password is signed out; the session this request is signed in to
+        stays. The new password is held to the password policy
+        (`weak_password` at `/new_password`) before anything is hashed, so a
+        weak new password is refused without the current one being checked
+        or counted. A wrong current password is refused 422
+        `invalid_credentials` with a violation at `/current_password` (not
+        401: the caller is signed in and stays so) and counts as a failure
+        of the caller's email and address like a wrong sign-in: the fifth
+        wrong attempt locks the email, and the attempts after it are refused
+        `locked`, so a session cannot be used to guess the password. Only a
+        session may do this.
+      x-permission: member
+      x-session-required: true
+      x-checks-password: true
+      tags: [me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordChange"
+      responses:
+        "204":
+          description: Changed; every other session is revoked.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "429":
+          $ref: "#/components/responses/TooManyAttempts"
+        "503":
+          $ref: "#/components/responses/Busy"
   /me/sessions:
     get:
       operationId: listMySessions
@@ -2267,7 +2342,7 @@ components:
       enum: [invited, active, deactivated]
     Me:
       type: object
-      required: [credential, client_ip]
+      required: [credential, client_ip, max_token_lifetime_seconds, require_token_expiry]
       properties:
         member:
           $ref: "#/components/schemas/MeMember"
@@ -2276,6 +2351,14 @@ components:
         client_ip:
           type: string
           description: The address the request came from, as the server sees it behind its trusted proxies.
+        max_token_lifetime_seconds:
+          type: integer
+          format: int64
+          nullable: true
+          description: The furthest ahead, in seconds, the instance lets an API token expire; null for no bound. Answered to every caller, so a client can offer only the expiries the instance accepts.
+        require_token_expiry:
+          type: boolean
+          description: Whether the instance refuses an API token that never expires.
     Member:
       type: object
       description: A member as an instance admin sees them.
@@ -2322,6 +2405,31 @@ components:
           description: Not blank, at most 200 characters.
         instance_admin:
           type: boolean
+    MePatch:
+      type: object
+      properties:
+        display_name:
+          type: string
+          description: Not blank, at most 200 characters.
+        locale:
+          type: string
+          nullable: true
+          description: The console language, `en` or `ru`; null follows the browser. Absent leaves it as it is.
+          x-go-type: nullable.Nullable[string]
+          x-go-type-import:
+            path: github.com/oapi-codegen/nullable
+          x-go-type-skip-optional-pointer: true
+    PasswordChange:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          format: password
+          description: 12 to 128 characters, or the instance's minimum length; not containing the part of the email before the @, nor a common password.
     MemberInvite:
       type: object
       required: [email, display_name]

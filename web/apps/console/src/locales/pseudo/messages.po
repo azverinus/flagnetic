@@ -7,6 +7,22 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: pseudo\n"
 
+#: src/lib/device.ts
+msgid "{browser} on {os}"
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "{others, plural, one {Revoke # session} other {Revoke # sessions}}"
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "{when} from {ip}"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "A key never changes once it is set."
 msgstr ""
@@ -19,6 +35,26 @@ msgstr ""
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr ""
 
+#: src/components/session-list.tsx
+msgid "A revoked device is signed out at its next request."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "A token cannot carry a scope you do not hold yourself."
+msgstr ""
+
+#: src/components/token-create-form.tsx
+msgid "A token does only what you can do yourself, narrowed to its scopes. Every write scope includes read."
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "A token lets a script act for you, narrowed to its scopes. Only a signed-in session creates or revokes one."
+msgstr ""
+
+#: src/components/token-create-form.tsx
+msgid "A year"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Action"
@@ -28,6 +64,10 @@ msgstr ""
 msgid "Actions"
 msgstr ""
 
+#: src/components/token-list.tsx
+msgid "Active"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Actor"
@@ -35,6 +75,14 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "Actor kind"
+msgstr ""
+
+#: src/lib/personal-tokens.ts
+msgid "Administer projects: environments, members and tokens."
+msgstr ""
+
+#: src/lib/personal-tokens.ts
+msgid "Administer the instance: projects, members and its settings."
 msgstr ""
 
 #: src/components/audit-entry-sheet.tsx
@@ -68,8 +116,21 @@ msgstr ""
 msgid "API token revoked"
 msgstr ""
 
+#: src/routes/_signed-in/settings/route.tsx
+#: src/routes/_signed-in/settings/tokens.tsx
+msgid "API tokens"
+msgstr ""
+
+#: src/routes/_signed-in/settings/profile.tsx
+msgid "Appearance"
+msgstr ""
+
 #: src/components/audit-log.tsx
 msgid "Apply filters"
+msgstr ""
+
+#: src/components/password-form.tsx
+msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -143,12 +204,32 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
+#: src/lib/personal-tokens.ts
+msgid "Change experiments."
+msgstr ""
+
+#: src/lib/personal-tokens.ts
+msgid "Change flags, segments and declarations."
+msgstr ""
+
+#: src/components/password-form.tsx
+msgid "Change password"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 msgid "changed"
 msgstr ""
 
+#: src/routes/_signed-in/settings/profile.tsx
+msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Choose a time in the future."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -157,6 +238,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered languages."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -186,6 +271,10 @@ msgstr ""
 msgid "Command line"
 msgstr ""
 
+#: src/components/password-form.tsx
+msgid "Confirm the new password"
+msgstr ""
+
 #: src/components/ui/reveal-secret.tsx
 msgid "Copied to the clipboard."
 msgstr ""
@@ -210,11 +299,24 @@ msgstr ""
 msgid "Create the first project to start declaring what it serves."
 msgstr ""
 
+#: src/components/token-create-form.tsx
+msgid "Create token"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Create unit type"
 msgstr ""
 
+#: src/components/token-list.tsx
+msgid "Created"
+msgstr ""
+
+#: src/components/password-form.tsx
+msgid "Current password"
+msgstr ""
+
 #: src/components/personal-menu.tsx
+#: src/components/theme-choice.tsx
 msgid "Dark"
 msgstr ""
 
@@ -257,8 +359,16 @@ msgstr ""
 msgid "Developer"
 msgstr ""
 
+#: src/components/session-list.tsx
+msgid "Device"
+msgstr ""
+
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Discard"
+msgstr ""
+
+#: src/components/profile-form.tsx
+msgid "Display name"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -270,13 +380,26 @@ msgstr ""
 msgid "edit the project"
 msgstr ""
 
+#: src/components/profile-form.tsx
 #: src/components/sign-in-form.tsx
 msgid "Email"
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "Ends at the latest"
+msgstr ""
+
+#: src/components/profile-form.tsx
+msgid "Enter a display name."
 msgstr ""
 
 #: src/lib/forms.ts
 #: src/lib/problem-messages.ts
 msgid "Enter a name."
+msgstr ""
+
+#: src/components/password-form.tsx
+msgid "Enter a new password."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -285,6 +408,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Enter a value from {min} to {max}."
+msgstr ""
+
+#: src/components/password-form.tsx
+msgid "Enter your current password."
 msgstr ""
 
 #: src/components/sign-in-form.tsx
@@ -333,8 +460,21 @@ msgstr ""
 msgid "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
 msgstr ""
 
+#: src/components/session-list.tsx
+msgid "Every device but this one is signed out at its next request and must sign in again."
+msgstr ""
+
 #: src/components/app-shell.tsx
 msgid "Expand the sidebar"
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "Expired"
+msgstr ""
+
+#: src/components/token-create-form.tsx
+#: src/components/token-list.tsx
+msgid "Expires"
 msgstr ""
 
 #: src/components/audit-entry-sheet.tsx
@@ -352,6 +492,11 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Fixed once the project is created, since SDKs and scripts use it."
+msgstr ""
+
+#: src/components/personal-menu.tsx
+#: src/components/profile-form.tsx
+msgid "Follow the browser"
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -373,6 +518,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
+msgstr ""
+
+#: src/components/profile-form.tsx
+msgid "How the instance knows you. An instance admin can change it."
 msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
@@ -403,8 +552,16 @@ msgstr ""
 msgid "Invitation issued again"
 msgstr ""
 
+#: src/components/session-list.tsx
+msgid "IP address"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "It does not exist, or it was deleted."
+msgstr ""
+
+#: src/components/theme-choice.tsx
+msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr ""
 
 #: src/components/projects-table.tsx
@@ -420,6 +577,19 @@ msgstr ""
 msgid "Key <0>{key}</0>"
 msgstr ""
 
+#: src/components/personal-menu.tsx
+#: src/components/profile-form.tsx
+msgid "Language"
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "Last seen"
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "Last used"
+msgstr ""
+
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Leave"
 msgstr ""
@@ -429,6 +599,7 @@ msgid "Leave without saving?"
 msgstr ""
 
 #: src/components/personal-menu.tsx
+#: src/components/theme-choice.tsx
 msgid "Light"
 msgstr ""
 
@@ -508,6 +679,8 @@ msgid "Members"
 msgstr ""
 
 #: src/components/projects-table.tsx
+#: src/components/token-create-form.tsx
+#: src/components/token-list.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
@@ -524,12 +697,25 @@ msgstr ""
 msgid "Needs the permission to {name}."
 msgstr ""
 
+#: src/components/token-create-form.tsx
+#: src/components/token-list.tsx
+msgid "Never"
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "New API token"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "New attribute"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "New environment"
+msgstr ""
+
+#: src/components/password-form.tsx
+msgid "New password"
 msgstr ""
 
 #: src/routes/_signed-in/admin/projects.tsx
@@ -635,11 +821,22 @@ msgid "Pages of entries"
 msgstr ""
 
 #: src/components/sign-in-form.tsx
+#: src/routes/_signed-in/settings/profile.tsx
 msgid "Password"
 msgstr ""
 
 #: src/lib/audit.ts
 msgid "Password changed"
+msgstr ""
+
+#: src/components/personal-menu.tsx
+#: src/routes/_signed-in/settings/route.tsx
+msgid "Personal settings"
+msgstr ""
+
+#: src/routes/_signed-in/settings/profile.tsx
+#: src/routes/_signed-in/settings/route.tsx
+msgid "Profile"
 msgstr ""
 
 #. A kind of entity in the audit log.
@@ -673,6 +870,10 @@ msgstr ""
 msgid "Projects"
 msgstr ""
 
+#: src/lib/personal-tokens.ts
+msgid "Read everything you can read."
+msgstr ""
+
 #: src/components/project-audit.tsx
 msgid "Recent activity"
 msgstr ""
@@ -694,16 +895,54 @@ msgstr ""
 msgid "Required."
 msgstr ""
 
+#: src/components/token-list.tsx
+msgid "Revoke {name}"
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "Revoke {revokingName}"
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "Revoke all other sessions"
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "Revoke session"
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "Revoke the session on {device}"
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "Revoke the session on {revokingDevice}"
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "Revoke token"
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "Revoked"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Role granted"
 msgstr ""
 
+#: src/components/profile-form.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Save"
+msgstr ""
+
+#: src/components/token-create-form.tsx
+#: src/components/token-list.tsx
+msgid "Scopes"
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -719,6 +958,10 @@ msgstr ""
 msgid "Semantic version"
 msgstr ""
 
+#: src/components/token-list.tsx
+msgid "Send it as a bearer token in the Authorization header. Keep it where only what uses it can read it."
+msgstr ""
+
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 msgid "Session"
@@ -726,6 +969,11 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Session ended"
+msgstr ""
+
+#: src/routes/_signed-in/settings/route.tsx
+#: src/routes/_signed-in/settings/sessions.tsx
+msgid "Sessions"
 msgstr ""
 
 #: src/components/navigation.tsx
@@ -750,6 +998,7 @@ msgstr ""
 msgid "Sign-in failed"
 msgstr ""
 
+#: src/components/session-list.tsx
 #: src/lib/audit.ts
 msgid "Signed in"
 msgstr ""
@@ -786,15 +1035,32 @@ msgstr ""
 msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
 msgstr ""
 
+#: src/components/token-list.tsx
+msgid "State"
+msgstr ""
+
 #. An attribute type.
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
 msgstr ""
 
 #. A kind of actor in the audit log.
-#: src/components/personal-menu.tsx
 #: src/lib/audit.ts
 msgid "System"
+msgstr ""
+
+#: src/components/personal-menu.tsx
+#: src/components/theme-choice.tsx
+msgctxt "theme"
+msgid "System"
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "That device is signed out at its next request and must sign in again."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "That is not your current password."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -803,6 +1069,14 @@ msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
 msgid "The browser refused the clipboard. Select the value and copy it by hand."
+msgstr ""
+
+#: src/components/profile-form.tsx
+msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
+msgstr ""
+
+#: src/components/session-list.tsx
+msgid "The devices you are signed in on"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -831,6 +1105,10 @@ msgstr ""
 
 #: src/components/project-audit.tsx
 msgid "The most recent changes in this project"
+msgstr ""
+
+#: src/components/password-form.tsx
+msgid "The new passwords do not match."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -885,8 +1163,16 @@ msgstr ""
 msgid "The server is unavailable. Try again in a moment."
 msgstr ""
 
+#: src/components/session-list.tsx
+msgid "The session is revoked."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The token in use does not carry the scope this needs."
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "The token is revoked."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
@@ -898,6 +1184,7 @@ msgid "The value is out of range."
 msgstr ""
 
 #: src/components/personal-menu.tsx
+#: src/components/theme-choice.tsx
 msgid "Theme"
 msgstr ""
 
@@ -905,8 +1192,29 @@ msgstr ""
 msgid "There is nothing at this address. The link may be old or mistyped."
 msgstr ""
 
+#: src/components/session-list.tsx
+msgid "This device"
+msgstr ""
+
+#: src/components/token-create-form.tsx
+msgid "This instance allows a token at most {lifetime} ahead, and every token must expire."
+msgstr ""
+
+#: src/components/token-create-form.tsx
+#: src/lib/problem-messages.ts
+msgid "This instance allows a token at most {lifetime} ahead."
+msgstr ""
+
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "This instance already has a project with that key."
+msgstr ""
+
+#: src/components/token-create-form.tsx
+msgid "This instance requires every token to expire."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This is further ahead than this instance allows."
 msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
@@ -1018,6 +1326,14 @@ msgstr ""
 msgid "Unit types"
 msgstr ""
 
+#: src/components/session-list.tsx
+msgid "Unknown"
+msgstr ""
+
+#: src/lib/device.ts
+msgid "Unknown device"
+msgstr ""
+
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Unsaved changes"
 msgstr ""
@@ -1059,6 +1375,14 @@ msgstr ""
 msgid "What the project is called and what it is for."
 msgstr ""
 
+#: src/components/token-create-form.tsx
+msgid "What uses the token, to tell it apart later."
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "Whatever uses the token is refused from now on. This cannot be undone."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr ""
@@ -1067,12 +1391,24 @@ msgstr ""
 msgid "You are not signed in."
 msgstr ""
 
+#: src/components/session-list.tsx
+msgid "You are signed in on this device only."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "You cannot open this project"
 msgstr ""
 
 #: src/components/can.tsx
 msgid "You cannot open this screen"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "You do not hold this scope yourself."
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "You have no API token yet."
 msgstr ""
 
 #: src/components/ui/unsaved-changes-bar.tsx
@@ -1091,8 +1427,24 @@ msgstr ""
 msgid "You need the permission to {name}."
 msgstr ""
 
+#: src/components/token-list.tsx
+msgid "Your API tokens"
+msgstr ""
+
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Your changes on this page will be lost."
+msgstr ""
+
+#: src/components/token-list.tsx
+msgid "Your new API token"
+msgstr ""
+
+#: src/components/password-form.tsx
+msgid "Your password is changed. Every other device is signed out."
+msgstr ""
+
+#: src/components/profile-form.tsx
+msgid "Your profile is saved."
 msgstr ""
 
 #: src/components/sign-in-form.tsx

@@ -125,3 +125,36 @@ func TestAMemberStatusIsParsedByName(t *testing.T) {
 		}
 	}
 }
+
+func TestAMemberRenamesThemselvesAndChoosesALanguage(t *testing.T) {
+	offered := []string{"en", "ru"}
+	m := access.Member{Email: "ada@example.com", DisplayName: "Ada", Status: access.MemberActive}
+	got, err := m.Profiled(access.ProfileChange{DisplayName: new(" Ada Lovelace "), Locale: new("ru")}, offered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.DisplayName != "Ada Lovelace" || got.Locale != "ru" || got.Email != m.Email || got.InstanceAdmin {
+		t.Errorf("profiled = %+v", got)
+	}
+	if browser, err := got.Profiled(access.ProfileChange{Locale: new("")}, offered); err != nil || browser.Locale != "" {
+		t.Errorf("following the browser = %+v, %v; want no locale", browser, err)
+	}
+	if same, err := got.Profiled(access.ProfileChange{}, offered); err != nil || same != got {
+		t.Errorf("an empty change = %+v, %v; want the member unchanged", same, err)
+	}
+	for name, tc := range map[string]struct {
+		change  access.ProfileChange
+		pointer string
+		code    string
+	}{
+		"blank name":       {access.ProfileChange{DisplayName: new(" ")}, "/display_name", "invalid_name"},
+		"long name":        {access.ProfileChange{DisplayName: new(strings.Repeat("n", 201))}, "/display_name", "too_long"},
+		"not offered":      {access.ProfileChange{Locale: new("de")}, "/locale", "unknown_locale"},
+		"a region instead": {access.ProfileChange{Locale: new("ru-RU")}, "/locale", "unknown_locale"},
+	} {
+		_, err := m.Profiled(tc.change, offered)
+		if code, pointer, violation := violationOf(err); code != "invalid_member" || pointer != tc.pointer || violation != tc.code {
+			t.Errorf("%s: err = %v, want invalid_member with %s at %s", name, err, tc.code, tc.pointer)
+		}
+	}
+}

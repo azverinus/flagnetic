@@ -42,6 +42,8 @@ type Handlers struct {
 	ListMembers         *appaccess.ListMembers
 	GetMember           *appaccess.GetMember
 	UpdateMember        *appaccess.UpdateMember
+	UpdateMe            *appaccess.UpdateMe
+	ChangeMyPassword    *appaccess.ChangeMyPassword
 	DeactivateMember    *appaccess.DeactivateMember
 	ReactivateMember    *appaccess.ReactivateMember
 	InviteMember        *appaccess.InviteMember

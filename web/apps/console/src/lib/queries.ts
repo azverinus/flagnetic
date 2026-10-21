@@ -1,5 +1,9 @@
 import {
   getAuthMethods,
+  listMySessions,
+  listMyTokens,
+  type ApiToken,
+  type Session,
   getProjectAuditEntry,
   listAuditEntries,
   listMembers,
@@ -37,6 +41,18 @@ export const meQuery = queryOptions<Me>({
   queryFn: () => unwrap(getMe()),
   staleTime: 60_000,
   retry: false,
+});
+
+/** The devices the caller is signed in on, the newest first, theirs marked current. */
+export const mySessionsQuery = queryOptions<Session[]>({
+  queryKey: ["me", "sessions"],
+  queryFn: async () => (await unwrap(listMySessions())).items,
+});
+
+/** The caller's personal access tokens, revoked and expired ones included, the newest first. */
+export const myTokensQuery = queryOptions<ApiToken[]>({
+  queryKey: ["me", "tokens"],
+  queryFn: async () => (await unwrap(listMyTokens())).items,
 });
 
 /** The ways this instance lets a member sign in, read before anyone is signed in. */

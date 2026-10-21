@@ -94,6 +94,27 @@ describe("a field violation", () => {
     ).toBe("This password is too common. Choose another.");
   });
 
+  it("names the bound of a token's expiry the instance allows", () => {
+    expect(
+      violationMessage(i18n, {
+        pointer: "/expires_at",
+        code: "beyond_max_lifetime",
+        detail: "too far",
+        params: { max_lifetime_seconds: 90 * 86_400 },
+      }),
+    ).toBe("This instance allows a token at most 90 days ahead.");
+    expect(
+      violationMessage(i18n, { pointer: "/locale", code: "unknown_locale", detail: "x" }),
+    ).toBe("Choose one of the offered languages.");
+    expect(
+      violationMessage(i18n, {
+        pointer: "/current_password",
+        code: "invalid_credentials",
+        detail: "wrong",
+      }),
+    ).toBe("That is not your current password.");
+  });
+
   it("falls back to the server's detail for a code it does not know", () => {
     expect(violationMessage(i18n, { pointer: "/x", code: "novel", detail: "Novel rule." })).toBe(
       "Novel rule.",

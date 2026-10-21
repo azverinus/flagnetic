@@ -1,8 +1,8 @@
-import { signOut } from "@flagnetic/api";
-import { Trans } from "@lingui/react/macro";
+import { type Me, signOut, updateMe } from "@flagnetic/api";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { LogOutIcon } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { LogOutIcon, SettingsIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { languageName } from "@/i18n/format";
+import { locales } from "@/i18n/locale";
 import { unwrap } from "@/lib/errors";
+import { chosenLocale, followBrowser, followMemberLocale, localeChoice } from "@/lib/member-locale";
 import { meQuery } from "@/lib/queries";
 import { isTheme } from "@/lib/theme";
 import { useTheme } from "@/lib/use-theme";
@@ -28,12 +31,25 @@ export function initialsOf(name: string, email: string): string {
   return (letters ?? "?").toUpperCase();
 }
 
-/** The signed-in member's menu: who they are, the theme, and signing out. */
+/**
+ * The signed-in member's menu: who they are, their settings, the theme,
+ * the language, and signing out.
+ */
 export function PersonalMenu() {
+  const { i18n, t } = useLingui();
   const { data: me } = useSuspenseQuery(meQuery);
   const [theme, setTheme] = useTheme();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  // The language is kept with the member, so it follows them to every
+  // device; a refusal is toasted, since the menu has closed by then.
+  const choosingLocale = useMutation({
+    mutationFn: (locale: string | null) => unwrap(updateMe({ body: { locale } })),
+    onSuccess: async (saved: Me) => {
+      queryClient.setQueryData(meQuery.queryKey, saved);
+      await followMemberLocale(i18n, saved);
+    },
+  });
   const signingOut = useMutation({
     mutationFn: () => unwrap(signOut()),
     meta: { readsAuditAgain: false },
@@ -67,6 +83,13 @@ export function PersonalMenu() {
           ) : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/settings/profile">
+            <SettingsIcon aria-hidden />
+            <Trans>Personal settings</Trans>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
           <Trans>Theme</Trans>
         </DropdownMenuLabel>
@@ -83,9 +106,32 @@ export function PersonalMenu() {
             <Trans>Dark</Trans>
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="system">
-            <Trans>System</Trans>
+            <Trans context="theme">System</Trans>
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
+        {me.member ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+              <Trans>Language</Trans>
+            </DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={localeChoice(me.member.locale)}
+              onValueChange={(value) => {
+                if (!choosingLocale.isPending) choosingLocale.mutate(chosenLocale(value));
+              }}
+            >
+              <DropdownMenuRadioItem
+                value={followBrowser}
+              >{t`Follow the browser`}</DropdownMenuRadioItem>
+              {locales.map((locale) => (
+                <DropdownMenuRadioItem key={locale} value={locale} lang={locale}>
+                  {languageName(locale)}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={signingOut.isPending} onSelect={() => signingOut.mutate()}>
           <LogOutIcon aria-hidden />
