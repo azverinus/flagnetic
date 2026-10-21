@@ -25,6 +25,7 @@ export type Permission =
   | "flag.archive"
   | "flag_configuration.update"
   | "flag_configuration.kill"
+  | "flag_configuration.revert"
   | "segment.edit"
   | "segment.delete";
 
@@ -40,6 +41,7 @@ const permissionNames: Record<Permission, MessageDescriptor> = {
   "flag.archive": msg`archive and delete flags`,
   "flag_configuration.update": msg`change flag configurations`,
   "flag_configuration.kill": msg`switch flags off with the kill switch`,
+  "flag_configuration.revert": msg`revert flag configurations to earlier versions`,
   "segment.edit": msg`edit segments`,
   "segment.delete": msg`delete segments`,
 };

@@ -1361,6 +1361,10 @@ msgstr "ID запроса: {requestId}"
 msgid "Required."
 msgstr "Обязательное поле."
 
+#: src/lib/access-names.ts
+msgid "revert flag configurations to earlier versions"
+msgstr "возвращать конфигурации флагов к прежним версиям"
+
 #: src/components/token-list.tsx
 msgid "Revoke {name}"
 msgstr "Отозвать {name}"
