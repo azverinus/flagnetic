@@ -54,6 +54,9 @@ type Handlers struct {
 	ListGrants          *appaccess.ListGrants
 	CreateGrant         *appaccess.CreateGrant
 	DeleteGrant         *appaccess.DeleteGrant
+	ListProjectTokens   *appaccess.ListProjectTokens
+	CreateProjectToken  *appaccess.CreateProjectToken
+	RevokeProjectToken  *appaccess.RevokeProjectToken
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
 

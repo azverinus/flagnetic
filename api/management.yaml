@@ -965,6 +965,86 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/tokens:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listProjectTokens
+      summary: The tokens of a project
+      description: Every token of the project, the newest first, revoked and expired ones included, by their hint.
+      x-permission: project_token.manage
+      tags: [project-tokens]
+      responses:
+        "200":
+          description: The tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectTokenList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createProjectToken
+      summary: Create a project token
+      description: |
+        Creates a token belonging to the project, for a pipeline, and
+        answers its value, shown this once and never again. It holds one
+        built-in role in the project, fixed for its life, narrowed by its
+        scopes; it never manages grants or project tokens, whatever its
+        role, so it never changes who has access. It reaches its project and
+        `GET /me` alone, acts for no member and survives its creator. A role
+        holding a permission the caller lacks in the project is refused
+        `role_not_allowed`; `instance:admin` or a scope the caller does not
+        hold `scope_not_allowed`. Its expiry follows the rules of a personal
+        access token's. Only a session creates one, so no token mints
+        another.
+      x-permission: project_token.manage
+      x-session-required: true
+      tags: [project-tokens]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectTokenCreate"
+      responses:
+        "201":
+          description: The token, with its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedProjectToken"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/tokens/{token}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/TokenID"
+    delete:
+      operationId: revokeProjectToken
+      summary: Revoke a project token
+      description: Revokes one of the project's tokens, which is refused `token_revoked` from then on. A token of another project, one already revoked or an identifier that names none is not found.
+      x-permission: project_token.manage
+      tags: [project-tokens]
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/audit:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -1859,6 +1939,11 @@ components:
           description: The API token in use, for the token method.
         token_name:
           type: string
+        project:
+          type: string
+          description: The key of the project a project token belongs to; absent for any other credential.
+        role:
+          $ref: "#/components/schemas/RoleName"
     Key:
       type: string
       pattern: "^[a-z][a-z0-9_-]{0,63}$"
@@ -2090,6 +2175,91 @@ components:
           type: string
           format: password
           description: The token's value, `fn_pat_` and 40 characters, shown this once.
+    ProjectToken:
+      type: object
+      description: A token belonging to a project, by its hint; its value is shown only when it is created.
+      required: [id, name, hint, role, scopes, expires_at, created_at, created_by, last_used_at, last_used_ip, revoked_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        hint:
+          type: string
+          description: The value's prefix and its first four characters, such as `fn_prj_Ab3d`.
+        role:
+          $ref: "#/components/schemas/RoleName"
+        scopes:
+          type: array
+          description: The scopes the token carries, `read` first.
+          items:
+            $ref: "#/components/schemas/Scope"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; null for a token that never expires.
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member who created the token; it keeps working when they leave.
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token was last presented, recorded at most once a minute; null until it is used.
+        last_used_ip:
+          type: string
+          nullable: true
+          description: The address the token was last presented from.
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+    ProjectTokenList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectToken"
+    ProjectTokenCreate:
+      type: object
+      required: [name, role]
+      properties:
+        name:
+          type: string
+          description: 1 to 200 characters, not blank, to tell the token apart.
+        role:
+          type: string
+          description: One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, which the token holds in the project.
+        scopes:
+          type: array
+          description: The scopes the token carries; `read` alone when absent, and `read` is added to any write scope. Never `instance:admin`.
+          items:
+            $ref: "#/components/schemas/Scope"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; absent or null for a token that never expires, unless the instance requires an expiry.
+    CreatedProjectToken:
+      type: object
+      description: A project token just created, with its value.
+      required: [token, value]
+      properties:
+        token:
+          $ref: "#/components/schemas/ProjectToken"
+        value:
+          type: string
+          format: password
+          description: The token's value, `fn_prj_` and 40 characters, shown this once.
     Grant:
       type: object
       description: One role held by one member in one project.

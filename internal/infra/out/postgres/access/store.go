@@ -71,18 +71,22 @@ func emailTaken(err error) error {
 
 // CreateToken stores t.
 func (s *Store) CreateToken(ctx context.Context, t access.APIToken) error {
-	var member, project any
+	var member, project, createdBy any
 	if !t.Member.IsZero() {
 		member = t.Member.Bytes()
 	}
 	if !t.Project.IsZero() {
 		project = t.Project.Bytes()
 	}
+	if !t.CreatedBy.IsZero() {
+		createdBy = t.CreatedBy.Bytes()
+	}
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO api_tokens (id, kind, member_id, project_id, role, name, hint, token_hash, scopes, expires_at, revoked_at, created_at)
-		VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, $9, $10, $11, $12)`,
+		INSERT INTO api_tokens (id, kind, member_id, project_id, role, name, hint, token_hash, scopes, expires_at, revoked_at,
+		                        created_at, created_by)
+		VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, $9, $10, $11, $12, $13)`,
 		t.ID.Bytes(), string(t.Kind), member, project, string(t.Role), t.Name, t.Hint, t.Hash[:], scopeStrings(t.Scopes),
-		t.ExpiresAt, t.RevokedAt, t.CreatedAt)
+		t.ExpiresAt, t.RevokedAt, t.CreatedAt, createdBy)
 	return err
 }
 

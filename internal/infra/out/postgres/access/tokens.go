@@ -20,7 +20,7 @@ import (
 //
 //nolint:gosec // column names, not a credential
 const tokenColumns = `t.id, t.kind, t.member_id, t.project_id, t.role, t.name, t.hint, t.token_hash, t.scopes,
-	t.expires_at, t.revoked_at, t.created_at, t.last_used_at, t.last_used_ip`
+	t.expires_at, t.revoked_at, t.created_at, t.created_by, t.last_used_at, t.last_used_ip`
 
 // scanToken returns a scan target of tokenColumns and the token it fills.
 func scanToken() ([]any, func() access.APIToken) {
@@ -34,9 +34,10 @@ func scanToken() ([]any, func() access.APIToken) {
 		hash      []byte
 		scopes    []string
 		ip        *netip.Addr
+		createdBy *[16]byte
 	)
 	dest := []any{&tokenID, &kind, &memberID, &projectID, &role, &t.Name, &t.Hint, &hash, &scopes,
-		&t.ExpiresAt, &t.RevokedAt, &t.CreatedAt, &t.LastUsedAt, &ip}
+		&t.ExpiresAt, &t.RevokedAt, &t.CreatedAt, &createdBy, &t.LastUsedAt, &ip}
 	fill := func() access.APIToken {
 		t.ID, t.Kind, t.Hash = id.FromBytes[access.APIToken](tokenID), access.TokenKind(kind), access.TokenHash(hash)
 		if memberID != nil {
@@ -50,6 +51,9 @@ func scanToken() ([]any, func() access.APIToken) {
 		}
 		if ip != nil {
 			t.LastUsedIP = *ip
+		}
+		if createdBy != nil {
+			t.CreatedBy = id.FromBytes[access.Member](*createdBy)
 		}
 		t.Scopes = nil
 		for _, sc := range scopes {
@@ -120,4 +124,30 @@ func (s *Store) RecordTokenUse(ctx context.Context, token access.APITokenID, at 
 		return fmt.Errorf("recording the use of an API token: %w", err)
 	}
 	return nil
+}
+
+// ProjectTokens returns every project token of project, the newest first.
+func (s *Store) ProjectTokens(ctx context.Context, project workspace.ProjectID) ([]access.APIToken, error) {
+	return collectTokens(s.db(ctx).Query(ctx, `
+		SELECT `+tokenColumns+` FROM api_tokens t
+		WHERE t.kind = 'project' AND t.project_id = $1
+		ORDER BY t.created_at DESC, t.id DESC`, project.Bytes()))
+}
+
+// RevokeProjectToken revokes project's unrevoked project token at at and
+// returns it.
+func (s *Store) RevokeProjectToken(ctx context.Context, project workspace.ProjectID, token access.APITokenID, at time.Time,
+) (access.APIToken, error) {
+	dest, revoked := scanToken()
+	err := s.db(ctx).QueryRow(ctx, `
+		UPDATE api_tokens t SET revoked_at = $3
+		WHERE t.kind = 'project' AND t.project_id = $1 AND t.id = $2 AND t.revoked_at IS NULL
+		RETURNING `+tokenColumns, project.Bytes(), token.Bytes(), at).Scan(dest...)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return access.APIToken{}, appaccess.ErrNotFound
+	}
+	if err != nil {
+		return access.APIToken{}, fmt.Errorf("revoking a project token: %w", err)
+	}
+	return revoked(), nil
 }

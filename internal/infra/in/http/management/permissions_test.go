@@ -53,6 +53,10 @@ func matrix(t *testing.T) []matrixRow {
 			}
 			return res.StatusCode(), res.Body
 		}},
+		{"project_token.manage", "listProjectTokens", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			res := do(c.ListProjectTokensWithResponse(t.Context(), p.Key))
+			return res.StatusCode(), res.Body
+		}},
 	}
 }
 
@@ -64,11 +68,12 @@ func TestThePermissionMatrixHoldsRowByRow(t *testing.T) {
 	pool := testkit.Pool(t)
 	p := createProject(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), projectKey())
 	holders := map[string][]access.RoleName{
-		"project.read":       {access.RoleViewer, access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
-		"project.update":     {access.RoleOwner},
-		"environment.manage": {access.RoleMaintainer, access.RoleOwner},
-		"declaration.manage": {access.RoleMaintainer, access.RoleOwner},
-		"grant.manage":       {access.RoleOwner},
+		"project.read":         {access.RoleViewer, access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
+		"project.update":       {access.RoleOwner},
+		"environment.manage":   {access.RoleMaintainer, access.RoleOwner},
+		"declaration.manage":   {access.RoleMaintainer, access.RoleOwner},
+		"grant.manage":         {access.RoleOwner},
+		"project_token.manage": {access.RoleOwner},
 	}
 	callers := map[string]*management.ClientWithResponses{
 		"instance admin": testkit.Client(t, srv, testkit.InstanceAdminToken(t)),

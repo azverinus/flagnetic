@@ -117,6 +117,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ListGrants:          appaccess.NewListGrants(accessStore),
 		CreateGrant:         appaccess.NewCreateGrant(tx, accessStore, auditLog, d.Clock, d.IDs),
 		DeleteGrant:         appaccess.NewDeleteGrant(tx, accessStore, auditLog, d.Clock, d.IDs),
+		ListProjectTokens:   appaccess.NewListProjectTokens(accessStore),
+		CreateProjectToken:  appaccess.NewCreateProjectToken(tx, accessStore, settings, auditLog, d.Clock, d.IDs, rand.Reader),
+		RevokeProjectToken:  appaccess.NewRevokeProjectToken(tx, accessStore, auditLog, d.Clock, d.IDs),
 		ProjectPermissions:  appaccess.NewProjectPermissions(accessStore),
 		WorkingProjects:     appaccess.NewWorkingProjects(accessStore),
 

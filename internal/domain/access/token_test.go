@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -259,6 +260,37 @@ func TestATokensUseIsRecordedAtMostOnceAMinute(t *testing.T) {
 	for d, want := range map[time.Duration]bool{0: false, 59 * time.Second: false, time.Minute: true, time.Hour: true} {
 		if got := tok.UseToRecord(now.Add(d)); got != want {
 			t.Errorf("%v after its last use: recorded = %v, want %v", d, got, want)
+		}
+	}
+}
+
+func TestAProjectTokenHoldsOneBuiltInRoleAndNeverInstanceAdmin(t *testing.T) {
+	ids := newIDs()
+	project := id.New[workspace.Project](ids)
+	creator := id.New[access.Member](ids)
+	in := access.NewProjectTokenInput{
+		Project: project, Role: access.RoleMaintainer, Name: " pipeline ", Scopes: []access.Scope{access.ScopeFlagsWrite},
+		CreatedBy: creator, Now: now,
+	}
+	tok, v, err := access.NewProjectToken(id.New[access.APIToken](ids), in, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tok.Kind != access.TokenProject || tok.Project != project || tok.Role != access.RoleMaintainer || tok.Name != "pipeline" ||
+		!tok.Member.IsZero() || tok.CreatedBy != creator || !strings.HasPrefix(v.Value.Reveal(), "fn_prj_") ||
+		len(tok.Scopes) != 2 || !tok.HasScope(access.ScopeRead) {
+		t.Errorf("token = %+v, want a project token of maintainer with read and flags:write", tok)
+	}
+	for name, change := range map[string]func(*access.NewProjectTokenInput){
+		"instance:admin": func(in *access.NewProjectTokenInput) { in.Scopes = []access.Scope{access.ScopeInstanceAdmin} },
+		"no role":        func(in *access.NewProjectTokenInput) { in.Role = "admin" },
+		"a blank name":   func(in *access.NewProjectTokenInput) { in.Name = "" },
+	} {
+		bad := in
+		change(&bad)
+		_, _, err := access.NewProjectToken(id.New[access.APIToken](ids), bad, rand.Reader)
+		if !apperrors.IsKind(err, apperrors.KindInvalid) {
+			t.Errorf("%s: err = %v, want invalid", name, err)
 		}
 	}
 }
