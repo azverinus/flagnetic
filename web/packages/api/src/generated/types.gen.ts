@@ -73,6 +73,14 @@ export type Me = {
    * The address the request came from, as the server sees it behind its trusted proxies.
    */
   client_ip: string;
+  /**
+   * The furthest ahead, in seconds, the instance lets an API token expire; null for no bound. Answered to every caller, so a client can offer only the expiries the instance accepts.
+   */
+  max_token_lifetime_seconds: number | null;
+  /**
+   * Whether the instance refuses an API token that never expires.
+   */
+  require_token_expiry: boolean;
 };
 
 /**
@@ -109,6 +117,25 @@ export type MemberPatch = {
    */
   display_name?: string;
   instance_admin?: boolean;
+};
+
+export type MePatch = {
+  /**
+   * Not blank, at most 200 characters.
+   */
+  display_name?: string;
+  /**
+   * The console language, `en` or `ru`; null follows the browser. Absent leaves it as it is.
+   */
+  locale?: string | null;
+};
+
+export type PasswordChange = {
+  current_password: string;
+  /**
+   * 12 to 128 characters, or the instance's minimum length; not containing the part of the email before the @, nor a common password.
+   */
+  new_password: string;
 };
 
 export type MemberInvite = {
@@ -1035,6 +1062,115 @@ export type GetMeResponses = {
 };
 
 export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type UpdateMeData = {
+  body: MePatch;
+  path?: never;
+  query?: never;
+  url: "/me";
+};
+
+export type UpdateMeErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type UpdateMeError = UpdateMeErrors[keyof UpdateMeErrors];
+
+export type UpdateMeResponses = {
+  /**
+   * The caller as changed, as `GET /me` answers it.
+   */
+  200: Me;
+};
+
+export type UpdateMeResponse = UpdateMeResponses[keyof UpdateMeResponses];
+
+export type ChangeMyPasswordData = {
+  body: PasswordChange;
+  path?: never;
+  query?: never;
+  url: "/me/password";
+};
+
+export type ChangeMyPasswordErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `request_too_large`: the body is larger than the operation accepts; one that checks a password accepts 8 KiB.
+   */
+  413: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * Refused before the password is checked: `locked` while the email is
+   * locked by consecutive failures, `rate_limited` while the address is
+   * throttled. `retry_after` and the `Retry-After` header give the
+   * seconds until the attempt can be made again.
+   *
+   */
+  429: Problem;
+  /**
+   * `busy`: the replica is checking as many passwords as it may at once
+   * and no turn freed within two seconds. The attempt was not counted as
+   * a failure; retry after `Retry-After` seconds.
+   *
+   */
+  503: Problem;
+};
+
+export type ChangeMyPasswordError = ChangeMyPasswordErrors[keyof ChangeMyPasswordErrors];
+
+export type ChangeMyPasswordResponses = {
+  /**
+   * Changed; every other session is revoked.
+   */
+  204: void;
+};
+
+export type ChangeMyPasswordResponse = ChangeMyPasswordResponses[keyof ChangeMyPasswordResponses];
 
 export type RevokeMySessionsData = {
   body?: never;

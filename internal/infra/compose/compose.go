@@ -14,6 +14,7 @@ import (
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
+	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/console"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
@@ -100,11 +101,15 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ListMembers:        appaccess.NewListMembers(accessStore),
 		GetMember:          appaccess.NewGetMember(accessStore),
 		UpdateMember:       appaccess.NewUpdateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
-		DeactivateMember:   appaccess.NewDeactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
-		ReactivateMember:   appaccess.NewReactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
-		InviteMember:       appaccess.NewInviteMember(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
-		ReissueInvitation:  appaccess.NewReissueInvitation(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
-		GetInvitation:      appaccess.NewGetInvitation(accessStore, d.Clock),
+		UpdateMe:           appaccess.NewUpdateMe(tx, accessStore, auditLog, d.Clock, d.IDs, config.ConsoleLocales),
+		ChangeMyPassword: appaccess.NewChangeMyPassword(appaccess.ChangeMyPasswordDeps{
+			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
+		}),
+		DeactivateMember:  appaccess.NewDeactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
+		ReactivateMember:  appaccess.NewReactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
+		InviteMember:      appaccess.NewInviteMember(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
+		ReissueInvitation: appaccess.NewReissueInvitation(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
+		GetInvitation:     appaccess.NewGetInvitation(accessStore, d.Clock),
 		AcceptInvitation: appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,

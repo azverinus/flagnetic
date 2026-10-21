@@ -1,4 +1,12 @@
-import { type Client, createClient, createConfig, createProject } from "@flagnetic/api";
+import {
+  acceptInvitation,
+  type Client,
+  createClient,
+  createConfig,
+  createProject,
+  inviteMember,
+  signOut,
+} from "@flagnetic/api";
 import type { Page } from "@playwright/test";
 
 import { admin, readState } from "./instance";
@@ -45,4 +53,38 @@ export async function seedProject(prefix: string): Promise<string> {
     await createProject({ client: managementClient(), body: { key, name: `Project ${prefix}` } }),
   );
   return key;
+}
+
+/**
+ * A member of one spec's own, invited by the instance admin and signed up
+ * through the invitation, so that what the spec changes of them (their
+ * name, password, sessions and tokens) never reaches another spec. The
+ * email carries the time, so a retried run does not meet its own member.
+ */
+export async function seedMember(
+  prefix: string,
+  name: string,
+  password: string,
+): Promise<Credentials & { id: string; name: string }> {
+  const email = `${prefix}-${Date.now().toString(36)}@flagnetic.test`;
+  const invited = must(
+    `inviting ${email}`,
+    await inviteMember({ client: managementClient(), body: { email, display_name: name } }),
+  );
+  const link = invited.invitation?.url ?? "";
+  const anonymous = createClient(createConfig({ baseUrl: `${readState().baseURL}/api/v1` }));
+  const accepted = await acceptInvitation({
+    client: anonymous,
+    path: { secret: link.slice(link.lastIndexOf("/") + 1) },
+    body: { password },
+  });
+  must(`accepting the invitation of ${email}`, accepted);
+  // Accepting signs the member in; that session is ended, so the member's
+  // devices are only those the spec signs in on.
+  const cookie = accepted.response?.headers.get("set-cookie")?.split(";")[0] ?? "";
+  must(
+    `signing ${email} out of the acceptance`,
+    await signOut({ client: anonymous, headers: { Cookie: cookie } }),
+  );
+  return { id: invited.member.id, email, password, name };
 }

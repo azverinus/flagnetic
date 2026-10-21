@@ -2,7 +2,7 @@ import type { Violation } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
-import { formatNumber, formatWait } from "@/i18n/format";
+import { formatLifetime, formatNumber, formatWait } from "@/i18n/format";
 
 import { permissionName } from "./access-names";
 import type { ApiError } from "./errors";
@@ -81,6 +81,8 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`An attribute's type is fixed once it is declared.`);
     case "key_immutable":
       return i18n._(msg`A key never changes once it is set.`);
+    case "scope_not_allowed":
+      return i18n._(msg`A token cannot carry a scope you do not hold yourself.`);
     default:
       if (error.code.startsWith("invalid_") && error.violations.length > 0) {
         return i18n._(msg`Some fields need correcting.`);
@@ -127,6 +129,23 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       return min && max
         ? i18n._(msg`Enter a value from ${min} to ${max}.`)
         : i18n._(msg`The value is out of range.`);
+    }
+    case "invalid_credentials":
+      // Only a password change names a field with it: the current password.
+      return i18n._(msg`That is not your current password.`);
+    case "unknown_locale":
+      return i18n._(msg`Choose one of the offered languages.`);
+    case "scope_not_allowed":
+      return i18n._(msg`You do not hold this scope yourself.`);
+    case "in_past":
+      return i18n._(msg`Choose a time in the future.`);
+    case "beyond_max_lifetime": {
+      const max = param(violation, "max_lifetime_seconds");
+      if (typeof max === "number") {
+        const lifetime = formatLifetime(i18n, max);
+        return i18n._(msg`This instance allows a token at most ${lifetime} ahead.`);
+      }
+      return i18n._(msg`This is further ahead than this instance allows.`);
     }
     case "idle_beyond_absolute":
       return i18n._(msg`The idle timeout cannot be longer than the absolute timeout.`);

@@ -63,3 +63,13 @@ func TestAGeneratedPasswordPassesThePolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestThePasswordPolicyNamesTheFieldItRefuses(t *testing.T) {
+	err := access.CheckPasswordAt("/new_password", "short", "ada@example.com", access.MinPasswordLength)
+	if code, pointer, violation := violationOf(err); code != "weak_password" || pointer != "/new_password" || violation != "weak_password" {
+		t.Errorf("err = %v, want weak_password at /new_password", err)
+	}
+	if access.PasswordRule(err) != access.PasswordRuleLength {
+		t.Errorf("rule = %q, want length", access.PasswordRule(err))
+	}
+}

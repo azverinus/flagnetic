@@ -1,6 +1,7 @@
 package access
 
 import (
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -135,6 +136,39 @@ func (m Member) Edited(change MemberChange) (Member, error) {
 	}
 	if change.InstanceAdmin != nil {
 		m.InstanceAdmin = *change.InstanceAdmin
+	}
+	return m, nil
+}
+
+// ProfileChange is a member's edit of themself; a nil field is left as it
+// is.
+type ProfileChange struct {
+	DisplayName *string
+	// Locale is the console language chosen; "" follows the browser.
+	Locale *string
+}
+
+// Profiled returns m with change applied: the display name trimmed and held
+// to the bounds of a new member's, the locale one of offered, the console
+// languages, or "" to follow the browser. The email and the instance admin
+// switch are an instance admin's to change, never the member's own.
+func (m Member) Profiled(change ProfileChange, offered []string) (Member, error) {
+	if change.DisplayName != nil {
+		name := strings.TrimSpace(*change.DisplayName)
+		if err := checkDisplayName(name); err != nil {
+			return Member{}, err
+		}
+		m.DisplayName = name
+	}
+	if change.Locale != nil {
+		if l := *change.Locale; l != "" && !slices.Contains(offered, l) {
+			return Member{}, invalidMember(apperrors.Violation{
+				Pointer: "/locale", Code: "unknown_locale",
+				Detail: "a locale is one of the console's languages, " + strings.Join(offered, ", ") + ", or null to follow the browser",
+				Params: map[string]any{"locales": offered},
+			})
+		}
+		m.Locale = *change.Locale
 	}
 	return m, nil
 }

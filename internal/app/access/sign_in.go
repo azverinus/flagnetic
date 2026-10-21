@@ -28,13 +28,10 @@ type PasswordVerifier interface {
 
 // SignInStore is what signing in needs of the stored members and sessions.
 type SignInStore interface {
-	// MemberByEmail returns the member whose email is email whatever its
-	// case, with their password hash ("" for none); ErrNotFound when none.
-	MemberByEmail(ctx context.Context, email string) (access.Member, string, error)
+	passwordStore
 	SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error
 	RecordSignIn(ctx context.Context, member access.MemberID, at time.Time) error
 	CreateSession(ctx context.Context, s access.Session) error
-	AttemptStore
 }
 
 // AttemptStore counts the failed attempts at a password, per email and per
@@ -117,50 +114,94 @@ const reasonWrongPassword = "wrong_password"
 // right. Failures of a known member are audited, attempts on unknown emails
 // are not: the log records people, not an attacker's input.
 func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, error) {
-	reserved, err := h.d.Store.ReserveAttempt(ctx, access.NewAttempt(cmd.Email, cmd.ClientIP, h.d.Clock.Now()))
+	a, err := attemptPassword(ctx, h.d.Tx, h.d.Store, h.d.Hasher, access.NewAttempt(cmd.Email, cmd.ClientIP, h.d.Clock.Now()), cmd.Password)
 	if err != nil {
 		return SignInResult{}, err
 	}
-	if refusal := reserved.Refusal(); refusal != nil {
-		// Refused before any hash: a locked email or a throttled source
-		// takes no hashing slot from the members signing in, and, since no
-		// password was checked, counts as no failure of its source either.
-		return SignInResult{}, h.release(ctx, reserved, refusal)
-	}
-	member, hash, err := h.d.Store.MemberByEmail(ctx, cmd.Email)
-	known := err == nil
-	if err != nil && !errors.Is(err, ErrNotFound) {
-		return SignInResult{}, h.release(ctx, reserved, err)
-	}
-	ok, outdated := false, false
-	// No password this long is ever set, so it is refused before any hash:
-	// a huge password cannot cost one.
-	if utf8.RuneCountInString(cmd.Password.Reveal()) <= access.MaxPasswordLength {
-		if ok, outdated, err = h.d.Hasher.Verify(ctx, cmd.Password, hash); err != nil {
-			// Busy, or the stored hash unreadable: nothing was guessed.
-			return SignInResult{}, h.release(ctx, reserved, err)
-		}
-	}
+	member, reserved := a.member, a.reserved
 	switch {
-	case !known:
+	case !a.known:
 		return SignInResult{}, ErrInvalidCredentials
-	case hash == "" && member.Status != access.MemberActive:
+	case a.hash == "" && member.Status != access.MemberActive:
 		// An invited member holds no password until they accept: no
 		// password was wrong, they may not sign in yet.
 		return SignInResult{}, h.fail(ctx, cmd, member, reserved, string(member.Status))
-	case !ok || hash == "":
+	case !a.right():
 		return SignInResult{}, h.fail(ctx, cmd, member, reserved, reasonWrongPassword)
 	case member.Status != access.MemberActive:
 		return SignInResult{}, h.fail(ctx, cmd, member, reserved, string(member.Status))
 	}
 
-	res, err := h.succeed(ctx, cmd, member, reserved, outdated)
+	res, err := h.succeed(ctx, cmd, member, reserved, a.outdated)
 	if err != nil {
 		// The password proved right, so whatever failed after was no wrong
 		// guess: a member who knows their password is never locked by it.
 		return SignInResult{}, h.release(ctx, reserved, err)
 	}
 	return res, nil
+}
+
+// passwordStore is what checking a password needs: the member an email
+// names, and the failed attempts counted against it.
+type passwordStore interface {
+	// MemberByEmail returns the member whose email is email whatever its
+	// case, with their password hash ("" for none); ErrNotFound when none.
+	MemberByEmail(ctx context.Context, email string) (access.Member, string, error)
+	AttemptStore
+}
+
+// passwordAttempt is a password verified against the member its email
+// names, with the failure reserved for it, which the caller keeps for a
+// wrong password and takes back otherwise.
+type passwordAttempt struct {
+	reserved access.Reservation
+	member   access.Member
+	// known is whether the email names a member.
+	known bool
+	// hash is the member's stored password hash, "" when they hold none.
+	hash string
+	// ok is whether the password matched hash, and outdated whether hash
+	// was made under parameters other than the current ones.
+	ok, outdated bool
+}
+
+// right reports whether the password proved right: it matched a password
+// the member holds.
+func (a passwordAttempt) right() bool { return a.ok && a.hash != "" }
+
+// attemptPassword counts attempt as a failure of its email and its source
+// before its password is verified, so attempts made at once cannot all pass
+// the lockout, then verifies password against the member the email names.
+// A locked email (locked) or a throttled source (rate_limited) is refused
+// before any hash: it takes no hashing slot from the members signing in
+// and, since no password was checked, counts as no failure either. An
+// unknown email is verified against a hash no password matches, so it takes
+// as long as a wrong password; a password longer than any ever set is
+// refused before any hash, so a huge one cannot cost one. On an error,
+// nothing was guessed and the failure is taken back.
+func attemptPassword(ctx context.Context, tx Transactor, store passwordStore, hasher PasswordVerifier,
+	attempt access.Attempt, password secret.String,
+) (passwordAttempt, error) {
+	reserved, err := store.ReserveAttempt(ctx, attempt)
+	if err != nil {
+		return passwordAttempt{}, err
+	}
+	a := passwordAttempt{reserved: reserved}
+	if refusal := reserved.Refusal(); refusal != nil {
+		return a, releaseAttempt(ctx, tx, store, reserved, refusal)
+	}
+	a.member, a.hash, err = store.MemberByEmail(ctx, attempt.Email)
+	a.known = err == nil
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return a, releaseAttempt(ctx, tx, store, reserved, err)
+	}
+	if utf8.RuneCountInString(password.Reveal()) <= access.MaxPasswordLength {
+		if a.ok, a.outdated, err = hasher.Verify(ctx, password, a.hash); err != nil {
+			// Busy, or the stored hash unreadable: nothing was guessed.
+			return a, releaseAttempt(ctx, tx, store, reserved, err)
+		}
+	}
+	return a, nil
 }
 
 // release takes back the failure reserved for an attempt that guessed
@@ -248,14 +289,8 @@ func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Memb
 	now := h.d.Clock.Now()
 	req := governance.Request{Actor: memberActor(member), ID: cmd.RequestID}
 	records := []governance.Record{authRecord("auth.sign_in_failed", member, map[string]any{"reason": reason})}
-	if locks, wait := reserved.Locks(); locks {
-		records = append(records, governance.Record{
-			Action: "auth.locked_out",
-			Entity: memberEntity(member),
-			After: map[string]any{
-				"email": member.Email, "failures": reserved.Failures, "retry_after_seconds": int(wait / time.Second),
-			},
-		})
+	if locked, locks := lockedOut(member, reserved); locks {
+		records = append(records, locked)
 	}
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		return recordAll(ctx, h.d.Audit, h.d.IDs, now, req, records...)
@@ -264,6 +299,22 @@ func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Memb
 		return err
 	}
 	return ErrInvalidCredentials
+}
+
+// lockedOut is the audit record of the lockout of member's email that the
+// failure reserved starts, and whether it starts one.
+func lockedOut(member access.Member, reserved access.Reservation) (governance.Record, bool) {
+	locks, wait := reserved.Locks()
+	if !locks {
+		return governance.Record{}, false
+	}
+	return governance.Record{
+		Action: "auth.locked_out",
+		Entity: memberEntity(member),
+		After: map[string]any{
+			"email": member.Email, "failures": reserved.Failures, "retry_after_seconds": int(wait / time.Second),
+		},
+	}, true
 }
 
 // memberActor is the actor of a member's own sign-in and sign-out: the

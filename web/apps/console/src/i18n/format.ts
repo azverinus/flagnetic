@@ -42,3 +42,26 @@ export function formatWait(i18n: I18n, seconds: number): string {
     unitDisplay: "long",
   }).format(Math.ceil(whole / 60));
 }
+
+/**
+ * A long span, such as how far ahead a token may expire: in whole days,
+ * else hours, else minutes, rounded down so it never promises more than
+ * the span allows.
+ */
+export function formatLifetime(i18n: I18n, seconds: number): string {
+  const [unit, size] =
+    seconds >= 86_400
+      ? (["day", 86_400] as const)
+      : seconds >= 3_600
+        ? (["hour", 3_600] as const)
+        : (["minute", 60] as const);
+  return new Intl.NumberFormat(i18n.locale, { style: "unit", unit, unitDisplay: "long" }).format(
+    Math.max(1, Math.floor(seconds / size)),
+  );
+}
+
+/** A language's name in that language, as a language picker shows it. */
+export function languageName(locale: string): string {
+  const name = new Intl.DisplayNames([locale], { type: "language" }).of(locale) ?? locale;
+  return name.charAt(0).toLocaleUpperCase(locale) + name.slice(1);
+}

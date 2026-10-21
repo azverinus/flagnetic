@@ -49,27 +49,34 @@ var commonPasswords = func() map[string]bool {
 // common password. There are no composition rules: length is what makes a
 // password hard to guess.
 func CheckPassword(password, email string, minLength int) error {
+	return CheckPasswordAt("/password", password, email, minLength)
+}
+
+// CheckPasswordAt is CheckPassword for a password sent at pointer in the
+// request, which its refusal names, such as /new_password beside the
+// current one.
+func CheckPasswordAt(pointer, password, email string, minLength int) error {
 	minLength = max(minLength, MinPasswordLength)
 	if n := utf8.RuneCountInString(password); n < minLength || n > MaxPasswordLength {
-		return weakPassword(PasswordRuleLength, "a password has "+strconv.Itoa(minLength)+" to 128 characters",
+		return weakPassword(pointer, PasswordRuleLength, "a password has "+strconv.Itoa(minLength)+" to 128 characters",
 			map[string]any{"rule": PasswordRuleLength, "min": minLength, "max": MaxPasswordLength})
 	}
 	lower := strings.ToLower(password)
 	if local, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(email)), "@"); local != "" && strings.Contains(lower, local) {
-		return weakPassword(PasswordRuleEmail, "a password does not contain the part of the email before the @", nil)
+		return weakPassword(pointer, PasswordRuleEmail, "a password does not contain the part of the email before the @", nil)
 	}
 	if commonPasswords[lower] {
-		return weakPassword(PasswordRuleCommon, "the password is on the list of common passwords", nil)
+		return weakPassword(pointer, PasswordRuleCommon, "the password is on the list of common passwords", nil)
 	}
 	return nil
 }
 
-func weakPassword(rule, detail string, params map[string]any) error {
+func weakPassword(pointer, rule, detail string, params map[string]any) error {
 	if params == nil {
 		params = map[string]any{"rule": rule}
 	}
 	return apperrors.Invalid("weak_password", "the password policy refuses this password: "+detail, apperrors.Violation{
-		Pointer: "/password", Code: "weak_password", Detail: detail, Params: params,
+		Pointer: pointer, Code: "weak_password", Detail: detail, Params: params,
 	})
 }
 
