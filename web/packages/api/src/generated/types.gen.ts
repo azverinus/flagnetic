@@ -966,11 +966,34 @@ export type KillResult = {
 };
 
 export type FlagList = {
-  items: Array<FlagDefinition>;
+  items: Array<FlagListItem>;
   /**
    * Pass as `cursor` for the next page; null on the last.
    */
   next_cursor: string | null;
+};
+
+/**
+ * A flag's definition with its flag state in every environment, by the environments' order.
+ */
+export type FlagListItem = FlagDefinition & {
+  states: Array<FlagState>;
+};
+
+/**
+ * What a flag's configuration in one environment serves at a glance.
+ */
+export type FlagState = {
+  environment: Key;
+  on: boolean;
+  /**
+   * The configuration has at least one rule, whether the flag is on or off.
+   */
+  has_rules: boolean;
+  /**
+   * A rule of the configuration serves a rollout.
+   */
+  has_rollout: boolean;
 };
 
 export type FlagCreate = {
@@ -2957,9 +2980,53 @@ export type ListFlagsData = {
   };
   query?: {
     /**
+     * Text the flag's key or name contains, ignoring case; `%`, `_`
+     * and `\` stand for themselves.
+     *
+     */
+    q?: string;
+    type?: FlagType;
+    /**
+     * A tag the flag carries, matched exactly.
+     */
+    tag?: string;
+    /**
+     * The member owning the flag.
+     */
+    owner?: string;
+    /**
      * Lists the archived flags instead of the others.
      */
     archived?: boolean;
+    /**
+     * The environment `state` is judged in; alone, it filters nothing.
+     */
+    environment?: Key;
+    /**
+     * Lists the flags whose configuration in `environment` is on, is
+     * off, has rules, or has a rule serving a rollout; rules count
+     * whether the flag is on or off.
+     *
+     */
+    state?: "on" | "off" | "rules" | "rollout";
+    /**
+     * Two environment keys, comma separated: lists the flags whose
+     * configurations differ between them in what their rulesets carry
+     * (on or off, the off and fallthrough variations, prerequisites,
+     * overrides by unit type, ID and variation, and rules with their
+     * identifiers, conditions and serves, salts included, in order),
+     * never in rule descriptions, override notes or authors, or
+     * versions.
+     *
+     */
+    differs_between?: [Key, Key];
+    /**
+     * `key` and `name` in byte order (capitals before lower case),
+     * `updated` by the last change to the flag's definition, the most
+     * recent first; ties by key.
+     *
+     */
+    sort?: "key" | "name" | "updated";
     /**
      * The `next_cursor` of the previous page.
      */

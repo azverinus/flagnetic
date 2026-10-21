@@ -623,8 +623,27 @@ export const zKill = z.object({
   reason: z.string().nullish(),
 });
 
+/**
+ * What a flag's configuration in one environment serves at a glance.
+ */
+export const zFlagState = z.object({
+  environment: zKey,
+  on: z.boolean(),
+  has_rules: z.boolean(),
+  has_rollout: z.boolean(),
+});
+
+/**
+ * A flag's definition with its flag state in every environment, by the environments' order.
+ */
+export const zFlagListItem = zFlagDefinition.and(
+  z.object({
+    states: z.array(zFlagState),
+  }),
+);
+
 export const zFlagList = z.object({
-  items: z.array(zFlagDefinition),
+  items: z.array(zFlagListItem),
   next_cursor: z.string().nullable(),
 });
 
@@ -1191,7 +1210,15 @@ export const zListFlagsPath = z.object({
 });
 
 export const zListFlagsQuery = z.object({
+  q: z.string().optional(),
+  type: zFlagType.optional(),
+  tag: z.string().optional(),
+  owner: z.uuid().optional(),
   archived: z.boolean().optional().default(false),
+  environment: zKey.optional(),
+  state: z.enum(["on", "off", "rules", "rollout"]).optional(),
+  differs_between: z.tuple([zKey, zKey]).optional(),
+  sort: z.enum(["key", "name", "updated"]).optional().default("key"),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });

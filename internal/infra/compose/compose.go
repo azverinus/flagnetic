@@ -167,7 +167,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		UpdateAttribute: appworkspace.NewUpdateAttribute(tx, ws, rec),
 		DeleteAttribute: appworkspace.NewDeleteAttribute(tx, ws, declarationGuard, rulesets, rec),
 
-		ListFlags: appflags.NewListFlags(flagStore),
+		ListFlags: appflags.NewListFlags(tx, ws, flagStore),
 		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
 			Tx: tx, Projects: flagStore, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),

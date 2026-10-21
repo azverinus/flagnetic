@@ -238,6 +238,51 @@ func (e SessionMethod) Valid() bool {
 	}
 }
 
+// Defines values for ListFlagsParamsState.
+const (
+	ListFlagsParamsStateOff     ListFlagsParamsState = "off"
+	ListFlagsParamsStateOn      ListFlagsParamsState = "on"
+	ListFlagsParamsStateRollout ListFlagsParamsState = "rollout"
+	ListFlagsParamsStateRules   ListFlagsParamsState = "rules"
+)
+
+// Valid indicates whether the value is a known member of the ListFlagsParamsState enum.
+func (e ListFlagsParamsState) Valid() bool {
+	switch e {
+	case ListFlagsParamsStateOff:
+		return true
+	case ListFlagsParamsStateOn:
+		return true
+	case ListFlagsParamsStateRollout:
+		return true
+	case ListFlagsParamsStateRules:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListFlagsParamsSort.
+const (
+	ListFlagsParamsSortKey     ListFlagsParamsSort = "key"
+	ListFlagsParamsSortName    ListFlagsParamsSort = "name"
+	ListFlagsParamsSortUpdated ListFlagsParamsSort = "updated"
+)
+
+// Valid indicates whether the value is a known member of the ListFlagsParamsSort enum.
+func (e ListFlagsParamsSort) Valid() bool {
+	switch e {
+	case ListFlagsParamsSortKey:
+		return true
+	case ListFlagsParamsSortName:
+		return true
+	case ListFlagsParamsSortUpdated:
+		return true
+	default:
+		return false
+	}
+}
+
 // Actor defines model for Actor.
 type Actor struct {
 	// Id The member's or token's identifier, or a fixed name for the command line and the system.
@@ -663,10 +708,46 @@ type FlagDefinition struct {
 
 // FlagList defines model for FlagList.
 type FlagList struct {
-	Items []FlagDefinition `json:"items"`
+	Items []FlagListItem `json:"items"`
 
 	// NextCursor Pass as `cursor` for the next page; null on the last.
 	NextCursor *string `json:"next_cursor"`
+}
+
+// FlagListItem A flag's definition with its flag state in every environment, by the environments' order.
+type FlagListItem struct {
+	// ArchivedAt When the flag was archived, hidden from SDKs; null while it is not.
+	ArchivedAt *time.Time `json:"archived_at"`
+
+	// AutomaticExposure SDKs record an exposure after every evaluation whose result carries an experiment.
+	AutomaticExposure bool      `json:"automatic_exposure"`
+	CreatedAt         time.Time `json:"created_at"`
+
+	// CreatedBy The member who created the flag; null when a project token did.
+	CreatedBy   *openapi_types.UUID `json:"created_by"`
+	Description Description         `json:"description"`
+
+	// ExpectedRemovalAt When a temporary flag is expected to be removed; null for a permanent one.
+	ExpectedRemovalAt *time.Time         `json:"expected_removal_at"`
+	Id                openapi_types.UUID `json:"id"`
+
+	// Key Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.
+	Key string `json:"key"`
+
+	// Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+	Lifetime Lifetime `json:"lifetime"`
+	Name     Name     `json:"name"`
+
+	// Owner The member accountable for the flag.
+	Owner      openapi_types.UUID `json:"owner"`
+	States     []FlagState        `json:"states"`
+	Tags       []string           `json:"tags"`
+	Type       FlagType           `json:"type"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+	Variations []Variation        `json:"variations"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
 }
 
 // FlagPatch defines model for FlagPatch.
@@ -693,6 +774,19 @@ type FlagPatch struct {
 
 	// Variations Every variation, in order, matched to the current ones by key.
 	Variations *[]VariationInput `json:"variations,omitempty"`
+}
+
+// FlagState What a flag's configuration in one environment serves at a glance.
+type FlagState struct {
+	// Environment Names the entity in URLs, SDK calls and rules, and never changes.
+	Environment Key `json:"environment"`
+
+	// HasRollout A rule of the configuration serves a rollout.
+	HasRollout bool `json:"has_rollout"`
+
+	// HasRules The configuration has at least one rule, whether the flag is on or off.
+	HasRules bool `json:"has_rules"`
+	On       bool `json:"on"`
 }
 
 // FlagType defines model for FlagType.
@@ -1540,8 +1634,41 @@ type ListProjectAuditEntriesParams struct {
 
 // ListFlagsParams defines parameters for ListFlags.
 type ListFlagsParams struct {
+	// Q Text the flag's key or name contains, ignoring case; `%`, `_`
+	// and `\` stand for themselves.
+	Q    *string   `form:"q,omitempty" json:"q,omitempty"`
+	Type *FlagType `form:"type,omitempty" json:"type,omitempty"`
+
+	// Tag A tag the flag carries, matched exactly.
+	Tag *string `form:"tag,omitempty" json:"tag,omitempty"`
+
+	// Owner The member owning the flag.
+	Owner *openapi_types.UUID `form:"owner,omitempty" json:"owner,omitempty"`
+
 	// Archived Lists the archived flags instead of the others.
 	Archived *bool `form:"archived,omitempty" json:"archived,omitempty"`
+
+	// Environment The environment `state` is judged in; alone, it filters nothing.
+	Environment *Key `form:"environment,omitempty" json:"environment,omitempty"`
+
+	// State Lists the flags whose configuration in `environment` is on, is
+	// off, has rules, or has a rule serving a rollout; rules count
+	// whether the flag is on or off.
+	State *ListFlagsParamsState `form:"state,omitempty" json:"state,omitempty"`
+
+	// DiffersBetween Two environment keys, comma separated: lists the flags whose
+	// configurations differ between them in what their rulesets carry
+	// (on or off, the off and fallthrough variations, prerequisites,
+	// overrides by unit type, ID and variation, and rules with their
+	// identifiers, conditions and serves, salts included, in order),
+	// never in rule descriptions, override notes or authors, or
+	// versions.
+	DiffersBetween *[]Key `form:"differs_between,omitempty" json:"differs_between,omitempty"`
+
+	// Sort `key` and `name` in byte order (capitals before lower case),
+	// `updated` by the last change to the flag's definition, the most
+	// recent first; ties by key.
+	Sort *ListFlagsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Cursor The `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -1549,6 +1676,12 @@ type ListFlagsParams struct {
 	// Limit How many entries a page holds at most.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// ListFlagsParamsState defines parameters for ListFlags.
+type ListFlagsParamsState string
+
+// ListFlagsParamsSort defines parameters for ListFlags.
+type ListFlagsParamsSort string
 
 // DeleteFlagParams defines parameters for DeleteFlag.
 type DeleteFlagParams struct {
@@ -2362,9 +2495,13 @@ type ClientInterface interface {
 
 	// ListFlags The project's flags
 	//
-	// The project's flags by key, in byte order (capitals before lower
-	// case). Page with `cursor` set to the `next_cursor` of the previous
-	// page.
+	// The project's flags, each with its flag state in every environment,
+	// in the order `sort` names. Every filter given applies. Page with
+	// `cursor` set to the `next_cursor` of the previous page, under the
+	// same `sort`; a cursor of another sort, `state` without
+	// `environment`, or `differs_between` naming other than two
+	// different environments is `invalid_request`, and an environment
+	// the project does not have is `not_found`.
 	//
 	// Corresponds with GET /projects/{project}/flags (the `ListFlags` operationId).
 	ListFlags(ctx context.Context, project ProjectKey, params *ListFlagsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3990,9 +4127,13 @@ func (c *Client) UpdateEnvironment(ctx context.Context, project ProjectKey, envi
 
 // ListFlags The project's flags
 //
-// The project's flags by key, in byte order (capitals before lower
-// case). Page with `cursor` set to the `next_cursor` of the previous
-// page.
+// The project's flags, each with its flag state in every environment,
+// in the order `sort` names. Every filter given applies. Page with
+// `cursor` set to the `next_cursor` of the previous page, under the
+// same `sort`; a cursor of another sort, `state` without
+// `environment`, or `differs_between` naming other than two
+// different environments is `invalid_request`, and an environment
+// the project does not have is `not_found`.
 //
 // Corresponds with GET /projects/{project}/flags (the `ListFlags` operationId).
 func (c *Client) ListFlags(ctx context.Context, project ProjectKey, params *ListFlagsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6940,9 +7081,105 @@ func NewListFlagsRequest(server string, project ProjectKey, params *ListFlagsPar
 		// per the OpenAPI spec (e.g. "color=blue,black,brown").
 		var rawQueryFragments []string
 
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Type != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "type", *params.Type, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Tag != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "tag", *params.Tag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Owner != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "owner", *params.Owner, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Archived != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "archived", *params.Archived, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Environment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", *params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.State != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.DiffersBetween != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "differs_between", *params.DiffersBetween, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Sort != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "sort", *params.Sort, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -9242,9 +9479,13 @@ type ClientWithResponsesInterface interface {
 
 	// ListFlagsWithResponse The project's flags
 	//
-	// The project's flags by key, in byte order (capitals before lower
-	// case). Page with `cursor` set to the `next_cursor` of the previous
-	// page.
+	// The project's flags, each with its flag state in every environment,
+	// in the order `sort` names. Every filter given applies. Page with
+	// `cursor` set to the `next_cursor` of the previous page, under the
+	// same `sort`; a cursor of another sort, `state` without
+	// `environment`, or `differs_between` naming other than two
+	// different environments is `invalid_request`, and an environment
+	// the project does not have is `not_found`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16635,9 +16876,13 @@ func (c *ClientWithResponses) UpdateEnvironmentWithResponse(ctx context.Context,
 
 // ListFlagsWithResponse The project's flags
 //
-// The project's flags by key, in byte order (capitals before lower
-// case). Page with `cursor` set to the `next_cursor` of the previous
-// page.
+// The project's flags, each with its flag state in every environment,
+// in the order `sort` names. Every filter given applies. Page with
+// `cursor` set to the `next_cursor` of the previous page, under the
+// same `sort`; a cursor of another sort, `state` without
+// `environment`, or `differs_between` naming other than two
+// different environments is `invalid_request`, and an environment
+// the project does not have is `not_found`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -24376,6 +24621,58 @@ func (siw *ServerInterfaceWrapper) ListFlags(w http.ResponseWriter, r *http.Requ
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListFlagsParams
 
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "type", r.URL.Query(), &params.Type, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "type"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "type", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "tag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tag", r.URL.Query(), &params.Tag, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tag", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "owner" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "owner", r.URL.Query(), &params.Owner, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "owner"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "owner", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "archived" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "archived", r.URL.Query(), &params.Archived, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
@@ -24385,6 +24682,58 @@ func (siw *ServerInterfaceWrapper) ListFlags(w http.ResponseWriter, r *http.Requ
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "archived"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "archived", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "differs_between" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "differs_between", r.URL.Query(), &params.DiffersBetween, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "differs_between"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "differs_between", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
 		}
 		return
 	}

@@ -1075,15 +1075,20 @@ export const updateAttribute = <ThrowOnError extends boolean = false>(
 /**
  * The project's flags
  *
- * The project's flags by key, in byte order (capitals before lower
- * case). Page with `cursor` set to the `next_cursor` of the previous
- * page.
+ * The project's flags, each with its flag state in every environment,
+ * in the order `sort` names. Every filter given applies. Page with
+ * `cursor` set to the `next_cursor` of the previous page, under the
+ * same `sort`; a cursor of another sort, `state` without
+ * `environment`, or `differs_between` naming other than two
+ * different environments is `invalid_request`, and an environment
+ * the project does not have is `not_found`.
  *
  */
 export const listFlags = <ThrowOnError extends boolean = false>(
   options: Options<ListFlagsData, ThrowOnError>,
 ): RequestResult<ListFlagsResponses, ListFlagsErrors, ThrowOnError> =>
   (options.client ?? client).get<ListFlagsResponses, ListFlagsErrors, ThrowOnError>({
+    querySerializer: { parameters: { differs_between: { array: { explode: false } } } },
     security: [
       { scheme: "bearer", type: "http" },
       {
