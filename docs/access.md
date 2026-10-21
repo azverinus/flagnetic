@@ -16,6 +16,8 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `project_token.manage` | listing, creating and revoking project tokens | `project:admin` |
 | `flag.edit` | creating flags and changing their definition | `flags:write` |
 | `flag.archive` | archiving, restoring and deleting flags | `flags:write` |
+| `flag_configuration.update` | replacing a flag's configuration in an environment, setting and removing single overrides, regenerating a rollout's salt | `flags:write` |
+| `flag_configuration.kill` | switching a flag off in an environment with the kill switch | `flags:write` |
 | `segment.edit` | creating segments and changing them | `flags:write` |
 | `segment.delete` | deleting segments | `flags:write` |
 
@@ -35,6 +37,8 @@ A role is a fixed list of permissions. The four built-in roles are the same on e
 | `project_token.manage` | | | | ✓ |
 | `flag.edit` | | ✓ | ✓ | ✓ |
 | `flag.archive` | | | ✓ | ✓ |
+| `flag_configuration.update` | | ✓ | ✓ | ✓ |
+| `flag_configuration.kill` | | ✓ | ✓ | ✓ |
 | `segment.edit` | | ✓ | ✓ | ✓ |
 | `segment.delete` | | | ✓ | ✓ |
 

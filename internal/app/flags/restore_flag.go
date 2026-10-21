@@ -15,5 +15,5 @@ func NewRestoreFlag(d ArchivalDeps) *RestoreFlag { return &RestoreFlag{d: d} }
 // Handle restores the flag and returns it; a flag that is not archived stays
 // as it is and nothing is recorded.
 func (h *RestoreFlag) Handle(ctx context.Context, cmd FlagCommand) (FlagView, error) {
-	return archival(ctx, h.d, cmd, "flag.restored", flags.Flag.Restore)
+	return archival(ctx, h.d, cmd, "flag.restored", flags.Flag.Restore, nil)
 }

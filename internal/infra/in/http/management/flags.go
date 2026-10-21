@@ -190,14 +190,6 @@ func flagOut(v appflags.FlagView) Flag {
 	}
 }
 
-func configurationOut(ec flags.EnvironmentConfiguration) FlagConfiguration {
-	c := ec.Configuration
-	return FlagConfiguration{
-		Environment: ec.Environment, On: c.On, OffVariation: c.OffVariation, Fallthrough: c.Fallthrough,
-		UpdatedAt: c.UpdatedAt, Version: c.Version,
-	}
-}
-
 // flagCommand returns the command naming flag of the request's project,
 // based on the version header names.
 func flagCommand(ctx context.Context, flag string, header *IfMatch) (appflags.FlagCommand, error) {

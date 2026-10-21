@@ -14,6 +14,8 @@ type RulesetVersions interface {
 	// BumpProject increments the ruleset version of every environment of
 	// project.
 	BumpProject(ctx context.Context, project workspace.ProjectID) error
+	// BumpEnvironment increments the ruleset version of environment.
+	BumpEnvironment(ctx context.Context, environment workspace.EnvironmentID) error
 }
 
 // BumpRulesets is the one way a write marks the rulesets it changed: every
@@ -32,4 +34,10 @@ func NewBumpRulesets(store RulesetVersions) *BumpRulesets { return &BumpRulesets
 // variations or a segment's conditions.
 func (h *BumpRulesets) Project(ctx context.Context, project workspace.ProjectID) error {
 	return h.store.BumpProject(ctx, project)
+}
+
+// Environment marks the ruleset of environment changed, for a write to what
+// one environment carries, such as a flag's configuration there.
+func (h *BumpRulesets) Environment(ctx context.Context, environment workspace.EnvironmentID) error {
+	return h.store.BumpEnvironment(ctx, environment)
 }

@@ -18,8 +18,9 @@ func TestMain(m *testing.M) { os.Exit(testkit.Main(m)) }
 // their entities share an identifier.
 var ids = testkit.IDs(testkit.Clock())
 
-// project stores a project with its default environments and returns it.
-func project(t *testing.T, key string) workspace.Project {
+// project stores a project with its default environments and returns it
+// with them.
+func project(t *testing.T, key string) (workspace.Project, []workspace.Environment) {
 	t.Helper()
 	p, err := workspace.NewProject(id.New[workspace.Project](ids), key, key, "", testkit.Start)
 	if err != nil {
@@ -29,12 +30,13 @@ func project(t *testing.T, key string) workspace.Project {
 	if err = ws.CreateProject(t.Context(), p); err != nil {
 		t.Fatal(err)
 	}
-	for _, e := range workspace.DefaultsOf(p, envIDs{ids}).Environments {
+	envs := workspace.DefaultsOf(p, envIDs{ids}).Environments
+	for _, e := range envs {
 		if err = ws.CreateEnvironment(t.Context(), e); err != nil {
 			t.Fatal(err)
 		}
 	}
-	return p
+	return p, envs
 }
 
 type envIDs struct{ src *id.Source }
@@ -43,10 +45,10 @@ func (i envIDs) Environment() workspace.EnvironmentID { return id.New[workspace.
 func (i envIDs) UnitType() workspace.UnitTypeID       { return id.New[workspace.UnitType](i.src) }
 func (i envIDs) Attribute() workspace.AttributeID     { return id.New[workspace.Attribute](i.src) }
 
-func TestARulesetVersionStartsAtOneAndMovesOnAProjectAtATime(t *testing.T) {
+func TestARulesetVersionStartsAtOneAndMovesOnAProjectOrAnEnvironmentAtATime(t *testing.T) {
 	store := pgdelivery.NewStore(testkit.Pool(t))
-	mobile := project(t, "mobile")
-	web := project(t, "web")
+	mobile, envs := project(t, "mobile")
+	web, _ := project(t, "web")
 	versions := func(p workspace.Project) map[string]int64 {
 		v, err := store.RulesetVersions(t.Context(), p.ID)
 		if err != nil {
@@ -65,5 +67,17 @@ func TestARulesetVersionStartsAtOneAndMovesOnAProjectAtATime(t *testing.T) {
 	}
 	if got, want := versions(web), map[string]int64{"development": 1, "staging": 1, "production": 1}; !maps.Equal(got, want) {
 		t.Errorf("another project = %v, want %v untouched", got, want)
+	}
+	var staging workspace.Environment
+	for _, e := range envs {
+		if e.Key == "staging" {
+			staging = e
+		}
+	}
+	if err := store.BumpEnvironment(t.Context(), staging.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := versions(mobile), map[string]int64{"development": 2, "staging": 3, "production": 2}; !maps.Equal(got, want) {
+		t.Errorf("after bumping staging = %v, want %v", got, want)
 	}
 }

@@ -30,6 +30,13 @@ func (s *Store) BumpProject(ctx context.Context, project workspace.ProjectID) er
 	return err
 }
 
+// BumpEnvironment increments the ruleset version of environment.
+func (s *Store) BumpEnvironment(ctx context.Context, environment workspace.EnvironmentID) error {
+	_, err := s.db(ctx).Exec(ctx, `UPDATE environments SET ruleset_version = ruleset_version + 1 WHERE id = $1`,
+		environment.Bytes())
+	return err
+}
+
 // RulesetVersions returns the ruleset version of every environment of
 // project, by environment key.
 func (s *Store) RulesetVersions(ctx context.Context, project workspace.ProjectID) (map[string]int64, error) {

@@ -83,8 +83,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Every write changing what SDKs receive moves the rulesets it changed
 	// on, through the delivery context.
 	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(d.Pool))
+	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
-	archival := appflags.ArchivalDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	sessionKey := o.Keyring.Key(secret.UseSessionCookie)
 	// Every request judging a session reads the settings: the replica keeps
 	// a copy, which a notification of each change drops.
@@ -170,11 +170,26 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
 
-		ArchiveFlag: appflags.NewArchiveFlag(archival),
-		RestoreFlag: appflags.NewRestoreFlag(archival),
+		ArchiveFlag: appflags.NewArchiveFlag(appflags.ArchiveFlagDeps{
+			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		RestoreFlag: appflags.NewRestoreFlag(appflags.ArchivalDeps{
+			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
 		DeleteFlag: appflags.NewDeleteFlag(appflags.DeleteFlagDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Recorder: flagRec,
 		}),
+
+		GetFlagConfiguration: appflags.NewGetFlagConfiguration(tx, flagStore),
+		ReplaceConfiguration: appflags.NewReplaceConfiguration(appflags.ReplaceConfigurationDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		KillFlag: appflags.NewKillFlag(configuration),
+		SetOverride: appflags.NewSetOverride(appflags.SetOverrideDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		RemoveOverride: appflags.NewRemoveOverride(configuration),
+		RegenerateSalt: appflags.NewRegenerateSalt(configuration),
 
 		ListSegments: appflags.NewListSegments(flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

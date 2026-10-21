@@ -367,7 +367,10 @@ type AuditEntry struct {
 	// EnvironmentId The environment the change addressed, if any.
 	EnvironmentId *openapi_types.UUID `json:"environment_id"`
 	Id            openapi_types.UUID  `json:"id"`
-	OccurredAt    time.Time           `json:"occurred_at"`
+
+	// KillSwitch Whether the entry records a kill switch, switching a flag off in an emergency.
+	KillSwitch bool      `json:"kill_switch"`
+	OccurredAt time.Time `json:"occurred_at"`
 
 	// ProjectId The project the change belongs to, kept after the project is gone; null for the instance.
 	ProjectId *openapi_types.UUID `json:"project_id"`
@@ -542,13 +545,33 @@ type FlagConfiguration struct {
 	// Fallthrough The variation served when the flag is on and no rule matches.
 	Fallthrough string `json:"fallthrough"`
 
-	// OffVariation The variation served while the flag is off.
-	OffVariation string    `json:"off_variation"`
-	On           bool      `json:"on"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	// OffVariation The variation served while the flag is off, and when a prerequisite fails.
+	OffVariation string     `json:"off_variation"`
+	On           bool       `json:"on"`
+	Overrides    []Override `json:"overrides"`
+
+	// Prerequisites Flags that must serve the named variation for this flag to be evaluated; otherwise it serves its off variation.
+	Prerequisites []Prerequisite `json:"prerequisites"`
+
+	// Rules Checked in order; the first whose conditions all hold serves.
+	Rules     []Rule    `json:"rules"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// UpdatedBy The member whose write made the configuration what it is; null when a project token did.
+	UpdatedBy *openapi_types.UUID `json:"updated_by"`
 
 	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
 	Version Version `json:"version"`
+}
+
+// FlagConfigurationPut defines model for FlagConfigurationPut.
+type FlagConfigurationPut struct {
+	Fallthrough   string           `json:"fallthrough"`
+	OffVariation  string           `json:"off_variation"`
+	On            bool             `json:"on"`
+	Overrides     *[]OverrideInput `json:"overrides,omitempty"`
+	Prerequisites *[]Prerequisite  `json:"prerequisites,omitempty"`
+	Rules         *[]RuleInput     `json:"rules,omitempty"`
 }
 
 // FlagCreate defines model for FlagCreate.
@@ -701,6 +724,21 @@ type IssuedInvitation struct {
 // Key Names the entity in URLs, SDK calls and rules, and never changes.
 type Key = string
 
+// Kill defines model for Kill.
+type Kill struct {
+	// Reason Why, at most 2,000 characters; recorded in the audit log.
+	Reason *string `json:"reason,omitempty"`
+}
+
+// KillResult defines model for KillResult.
+type KillResult struct {
+	// Changed False when the flag was off already.
+	Changed bool `json:"changed"`
+
+	// Configuration What the flag serves in one environment.
+	Configuration FlagConfiguration `json:"configuration"`
+}
+
 // Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
 type Lifetime string
 
@@ -796,6 +834,38 @@ type MemberStatus string
 // Name defines model for Name.
 type Name = string
 
+// Override A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
+type Override struct {
+	// AddedBy The member who last wrote the override; null when a project token did.
+	AddedBy *openapi_types.UUID `json:"added_by"`
+
+	// Note Why the unit is pinned; null for none.
+	Note      *string `json:"note"`
+	UnitId    string  `json:"unit_id"`
+	UnitType  string  `json:"unit_type"`
+	Variation string  `json:"variation"`
+}
+
+// OverrideInput defines model for OverrideInput.
+type OverrideInput struct {
+	// Note At most 200 characters once trimmed; blank is none.
+	Note *string `json:"note,omitempty"`
+
+	// UnitId The unit's ID, of 1 to 256 bytes, unique per unit type in the configuration.
+	UnitId string `json:"unit_id"`
+
+	// UnitType A unit type the project declares.
+	UnitType  string `json:"unit_type"`
+	Variation string `json:"variation"`
+}
+
+// OverridePut defines model for OverridePut.
+type OverridePut struct {
+	// Note At most 200 characters once trimmed; blank or absent is none.
+	Note      *string `json:"note,omitempty"`
+	Variation string  `json:"variation"`
+}
+
 // PasswordChange defines model for PasswordChange.
 type PasswordChange struct {
 	CurrentPassword string `json:"current_password"`
@@ -806,6 +876,15 @@ type PasswordChange struct {
 
 // Permission A permission of the catalog, named entity.verb, such as `environment.manage`.
 type Permission = string
+
+// Prerequisite defines model for Prerequisite.
+type Prerequisite struct {
+	// Flag The key of another flag of the project, not archived.
+	Flag string `json:"flag"`
+
+	// Variation One of that flag's variations.
+	Variation string `json:"variation"`
+}
 
 // Problem A problem document (RFC 9457). Code-specific values are further members.
 type Problem struct {
@@ -970,6 +1049,43 @@ type RoleList struct {
 // RoleName defines model for RoleName.
 type RoleName string
 
+// Rule defines model for Rule.
+type Rule struct {
+	// Conditions Every one must hold for the rule to match.
+	Conditions  []Condition `json:"conditions"`
+	Description string      `json:"description"`
+
+	// Id Given by the server to a new rule and kept across writes.
+	Id openapi_types.UUID `json:"id"`
+
+	// Serve What a matching rule serves. `variation` serves `variation`;
+	// `rollout` serves `variation` to `percentage` of the units of
+	// `unit_type`, in basis points (0 to 10,000), the others continuing to
+	// the next rule. A rollout's `salt` is given by the server and changes
+	// only through regenerating it, so a write omits it or sends it
+	// unchanged. Experiments are not available yet
+	// (`experiment_not_available`).
+	Serve Serve `json:"serve"`
+}
+
+// RuleInput defines model for RuleInput.
+type RuleInput struct {
+	Conditions  *[]Condition `json:"conditions,omitempty"`
+	Description *Description `json:"description,omitempty"`
+
+	// Id The rule of the current configuration this one is; omitted for a new rule.
+	Id *openapi_types.UUID `json:"id,omitempty"`
+
+	// Serve What a matching rule serves. `variation` serves `variation`;
+	// `rollout` serves `variation` to `percentage` of the units of
+	// `unit_type`, in basis points (0 to 10,000), the others continuing to
+	// the next rule. A rollout's `salt` is given by the server and changes
+	// only through regenerating it, so a write omits it or sends it
+	// unchanged. Experiments are not available yet
+	// (`experiment_not_available`).
+	Serve Serve `json:"serve"`
+}
+
 // Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
 type Scope string
 
@@ -1017,6 +1133,22 @@ type SegmentPatch struct {
 	Key     *string `json:"key,omitempty"`
 	Name    *Name   `json:"name,omitempty"`
 	Private *bool   `json:"private,omitempty"`
+}
+
+// Serve What a matching rule serves. `variation` serves `variation`;
+// `rollout` serves `variation` to `percentage` of the units of
+// `unit_type`, in basis points (0 to 10,000), the others continuing to
+// the next rule. A rollout's `salt` is given by the server and changes
+// only through regenerating it, so a write omits it or sends it
+// unchanged. Experiments are not available yet
+// (`experiment_not_available`).
+type Serve struct {
+	// Kind `variation` or `rollout`.
+	Kind       string  `json:"kind"`
+	Percentage *int    `json:"percentage,omitempty"`
+	Salt       *string `json:"salt,omitempty"`
+	UnitType   *string `json:"unit_type,omitempty"`
+	Variation  *string `json:"variation,omitempty"`
 }
 
 // Session One device a member is signed in on.
@@ -1162,6 +1294,9 @@ type AuditEnvironment = openapi_types.UUID
 // AuditFrom defines model for AuditFrom.
 type AuditFrom = time.Time
 
+// AuditKillSwitch defines model for AuditKillSwitch.
+type AuditKillSwitch = bool
+
 // AuditQ defines model for AuditQ.
 type AuditQ = string
 
@@ -1273,6 +1408,9 @@ type ListAuditEntriesParams struct {
 	// Q Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
 	Q *AuditQ `form:"q,omitempty" json:"q,omitempty"`
 
+	// KillSwitch Lists only the entries of kill switches when true, only the others when false.
+	KillSwitch *AuditKillSwitch `form:"kill_switch,omitempty" json:"kill_switch,omitempty"`
+
 	// Cursor The `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
@@ -1322,6 +1460,9 @@ type ListProjectAuditEntriesParams struct {
 	// Q Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
 	Q *AuditQ `form:"q,omitempty" json:"q,omitempty"`
 
+	// KillSwitch Lists only the entries of kill switches when true, only the others when false.
+	KillSwitch *AuditKillSwitch `form:"kill_switch,omitempty" json:"kill_switch,omitempty"`
+
 	// Cursor The `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
@@ -1363,6 +1504,26 @@ type UpdateFlagParams struct {
 
 // ArchiveFlagParams defines parameters for ArchiveFlag.
 type ArchiveFlagParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// PutFlagConfigurationParams defines parameters for PutFlagConfiguration.
+type PutFlagConfigurationParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// RegenerateRolloutSaltParams defines parameters for RegenerateRolloutSalt.
+type RegenerateRolloutSaltParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
 	// answered it (`"7"`, or `7`). Required: without it the write is
 	// refused `428 precondition_required`, and with any other version than
@@ -1448,6 +1609,15 @@ type CreateFlagJSONRequestBody = FlagCreate
 
 // UpdateFlagJSONRequestBody defines body for UpdateFlag for application/json ContentType.
 type UpdateFlagJSONRequestBody = FlagPatch
+
+// PutFlagConfigurationJSONRequestBody defines body for PutFlagConfiguration for application/json ContentType.
+type PutFlagConfigurationJSONRequestBody = FlagConfigurationPut
+
+// KillFlagJSONRequestBody defines body for KillFlag for application/json ContentType.
+type KillFlagJSONRequestBody = Kill
+
+// PutOverrideJSONRequestBody defines body for PutOverride for application/json ContentType.
+type PutOverrideJSONRequestBody = OverridePut
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody = GrantCreate
@@ -2204,6 +2374,138 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
 	ArchiveFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFlagConfiguration A flag's configuration in one environment
+	//
+	// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment} (the `GetFlagConfiguration` operationId).
+	GetFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFlagConfigurationWithBody Replace a flag's configuration in one environment
+	//
+	// Replaces the whole configuration: on or off, the off and fallthrough
+	// variations, prerequisites, overrides and rules, in one change. Every
+	// name in it is checked against the project (`invalid_configuration`,
+	// with a JSON Pointer to each field to fix): variations of this flag
+	// and of the flags it requires, declared attributes and unit types,
+	// existing segments, flags that are not archived, prerequisite chains
+	// that are acyclic and at most 5 flags deep in the environment
+	// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+	// flag keys in `params.path`), and the limits (`too_many` with
+	// `params.max`). A new rule omits `id` and is given one; a rule sent
+	// with an `id` is the rule of the current configuration it names
+	// (`unknown_rule` otherwise). A new rollout is given a salt, which
+	// then changes only through regenerating it. An override left as it
+	// was keeps the member who wrote it; any other is written by the
+	// caller. A configuration of an archived flag is not written
+	// (`archived`). A change to the values the configuration already has
+	// changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+	PutFlagConfigurationWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutFlagConfiguration Replace a flag's configuration in one environment
+	//
+	// Replaces the whole configuration: on or off, the off and fallthrough
+	// variations, prerequisites, overrides and rules, in one change. Every
+	// name in it is checked against the project (`invalid_configuration`,
+	// with a JSON Pointer to each field to fix): variations of this flag
+	// and of the flags it requires, declared attributes and unit types,
+	// existing segments, flags that are not archived, prerequisite chains
+	// that are acyclic and at most 5 flags deep in the environment
+	// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+	// flag keys in `params.path`), and the limits (`too_many` with
+	// `params.max`). A new rule omits `id` and is given one; a rule sent
+	// with an `id` is the rule of the current configuration it names
+	// (`unknown_rule` otherwise). A new rollout is given a salt, which
+	// then changes only through regenerating it. An override left as it
+	// was keeps the member who wrote it; any other is written by the
+	// caller. A configuration of an archived flag is not written
+	// (`archived`). A change to the values the configuration already has
+	// changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+	PutFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// KillFlagWithBody Switch a flag off in one environment at once
+	//
+	// The kill switch: switches the flag off in the environment, so it
+	// serves its off variation to everyone, and changes nothing else. It
+	// needs no `If-Match`, so it is never refused for an old page, and
+	// still moves the configuration's version on. A flag already off
+	// changes nothing and records nothing (`changed` false). The audit
+	// entry carries the reason and is marked as a kill switch, which the
+	// audit log is filtered by.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/kill (the `KillFlag` operationId).
+	KillFlagWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// KillFlag Switch a flag off in one environment at once
+	//
+	// The kill switch: switches the flag off in the environment, so it
+	// serves its off variation to everyone, and changes nothing else. It
+	// needs no `If-Match`, so it is never refused for an old page, and
+	// still moves the configuration's version on. A flag already off
+	// changes nothing and records nothing (`changed` false). The audit
+	// entry carries the reason and is marked as a kill switch, which the
+	// audit log is filtered by.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/kill (the `KillFlag` operationId).
+	KillFlag(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, body KillFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteOverride Remove the override of one unit
+	//
+	// Removes one override without replacing the configuration, and needs
+	// no `If-Match`; the configuration's version still moves on. A unit
+	// without an override is `not_found`.
+	//
+	// Corresponds with DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `DeleteOverride` operationId).
+	DeleteOverride(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutOverrideWithBody Pin a variation for one unit
+	//
+	// Sets one override without replacing the configuration, and needs
+	// no `If-Match`; the configuration's version still moves on. An
+	// override of the unit is replaced, variation and note together, and
+	// written by the caller; another is added, up to 200. Validated like
+	// an override of a whole configuration (`invalid_configuration`).
+	// Setting what the override already is changes nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
+	PutOverrideWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutOverride Pin a variation for one unit
+	//
+	// Sets one override without replacing the configuration, and needs
+	// no `If-Match`; the configuration's version still moves on. An
+	// override of the unit is replaced, variation and note together, and
+	// written by the caller; another is added, up to 200. Validated like
+	// an override of a whole configuration (`invalid_configuration`).
+	// Setting what the override already is changes nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
+	PutOverride(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, body PutOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegenerateRolloutSalt Give a rollout a new salt
+	//
+	// Gives the rollout of the rule a new salt, which reshuffles which
+	// units it serves: units in it may fall out and others come in. It is
+	// the only way a rollout's salt changes. A rule that is not a rollout
+	// is `not_a_rollout`.
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt (the `RegenerateRolloutSalt` operationId).
+	RegenerateRolloutSalt(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, rule string, params *RegenerateRolloutSaltParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RestoreFlag Restore an archived flag
 	//
@@ -3776,6 +4078,228 @@ func (c *Client) ArchiveFlag(ctx context.Context, project ProjectKey, flag FlagK
 	return c.Client.Do(req)
 }
 
+// GetFlagConfiguration A flag's configuration in one environment
+//
+// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment} (the `GetFlagConfiguration` operationId).
+func (c *Client) GetFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFlagConfigurationRequest(c.Server, project, flag, environment)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFlagConfigurationWithBody Replace a flag's configuration in one environment
+//
+// Replaces the whole configuration: on or off, the off and fallthrough
+// variations, prerequisites, overrides and rules, in one change. Every
+// name in it is checked against the project (`invalid_configuration`,
+// with a JSON Pointer to each field to fix): variations of this flag
+// and of the flags it requires, declared attributes and unit types,
+// existing segments, flags that are not archived, prerequisite chains
+// that are acyclic and at most 5 flags deep in the environment
+// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+// flag keys in `params.path`), and the limits (`too_many` with
+// `params.max`). A new rule omits `id` and is given one; a rule sent
+// with an `id` is the rule of the current configuration it names
+// (`unknown_rule` otherwise). A new rollout is given a salt, which
+// then changes only through regenerating it. An override left as it
+// was keeps the member who wrote it; any other is written by the
+// caller. A configuration of an archived flag is not written
+// (`archived`). A change to the values the configuration already has
+// changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+func (c *Client) PutFlagConfigurationWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFlagConfigurationRequestWithBody(c.Server, project, flag, environment, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutFlagConfiguration Replace a flag's configuration in one environment
+//
+// Replaces the whole configuration: on or off, the off and fallthrough
+// variations, prerequisites, overrides and rules, in one change. Every
+// name in it is checked against the project (`invalid_configuration`,
+// with a JSON Pointer to each field to fix): variations of this flag
+// and of the flags it requires, declared attributes and unit types,
+// existing segments, flags that are not archived, prerequisite chains
+// that are acyclic and at most 5 flags deep in the environment
+// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+// flag keys in `params.path`), and the limits (`too_many` with
+// `params.max`). A new rule omits `id` and is given one; a rule sent
+// with an `id` is the rule of the current configuration it names
+// (`unknown_rule` otherwise). A new rollout is given a salt, which
+// then changes only through regenerating it. An override left as it
+// was keeps the member who wrote it; any other is written by the
+// caller. A configuration of an archived flag is not written
+// (`archived`). A change to the values the configuration already has
+// changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+func (c *Client) PutFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutFlagConfigurationRequest(c.Server, project, flag, environment, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// KillFlagWithBody Switch a flag off in one environment at once
+//
+// The kill switch: switches the flag off in the environment, so it
+// serves its off variation to everyone, and changes nothing else. It
+// needs no `If-Match`, so it is never refused for an old page, and
+// still moves the configuration's version on. A flag already off
+// changes nothing and records nothing (`changed` false). The audit
+// entry carries the reason and is marked as a kill switch, which the
+// audit log is filtered by.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/kill (the `KillFlag` operationId).
+func (c *Client) KillFlagWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewKillFlagRequestWithBody(c.Server, project, flag, environment, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// KillFlag Switch a flag off in one environment at once
+//
+// The kill switch: switches the flag off in the environment, so it
+// serves its off variation to everyone, and changes nothing else. It
+// needs no `If-Match`, so it is never refused for an old page, and
+// still moves the configuration's version on. A flag already off
+// changes nothing and records nothing (`changed` false). The audit
+// entry carries the reason and is marked as a kill switch, which the
+// audit log is filtered by.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/kill (the `KillFlag` operationId).
+func (c *Client) KillFlag(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, body KillFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewKillFlagRequest(c.Server, project, flag, environment, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteOverride Remove the override of one unit
+//
+// Removes one override without replacing the configuration, and needs
+// no `If-Match`; the configuration's version still moves on. A unit
+// without an override is `not_found`.
+//
+// Corresponds with DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `DeleteOverride` operationId).
+func (c *Client) DeleteOverride(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteOverrideRequest(c.Server, project, flag, environment, unitType, unitId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutOverrideWithBody Pin a variation for one unit
+//
+// Sets one override without replacing the configuration, and needs
+// no `If-Match`; the configuration's version still moves on. An
+// override of the unit is replaced, variation and note together, and
+// written by the caller; another is added, up to 200. Validated like
+// an override of a whole configuration (`invalid_configuration`).
+// Setting what the override already is changes nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
+func (c *Client) PutOverrideWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutOverrideRequestWithBody(c.Server, project, flag, environment, unitType, unitId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutOverride Pin a variation for one unit
+//
+// Sets one override without replacing the configuration, and needs
+// no `If-Match`; the configuration's version still moves on. An
+// override of the unit is replaced, variation and note together, and
+// written by the caller; another is added, up to 200. Validated like
+// an override of a whole configuration (`invalid_configuration`).
+// Setting what the override already is changes nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
+func (c *Client) PutOverride(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, body PutOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutOverrideRequest(c.Server, project, flag, environment, unitType, unitId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RegenerateRolloutSalt Give a rollout a new salt
+//
+// Gives the rollout of the rule a new salt, which reshuffles which
+// units it serves: units in it may fall out and others come in. It is
+// the only way a rollout's salt changes. A rule that is not a rollout
+// is `not_a_rollout`.
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt (the `RegenerateRolloutSalt` operationId).
+func (c *Client) RegenerateRolloutSalt(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, rule string, params *RegenerateRolloutSaltParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRegenerateRolloutSaltRequest(c.Server, project, flag, environment, rule, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // RestoreFlag Restore an archived flag
 //
 // Brings an archived flag back to SDKs as it was archived. Restoring a flag that is not archived changes nothing.
@@ -4431,6 +4955,18 @@ func NewListAuditEntriesRequest(server string, params *ListAuditEntriesParams) (
 		if params.Q != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.KillSwitch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kill_switch", *params.KillSwitch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -5983,6 +6519,18 @@ func NewListProjectAuditEntriesRequest(server string, project ProjectKey, params
 
 		}
 
+		if params.KillSwitch != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kill_switch", *params.KillSwitch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Cursor != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
@@ -6601,6 +7149,398 @@ func NewArchiveFlagRequest(server string, project ProjectKey, flag FlagKey, para
 	}
 
 	operationPath := fmt.Sprintf("/projects/%s/flags/%s/archive", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetFlagConfigurationRequest constructs an http.Request for the GetFlagConfiguration method
+func NewGetFlagConfigurationRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutFlagConfigurationRequest calls the generic PutFlagConfiguration builder with application/json body
+func NewPutFlagConfigurationRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutFlagConfigurationRequestWithBody(server, project, flag, environment, params, "application/json", bodyReader)
+}
+
+// NewPutFlagConfigurationRequestWithBody constructs an http.Request for the PutFlagConfiguration method, with any body, and a specified content type
+func NewPutFlagConfigurationRequestWithBody(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewKillFlagRequest calls the generic KillFlag builder with application/json body
+func NewKillFlagRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, body KillFlagJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewKillFlagRequestWithBody(server, project, flag, environment, "application/json", bodyReader)
+}
+
+// NewKillFlagRequestWithBody constructs an http.Request for the KillFlag method, with any body, and a specified content type
+func NewKillFlagRequestWithBody(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s/kill", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteOverrideRequest constructs an http.Request for the DeleteOverride method
+func NewDeleteOverrideRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithOptions("simple", false, "unit_type", unitType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithOptions("simple", false, "unit_id", unitId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s/overrides/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutOverrideRequest calls the generic PutOverride builder with application/json body
+func NewPutOverrideRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, body PutOverrideJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutOverrideRequestWithBody(server, project, flag, environment, unitType, unitId, "application/json", bodyReader)
+}
+
+// NewPutOverrideRequestWithBody constructs an http.Request for the PutOverride method, with any body, and a specified content type
+func NewPutOverrideRequestWithBody(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithOptions("simple", false, "unit_type", unitType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam4 string
+
+	pathParam4, err = runtime.StyleParamWithOptions("simple", false, "unit_id", unitId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s/overrides/%s/%s", pathParam0, pathParam1, pathParam2, pathParam3, pathParam4)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRegenerateRolloutSaltRequest constructs an http.Request for the RegenerateRolloutSalt method
+func NewRegenerateRolloutSaltRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, rule string, params *RegenerateRolloutSaltParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam3 string
+
+	pathParam3, err = runtime.StyleParamWithOptions("simple", false, "rule", rule, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s/rules/%s/regenerate-salt", pathParam0, pathParam1, pathParam2, pathParam3)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -8312,6 +9252,144 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
 	ArchiveFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*ArchiveFlagResponse, error)
+
+	// GetFlagConfigurationWithResponse A flag's configuration in one environment
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment} (the `GetFlagConfiguration` operationId).
+	GetFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*GetFlagConfigurationResponse, error)
+
+	// PutFlagConfigurationWithBodyWithResponse Replace a flag's configuration in one environment
+	//
+	// Replaces the whole configuration: on or off, the off and fallthrough
+	// variations, prerequisites, overrides and rules, in one change. Every
+	// name in it is checked against the project (`invalid_configuration`,
+	// with a JSON Pointer to each field to fix): variations of this flag
+	// and of the flags it requires, declared attributes and unit types,
+	// existing segments, flags that are not archived, prerequisite chains
+	// that are acyclic and at most 5 flags deep in the environment
+	// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+	// flag keys in `params.path`), and the limits (`too_many` with
+	// `params.max`). A new rule omits `id` and is given one; a rule sent
+	// with an `id` is the rule of the current configuration it names
+	// (`unknown_rule` otherwise). A new rollout is given a salt, which
+	// then changes only through regenerating it. An override left as it
+	// was keeps the member who wrote it; any other is written by the
+	// caller. A configuration of an archived flag is not written
+	// (`archived`). A change to the values the configuration already has
+	// changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+	PutFlagConfigurationWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutFlagConfigurationResponse, error)
+
+	// PutFlagConfigurationWithResponse Replace a flag's configuration in one environment
+	//
+	// Replaces the whole configuration: on or off, the off and fallthrough
+	// variations, prerequisites, overrides and rules, in one change. Every
+	// name in it is checked against the project (`invalid_configuration`,
+	// with a JSON Pointer to each field to fix): variations of this flag
+	// and of the flags it requires, declared attributes and unit types,
+	// existing segments, flags that are not archived, prerequisite chains
+	// that are acyclic and at most 5 flags deep in the environment
+	// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+	// flag keys in `params.path`), and the limits (`too_many` with
+	// `params.max`). A new rule omits `id` and is given one; a rule sent
+	// with an `id` is the rule of the current configuration it names
+	// (`unknown_rule` otherwise). A new rollout is given a salt, which
+	// then changes only through regenerating it. An override left as it
+	// was keeps the member who wrote it; any other is written by the
+	// caller. A configuration of an archived flag is not written
+	// (`archived`). A change to the values the configuration already has
+	// changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+	PutFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*PutFlagConfigurationResponse, error)
+
+	// KillFlagWithBodyWithResponse Switch a flag off in one environment at once
+	//
+	// The kill switch: switches the flag off in the environment, so it
+	// serves its off variation to everyone, and changes nothing else. It
+	// needs no `If-Match`, so it is never refused for an old page, and
+	// still moves the configuration's version on. A flag already off
+	// changes nothing and records nothing (`changed` false). The audit
+	// entry carries the reason and is marked as a kill switch, which the
+	// audit log is filtered by.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/kill (the `KillFlag` operationId).
+	KillFlagWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*KillFlagResponse, error)
+
+	// KillFlagWithResponse Switch a flag off in one environment at once
+	//
+	// The kill switch: switches the flag off in the environment, so it
+	// serves its off variation to everyone, and changes nothing else. It
+	// needs no `If-Match`, so it is never refused for an old page, and
+	// still moves the configuration's version on. A flag already off
+	// changes nothing and records nothing (`changed` false). The audit
+	// entry carries the reason and is marked as a kill switch, which the
+	// audit log is filtered by.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/kill (the `KillFlag` operationId).
+	KillFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, body KillFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*KillFlagResponse, error)
+
+	// DeleteOverrideWithResponse Remove the override of one unit
+	//
+	// Removes one override without replacing the configuration, and needs
+	// no `If-Match`; the configuration's version still moves on. A unit
+	// without an override is `not_found`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `DeleteOverride` operationId).
+	DeleteOverrideWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, reqEditors ...RequestEditorFn) (*DeleteOverrideResponse, error)
+
+	// PutOverrideWithBodyWithResponse Pin a variation for one unit
+	//
+	// Sets one override without replacing the configuration, and needs
+	// no `If-Match`; the configuration's version still moves on. An
+	// override of the unit is replaced, variation and note together, and
+	// written by the caller; another is added, up to 200. Validated like
+	// an override of a whole configuration (`invalid_configuration`).
+	// Setting what the override already is changes nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
+	PutOverrideWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutOverrideResponse, error)
+
+	// PutOverrideWithResponse Pin a variation for one unit
+	//
+	// Sets one override without replacing the configuration, and needs
+	// no `If-Match`; the configuration's version still moves on. An
+	// override of the unit is replaced, variation and note together, and
+	// written by the caller; another is added, up to 200. Validated like
+	// an override of a whole configuration (`invalid_configuration`).
+	// Setting what the override already is changes nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
+	PutOverrideWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, body PutOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*PutOverrideResponse, error)
+
+	// RegenerateRolloutSaltWithResponse Give a rollout a new salt
+	//
+	// Gives the rollout of the rule a new salt, which reshuffles which
+	// units it serves: units in it may fall out and others come in. It is
+	// the only way a rollout's salt changes. A rule that is not a rollout
+	// is `not_a_rollout`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt (the `RegenerateRolloutSalt` operationId).
+	RegenerateRolloutSaltWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, rule string, params *RegenerateRolloutSaltParams, reqEditors ...RequestEditorFn) (*RegenerateRolloutSaltResponse, error)
 
 	// RestoreFlagWithResponse Restore an archived flag
 	//
@@ -12336,6 +13414,560 @@ func (r ArchiveFlagResponse) ContentType() string {
 	return ""
 }
 
+// GetFlagConfigurationResponse200Headers the declared response headers of an HTTP 200 response for GetFlagConfiguration
+type GetFlagConfigurationResponse200Headers struct {
+	ETag *string
+}
+
+// GetFlagConfigurationResponse401Headers the declared response headers of an HTTP 401 response for GetFlagConfiguration
+type GetFlagConfigurationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetFlagConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagConfiguration
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetFlagConfigurationResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetFlagConfigurationResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFlagConfigurationResponse) GetJSON200() *FlagConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetFlagConfigurationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetFlagConfigurationResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetFlagConfigurationResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFlagConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFlagConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFlagConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFlagConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutFlagConfigurationResponse200Headers the declared response headers of an HTTP 200 response for PutFlagConfiguration
+type PutFlagConfigurationResponse200Headers struct {
+	ETag *string
+}
+
+// PutFlagConfigurationResponse401Headers the declared response headers of an HTTP 401 response for PutFlagConfiguration
+type PutFlagConfigurationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type PutFlagConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagConfiguration
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *PutFlagConfigurationResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *PutFlagConfigurationResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutFlagConfigurationResponse) GetJSON200() *FlagConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r PutFlagConfigurationResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r PutFlagConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutFlagConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutFlagConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutFlagConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// KillFlagResponse200Headers the declared response headers of an HTTP 200 response for KillFlag
+type KillFlagResponse200Headers struct {
+	ETag *string
+}
+
+// KillFlagResponse401Headers the declared response headers of an HTTP 401 response for KillFlag
+type KillFlagResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type KillFlagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *KillResult
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *KillFlagResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *KillFlagResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r KillFlagResponse) GetJSON200() *KillResult {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r KillFlagResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r KillFlagResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r KillFlagResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r KillFlagResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r KillFlagResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r KillFlagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r KillFlagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r KillFlagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r KillFlagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteOverrideResponse200Headers the declared response headers of an HTTP 200 response for DeleteOverride
+type DeleteOverrideResponse200Headers struct {
+	ETag *string
+}
+
+// DeleteOverrideResponse401Headers the declared response headers of an HTTP 401 response for DeleteOverride
+type DeleteOverrideResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteOverrideResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagConfiguration
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DeleteOverrideResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteOverrideResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteOverrideResponse) GetJSON200() *FlagConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteOverrideResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteOverrideResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteOverrideResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteOverrideResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteOverrideResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteOverrideResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteOverrideResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteOverrideResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PutOverrideResponse200Headers the declared response headers of an HTTP 200 response for PutOverride
+type PutOverrideResponse200Headers struct {
+	ETag *string
+}
+
+// PutOverrideResponse401Headers the declared response headers of an HTTP 401 response for PutOverride
+type PutOverrideResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type PutOverrideResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagConfiguration
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *PutOverrideResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *PutOverrideResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutOverrideResponse) GetJSON200() *FlagConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r PutOverrideResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r PutOverrideResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PutOverrideResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r PutOverrideResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r PutOverrideResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r PutOverrideResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutOverrideResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutOverrideResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutOverrideResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RegenerateRolloutSaltResponse200Headers the declared response headers of an HTTP 200 response for RegenerateRolloutSalt
+type RegenerateRolloutSaltResponse200Headers struct {
+	ETag *string
+}
+
+// RegenerateRolloutSaltResponse401Headers the declared response headers of an HTTP 401 response for RegenerateRolloutSalt
+type RegenerateRolloutSaltResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RegenerateRolloutSaltResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagConfiguration
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RegenerateRolloutSaltResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RegenerateRolloutSaltResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RegenerateRolloutSaltResponse) GetJSON200() *FlagConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r RegenerateRolloutSaltResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RegenerateRolloutSaltResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RegenerateRolloutSaltResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RegenerateRolloutSaltResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RegenerateRolloutSaltResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r RegenerateRolloutSaltResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r RegenerateRolloutSaltResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r RegenerateRolloutSaltResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RegenerateRolloutSaltResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RegenerateRolloutSaltResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RegenerateRolloutSaltResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // RestoreFlagResponse200Headers the declared response headers of an HTTP 200 response for RestoreFlag
 type RestoreFlagResponse200Headers struct {
 	ETag *string
@@ -15048,6 +16680,198 @@ func (c *ClientWithResponses) ArchiveFlagWithResponse(ctx context.Context, proje
 		return nil, err
 	}
 	return ParseArchiveFlagResponse(rsp)
+}
+
+// GetFlagConfigurationWithResponse A flag's configuration in one environment
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment} (the `GetFlagConfiguration` operationId).
+func (c *ClientWithResponses) GetFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*GetFlagConfigurationResponse, error) {
+	rsp, err := c.GetFlagConfiguration(ctx, project, flag, environment, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFlagConfigurationResponse(rsp)
+}
+
+// PutFlagConfigurationWithBodyWithResponse Replace a flag's configuration in one environment
+//
+// Replaces the whole configuration: on or off, the off and fallthrough
+// variations, prerequisites, overrides and rules, in one change. Every
+// name in it is checked against the project (`invalid_configuration`,
+// with a JSON Pointer to each field to fix): variations of this flag
+// and of the flags it requires, declared attributes and unit types,
+// existing segments, flags that are not archived, prerequisite chains
+// that are acyclic and at most 5 flags deep in the environment
+// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+// flag keys in `params.path`), and the limits (`too_many` with
+// `params.max`). A new rule omits `id` and is given one; a rule sent
+// with an `id` is the rule of the current configuration it names
+// (`unknown_rule` otherwise). A new rollout is given a salt, which
+// then changes only through regenerating it. An override left as it
+// was keeps the member who wrote it; any other is written by the
+// caller. A configuration of an archived flag is not written
+// (`archived`). A change to the values the configuration already has
+// changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+func (c *ClientWithResponses) PutFlagConfigurationWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutFlagConfigurationResponse, error) {
+	rsp, err := c.PutFlagConfigurationWithBody(ctx, project, flag, environment, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFlagConfigurationResponse(rsp)
+}
+
+// PutFlagConfigurationWithResponse Replace a flag's configuration in one environment
+//
+// Replaces the whole configuration: on or off, the off and fallthrough
+// variations, prerequisites, overrides and rules, in one change. Every
+// name in it is checked against the project (`invalid_configuration`,
+// with a JSON Pointer to each field to fix): variations of this flag
+// and of the flags it requires, declared attributes and unit types,
+// existing segments, flags that are not archived, prerequisite chains
+// that are acyclic and at most 5 flags deep in the environment
+// (`prerequisite_cycle`, `prerequisite_too_deep` with the chain's
+// flag keys in `params.path`), and the limits (`too_many` with
+// `params.max`). A new rule omits `id` and is given one; a rule sent
+// with an `id` is the rule of the current configuration it names
+// (`unknown_rule` otherwise). A new rollout is given a salt, which
+// then changes only through regenerating it. An override left as it
+// was keeps the member who wrote it; any other is written by the
+// caller. A configuration of an archived flag is not written
+// (`archived`). A change to the values the configuration already has
+// changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
+func (c *ClientWithResponses) PutFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*PutFlagConfigurationResponse, error) {
+	rsp, err := c.PutFlagConfiguration(ctx, project, flag, environment, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutFlagConfigurationResponse(rsp)
+}
+
+// KillFlagWithBodyWithResponse Switch a flag off in one environment at once
+//
+// The kill switch: switches the flag off in the environment, so it
+// serves its off variation to everyone, and changes nothing else. It
+// needs no `If-Match`, so it is never refused for an old page, and
+// still moves the configuration's version on. A flag already off
+// changes nothing and records nothing (`changed` false). The audit
+// entry carries the reason and is marked as a kill switch, which the
+// audit log is filtered by.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/kill (the `KillFlag` operationId).
+func (c *ClientWithResponses) KillFlagWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*KillFlagResponse, error) {
+	rsp, err := c.KillFlagWithBody(ctx, project, flag, environment, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseKillFlagResponse(rsp)
+}
+
+// KillFlagWithResponse Switch a flag off in one environment at once
+//
+// The kill switch: switches the flag off in the environment, so it
+// serves its off variation to everyone, and changes nothing else. It
+// needs no `If-Match`, so it is never refused for an old page, and
+// still moves the configuration's version on. A flag already off
+// changes nothing and records nothing (`changed` false). The audit
+// entry carries the reason and is marked as a kill switch, which the
+// audit log is filtered by.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/kill (the `KillFlag` operationId).
+func (c *ClientWithResponses) KillFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, body KillFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*KillFlagResponse, error) {
+	rsp, err := c.KillFlag(ctx, project, flag, environment, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseKillFlagResponse(rsp)
+}
+
+// DeleteOverrideWithResponse Remove the override of one unit
+//
+// Removes one override without replacing the configuration, and needs
+// no `If-Match`; the configuration's version still moves on. A unit
+// without an override is `not_found`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `DeleteOverride` operationId).
+func (c *ClientWithResponses) DeleteOverrideWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, reqEditors ...RequestEditorFn) (*DeleteOverrideResponse, error) {
+	rsp, err := c.DeleteOverride(ctx, project, flag, environment, unitType, unitId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteOverrideResponse(rsp)
+}
+
+// PutOverrideWithBodyWithResponse Pin a variation for one unit
+//
+// Sets one override without replacing the configuration, and needs
+// no `If-Match`; the configuration's version still moves on. An
+// override of the unit is replaced, variation and note together, and
+// written by the caller; another is added, up to 200. Validated like
+// an override of a whole configuration (`invalid_configuration`).
+// Setting what the override already is changes nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
+func (c *ClientWithResponses) PutOverrideWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutOverrideResponse, error) {
+	rsp, err := c.PutOverrideWithBody(ctx, project, flag, environment, unitType, unitId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutOverrideResponse(rsp)
+}
+
+// PutOverrideWithResponse Pin a variation for one unit
+//
+// Sets one override without replacing the configuration, and needs
+// no `If-Match`; the configuration's version still moves on. An
+// override of the unit is replaced, variation and note together, and
+// written by the caller; another is added, up to 200. Validated like
+// an override of a whole configuration (`invalid_configuration`).
+// Setting what the override already is changes nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
+func (c *ClientWithResponses) PutOverrideWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, body PutOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*PutOverrideResponse, error) {
+	rsp, err := c.PutOverride(ctx, project, flag, environment, unitType, unitId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutOverrideResponse(rsp)
+}
+
+// RegenerateRolloutSaltWithResponse Give a rollout a new salt
+//
+// Gives the rollout of the rule a new salt, which reshuffles which
+// units it serves: units in it may fall out and others come in. It is
+// the only way a rollout's salt changes. A rule that is not a rollout
+// is `not_a_rollout`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt (the `RegenerateRolloutSalt` operationId).
+func (c *ClientWithResponses) RegenerateRolloutSaltWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, rule string, params *RegenerateRolloutSaltParams, reqEditors ...RequestEditorFn) (*RegenerateRolloutSaltResponse, error) {
+	rsp, err := c.RegenerateRolloutSalt(ctx, project, flag, environment, rule, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegenerateRolloutSaltResponse(rsp)
 }
 
 // RestoreFlagWithResponse Restore an archived flag
@@ -18856,6 +20680,524 @@ func ParseArchiveFlagResponse(rsp *http.Response) (*ArchiveFlagResponse, error) 
 	return response, nil
 }
 
+// ParseGetFlagConfigurationResponse parses an HTTP response from a GetFlagConfigurationWithResponse call
+func ParseGetFlagConfigurationResponse(rsp *http.Response) (*GetFlagConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFlagConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetFlagConfigurationResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetFlagConfigurationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePutFlagConfigurationResponse parses an HTTP response from a PutFlagConfigurationWithResponse call
+func ParsePutFlagConfigurationResponse(rsp *http.Response) (*PutFlagConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutFlagConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers PutFlagConfigurationResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers PutFlagConfigurationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseKillFlagResponse parses an HTTP response from a KillFlagWithResponse call
+func ParseKillFlagResponse(rsp *http.Response) (*KillFlagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &KillFlagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest KillResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers KillFlagResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers KillFlagResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteOverrideResponse parses an HTTP response from a DeleteOverrideWithResponse call
+func ParseDeleteOverrideResponse(rsp *http.Response) (*DeleteOverrideResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteOverrideResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers DeleteOverrideResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers DeleteOverrideResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParsePutOverrideResponse parses an HTTP response from a PutOverrideWithResponse call
+func ParsePutOverrideResponse(rsp *http.Response) (*PutOverrideResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutOverrideResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers PutOverrideResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers PutOverrideResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRegenerateRolloutSaltResponse parses an HTTP response from a RegenerateRolloutSaltWithResponse call
+func ParseRegenerateRolloutSaltResponse(rsp *http.Response) (*RegenerateRolloutSaltResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RegenerateRolloutSaltResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RegenerateRolloutSaltResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RegenerateRolloutSaltResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseRestoreFlagResponse parses an HTTP response from a RestoreFlagWithResponse call
 func ParseRestoreFlagResponse(rsp *http.Response) (*RestoreFlagResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -20425,6 +22767,24 @@ type ServerInterface interface {
 	// ArchiveFlag Archive a flag
 	// (POST /projects/{project}/flags/{flag}/archive)
 	ArchiveFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params ArchiveFlagParams)
+	// GetFlagConfiguration A flag's configuration in one environment
+	// (GET /projects/{project}/flags/{flag}/environments/{environment})
+	GetFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey)
+	// PutFlagConfiguration Replace a flag's configuration in one environment
+	// (PUT /projects/{project}/flags/{flag}/environments/{environment})
+	PutFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params PutFlagConfigurationParams)
+	// KillFlag Switch a flag off in one environment at once
+	// (POST /projects/{project}/flags/{flag}/environments/{environment}/kill)
+	KillFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey)
+	// DeleteOverride Remove the override of one unit
+	// (DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
+	DeleteOverride(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string)
+	// PutOverride Pin a variation for one unit
+	// (PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
+	PutOverride(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string)
+	// RegenerateRolloutSalt Give a rollout a new salt
+	// (POST /projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt)
+	RegenerateRolloutSalt(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, rule string, params RegenerateRolloutSaltParams)
 	// RestoreFlag Restore an archived flag
 	// (POST /projects/{project}/flags/{flag}/restore)
 	RestoreFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params RestoreFlagParams)
@@ -20634,6 +22994,19 @@ func (siw *ServerInterfaceWrapper) ListAuditEntries(w http.ResponseWriter, r *ht
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "kill_switch" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kill_switch", r.URL.Query(), &params.KillSwitch, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kill_switch"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kill_switch", Err: err})
 		}
 		return
 	}
@@ -21641,6 +24014,19 @@ func (siw *ServerInterfaceWrapper) ListProjectAuditEntries(w http.ResponseWriter
 		return
 	}
 
+	// ------------- Optional query parameter "kill_switch" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kill_switch", r.URL.Query(), &params.KillSwitch, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kill_switch"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kill_switch", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "cursor" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -22167,6 +24553,363 @@ func (siw *ServerInterfaceWrapper) ArchiveFlag(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ArchiveFlag(w, r, project, flag, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFlagConfiguration operation middleware
+func (siw *ServerInterfaceWrapper) GetFlagConfiguration(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFlagConfiguration(w, r, project, flag, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutFlagConfiguration operation middleware
+func (siw *ServerInterfaceWrapper) PutFlagConfiguration(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutFlagConfigurationParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutFlagConfiguration(w, r, project, flag, environment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// KillFlag operation middleware
+func (siw *ServerInterfaceWrapper) KillFlag(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.KillFlag(w, r, project, flag, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteOverride operation middleware
+func (siw *ServerInterfaceWrapper) DeleteOverride(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "unit_type" -------------
+	var unitType UnitTypeKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "unit_type", r.PathValue("unit_type"), &unitType, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "unit_type", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "unit_id" -------------
+	var unitId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "unit_id", r.PathValue("unit_id"), &unitId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "unit_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteOverride(w, r, project, flag, environment, unitType, unitId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutOverride operation middleware
+func (siw *ServerInterfaceWrapper) PutOverride(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "unit_type" -------------
+	var unitType UnitTypeKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "unit_type", r.PathValue("unit_type"), &unitType, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "unit_type", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "unit_id" -------------
+	var unitId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "unit_id", r.PathValue("unit_id"), &unitId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "unit_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutOverride(w, r, project, flag, environment, unitType, unitId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegenerateRolloutSalt operation middleware
+func (siw *ServerInterfaceWrapper) RegenerateRolloutSalt(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "rule" -------------
+	var rule string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "rule", r.PathValue("rule"), &rule, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rule", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RegenerateRolloutSaltParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegenerateRolloutSalt(w, r, project, flag, environment, rule, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -23034,6 +25777,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/flags/{flag}", wrapper.UpdateFlag)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/archive", wrapper.ArchiveFlag)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/restore", wrapper.RestoreFlag)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}", wrapper.GetFlagConfiguration)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}", wrapper.PutFlagConfiguration)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/kill", wrapper.KillFlag)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}", wrapper.DeleteOverride)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}", wrapper.PutOverride)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt", wrapper.RegenerateRolloutSalt)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/segments", wrapper.ListSegments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/segments", wrapper.CreateSegment)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/segments/{segment}", wrapper.DeleteSegment)
@@ -27393,6 +30142,750 @@ func (response ArchiveFlag428ApplicationProblemPlusJSONResponse) VisitArchiveFla
 	return err
 }
 
+type GetFlagConfigurationRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+}
+
+type GetFlagConfigurationResponseObject interface {
+	VisitGetFlagConfigurationResponse(w http.ResponseWriter) error
+}
+
+type GetFlagConfiguration200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetFlagConfiguration200JSONResponse struct {
+	Body    FlagConfiguration
+	Headers GetFlagConfiguration200ResponseHeaders
+}
+
+func (response GetFlagConfiguration200JSONResponse) VisitGetFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagConfiguration401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagConfiguration401ApplicationProblemPlusJSONResponse) VisitGetFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagConfiguration403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagConfiguration403ApplicationProblemPlusJSONResponse) VisitGetFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagConfiguration404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagConfiguration404ApplicationProblemPlusJSONResponse) VisitGetFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfigurationRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+	Params      PutFlagConfigurationParams
+	Body        *PutFlagConfigurationJSONRequestBody
+}
+
+type PutFlagConfigurationResponseObject interface {
+	VisitPutFlagConfigurationResponse(w http.ResponseWriter) error
+}
+
+type PutFlagConfiguration200ResponseHeaders struct {
+	ETag *string
+}
+
+type PutFlagConfiguration200JSONResponse struct {
+	Body    FlagConfiguration
+	Headers PutFlagConfiguration200ResponseHeaders
+}
+
+func (response PutFlagConfiguration200JSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration400ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration401ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration403ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration404ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration409ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration412ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration422ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutFlagConfiguration428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response PutFlagConfiguration428ApplicationProblemPlusJSONResponse) VisitPutFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type KillFlagRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+	Body        *KillFlagJSONRequestBody
+}
+
+type KillFlagResponseObject interface {
+	VisitKillFlagResponse(w http.ResponseWriter) error
+}
+
+type KillFlag200ResponseHeaders struct {
+	ETag *string
+}
+
+type KillFlag200JSONResponse struct {
+	Body    KillResult
+	Headers KillFlag200ResponseHeaders
+}
+
+func (response KillFlag200JSONResponse) VisitKillFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type KillFlag401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response KillFlag401ApplicationProblemPlusJSONResponse) VisitKillFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type KillFlag403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response KillFlag403ApplicationProblemPlusJSONResponse) VisitKillFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type KillFlag404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response KillFlag404ApplicationProblemPlusJSONResponse) VisitKillFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type KillFlag409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response KillFlag409ApplicationProblemPlusJSONResponse) VisitKillFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type KillFlag422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response KillFlag422ApplicationProblemPlusJSONResponse) VisitKillFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteOverrideRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+	UnitType    UnitTypeKey    `json:"unit_type"`
+	UnitId      string         `json:"unit_id"`
+}
+
+type DeleteOverrideResponseObject interface {
+	VisitDeleteOverrideResponse(w http.ResponseWriter) error
+}
+
+type DeleteOverride200ResponseHeaders struct {
+	ETag *string
+}
+
+type DeleteOverride200JSONResponse struct {
+	Body    FlagConfiguration
+	Headers DeleteOverride200ResponseHeaders
+}
+
+func (response DeleteOverride200JSONResponse) VisitDeleteOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteOverride401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteOverride401ApplicationProblemPlusJSONResponse) VisitDeleteOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteOverride403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteOverride403ApplicationProblemPlusJSONResponse) VisitDeleteOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteOverride404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteOverride404ApplicationProblemPlusJSONResponse) VisitDeleteOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteOverride409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteOverride409ApplicationProblemPlusJSONResponse) VisitDeleteOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutOverrideRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+	UnitType    UnitTypeKey    `json:"unit_type"`
+	UnitId      string         `json:"unit_id"`
+	Body        *PutOverrideJSONRequestBody
+}
+
+type PutOverrideResponseObject interface {
+	VisitPutOverrideResponse(w http.ResponseWriter) error
+}
+
+type PutOverride200ResponseHeaders struct {
+	ETag *string
+}
+
+type PutOverride200JSONResponse struct {
+	Body    FlagConfiguration
+	Headers PutOverride200ResponseHeaders
+}
+
+func (response PutOverride200JSONResponse) VisitPutOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutOverride401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response PutOverride401ApplicationProblemPlusJSONResponse) VisitPutOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutOverride403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PutOverride403ApplicationProblemPlusJSONResponse) VisitPutOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutOverride404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PutOverride404ApplicationProblemPlusJSONResponse) VisitPutOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutOverride409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response PutOverride409ApplicationProblemPlusJSONResponse) VisitPutOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutOverride422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response PutOverride422ApplicationProblemPlusJSONResponse) VisitPutOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateRolloutSaltRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+	Rule        string         `json:"rule"`
+	Params      RegenerateRolloutSaltParams
+}
+
+type RegenerateRolloutSaltResponseObject interface {
+	VisitRegenerateRolloutSaltResponse(w http.ResponseWriter) error
+}
+
+type RegenerateRolloutSalt200ResponseHeaders struct {
+	ETag *string
+}
+
+type RegenerateRolloutSalt200JSONResponse struct {
+	Body    FlagConfiguration
+	Headers RegenerateRolloutSalt200ResponseHeaders
+}
+
+func (response RegenerateRolloutSalt200JSONResponse) VisitRegenerateRolloutSaltResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateRolloutSalt400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateRolloutSalt400ApplicationProblemPlusJSONResponse) VisitRegenerateRolloutSaltResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateRolloutSalt401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateRolloutSalt401ApplicationProblemPlusJSONResponse) VisitRegenerateRolloutSaltResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateRolloutSalt403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateRolloutSalt403ApplicationProblemPlusJSONResponse) VisitRegenerateRolloutSaltResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateRolloutSalt404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateRolloutSalt404ApplicationProblemPlusJSONResponse) VisitRegenerateRolloutSaltResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateRolloutSalt409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateRolloutSalt409ApplicationProblemPlusJSONResponse) VisitRegenerateRolloutSaltResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateRolloutSalt412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateRolloutSalt412ApplicationProblemPlusJSONResponse) VisitRegenerateRolloutSaltResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateRolloutSalt428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateRolloutSalt428ApplicationProblemPlusJSONResponse) VisitRegenerateRolloutSaltResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RestoreFlagRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Flag    FlagKey    `json:"flag"`
@@ -29416,6 +32909,24 @@ type StrictServerInterface interface {
 	// ArchiveFlag Archive a flag
 	// (POST /projects/{project}/flags/{flag}/archive)
 	ArchiveFlag(ctx context.Context, request ArchiveFlagRequestObject) (ArchiveFlagResponseObject, error)
+	// GetFlagConfiguration A flag's configuration in one environment
+	// (GET /projects/{project}/flags/{flag}/environments/{environment})
+	GetFlagConfiguration(ctx context.Context, request GetFlagConfigurationRequestObject) (GetFlagConfigurationResponseObject, error)
+	// PutFlagConfiguration Replace a flag's configuration in one environment
+	// (PUT /projects/{project}/flags/{flag}/environments/{environment})
+	PutFlagConfiguration(ctx context.Context, request PutFlagConfigurationRequestObject) (PutFlagConfigurationResponseObject, error)
+	// KillFlag Switch a flag off in one environment at once
+	// (POST /projects/{project}/flags/{flag}/environments/{environment}/kill)
+	KillFlag(ctx context.Context, request KillFlagRequestObject) (KillFlagResponseObject, error)
+	// DeleteOverride Remove the override of one unit
+	// (DELETE /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
+	DeleteOverride(ctx context.Context, request DeleteOverrideRequestObject) (DeleteOverrideResponseObject, error)
+	// PutOverride Pin a variation for one unit
+	// (PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
+	PutOverride(ctx context.Context, request PutOverrideRequestObject) (PutOverrideResponseObject, error)
+	// RegenerateRolloutSalt Give a rollout a new salt
+	// (POST /projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt)
+	RegenerateRolloutSalt(ctx context.Context, request RegenerateRolloutSaltRequestObject) (RegenerateRolloutSaltResponseObject, error)
 	// RestoreFlag Restore an archived flag
 	// (POST /projects/{project}/flags/{flag}/restore)
 	RestoreFlag(ctx context.Context, request RestoreFlagRequestObject) (RestoreFlagResponseObject, error)
@@ -30914,6 +34425,205 @@ func (sh *strictHandler) ArchiveFlag(w http.ResponseWriter, r *http.Request, pro
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ArchiveFlagResponseObject); ok {
 		if err := validResponse.VisitArchiveFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFlagConfiguration operation middleware
+func (sh *strictHandler) GetFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey) {
+	var request GetFlagConfigurationRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFlagConfiguration(ctx, request.(GetFlagConfigurationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFlagConfiguration")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFlagConfigurationResponseObject); ok {
+		if err := validResponse.VisitGetFlagConfigurationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutFlagConfiguration operation middleware
+func (sh *strictHandler) PutFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params PutFlagConfigurationParams) {
+	var request PutFlagConfigurationRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+	request.Params = params
+
+	var body PutFlagConfigurationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutFlagConfiguration(ctx, request.(PutFlagConfigurationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutFlagConfiguration")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutFlagConfigurationResponseObject); ok {
+		if err := validResponse.VisitPutFlagConfigurationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// KillFlag operation middleware
+func (sh *strictHandler) KillFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey) {
+	var request KillFlagRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+
+	var body KillFlagJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.KillFlag(ctx, request.(KillFlagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "KillFlag")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(KillFlagResponseObject); ok {
+		if err := validResponse.VisitKillFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteOverride operation middleware
+func (sh *strictHandler) DeleteOverride(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string) {
+	var request DeleteOverrideRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+	request.UnitType = unitType
+	request.UnitId = unitId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteOverride(ctx, request.(DeleteOverrideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteOverride")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteOverrideResponseObject); ok {
+		if err := validResponse.VisitDeleteOverrideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutOverride operation middleware
+func (sh *strictHandler) PutOverride(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string) {
+	var request PutOverrideRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+	request.UnitType = unitType
+	request.UnitId = unitId
+
+	var body PutOverrideJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutOverride(ctx, request.(PutOverrideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutOverride")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutOverrideResponseObject); ok {
+		if err := validResponse.VisitPutOverrideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegenerateRolloutSalt operation middleware
+func (sh *strictHandler) RegenerateRolloutSalt(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, rule string, params RegenerateRolloutSaltParams) {
+	var request RegenerateRolloutSaltRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+	request.Rule = rule
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegenerateRolloutSalt(ctx, request.(RegenerateRolloutSaltRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegenerateRolloutSalt")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegenerateRolloutSaltResponseObject); ok {
+		if err := validResponse.VisitRegenerateRolloutSaltResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

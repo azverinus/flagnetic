@@ -455,6 +455,7 @@ export const zAuditEntry = z.object({
   entity: zAuditEntity,
   before: z.unknown(),
   after: z.unknown(),
+  kill_switch: z.boolean(),
   request_id: z.string().nullable(),
 });
 
@@ -551,26 +552,55 @@ export const zFlagDefinition = z.object({
   version: zVersion,
 });
 
-/**
- * What the flag serves in one environment.
- */
-export const zFlagConfiguration = z.object({
-  environment: zKey,
-  on: z.boolean(),
-  off_variation: z.string(),
-  fallthrough: z.string(),
-  updated_at: z.iso.datetime(),
-  version: zVersion,
+export const zPrerequisite = z.object({
+  flag: z.string(),
+  variation: z.string(),
 });
 
 /**
- * A flag's definition with its configuration in every environment, by the environments' order.
+ * A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
  */
-export const zFlag = zFlagDefinition.and(
-  z.object({
-    environments: z.array(zFlagConfiguration),
-  }),
-);
+export const zOverride = z.object({
+  unit_type: z.string(),
+  unit_id: z.string(),
+  variation: z.string(),
+  note: z.string().nullable(),
+  added_by: z.uuid().nullable(),
+});
+
+export const zOverrideInput = z.object({
+  unit_type: z.string(),
+  unit_id: z.string().min(1),
+  variation: z.string(),
+  note: z.string().nullish(),
+});
+
+/**
+ * What a matching rule serves. `variation` serves `variation`;
+ * `rollout` serves `variation` to `percentage` of the units of
+ * `unit_type`, in basis points (0 to 10,000), the others continuing to
+ * the next rule. A rollout's `salt` is given by the server and changes
+ * only through regenerating it, so a write omits it or sends it
+ * unchanged. Experiments are not available yet
+ * (`experiment_not_available`).
+ *
+ */
+export const zServe = z.object({
+  kind: z.string(),
+  variation: z.string().optional(),
+  unit_type: z.string().optional(),
+  percentage: z.int().gte(0).lte(10000).optional(),
+  salt: z.string().optional(),
+});
+
+export const zOverridePut = z.object({
+  variation: z.string(),
+  note: z.string().nullish(),
+});
+
+export const zKill = z.object({
+  reason: z.string().nullish(),
+});
 
 export const zFlagList = z.object({
   items: z.array(zFlagDefinition),
@@ -623,6 +653,59 @@ export const zCondition = z.object({
   segment: z.string().optional(),
   flag: z.string().optional(),
   variation: z.string().optional(),
+});
+
+export const zRule = z.object({
+  id: z.uuid(),
+  description: z.string(),
+  conditions: z.array(zCondition),
+  serve: zServe,
+});
+
+/**
+ * What the flag serves in one environment.
+ */
+export const zFlagConfiguration = z.object({
+  environment: zKey,
+  on: z.boolean(),
+  off_variation: z.string(),
+  fallthrough: z.string(),
+  prerequisites: z.array(zPrerequisite),
+  overrides: z.array(zOverride),
+  rules: z.array(zRule),
+  updated_at: z.iso.datetime(),
+  updated_by: z.uuid().nullable(),
+  version: zVersion,
+});
+
+/**
+ * A flag's definition with its configuration in every environment, by the environments' order.
+ */
+export const zFlag = zFlagDefinition.and(
+  z.object({
+    environments: z.array(zFlagConfiguration),
+  }),
+);
+
+export const zRuleInput = z.object({
+  id: z.uuid().optional(),
+  description: zDescription.optional(),
+  conditions: z.array(zCondition).max(20).optional(),
+  serve: zServe,
+});
+
+export const zFlagConfigurationPut = z.object({
+  on: z.boolean(),
+  off_variation: z.string(),
+  fallthrough: z.string(),
+  prerequisites: z.array(zPrerequisite).optional(),
+  overrides: z.array(zOverrideInput).max(200).optional(),
+  rules: z.array(zRuleInput).max(50).optional(),
+});
+
+export const zKillResult = z.object({
+  changed: z.boolean(),
+  configuration: zFlagConfiguration,
 });
 
 export const zSegment = z.object({
@@ -693,6 +776,11 @@ export const zAuditFrom = z.iso.datetime();
  * The latest time of an entry, included.
  */
 export const zAuditTo = z.iso.datetime();
+
+/**
+ * Lists only the entries of kill switches when true, only the others when false.
+ */
+export const zAuditKillSwitch = z.boolean();
 
 /**
  * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
@@ -1165,6 +1253,91 @@ export const zRestoreFlagPath = z.object({
  */
 export const zRestoreFlagResponse = zFlag;
 
+export const zGetFlagConfigurationPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The configuration; its `ETag` is the configuration's version.
+ */
+export const zGetFlagConfigurationResponse = zFlagConfiguration;
+
+export const zPutFlagConfigurationBody = zFlagConfigurationPut;
+
+export const zPutFlagConfigurationHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zPutFlagConfigurationPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zPutFlagConfigurationResponse = zFlagConfiguration;
+
+export const zKillFlagBody = zKill;
+
+export const zKillFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * Whether the flag was switched off, and the configuration as it is now.
+ */
+export const zKillFlagResponse = zKillResult;
+
+export const zDeleteOverridePath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+  unit_type: z.string(),
+  unit_id: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zDeleteOverrideResponse = zFlagConfiguration;
+
+export const zPutOverrideBody = zOverridePut;
+
+export const zPutOverridePath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+  unit_type: z.string(),
+  unit_id: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zPutOverrideResponse = zFlagConfiguration;
+
+export const zRegenerateRolloutSaltHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zRegenerateRolloutSaltPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+  rule: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zRegenerateRolloutSaltResponse = zFlagConfiguration;
+
 export const zListSegmentsPath = z.object({
   project: z.string(),
 });
@@ -1318,6 +1491,7 @@ export const zListProjectAuditEntriesQuery = z.object({
   from: z.iso.datetime().optional(),
   to: z.iso.datetime().optional(),
   q: z.string().optional(),
+  kill_switch: z.boolean().optional(),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });
@@ -1461,6 +1635,7 @@ export const zListAuditEntriesQuery = z.object({
   from: z.iso.datetime().optional(),
   to: z.iso.datetime().optional(),
   q: z.string().optional(),
+  kill_switch: z.boolean().optional(),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });

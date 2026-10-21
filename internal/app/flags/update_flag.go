@@ -25,11 +25,26 @@ type FlagUpdater interface {
 	UpdateFlag(ctx context.Context, f flags.Flag) error
 }
 
+// DependentFinder finds the flags requiring a flag.
+type DependentFinder interface {
+	// Dependents returns every flag of project whose configuration in an
+	// environment requires a variation of the flag keyed flag, archived
+	// flags included, by flag key and then environment order.
+	Dependents(ctx context.Context, project workspace.ProjectID, flag string) ([]flags.Dependent, error)
+}
+
+// DefinitionUpdater stores a flag's changed definition once nothing names
+// what the change removes.
+type DefinitionUpdater interface {
+	FlagUpdater
+	DependentFinder
+}
+
 // UpdateFlagDeps are what UpdateFlag runs on.
 type UpdateFlagDeps struct {
 	Tx       Transactor
 	Projects ProjectLocker
-	Store    FlagUpdater
+	Store    DefinitionUpdater
 	Owners   Owners
 	Rulesets Rulesets
 	Recorder Recorder
@@ -54,8 +69,8 @@ type UpdateFlagCommand struct {
 
 // Handle applies the change and returns the flag as it is after it. The
 // change is validated first, then judged against the version it was based
-// on, then against what still serves a variation it removes; a change to
-// the values the flag already has stores and records nothing. A change to
+// on, then against what still names a variation it removes, in the flag's
+// configurations or other flags' prerequisites; a change to the values the flag already has stores and records nothing. A change to
 // what a ruleset carries moves every environment's ruleset on.
 func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagView, error) {
 	now := h.d.Recorder.now()
@@ -87,8 +102,14 @@ func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagVie
 		if !changed.Any {
 			return nil
 		}
-		if refs := flags.VariationReferences(before, changed.RemovedVariations, configs); len(refs) > 0 {
-			return flags.ErrInUse(refs)
+		if len(changed.RemovedVariations) > 0 {
+			dependents, err := h.d.Store.Dependents(ctx, cmd.Project, before.Key)
+			if err != nil {
+				return err
+			}
+			if refs := flags.VariationReferences(before, changed.RemovedVariations, configs, dependents); len(refs) > 0 {
+				return flags.ErrInUse(refs)
+			}
 		}
 		if err := h.d.Store.UpdateFlag(ctx, after); err != nil {
 			return err

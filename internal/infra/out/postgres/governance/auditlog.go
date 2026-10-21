@@ -42,11 +42,11 @@ func (l *AuditLog) Record(ctx context.Context, e governance.Entry) error {
 	_, err = pgxtx.Querier(ctx, l.pool).Exec(ctx, `
 		INSERT INTO audit_entries (id, occurred_at, project_id, environment_id,
 		    actor_kind, actor_id, actor_name, actor_member_id,
-		    action, entity_kind, entity_id, entity_key, before, after, request_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, '')::uuid, $9, $10, $11, $12, $13, $14, NULLIF($15, ''))`,
+		    action, entity_kind, entity_id, entity_key, before, after, kill_switch, request_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, '')::uuid, $9, $10, $11, $12, $13, $14, $15, NULLIF($16, ''))`,
 		e.ID.Bytes(), e.OccurredAt, optional(e.Project), optional(e.Environment),
 		string(e.Actor.Kind), e.Actor.ID, e.Actor.Name, e.Actor.MemberID,
-		e.Action, e.Entity.Kind, e.Entity.ID, e.Entity.Key, before, after, e.RequestID)
+		e.Action, e.Entity.Kind, e.Entity.ID, e.Entity.Key, before, after, e.KillSwitch, e.RequestID)
 	return err
 }
 
@@ -81,7 +81,8 @@ func scanEntry(row pgx.Row) (governance.Entry, error) {
 		before, after        []byte
 	)
 	if err := row.Scan(&entryID, &e.OccurredAt, &project, &environment, &kind, &e.Actor.ID, &e.Actor.Name,
-		&e.Actor.MemberID, &e.Action, &e.Entity.Kind, &e.Entity.ID, &e.Entity.Key, &before, &after, &e.RequestID); err != nil {
+		&e.Actor.MemberID, &e.Action, &e.Entity.Kind, &e.Entity.ID, &e.Entity.Key, &before, &after, &e.KillSwitch,
+		&e.RequestID); err != nil {
 		return governance.Entry{}, err
 	}
 	e.ID, e.Actor.Kind = id.FromBytes[governance.Entry](entryID), governance.ActorKind(kind)
@@ -102,7 +103,7 @@ func scanEntry(row pgx.Row) (governance.Entry, error) {
 
 const entryColumns = `id, occurred_at, project_id, environment_id, actor_kind, actor_id, actor_name,
 	coalesce(actor_member_id::text, ''), action, entity_kind, entity_id, entity_key,
-	before, after, coalesce(request_id, '')`
+	before, after, kill_switch, coalesce(request_id, '')`
 
 // Entries returns at most limit entries matching f, older than after unless
 // it is zero, newest first.
@@ -141,6 +142,12 @@ func (l *AuditLog) Entries(ctx context.Context, f appgovernance.AuditFilter, aft
 	}
 	if !f.To.IsZero() {
 		where("occurred_at <= $?", f.To)
+	}
+	if f.KillSwitch != nil {
+		// Only true is indexed, by the partial index of the few kill
+		// switches; false narrows what another filter or the log's order
+		// yields.
+		where("kill_switch = $?", *f.KillSwitch)
 	}
 	if f.Q != "" {
 		// The expression is the search index's, so the index answers it.

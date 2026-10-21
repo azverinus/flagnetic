@@ -136,9 +136,7 @@ func (s *Store) Segments(ctx context.Context, project workspace.ProjectID) ([]fl
 // whose rules have a condition naming the segment key, archived flags
 // included, by flag key and then environment order. Only a segment
 // condition names a segment, so containment of the key alone finds both
-// kinds, through the configurations' GIN index. A configuration stores rules
-// only once its whole document can be replaced; until then no document has
-// a rules key, and a segment has no usages.
+// kinds, through the configurations' GIN index.
 func (s *Store) SegmentUsages(ctx context.Context, project workspace.ProjectID, key string) ([]flags.Reference, error) {
 	rows, err := s.db(ctx).Query(ctx, `
 		SELECT f.key, e.key

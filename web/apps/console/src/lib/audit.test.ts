@@ -131,6 +131,7 @@ function entryBy(actor: AuditEntry["actor"]): AuditEntry {
     entity: { kind: "environment", id: "e", key: "staging" },
     before: null,
     after: null,
+    kill_switch: false,
     request_id: null,
   };
 }

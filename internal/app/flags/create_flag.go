@@ -83,7 +83,7 @@ func (h *CreateFlag) Handle(ctx context.Context, cmd CreateFlagCommand) (FlagVie
 		out = FlagView{Flag: f}
 		configs := make([]flags.Configuration, len(envs))
 		for i, e := range envs {
-			configs[i] = flags.InitialConfiguration(f, e.ID, now)
+			configs[i] = flags.InitialConfiguration(f, e.ID, cmd.Caller, now)
 			out.Configurations = append(out.Configurations, flags.EnvironmentConfiguration{Environment: e.Key, Configuration: configs[i]})
 		}
 		if err := h.d.Store.CreateFlag(ctx, f); err != nil {
