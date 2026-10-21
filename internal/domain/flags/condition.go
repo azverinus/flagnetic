@@ -93,6 +93,9 @@ func (c *check) attributeCondition(pointer string, cond Condition, d Declaration
 		c.add(pointer+"/value", "invalid_value", "the operator takes no value", nil)
 	case !valueless && cond.Value == nil:
 		c.add(pointer+"/value", "invalid_value", "the operator needs a value", nil)
+	case valueless:
+		// Nothing to parse: whether the attribute is there holds for every
+		// type alike.
 	case eval.CheckOperator(typ, cond.Op, cond.Value) != nil:
 		c.add(pointer+"/value", "invalid_value", "the value does not fit the operator and the attribute's type", nil)
 	default:

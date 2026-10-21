@@ -82,7 +82,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	flagStore, flagRec := pgflags.NewStore(d.Pool), appflags.NewRecorder(auditLog, d.Clock, d.IDs)
 	// Every write changing what SDKs receive moves the rulesets it changed
 	// on, through the delivery context.
-	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(d.Pool))
+	deliveryStore := pgdelivery.NewStore(d.Pool)
+	rulesets := appdelivery.NewBumpRulesets(deliveryStore)
 	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
 	// Deleting a unit type or attribute asks the flags context what still
@@ -196,6 +197,19 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		}),
 		RemoveOverride: appflags.NewRemoveOverride(configuration),
 		RegenerateSalt: appflags.NewRegenerateSalt(configuration),
+		// A revert finds the version it writes again in the audit log.
+		RevertConfiguration: appflags.NewRevertConfiguration(appflags.RevertConfigurationDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, History: auditLog, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		CopyConfiguration: appflags.NewCopyConfiguration(appflags.ReplaceConfigurationDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		// The tester evaluates through the delivery context, which asks
+		// the flags context to check a draft as a write would.
+		Evaluate: appdelivery.NewEvaluate(appdelivery.EvaluateDeps{
+			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
+			Drafts: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
+		}),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

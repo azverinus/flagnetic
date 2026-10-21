@@ -1,6 +1,7 @@
 // Package delivery holds the use cases of the delivery context: for now,
 // moving an environment's ruleset version on when a write changes what its
-// SDKs receive.
+// SDKs receive, and evaluating its ruleset for a context to explain what
+// the context is served.
 package delivery
 
 import (

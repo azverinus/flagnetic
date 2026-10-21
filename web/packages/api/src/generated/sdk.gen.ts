@@ -12,6 +12,9 @@ import type {
   ChangeMyPasswordData,
   ChangeMyPasswordErrors,
   ChangeMyPasswordResponses,
+  CopyFlagConfigurationData,
+  CopyFlagConfigurationErrors,
+  CopyFlagConfigurationResponses,
   CreateAttributeData,
   CreateAttributeErrors,
   CreateAttributeResponses,
@@ -63,6 +66,9 @@ import type {
   DeleteUnitTypeData,
   DeleteUnitTypeErrors,
   DeleteUnitTypeResponses,
+  EvaluateData,
+  EvaluateErrors,
+  EvaluateResponses,
   GetAttributeData,
   GetAttributeErrors,
   GetAttributeResponses,
@@ -183,6 +189,9 @@ import type {
   RestoreFlagData,
   RestoreFlagErrors,
   RestoreFlagResponses,
+  RevertFlagConfigurationData,
+  RevertFlagConfigurationErrors,
+  RevertFlagConfigurationResponses,
   RevokeMemberSessionsData,
   RevokeMemberSessionsErrors,
   RevokeMemberSessionsResponses,
@@ -862,6 +871,45 @@ export const updateEnvironment = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Evaluate flags for a context, as the environment's SDKs would
+ *
+ * Evaluates the environment's saved configuration for a context, with
+ * the full reason of each result: the served value and variation,
+ * the reason, the rule that served, the error code, and for a rollout
+ * the unit's bucket and the rollout's salt. It evaluates every flag
+ * that is not archived, or only the flags named, where a key the
+ * ruleset does not hold answers `error` with `flag_not_found`.
+ *
+ * A `draft` evaluates one flag's unsaved configuration in place of
+ * its saved one, every other flag seeing it as SDKs would once it is
+ * saved. It is validated as replacing the configuration would
+ * validate it (`invalid_configuration`, its pointers under
+ * `/draft/configuration`), with no `If-Match`, and is never stored:
+ * nothing changes and nothing is recorded. A context whose unit ID is
+ * over 256 bytes is `invalid_context`. Evaluating records no exposure.
+ *
+ */
+export const evaluate = <ThrowOnError extends boolean = false>(
+  options: Options<EvaluateData, ThrowOnError>,
+): RequestResult<EvaluateResponses, EvaluateErrors, ThrowOnError> =>
+  (options.client ?? client).post<EvaluateResponses, EvaluateErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/evaluate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * The project's unit types
  */
 export const listUnitTypes = <ThrowOnError extends boolean = false>(
@@ -1344,6 +1392,88 @@ export const killFlag = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/flags/{flag}/environments/{environment}/kill",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Revert a flag's configuration in one environment to an earlier version
+ *
+ * Writes, whole, the configuration this flag had in this environment
+ * at `version`, as the audit log recorded it: on or off, the off and
+ * fallthrough variations, prerequisites, overrides with their notes
+ * and authors, and rules with their identifiers and salts, so the same
+ * units fall in every rollout again. The version is looked up only in
+ * the history of this flag in this environment (`version_not_found`
+ * otherwise). The configuration is validated as replacing it would be
+ * (`invalid_configuration`, its pointers into the configuration the
+ * revert would write), so a variation, segment, attribute or flag
+ * removed since refuses it. `If-Match` names the current version, not
+ * the one reverted to. Reverting to what the configuration already is
+ * changes nothing and records nothing.
+ *
+ */
+export const revertFlagConfiguration = <ThrowOnError extends boolean = false>(
+  options: Options<RevertFlagConfigurationData, ThrowOnError>,
+): RequestResult<RevertFlagConfigurationResponses, RevertFlagConfigurationErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RevertFlagConfigurationResponses,
+    RevertFlagConfigurationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/environments/{environment}/revert",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Copy a flag's configuration from another environment
+ *
+ * Makes the flag's configuration in this environment what it is in
+ * environment `from`: its rules with their identifiers and salts, so
+ * the same units fall in every rollout in both environments, its
+ * prerequisites, and its off and fallthrough variations. This
+ * environment keeps whether the flag is on or off, so a copy never
+ * switches it on by accident, and keeps its overrides unless
+ * `include_overrides` asks for the source's, with their notes and
+ * authors. Validated as replacing the configuration would be
+ * (`invalid_configuration`, its pointers into the configuration the
+ * copy would write); copying from this environment itself is
+ * `invalid_configuration`. `If-Match` names this environment's
+ * version. A copy that changes nothing records nothing.
+ *
+ */
+export const copyFlagConfiguration = <ThrowOnError extends boolean = false>(
+  options: Options<CopyFlagConfigurationData, ThrowOnError>,
+): RequestResult<CopyFlagConfigurationResponses, CopyFlagConfigurationErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CopyFlagConfigurationResponses,
+    CopyFlagConfigurationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/environments/{environment}/copy",
     ...options,
     headers: {
       "Content-Type": "application/json",

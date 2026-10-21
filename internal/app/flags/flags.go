@@ -108,8 +108,11 @@ func (rec Recorder) now() time.Time { return rec.clock.Now().UTC().Truncate(time
 // from the recorder's source, and salts of 16 random lower-case letters and
 // digits, which no one can guess a unit's bucket from before the rollout
 // exists.
-func (rec Recorder) mint() flags.Mint {
-	return flags.Mint{RuleID: func() flags.RuleID { return id.New[flags.Rule](rec.ids) }, Salt: newSalt}
+func (rec Recorder) mint() flags.Mint { return mintFrom(rec.ids) }
+
+// mintFrom returns a mint drawing rule identifiers from ids.
+func mintFrom(ids *id.Source) flags.Mint {
+	return flags.Mint{RuleID: func() flags.RuleID { return id.New[flags.Rule](ids) }, Salt: newSalt}
 }
 
 // saltAlphabet is what a salt is drawn from: characters that read the same

@@ -194,3 +194,28 @@ func (l *AuditLog) Entry(ctx context.Context, project workspace.ProjectID, entry
 	}
 	return e, err
 }
+
+// RecordedVersion returns the values the newest entry of project recording
+// entity in environment holds for the entity at version, its before or its
+// after, whichever carries that version, and whether an entry does. Every
+// version of an entity written whole into its entries is found so, also
+// the first, which the before of the second write holds.
+func (l *AuditLog) RecordedVersion(ctx context.Context, project workspace.ProjectID, entity governance.Entity,
+	environment workspace.EnvironmentID, version int64,
+) ([]byte, bool, error) {
+	var values []byte
+	err := pgxtx.Querier(ctx, l.pool).QueryRow(ctx, `
+		SELECT CASE WHEN after -> 'version' = to_jsonb($5::bigint) THEN after ELSE before END
+		FROM audit_entries
+		WHERE project_id = $1 AND entity_kind = $2 AND entity_id = $3 AND environment_id = $4
+		  AND (after -> 'version' = to_jsonb($5::bigint) OR before -> 'version' = to_jsonb($5::bigint))
+		ORDER BY id DESC LIMIT 1`,
+		project.Bytes(), entity.Kind, entity.ID, environment.Bytes(), version).Scan(&values)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("reading a recorded version: %w", err)
+	}
+	return values, true, nil
+}

@@ -64,6 +64,11 @@ const (
 	// PermFlagConfigurationKill switches a flag off in an environment with
 	// the kill switch.
 	PermFlagConfigurationKill Permission = "flag_configuration.kill"
+	// PermFlagConfigurationRevert writes a flag's configuration in an
+	// environment again as an earlier version had it. It is apart from
+	// update so that whoever is on call may undo a change without being
+	// allowed to write rules.
+	PermFlagConfigurationRevert Permission = "flag_configuration.revert"
 	// PermSegmentEdit creates segments and changes them.
 	PermSegmentEdit Permission = "segment.edit"
 	// PermSegmentDelete deletes segments.
@@ -86,6 +91,7 @@ var catalog = []PermissionSpec{
 	{Name: PermFlagArchive, Scope: ScopeFlagsWrite},
 	{Name: PermFlagConfigurationUpdate, Scope: ScopeFlagsWrite},
 	{Name: PermFlagConfigurationKill, Scope: ScopeFlagsWrite},
+	{Name: PermFlagConfigurationRevert, Scope: ScopeFlagsWrite},
 	{Name: PermSegmentEdit, Scope: ScopeFlagsWrite},
 	{Name: PermSegmentDelete, Scope: ScopeFlagsWrite},
 }
@@ -176,14 +182,15 @@ var roles = []Role{
 	{Name: RoleOwner, Permissions: []Permission{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermDeclarationManage,
 		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
-		PermFlagConfigurationKill, PermSegmentEdit, PermSegmentDelete,
+		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
-		PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermSegmentEdit, PermSegmentDelete,
+		PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete,
 	}},
 	{Name: RoleDeveloper, Permissions: []Permission{
-		PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermSegmentEdit,
+		PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert,
+		PermSegmentEdit,
 	}},
 	{Name: RoleViewer, Permissions: []Permission{PermProjectRead}},
 }

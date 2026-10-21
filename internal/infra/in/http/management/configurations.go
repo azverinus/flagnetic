@@ -28,15 +28,7 @@ func (a *api) PutFlagConfiguration(ctx context.Context, req PutFlagConfiguration
 	if err != nil {
 		return nil, err
 	}
-	b := req.Body
-	in := flags.ConfigurationInput{
-		On: b.On, OffVariation: b.OffVariation, Fallthrough: b.Fallthrough, Prerequisites: each(valueOr(b.Prerequisites, nil), prerequisiteIn),
-		Overrides: each(valueOr(b.Overrides, nil), func(o OverrideInput) flags.OverrideInput {
-			return flags.OverrideInput{UnitType: o.UnitType, UnitID: o.UnitId, Variation: o.Variation, Note: o.Note}
-		}),
-		Rules: each(valueOr(b.Rules, nil), ruleIn),
-	}
-	ec, err := a.h.ReplaceConfiguration.Handle(ctx, appflags.ReplaceConfigurationCommand{Configuration: cmd, Input: in})
+	ec, err := a.h.ReplaceConfiguration.Handle(ctx, appflags.ReplaceConfigurationCommand{Configuration: cmd, Input: configurationIn(*req.Body)})
 	if err != nil {
 		return nil, err
 	}
@@ -117,6 +109,40 @@ func (a *api) RegenerateRolloutSalt(ctx context.Context, req RegenerateRolloutSa
 	}, nil
 }
 
+// RevertFlagConfiguration writes a flag's configuration in one environment
+// again as an earlier version of it was.
+func (a *api) RevertFlagConfiguration(ctx context.Context, req RevertFlagConfigurationRequestObject) (RevertFlagConfigurationResponseObject, error) {
+	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	ec, err := a.h.RevertConfiguration.Handle(ctx, appflags.RevertConfigurationCommand{Configuration: cmd, Version: req.Body.Version})
+	if err != nil {
+		return nil, err
+	}
+	return RevertFlagConfiguration200JSONResponse{
+		Body: configurationOut(ec), Headers: RevertFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+	}, nil
+}
+
+// CopyFlagConfiguration makes a flag's configuration in one environment
+// serve what it serves in another.
+func (a *api) CopyFlagConfiguration(ctx context.Context, req CopyFlagConfigurationRequestObject) (CopyFlagConfigurationResponseObject, error) {
+	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	ec, err := a.h.CopyConfiguration.Handle(ctx, appflags.CopyConfigurationCommand{
+		Configuration: cmd, From: req.Body.From, Overrides: valueOr(req.Body.IncludeOverrides, false),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return CopyFlagConfiguration200JSONResponse{
+		Body: configurationOut(ec), Headers: CopyFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+	}, nil
+}
+
 // configurationCommand returns the command naming flag's configuration in
 // environment of the request's project, based on the version header names,
 // none when it is nil.
@@ -126,6 +152,17 @@ func configurationCommand(ctx context.Context, flag, environment string, header 
 		Project: projectID(ctx), Flag: flag, Environment: environment, Expected: expected, Caller: callerMember(ctx),
 		Request: requestOf(ctx),
 	}, err
+}
+
+// configurationIn returns the configuration b gives whole.
+func configurationIn(b FlagConfigurationPut) flags.ConfigurationInput {
+	return flags.ConfigurationInput{
+		On: b.On, OffVariation: b.OffVariation, Fallthrough: b.Fallthrough, Prerequisites: each(valueOr(b.Prerequisites, nil), prerequisiteIn),
+		Overrides: each(valueOr(b.Overrides, nil), func(o OverrideInput) flags.OverrideInput {
+			return flags.OverrideInput{UnitType: o.UnitType, UnitID: o.UnitId, Variation: o.Variation, Note: o.Note}
+		}),
+		Rules: each(valueOr(b.Rules, nil), ruleIn),
+	}
 }
 
 func prerequisiteIn(p Prerequisite) flags.Prerequisite {

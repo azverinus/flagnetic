@@ -176,6 +176,17 @@ func (e *Error) WithExtension(key string, value any) *Error {
 	return c
 }
 
+// Under returns a copy of e whose violations point under prefix, a JSON
+// Pointer: for what was checked as a document of its own and arrived as
+// part of a larger request body.
+func (e *Error) Under(prefix string) *Error {
+	c := e.clone()
+	for i := range c.Violations {
+		c.Violations[i].Pointer = prefix + c.Violations[i].Pointer
+	}
+	return c
+}
+
 // Error describes the error for a log: kind, code, detail and cause.
 func (e *Error) Error() string {
 	s := e.Kind.String() + " " + e.Code + ": " + e.Detail

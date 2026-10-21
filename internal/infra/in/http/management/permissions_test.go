@@ -72,6 +72,13 @@ func matrix(t *testing.T) []matrixRow {
 			res := do(c.KillFlagWithResponse(t.Context(), p.Key, "absent", "production", management.Kill{}))
 			return res.StatusCode(), res.Body
 		}},
+		{"flag_configuration.revert", "revertFlagConfiguration", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			// No flag has the key, so a caller holding the permission is
+			// answered not_found, and one lacking it forbidden first.
+			res := do(c.RevertFlagConfigurationWithResponse(t.Context(), p.Key, "absent", "production",
+				&management.RevertFlagConfigurationParams{IfMatch: ptr("1")}, management.FlagConfigurationRevert{Version: 1}))
+			return res.StatusCode(), res.Body
+		}},
 		{"segment.edit", "createSegment", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
 			res := do(c.CreateSegmentWithResponse(t.Context(), p.Key, management.SegmentCreate{Key: projectKey(), Name: "Matrix"}))
 			return res.StatusCode(), res.Body
@@ -115,6 +122,7 @@ func TestThePermissionMatrixHoldsRowByRow(t *testing.T) {
 		"flag.archive":              {access.RoleMaintainer, access.RoleOwner},
 		"flag_configuration.update": {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
 		"flag_configuration.kill":   {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
+		"flag_configuration.revert": {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
 		"segment.edit":              {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
 		"segment.delete":            {access.RoleMaintainer, access.RoleOwner},
 	}
@@ -151,11 +159,11 @@ func TestProjectMeAnswersGrantsAndPermissionsPerRole(t *testing.T) {
 	p := createProject(t, admin, projectKey())
 	for role, want := range map[access.RoleName][]string{
 		access.RoleViewer:    {"project.read"},
-		access.RoleDeveloper: {"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "segment.edit"},
+		access.RoleDeveloper: {"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit"},
 		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
-			"flag_configuration.update", "flag_configuration.kill", "segment.edit", "segment.delete"},
+			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"},
 		access.RoleOwner: {"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage",
-			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "segment.edit", "segment.delete"},
+			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"},
 	} {
 		got := projectMe(t, testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), role)), p.Key)
 		if !slices.Equal(got.Permissions, want) || !slices.Equal(rolesOf(got.Grants), []string{string(role)}) {

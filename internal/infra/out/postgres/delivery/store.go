@@ -4,12 +4,16 @@ package delivery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 // Store is the repository of ruleset versions.
@@ -57,4 +61,22 @@ func (s *Store) RulesetVersions(ctx context.Context, project workspace.ProjectID
 		out[key] = v
 	}
 	return out, rows.Err()
+}
+
+// RulesetEnvironment returns the identifier and ruleset version of the
+// environment of project keyed key, or appdelivery.ErrNotFound.
+func (s *Store) RulesetEnvironment(ctx context.Context, project workspace.ProjectID, key string) (workspace.EnvironmentID, int64, error) {
+	var (
+		environment [16]byte
+		version     int64
+	)
+	err := s.db(ctx).QueryRow(ctx, `SELECT id, ruleset_version FROM environments WHERE project_id = $1 AND key = $2`,
+		project.Bytes(), key).Scan(&environment, &version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return workspace.EnvironmentID{}, 0, appdelivery.ErrNotFound
+	}
+	if err != nil {
+		return workspace.EnvironmentID{}, 0, fmt.Errorf("reading an environment's ruleset version: %w", err)
+	}
+	return id.FromBytes[workspace.Environment](environment), version, nil
 }

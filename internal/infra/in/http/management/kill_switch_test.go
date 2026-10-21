@@ -121,22 +121,40 @@ func TestAddedByIsTheMemberWhoLastWroteTheOverride(t *testing.T) {
 	}
 }
 
-func TestAnOverrideNoteReachesNoRuleset(t *testing.T) {
+func TestAnOverrideNoteReachesNoRulesetAndNoEvaluation(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 	stringFlag(t, admin, p.Key, "copy")
+	mustPut(t, admin, p.Key, "copy", "staging", 1, management.FlagConfigurationPut{On: true, OffVariation: "a", Fallthrough: "a"})
 	putOverride(t, admin, p.Key, "copy", "staging", "user", "u-1", management.OverridePut{Variation: "b"})
 	before := rulesetVersions(t, p)
+	evaluated := func(draft *management.EvaluationDraft) string {
+		t.Helper()
+		got := mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(user("u-1"), ""), Draft: draft})
+		if got.Flags["copy"].Reason != "override" {
+			t.Errorf("u-1 = %+v, want its override", got.Flags["copy"])
+		}
+		out, _ := json.Marshal(got)
+		return string(out)
+	}
+	unnoted := evaluated(nil)
 	noted := putOverride(t, admin, p.Key, "copy", "staging", "user", "u-1", management.OverridePut{Variation: "b", Note: ptr("Pinned for the demo")})
-	if noted.JSON200 == nil || noted.JSON200.Version != 3 {
+	if noted.JSON200 == nil || noted.JSON200.Version != 4 {
 		t.Fatalf("noting = %d %s", noted.StatusCode(), noted.Body)
 	}
 	body := asPut(*noted.JSON200)
 	(*body.Overrides)[0].Note = ptr("Pinned for the sales demo")
-	mustPut(t, admin, p.Key, "copy", "staging", 3, body)
+	mustPut(t, admin, p.Key, "copy", "staging", 4, body)
 	if got := bumped(t, "notes", before, rulesetVersions(t, p)); len(got) != 0 {
 		t.Errorf("writing notes bumped %v, want no ruleset changed", got)
+	}
+	if noted := evaluated(nil); noted != unnoted {
+		t.Errorf("evaluation with a note = %s, without = %s, want them the same", noted, unnoted)
+	}
+	(*body.Overrides)[0].Note = ptr("A note only the draft has")
+	if drafted := evaluated(&management.EvaluationDraft{Flag: "copy", Configuration: body}); drafted != unnoted {
+		t.Errorf("evaluation of a draft with a note = %s, want %s", drafted, unnoted)
 	}
 }
 

@@ -614,6 +614,20 @@ export const zServe = z.object({
   salt: z.string().optional(),
 });
 
+export const zFlagConfigurationRevert = z.object({
+  version: z.coerce
+    .bigint()
+    .gte(BigInt(1))
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zFlagConfigurationCopy = z.object({
+  from: z.string(),
+  include_overrides: z.boolean().optional().default(false),
+});
+
 export const zOverridePut = z.object({
   variation: z.string(),
   note: z.string().nullish(),
@@ -784,6 +798,64 @@ export const zSegmentPatch = z.object({
   description: zDescription.optional(),
   private: z.boolean().optional(),
   conditions: z.array(zCondition).max(20).optional(),
+});
+
+/**
+ * What flags are evaluated for: unit IDs by unit type, each of at most
+ * 256 bytes, an empty one counting as absent; and attribute values by
+ * key, as SDKs send them. A context with no units is valid: rules on
+ * attributes apply, while rollouts and overrides are skipped.
+ *
+ */
+export const zEvaluationContext = z.object({
+  units: z.record(z.string(), z.string()).optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
+});
+
+/**
+ * An unsaved configuration of one flag in the environment, evaluated in place of the saved one and never stored.
+ */
+export const zEvaluationDraft = z.object({
+  flag: z.string(),
+  configuration: zFlagConfigurationPut,
+});
+
+export const zEvaluationRequest = z.object({
+  context: zEvaluationContext,
+  flags: z.array(z.string()).optional(),
+  draft: zEvaluationDraft.optional(),
+});
+
+/**
+ * What one flag serves the context, and why, as the reference
+ * evaluator computes it. `type` and `automatic_exposure` are absent
+ * only for `flag_not_found`.
+ *
+ */
+export const zEvaluationResult = z.object({
+  type: zFlagType.optional(),
+  value: zVariationValue.optional(),
+  variation: z.string().optional(),
+  reason: z.string(),
+  rule_id: z.uuid().optional(),
+  automatic_exposure: z.boolean().optional(),
+  prerequisite: z.string().optional(),
+  bucket: z.int().optional(),
+  salt: z.string().optional(),
+  error_code: z.string().optional(),
+  override_influenced: z.boolean(),
+});
+
+export const zEvaluation = z.object({
+  ruleset_version: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  flags: z.record(z.string(), zEvaluationResult),
 });
 
 /**
@@ -1101,6 +1173,18 @@ export const zUpdateEnvironmentPath = z.object({
  */
 export const zUpdateEnvironmentResponse = zEnvironment;
 
+export const zEvaluateBody = zEvaluationRequest;
+
+export const zEvaluatePath = z.object({
+  project: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The result of every flag evaluated, by flag key.
+ */
+export const zEvaluateResponse = zEvaluation;
+
 export const zListUnitTypesPath = z.object({
   project: z.string(),
 });
@@ -1347,6 +1431,40 @@ export const zKillFlagPath = z.object({
  * Whether the flag was switched off, and the configuration as it is now.
  */
 export const zKillFlagResponse = zKillResult;
+
+export const zRevertFlagConfigurationBody = zFlagConfigurationRevert;
+
+export const zRevertFlagConfigurationHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zRevertFlagConfigurationPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zRevertFlagConfigurationResponse = zFlagConfiguration;
+
+export const zCopyFlagConfigurationBody = zFlagConfigurationCopy;
+
+export const zCopyFlagConfigurationHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zCopyFlagConfigurationPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zCopyFlagConfigurationResponse = zFlagConfiguration;
 
 export const zDeleteOverridePath = z.object({
   project: z.string(),
