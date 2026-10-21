@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -124,12 +125,44 @@ func problemOf(err error) problem {
 	return internalProblem()
 }
 
+// statusClientClosedRequest is the status the access log and the metrics
+// record for a request its client canceled before it was answered. No client
+// ever receives it: it is the conventional status proxies log for such a
+// request, outside the range of a server failure.
+const statusClientClosedRequest = 499
+
+// canceledByClient reports whether err is r ending because its client went
+// away: err is a cancellation, and the context net/http served r under was
+// canceled with no cause of its own, which is how net/http ends the context
+// of a request whose connection closed. The context r carries now is not
+// judged, since a handler may have derived it and cancelled it itself. A
+// server deadline, a handler's own cancel, and the replica ending its
+// requests when it stops, which gives a cause, are failures of the server
+// instead.
+func canceledByClient(r *http.Request, err error) bool {
+	st := stateOf(r.Context())
+	return st != nil && st.served != nil && errors.Is(err, context.Canceled) &&
+		context.Cause(st.served) == context.Canceled //nolint:errorlint // a cause of its own may wrap Canceled and still be the server's
+}
+
 // WriteError answers err as an RFC 9457 problem document. An error of a kind
 // is answered with the kind's status and the error's code, detail, field
 // violations and extensions; any other error is 500 internal, with no detail
 // for the client. Every 5xx is logged at error with its cause, so the request
 // ID a client reports leads to it.
+//
+// A request its client canceled is answered nothing, since nobody is left to
+// read it, and is no failure of the server: it is logged at debug and
+// recorded as 499, so that neither the error log nor the 5xx count operators
+// alert on grows with every browser that navigates away.
 func (s *Server) WriteError(w http.ResponseWriter, r *http.Request, err error) {
+	if canceledByClient(r, err) {
+		if st := stateOf(r.Context()); st != nil {
+			st.canceled = true
+		}
+		s.log.DebugContext(r.Context(), "request canceled by the client", "error", err.Error())
+		return
+	}
 	p := problemOf(err)
 	if p.status >= http.StatusInternalServerError {
 		s.log.ErrorContext(r.Context(), "request failed", "status", p.status, "error", err.Error())

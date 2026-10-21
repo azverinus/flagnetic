@@ -20,9 +20,24 @@ type requestState struct {
 	// the request is routed.
 	route  string
 	client Client
+	// canceled is set when the request ended because its client went away
+	// before it was answered.
+	canceled bool
+	// served is the request's context as net/http handed it to the edge,
+	// before anything derived from it. Whether the client went away is judged
+	// on it alone: net/http cancels it when the connection closes, while a
+	// context a handler derived may have been cancelled by the handler itself.
+	served context.Context
 }
 
 type stateKey struct{}
+
+// withState attaches st to r's context, recording that context, as net/http
+// gave it, as the one the request was served under.
+func withState(r *http.Request, st *requestState) *http.Request {
+	st.served = r.Context()
+	return r.WithContext(context.WithValue(r.Context(), stateKey{}, st))
+}
 
 func stateOf(ctx context.Context) *requestState {
 	st, _ := ctx.Value(stateKey{}).(*requestState)
