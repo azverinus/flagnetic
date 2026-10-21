@@ -12,9 +12,18 @@ import type {
   CreateEnvironmentData,
   CreateEnvironmentErrors,
   CreateEnvironmentResponses,
+  CreateGrantData,
+  CreateGrantErrors,
+  CreateGrantResponses,
+  CreateMyTokenData,
+  CreateMyTokenErrors,
+  CreateMyTokenResponses,
   CreateProjectData,
   CreateProjectErrors,
   CreateProjectResponses,
+  CreateProjectTokenData,
+  CreateProjectTokenErrors,
+  CreateProjectTokenResponses,
   CreateUnitTypeData,
   CreateUnitTypeErrors,
   CreateUnitTypeResponses,
@@ -27,6 +36,9 @@ import type {
   DeleteEnvironmentData,
   DeleteEnvironmentErrors,
   DeleteEnvironmentResponses,
+  DeleteGrantData,
+  DeleteGrantErrors,
+  DeleteGrantResponses,
   DeleteUnitTypeData,
   DeleteUnitTypeErrors,
   DeleteUnitTypeResponses,
@@ -75,21 +87,36 @@ import type {
   ListEnvironmentsData,
   ListEnvironmentsErrors,
   ListEnvironmentsResponses,
+  ListGrantsData,
+  ListGrantsErrors,
+  ListGrantsResponses,
   ListMembersData,
   ListMembersErrors,
   ListMemberSessionsData,
   ListMemberSessionsErrors,
   ListMemberSessionsResponses,
   ListMembersResponses,
+  ListMemberTokensData,
+  ListMemberTokensErrors,
+  ListMemberTokensResponses,
   ListMySessionsData,
   ListMySessionsErrors,
   ListMySessionsResponses,
+  ListMyTokensData,
+  ListMyTokensErrors,
+  ListMyTokensResponses,
   ListProjectAuditEntriesData,
   ListProjectAuditEntriesErrors,
   ListProjectAuditEntriesResponses,
+  ListProjectMembersData,
+  ListProjectMembersErrors,
+  ListProjectMembersResponses,
   ListProjectsData,
   ListProjectsErrors,
   ListProjectsResponses,
+  ListProjectTokensData,
+  ListProjectTokensErrors,
+  ListProjectTokensResponses,
   ListRolesData,
   ListRolesErrors,
   ListRolesResponses,
@@ -105,12 +132,21 @@ import type {
   RevokeMemberSessionsData,
   RevokeMemberSessionsErrors,
   RevokeMemberSessionsResponses,
+  RevokeMemberTokenData,
+  RevokeMemberTokenErrors,
+  RevokeMemberTokenResponses,
   RevokeMySessionData,
   RevokeMySessionErrors,
   RevokeMySessionResponses,
   RevokeMySessionsData,
   RevokeMySessionsErrors,
   RevokeMySessionsResponses,
+  RevokeMyTokenData,
+  RevokeMyTokenErrors,
+  RevokeMyTokenResponses,
+  RevokeProjectTokenData,
+  RevokeProjectTokenErrors,
+  RevokeProjectTokenResponses,
   SignInData,
   SignInErrors,
   SignInResponses,
@@ -356,6 +392,89 @@ export const revokeMySession = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/me/sessions/{session}",
+    ...options,
+  });
+
+/**
+ * The caller's personal access tokens
+ *
+ * Every personal access token of the caller, the newest first, revoked
+ * and expired ones included, by their hint: a token's value is shown
+ * only when it is created.
+ *
+ */
+export const listMyTokens = <ThrowOnError extends boolean = false>(
+  options?: Options<ListMyTokensData, ThrowOnError>,
+): RequestResult<ListMyTokensResponses, ListMyTokensErrors, ThrowOnError> =>
+  (options?.client ?? client).get<ListMyTokensResponses, ListMyTokensErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/me/tokens",
+    ...options,
+  });
+
+/**
+ * Create a personal access token
+ *
+ * Creates a personal access token acting for the caller and answers its
+ * value, shown this once and never again. It carries `read` alone
+ * unless asked for more, and `read` beside every write scope; a scope
+ * the caller does not hold, `instance:admin` for a member who is no
+ * instance admin, is refused `scope_not_allowed`. Its expiry lies in
+ * the future and at most the instance's maximum token lifetime ahead,
+ * and is required when the instance requires one; without one the
+ * token never expires. Only a session creates a token, so a leaked
+ * token can never multiply itself or outlive its revocation.
+ *
+ */
+export const createMyToken = <ThrowOnError extends boolean = false>(
+  options: Options<CreateMyTokenData, ThrowOnError>,
+): RequestResult<CreateMyTokenResponses, CreateMyTokenErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateMyTokenResponses, CreateMyTokenErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/me/tokens",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Revoke a personal access token
+ *
+ * Revokes one of the caller's tokens, which is refused `token_revoked`
+ * from then on. A token of another member, one already revoked or an
+ * identifier that names none is not found. Only a session may do this,
+ * so a leaked token cannot hide its siblings.
+ *
+ */
+export const revokeMyToken = <ThrowOnError extends boolean = false>(
+  options: Options<RevokeMyTokenData, ThrowOnError>,
+): RequestResult<RevokeMyTokenResponses, RevokeMyTokenErrors, ThrowOnError> =>
+  (options.client ?? client).delete<RevokeMyTokenResponses, RevokeMyTokenErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/me/tokens/{token}",
     ...options,
   });
 
@@ -817,6 +936,199 @@ export const updateAttribute = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * The members holding grants in a project
+ *
+ * Every member holding a grant in the project, ordered by email, with their grants side by side, oldest first.
+ */
+export const listProjectMembers = <ThrowOnError extends boolean = false>(
+  options: Options<ListProjectMembersData, ThrowOnError>,
+): RequestResult<ListProjectMembersResponses, ListProjectMembersErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListProjectMembersResponses,
+    ListProjectMembersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/members",
+    ...options,
+  });
+
+/**
+ * The grants of a project
+ *
+ * Every grant of the project, oldest first.
+ */
+export const listGrants = <ThrowOnError extends boolean = false>(
+  options: Options<ListGrantsData, ThrowOnError>,
+): RequestResult<ListGrantsResponses, ListGrantsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListGrantsResponses, ListGrantsErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/grants",
+    ...options,
+  });
+
+/**
+ * Grant a member a role in a project
+ *
+ * Grants the member one of the built-in roles in the project, beside
+ * any grants they hold already; they act with the union of their
+ * grants' permissions. An invited member may be granted roles before
+ * they join. A role holding a permission the caller lacks in the
+ * project is refused `role_not_allowed`, naming it in `permission`;
+ * the same member and role twice `already_granted`; a deactivated
+ * member `member_deactivated`; an unknown member or role
+ * `invalid_grant`. Only a member grants: a project token never changes
+ * who has access.
+ *
+ */
+export const createGrant = <ThrowOnError extends boolean = false>(
+  options: Options<CreateGrantData, ThrowOnError>,
+): RequestResult<CreateGrantResponses, CreateGrantErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateGrantResponses, CreateGrantErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/grants",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Remove one grant
+ *
+ * Removes one grant, leaving the member's others. The grant of a role
+ * holding a permission the caller lacks in the project is refused
+ * `role_not_allowed`. Removing the last owner's grant is allowed: an
+ * instance admin holds every permission in every project.
+ *
+ */
+export const deleteGrant = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteGrantData, ThrowOnError>,
+): RequestResult<DeleteGrantResponses, DeleteGrantErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteGrantResponses, DeleteGrantErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/grants/{grant}",
+    ...options,
+  });
+
+/**
+ * The tokens of a project
+ *
+ * Every token of the project, the newest first, revoked and expired ones included, by their hint.
+ */
+export const listProjectTokens = <ThrowOnError extends boolean = false>(
+  options: Options<ListProjectTokensData, ThrowOnError>,
+): RequestResult<ListProjectTokensResponses, ListProjectTokensErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListProjectTokensResponses, ListProjectTokensErrors, ThrowOnError>(
+    {
+      security: [
+        { scheme: "bearer", type: "http" },
+        {
+          in: "cookie",
+          name: "flagnetic_session",
+          type: "apiKey",
+        },
+      ],
+      url: "/projects/{project}/tokens",
+      ...options,
+    },
+  );
+
+/**
+ * Create a project token
+ *
+ * Creates a token belonging to the project, for a pipeline, and
+ * answers its value, shown this once and never again. It holds one
+ * built-in role in the project, fixed for its life, narrowed by its
+ * scopes; it never manages grants or project tokens, whatever its
+ * role, so it never changes who has access. It reaches its project and
+ * `GET /me` alone, acts for no member and survives its creator. A role
+ * holding a permission the caller lacks in the project is refused
+ * `role_not_allowed`; `instance:admin` or a scope the caller does not
+ * hold `scope_not_allowed`. Its expiry follows the rules of a personal
+ * access token's. Only a session creates one, so no token mints
+ * another.
+ *
+ */
+export const createProjectToken = <ThrowOnError extends boolean = false>(
+  options: Options<CreateProjectTokenData, ThrowOnError>,
+): RequestResult<CreateProjectTokenResponses, CreateProjectTokenErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateProjectTokenResponses,
+    CreateProjectTokenErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/tokens",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Revoke a project token
+ *
+ * Revokes one of the project's tokens, which is refused `token_revoked` from then on. A token of another project, one already revoked or an identifier that names none is not found.
+ */
+export const revokeProjectToken = <ThrowOnError extends boolean = false>(
+  options: Options<RevokeProjectTokenData, ThrowOnError>,
+): RequestResult<RevokeProjectTokenResponses, RevokeProjectTokenErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    RevokeProjectTokenResponses,
+    RevokeProjectTokenErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/tokens/{token}",
+    ...options,
+  });
+
+/**
  * The project's audit log
  *
  * Every change made in the project, newest first, filtered by every
@@ -1096,6 +1408,52 @@ export const listMemberSessions = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/members/{member}/sessions",
+    ...options,
+  });
+
+/**
+ * A member's personal access tokens
+ *
+ * Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+ */
+export const listMemberTokens = <ThrowOnError extends boolean = false>(
+  options: Options<ListMemberTokensData, ThrowOnError>,
+): RequestResult<ListMemberTokensResponses, ListMemberTokensErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListMemberTokensResponses, ListMemberTokensErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/members/{member}/tokens",
+    ...options,
+  });
+
+/**
+ * Revoke a member's personal access token
+ *
+ * Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+ */
+export const revokeMemberToken = <ThrowOnError extends boolean = false>(
+  options: Options<RevokeMemberTokenData, ThrowOnError>,
+): RequestResult<RevokeMemberTokenResponses, RevokeMemberTokenErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    RevokeMemberTokenResponses,
+    RevokeMemberTokenErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/members/{member}/tokens/{token}",
     ...options,
   });
 

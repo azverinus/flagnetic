@@ -103,18 +103,6 @@ export const zMeMember = z.object({
   locale: z.string().nullable(),
 });
 
-export const zCredential = z.object({
-  method: z.enum(["token", "session"]),
-  token_id: z.uuid().optional(),
-  token_name: z.string().optional(),
-});
-
-export const zMe = z.object({
-  member: zMeMember.optional(),
-  credential: zCredential,
-  client_ip: z.string(),
-});
-
 /**
  * Names the entity in URLs, SDK calls and rules, and never changes.
  */
@@ -129,6 +117,7 @@ export const zProject = z.object({
   key: zKey,
   name: zName,
   description: zDescription,
+  member_count: z.int(),
 });
 
 export const zProjectList = z.object({
@@ -153,6 +142,20 @@ export const zProjectPatch = z.object({
 export const zPermission = z.string();
 
 export const zRoleName = z.enum(["owner", "maintainer", "developer", "viewer"]);
+
+export const zCredential = z.object({
+  method: z.enum(["token", "session"]),
+  token_id: z.uuid().optional(),
+  token_name: z.string().optional(),
+  project: z.string().optional(),
+  role: zRoleName.optional(),
+});
+
+export const zMe = z.object({
+  member: zMeMember.optional(),
+  credential: zCredential,
+  client_ip: z.string(),
+});
 
 export const zRole = z.object({
   name: zRoleName,
@@ -223,6 +226,86 @@ export const zAuthSettings = z.object({
 });
 
 /**
+ * What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
+ */
+export const zScope = z.enum([
+  "read",
+  "flags:write",
+  "experiments:write",
+  "project:admin",
+  "instance:admin",
+]);
+
+/**
+ * A personal access token, by its hint; its value is shown only when it is created.
+ */
+export const zApiToken = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  hint: z.string(),
+  scopes: z.array(zScope),
+  expires_at: z.iso.datetime().nullable(),
+  created_at: z.iso.datetime(),
+  last_used_at: z.iso.datetime().nullable(),
+  last_used_ip: z.string().nullable(),
+  revoked_at: z.iso.datetime().nullable(),
+});
+
+export const zApiTokenList = z.object({
+  items: z.array(zApiToken),
+});
+
+export const zApiTokenCreate = z.object({
+  name: z.string(),
+  scopes: z.array(zScope).optional(),
+  expires_at: z.iso.datetime().nullish(),
+});
+
+/**
+ * A personal access token just created, with its value.
+ */
+export const zCreatedApiToken = z.object({
+  token: zApiToken,
+  value: z.string(),
+});
+
+/**
+ * A token belonging to a project, by its hint; its value is shown only when it is created.
+ */
+export const zProjectToken = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  hint: z.string(),
+  role: zRoleName,
+  scopes: z.array(zScope),
+  expires_at: z.iso.datetime().nullable(),
+  created_at: z.iso.datetime(),
+  created_by: z.uuid().nullable(),
+  last_used_at: z.iso.datetime().nullable(),
+  last_used_ip: z.string().nullable(),
+  revoked_at: z.iso.datetime().nullable(),
+});
+
+export const zProjectTokenList = z.object({
+  items: z.array(zProjectToken),
+});
+
+export const zProjectTokenCreate = z.object({
+  name: z.string(),
+  role: z.string(),
+  scopes: z.array(zScope).optional(),
+  expires_at: z.iso.datetime().nullish(),
+});
+
+/**
+ * A project token just created, with its value.
+ */
+export const zCreatedProjectToken = z.object({
+  token: zProjectToken,
+  value: z.string(),
+});
+
+/**
  * One role held by one member in one project.
  */
 export const zGrant = z.object({
@@ -230,8 +313,32 @@ export const zGrant = z.object({
   member: z.uuid(),
   role: zRoleName,
   source: z.enum(["manual"]),
-  created_by: z.uuid().nullish(),
+  created_by: z.uuid().nullable(),
   created_at: z.iso.datetime(),
+});
+
+export const zGrantList = z.object({
+  items: z.array(zGrant),
+});
+
+export const zGrantCreate = z.object({
+  member: z.uuid(),
+  role: z.string(),
+});
+
+/**
+ * A member holding grants in a project, with those grants.
+ */
+export const zProjectMember = z.object({
+  member: z.uuid(),
+  email: z.string(),
+  display_name: z.string(),
+  status: zMemberStatus,
+  grants: z.array(zGrant),
+});
+
+export const zProjectMemberList = z.object({
+  items: z.array(zProjectMember),
 });
 
 export const zProjectMe = z.object({
@@ -429,6 +536,16 @@ export const zSessionId = z.string();
 export const zMemberId = z.string();
 
 /**
+ * The grant's identifier.
+ */
+export const zGrantId = z.string();
+
+/**
+ * The API token's identifier.
+ */
+export const zTokenId = z.string();
+
+/**
  * The project's key.
  */
 export const zProjectKey = z.string();
@@ -497,6 +614,27 @@ export const zRevokeMySessionPath = z.object({
  * Revoked.
  */
 export const zRevokeMySessionResponse = z.void();
+
+/**
+ * The tokens.
+ */
+export const zListMyTokensResponse = zApiTokenList;
+
+export const zCreateMyTokenBody = zApiTokenCreate;
+
+/**
+ * The token, with its value.
+ */
+export const zCreateMyTokenResponse = zCreatedApiToken;
+
+export const zRevokeMyTokenPath = z.object({
+  token: z.string(),
+});
+
+/**
+ * Revoked.
+ */
+export const zRevokeMyTokenResponse = z.void();
 
 /**
  * The roles, the most powerful first.
@@ -700,6 +838,75 @@ export const zUpdateAttributePath = z.object({
  */
 export const zUpdateAttributeResponse = zAttribute;
 
+export const zListProjectMembersPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The members and their grants.
+ */
+export const zListProjectMembersResponse = zProjectMemberList;
+
+export const zListGrantsPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The grants.
+ */
+export const zListGrantsResponse = zGrantList;
+
+export const zCreateGrantBody = zGrantCreate;
+
+export const zCreateGrantPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The grant.
+ */
+export const zCreateGrantResponse = zGrant;
+
+export const zDeleteGrantPath = z.object({
+  project: z.string(),
+  grant: z.string(),
+});
+
+/**
+ * Removed.
+ */
+export const zDeleteGrantResponse = z.void();
+
+export const zListProjectTokensPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The tokens.
+ */
+export const zListProjectTokensResponse = zProjectTokenList;
+
+export const zCreateProjectTokenBody = zProjectTokenCreate;
+
+export const zCreateProjectTokenPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The token, with its value.
+ */
+export const zCreateProjectTokenResponse = zCreatedProjectToken;
+
+export const zRevokeProjectTokenPath = z.object({
+  project: z.string(),
+  token: z.string(),
+});
+
+/**
+ * Revoked.
+ */
+export const zRevokeProjectTokenResponse = z.void();
+
 export const zListProjectAuditEntriesPath = z.object({
   project: z.string(),
 });
@@ -814,6 +1021,25 @@ export const zListMemberSessionsPath = z.object({
  * The live sessions.
  */
 export const zListMemberSessionsResponse = zSessionList;
+
+export const zListMemberTokensPath = z.object({
+  member: z.string(),
+});
+
+/**
+ * The tokens.
+ */
+export const zListMemberTokensResponse = zApiTokenList;
+
+export const zRevokeMemberTokenPath = z.object({
+  member: z.string(),
+  token: z.string(),
+});
+
+/**
+ * Revoked.
+ */
+export const zRevokeMemberTokenResponse = z.void();
 
 /**
  * The settings in force.
