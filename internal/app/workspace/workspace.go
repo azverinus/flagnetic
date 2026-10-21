@@ -48,8 +48,10 @@ func (i ids) Environment() workspace.EnvironmentID { return id.New[workspace.Env
 func (i ids) UnitType() workspace.UnitTypeID       { return id.New[workspace.UnitType](i.src) }
 func (i ids) Attribute() workspace.AttributeID     { return id.New[workspace.Attribute](i.src) }
 
-// Recorder makes the audit entries of a context's changes: it holds what
-// every command handler of the context records with.
+// Recorder is what every command handler of the context runs on besides its
+// store: the clock a change is timed by, the source its identifiers are
+// drawn from, and the audit log it is recorded in, so a change and its entry
+// carry the same instant.
 type Recorder struct {
 	audit AuditLog
 	clock clock.Clock

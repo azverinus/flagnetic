@@ -540,8 +540,8 @@ type Unauthenticated = Problem
 
 // ListAuditEntriesParams defines parameters for ListAuditEntries.
 type ListAuditEntriesParams struct {
-	// Project The key of the project whose entries to list; an unknown key is not found.
-	Project *string `form:"project,omitempty" json:"project,omitempty"`
+	// Project The identifier of the project whose entries to list, kept by its entries after the project is gone.
+	Project *openapi_types.UUID `form:"project,omitempty" json:"project,omitempty"`
 
 	// Actor A member's identifier; their own changes and those of their personal access tokens.
 	Actor     *AuditActor     `form:"actor,omitempty" json:"actor,omitempty"`
@@ -1530,7 +1530,7 @@ func NewListAuditEntriesRequest(server string, params *ListAuditEntriesParams) (
 
 		if params.Project != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -7039,7 +7039,7 @@ func (siw *ServerInterfaceWrapper) ListAuditEntries(w http.ResponseWriter, r *ht
 
 	// ------------- Optional query parameter "project" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", true, false, "project", r.URL.Query(), &params.Project, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "project", r.URL.Query(), &params.Project, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {

@@ -29,7 +29,9 @@ const BaseURL = "/api/v1"
 
 // Handlers are the use cases the management API serves.
 type Handlers struct {
-	AuthenticateToken *appaccess.AuthenticateToken
+	AuthenticateToken  *appaccess.AuthenticateToken
+	ProjectPermissions *appaccess.ProjectPermissions
+	WorkingProjects    *appaccess.WorkingProjects
 
 	FindProject   *appworkspace.FindProject
 	ListProjects  *appworkspace.ListProjects
@@ -132,8 +134,8 @@ type addressed struct {
 	permissions []access.Permission
 }
 
-// projectOf returns the project the request ctx belongs to addresses, which
-// the seam found before judging it.
+// projectOf returns the project addressed by the request ctx belongs to, as
+// the seam found it before judging the request.
 func projectOf(ctx context.Context) addressed {
 	p, _ := ctx.Value(projectKey{}).(addressed)
 	return p
@@ -188,9 +190,11 @@ func (a *api) address(ctx context.Context, caller access.Caller, key string) (*a
 	if err != nil {
 		return nil, err
 	}
-	// Grants are not stored yet, so a member who is not an instance admin
-	// holds no role in any project.
-	return &addressed{project: p, permissions: access.EffectivePermissions(caller, p.ID, nil)}, nil
+	perms, err := a.h.ProjectPermissions.Handle(ctx, caller, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &addressed{project: p, permissions: perms}, nil
 }
 
 // errUnauthenticated answers a request that presents no credential.

@@ -272,12 +272,17 @@ func TestInstanceAuditLogSpansEveryProjectAndTheEntriesWithNone(t *testing.T) {
 		t.Errorf("command line entries = %v", cliActions)
 	}
 
-	web := do(l.admin.ListAuditEntriesWithResponse(ctx, &management.ListAuditEntriesParams{Project: ptr("web")}))
+	web := do(l.admin.ListAuditEntriesWithResponse(ctx, &management.ListAuditEntriesParams{Project: &l.web.Id}))
 	if web.JSON200 == nil || len(web.JSON200.Items) != 1 || web.JSON200.Items[0].Action != "project.created" {
 		t.Errorf("web's entries = %s", web.Body)
 	}
-	unknown := do(l.admin.ListAuditEntriesWithResponse(ctx, &management.ListAuditEntriesParams{Project: ptr("no-such-project")}))
-	assertProblem(t, "an unknown project", unknown.StatusCode(), unknown.Body, http.StatusNotFound, "not_found")
+	// A project that no longer exists, or never did, simply has no entries
+	// left to list.
+	unknown := openapi_types.UUID(id.New[struct{}](id.NewSource(l.clock)).Bytes())
+	none := do(l.admin.ListAuditEntriesWithResponse(ctx, &management.ListAuditEntriesParams{Project: &unknown}))
+	if none.JSON200 == nil || len(none.JSON200.Items) != 0 {
+		t.Errorf("an unknown project's entries = %d %s, want none", none.StatusCode(), none.Body)
+	}
 }
 
 func TestInstanceAuditLogIsForInstanceAdminsAlone(t *testing.T) {

@@ -43,7 +43,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer) {
 	rec := appworkspace.NewRecorder(auditLog, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
 	management.Mount(edge, management.Handlers{
-		AuthenticateToken: appaccess.NewAuthenticateToken(accessStore, d.Clock),
+		AuthenticateToken:  appaccess.NewAuthenticateToken(accessStore, d.Clock),
+		ProjectPermissions: appaccess.NewProjectPermissions(),
+		WorkingProjects:    appaccess.NewWorkingProjects(),
 
 		FindProject:   appworkspace.NewFindProject(ws),
 		ListProjects:  appworkspace.NewListProjects(ws),

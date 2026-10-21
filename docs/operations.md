@@ -5,6 +5,7 @@ How to run Flagnetic in production: what it needs, how it starts and stops, and 
 ## What it needs
 
 - **PostgreSQL 16 or newer.** `serve` and `migrate` read the server version at start and refuse an older one with a message naming it. Flagnetic is tested on the oldest and the newest supported versions.
+- **The `pg_trgm` extension.** The audit log's free-text search runs on a trigram index, and `migrate` creates the extension when the database lacks it, which needs a role allowed to create extensions there (on most managed services, the default administrative role). Create it once beforehand (`CREATE EXTENSION pg_trgm;`) to run migrations as a role without that right.
 - **Synchronized clocks.** Every replica judges time by its own wall clock (expiry, leases, scheduled changes), so run NTP or your platform's time sync on every host. Coordination between replicas tolerates seconds of skew, not minutes.
 - **A secret key.** `serve` refuses to start without `FLAGNETIC_SECRET_KEY`, or with one shorter than 32 bytes (exit code 2); see [The secret key](#the-secret-key).
 

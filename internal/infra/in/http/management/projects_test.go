@@ -12,7 +12,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
-	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -413,18 +412,15 @@ func TestEveryProjectWriteRecordsAnAuditEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entries, err := pggovernance.NewAuditLog(pool).Latest(t.Context(), 50)
-	if err != nil {
-		t.Fatal(err)
+	entries := do(admin.ListProjectAuditEntriesWithResponse(t.Context(), "mobile", &management.ListProjectAuditEntriesParams{})).JSON200
+	if entries == nil {
+		t.Fatal("the audit log was not listed")
 	}
 	type seen struct{ action, before, after string }
 	var got []seen
-	for _, e := range entries {
-		if e.Project != projectIDOf(*created.JSON201) {
-			continue
-		}
-		if e.Entity.Kind != "project" || e.Entity.ID != projectIDOf(*created.JSON201).String() || e.Entity.Key != "mobile" ||
-			!e.Environment.IsZero() || e.Actor.Kind != "token" || e.Actor.Name != "bootstrap" || e.RequestID == "" {
+	for _, e := range entries.Items {
+		if e.Entity.Kind != "project" || e.Entity.Id != created.JSON201.Id.String() || e.Entity.Key != "mobile" ||
+			e.EnvironmentId != nil || e.Actor.Kind != "token" || e.Actor.Name != "bootstrap" || e.RequestId == nil {
 			t.Errorf("entry %s = %+v", e.Action, e)
 		}
 		got = append(got, seen{e.Action, raw(e.Before), raw(e.After)})
@@ -441,16 +437,14 @@ func TestEveryProjectWriteRecordsAnAuditEntry(t *testing.T) {
 	}
 }
 
-// raw returns recorded JSON in a canonical form, keys sorted.
+// raw returns recorded values as JSON with sorted keys, "" for none.
 func raw(v any) string {
 	if v == nil {
 		return ""
 	}
-	b, _ := v.(json.RawMessage)
-	var decoded any
-	if err := json.Unmarshal(b, &decoded); err != nil {
-		return "malformed: " + string(b)
+	out, err := json.Marshal(v)
+	if err != nil {
+		return "unencodable: " + err.Error()
 	}
-	out, _ := json.Marshal(decoded)
 	return string(out)
 }

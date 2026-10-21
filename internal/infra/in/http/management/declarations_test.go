@@ -8,7 +8,6 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
-	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -409,21 +408,21 @@ func TestEveryWorkspaceWriteRecordsAnAuditEntry(t *testing.T) {
 		t.Fatal("a create failed")
 	}
 
-	entries, err := pggovernance.NewAuditLog(pool).Latest(ctx, 50)
-	if err != nil {
-		t.Fatal(err)
+	entries := do(admin.ListProjectAuditEntriesWithResponse(ctx, p, &management.ListProjectAuditEntriesParams{})).JSON200
+	if entries == nil {
+		t.Fatal("the audit log was not listed")
 	}
 	type seen struct{ action, entity, environment, before, after string }
 	var got []seen
-	for _, e := range entries {
-		if e.Project != projectIDOf(project) || e.Entity.Kind == "project" {
+	for _, e := range entries.Items {
+		if e.Entity.Kind == "project" {
 			continue
 		}
 		env := ""
-		if !e.Environment.IsZero() {
-			env = e.Environment.String()
+		if e.EnvironmentId != nil {
+			env = e.EnvironmentId.String()
 		}
-		got = append(got, seen{e.Action, e.Entity.ID + " " + e.Entity.Key, env, raw(e.Before), raw(e.After)})
+		got = append(got, seen{e.Action, e.Entity.Id + " " + e.Entity.Key, env, raw(e.Before), raw(e.After)})
 	}
 	qaID, deviceID, tierID := qa.Id.String(), device.Id.String(), tier.Id.String()
 	want := []seen{

@@ -1,8 +1,11 @@
 -- +goose Up
 
 -- The audit log is read newest first, one page at a time, by project or for
--- the whole instance, and filtered: each filter is answered from an index
--- ordered like the log, so a page costs the same however long the log grows.
+-- the whole instance, and filtered. The filters that narrow it most (project,
+-- member, action, entity, environment) are each answered from an index
+-- ordered like the log, so such a page costs the same however long the log
+-- grows; the others (actor kind, entity kind, period) only narrow further
+-- what one of these or the log's own order yields.
 CREATE INDEX audit_entries_project_id ON audit_entries (project_id, id DESC);
 CREATE INDEX audit_entries_actor_member_id ON audit_entries (actor_member_id, id DESC);
 CREATE INDEX audit_entries_action ON audit_entries (action, id DESC);

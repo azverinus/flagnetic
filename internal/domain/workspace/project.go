@@ -45,14 +45,8 @@ func (p Project) Change(c ProjectChange, now time.Time) (Project, bool, error) {
 	if c.Key != nil {
 		return p, false, errKeyImmutable
 	}
-	name, description := p.Name, p.Description
-	if c.Name != nil {
-		name = *c.Name
-	}
-	if c.Description != nil {
-		description = *c.Description
-	}
-	f := check("invalid_project", "the project is not valid").nameOf(name).descriptionOf(description)
+	f := check("invalid_project", "the project is not valid").
+		nameOf(valueOr(c.Name, p.Name)).descriptionOf(valueOr(c.Description, p.Description))
 	if err := f.err(); err != nil {
 		return p, false, err
 	}

@@ -14,19 +14,15 @@ import (
 // an instance admin, else those where they hold a grant. A project token
 // never gets here: it reaches its own project only.
 func (a *api) ListProjects(ctx context.Context, _ ListProjectsRequestObject) (ListProjectsResponseObject, error) {
-	c := callerOf(ctx)
-	// Grants are not stored yet, so a member who is not an instance admin
-	// works in no project.
-	q := appworkspace.ListProjectsQuery{All: c.Member != nil && c.Member.InstanceAdmin}
-	projects, err := a.h.ListProjects.Handle(ctx, q)
+	all, only, err := a.h.WorkingProjects.Handle(ctx, callerOf(ctx))
 	if err != nil {
 		return nil, err
 	}
-	out := ListProjects200JSONResponse{Items: make([]Project, len(projects))}
-	for i, p := range projects {
-		out.Items[i] = projectOut(p)
+	projects, err := a.h.ListProjects.Handle(ctx, appworkspace.ListProjectsQuery{All: all, Only: only})
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	return ListProjects200JSONResponse{Items: each(projects, projectOut)}, nil
 }
 
 // CreateProject creates a project with its defaults.
@@ -63,12 +59,8 @@ func (a *api) UpdateProject(ctx context.Context, req UpdateProjectRequestObject)
 // GetProjectMe answers what the caller holds in the project: their grants
 // and their effective permissions there.
 func (a *api) GetProjectMe(ctx context.Context, _ GetProjectMeRequestObject) (GetProjectMeResponseObject, error) {
-	in := projectOf(ctx)
-	out := GetProjectMe200JSONResponse{Grants: []Grant{}, Permissions: make([]Permission, len(in.permissions))}
-	for i, p := range in.permissions {
-		out.Permissions[i] = string(p)
-	}
-	return out, nil
+	perms := each(projectOf(ctx).permissions, func(p access.Permission) Permission { return string(p) })
+	return GetProjectMe200JSONResponse{Grants: []Grant{}, Permissions: perms}, nil
 }
 
 // ListRoles answers every role with its permissions.
@@ -76,11 +68,7 @@ func (a *api) ListRoles(context.Context, ListRolesRequestObject) (ListRolesRespo
 	roles := access.Roles()
 	out := ListRoles200JSONResponse{Items: make([]Role, len(roles))}
 	for i, r := range roles {
-		perms := make([]Permission, len(r.Permissions))
-		for j, p := range r.Permissions {
-			perms[j] = string(p)
-		}
-		out.Items[i] = Role{Name: RoleName(r.Name), Permissions: perms}
+		out.Items[i] = Role{Name: RoleName(r.Name), Permissions: each(r.Permissions, func(p access.Permission) Permission { return string(p) })}
 	}
 	return out, nil
 }

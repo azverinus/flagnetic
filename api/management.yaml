@@ -595,9 +595,10 @@ paths:
       parameters:
         - name: project
           in: query
-          description: The key of the project whose entries to list; an unknown key is not found.
+          description: The identifier of the project whose entries to list, kept by its entries after the project is gone.
           schema:
             type: string
+            format: uuid
         - $ref: "#/components/parameters/AuditActor"
         - $ref: "#/components/parameters/AuditActorKind"
         - $ref: "#/components/parameters/AuditAction"

@@ -2,12 +2,11 @@ package management
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
-	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -33,16 +32,12 @@ func (a *api) ListProjectAuditEntries(ctx context.Context, req ListProjectAuditE
 // ListAuditEntries answers a page of the instance's audit log, narrowed to
 // one project when the request names one.
 func (a *api) ListAuditEntries(ctx context.Context, req ListAuditEntriesRequestObject) (ListAuditEntriesResponseObject, error) {
+	// The project is named by its identifier, which its entries keep after
+	// the project is gone and which a later project reusing its key never
+	// has.
 	var project workspace.ProjectID
 	if req.Params.Project != nil {
-		p, err := a.h.FindProject.Handle(ctx, *req.Params.Project)
-		if errors.Is(err, appworkspace.ErrNotFound) {
-			return nil, access.ErrProjectNotFound
-		}
-		if err != nil {
-			return nil, err
-		}
-		project = p.ID
+		project = id.FromBytes[workspace.Project](*req.Params.Project)
 	}
 	q := req.Params
 	list, err := a.auditPage(ctx, project, ListProjectAuditEntriesParams{
@@ -73,7 +68,7 @@ func (a *api) GetProjectAuditEntry(ctx context.Context, req GetProjectAuditEntry
 // instance) that q asks for.
 func (a *api) auditPage(ctx context.Context, project workspace.ProjectID, q ListProjectAuditEntriesParams) (AuditEntryList, error) {
 	f := appgovernance.AuditFilter{
-		Project: project, Action: deref(q.Action), EntityKind: deref(q.EntityKind), EntityID: deref(q.EntityId), Q: deref(q.Q),
+		Project: project, Action: valueOf(q.Action), EntityKind: valueOf(q.EntityKind), EntityID: valueOf(q.EntityId), Q: valueOf(q.Q),
 	}
 	if q.Actor != nil {
 		f.Actor = id.FromBytes[access.Member](*q.Actor)
@@ -93,7 +88,7 @@ func (a *api) auditPage(ctx context.Context, project workspace.ProjectID, q List
 	page := appgovernance.AuditPage{Limit: defaultAuditLimit}
 	if q.Limit != nil {
 		if *q.Limit < 1 || *q.Limit > maxAuditLimit {
-			return AuditEntryList{}, flaghttp.InvalidRequest("limit must be between 1 and 200")
+			return AuditEntryList{}, flaghttp.InvalidRequest(fmt.Sprintf("limit must be between 1 and %d", maxAuditLimit))
 		}
 		page.Limit = *q.Limit
 	}
@@ -114,13 +109,6 @@ func (a *api) auditPage(ctx context.Context, project workspace.ProjectID, q List
 		out.NextCursor = &cursor
 	}
 	return out, nil
-}
-
-func deref(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 
 func auditEntryOut(e governance.Entry) AuditEntry {
