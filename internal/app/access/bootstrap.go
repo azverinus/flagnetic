@@ -120,8 +120,13 @@ func (h *Bootstrap) Handle(ctx context.Context, cmd BootstrapCommand) (Bootstrap
 	}
 	res := BootstrapResult{Member: member, Token: value.Value}
 	password := cmd.Password
-	if password.IsZero() {
-		password = access.GeneratePassword(h.random)
+	if !password.IsZero() {
+		// Checked before any hash, like every password a person chooses.
+		if err := access.CheckPassword(password.Reveal(), member.Email, access.MinPasswordLength); err != nil {
+			return BootstrapResult{}, err
+		}
+	} else {
+		password = access.GeneratePassword(member.Email, h.random)
 		res.GeneratedPassword = password
 	}
 
@@ -191,7 +196,7 @@ func (h *InstanceAdminExists) Handle(ctx context.Context) (bool, error) {
 func memberCreated(m access.Member) governance.Record {
 	return governance.Record{
 		Action: "member.created",
-		Entity: governance.Entity{Kind: "member", ID: m.ID.String(), Key: m.Email},
+		Entity: memberEntity(m),
 		After: map[string]any{
 			"email": m.Email, "display_name": m.DisplayName, "status": m.Status, "instance_admin": m.InstanceAdmin,
 		},

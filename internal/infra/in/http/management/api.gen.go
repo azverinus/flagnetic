@@ -259,6 +259,15 @@ type AuditEntryList struct {
 	NextCursor *string `json:"next_cursor"`
 }
 
+// AuthMethods defines model for AuthMethods.
+type AuthMethods struct {
+	// LocalLoginEnabled Whether a member signs in with their email and password.
+	LocalLoginEnabled bool `json:"local_login_enabled"`
+
+	// Providers The identity providers a member signs in through; none yet.
+	Providers []map[string]interface{} `json:"providers"`
+}
+
 // Credential defines model for Credential.
 type Credential struct {
 	Method CredentialMethod `json:"method"`
@@ -430,6 +439,12 @@ type RoleList struct {
 // RoleName defines model for RoleName.
 type RoleName string
 
+// SignInRequest defines model for SignInRequest.
+type SignInRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 // UnitType defines model for UnitType.
 type UnitType struct {
 	Description Description        `json:"description"`
@@ -523,6 +538,9 @@ type UnitTypeKey = string
 // BadRequest A problem document (RFC 9457). Code-specific values are further members.
 type BadRequest = Problem
 
+// Busy A problem document (RFC 9457). Code-specific values are further members.
+type Busy = Problem
+
 // Conflict A problem document (RFC 9457). Code-specific values are further members.
 type Conflict = Problem
 
@@ -535,8 +553,17 @@ type Invalid = Problem
 // NotFound A problem document (RFC 9457). Code-specific values are further members.
 type NotFound = Problem
 
+// RequestTooLarge A problem document (RFC 9457). Code-specific values are further members.
+type RequestTooLarge = Problem
+
+// TooManyAttempts A problem document (RFC 9457). Code-specific values are further members.
+type TooManyAttempts = Problem
+
 // Unauthenticated A problem document (RFC 9457). Code-specific values are further members.
 type Unauthenticated = Problem
+
+// UnsupportedMediaType A problem document (RFC 9457). Code-specific values are further members.
+type UnsupportedMediaType = Problem
 
 // ListAuditEntriesParams defines parameters for ListAuditEntries.
 type ListAuditEntriesParams struct {
@@ -608,6 +635,9 @@ type ListProjectAuditEntriesParams struct {
 	// Limit How many entries a page holds at most.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// SignInJSONRequestBody defines body for SignIn for application/json ContentType.
+type SignInJSONRequestBody = SignInRequest
 
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectCreate
@@ -715,6 +745,58 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /audit (the `ListAuditEntries` operationId).
 	ListAuditEntries(ctx context.Context, params *ListAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuthMethods How members sign in
+	//
+	// The ways the sign-in page offers, read before anyone is signed in.
+	//
+	// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
+	GetAuthMethods(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SignInWithBody Sign in with an email and a password
+	//
+	// Opens a fresh session and sets its cookie. A wrong email, a wrong
+	// password and a member who may not sign in all get the same
+	// `invalid_credentials`, in comparable time. The body must be sent as
+	// `application/json`, which a form on another site cannot send;
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its email and of its address
+	// before the password is checked, and is taken back when the password
+	// was right or could not be checked. Five consecutive failures lock the
+	// email, a hundred from one address in fifteen minutes throttle the
+	// address; either is refused before the password is checked.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
+	SignInWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SignIn Sign in with an email and a password
+	//
+	// Opens a fresh session and sets its cookie. A wrong email, a wrong
+	// password and a member who may not sign in all get the same
+	// `invalid_credentials`, in comparable time. The body must be sent as
+	// `application/json`, which a form on another site cannot send;
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its email and of its address
+	// before the password is checked, and is taken back when the password
+	// was right or could not be checked. Five consecutive failures lock the
+	// email, a hundred from one address in fifteen minutes throttle the
+	// address; either is refused before the password is checked.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
+	SignIn(ctx context.Context, body SignInJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SignOut Sign out
+	//
+	// Ends the session the request is signed in to and clears its cookie. An API token has no session to end and is refused `session_required`, so a script never believes it ended something.
+	//
+	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
+	SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetMe Who the caller is
 	//
@@ -948,6 +1030,98 @@ type ClientInterface interface {
 // Corresponds with GET /audit (the `ListAuditEntries` operationId).
 func (c *Client) ListAuditEntries(ctx context.Context, params *ListAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListAuditEntriesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuthMethods How members sign in
+//
+// The ways the sign-in page offers, read before anyone is signed in.
+//
+// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
+func (c *Client) GetAuthMethods(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthMethodsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SignInWithBody Sign in with an email and a password
+//
+// Opens a fresh session and sets its cookie. A wrong email, a wrong
+// password and a member who may not sign in all get the same
+// `invalid_credentials`, in comparable time. The body must be sent as
+// `application/json`, which a form on another site cannot send;
+// anything else is refused `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its email and of its address
+// before the password is checked, and is taken back when the password
+// was right or could not be checked. Five consecutive failures lock the
+// email, a hundred from one address in fifteen minutes throttle the
+// address; either is refused before the password is checked.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
+func (c *Client) SignInWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSignInRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SignIn Sign in with an email and a password
+//
+// Opens a fresh session and sets its cookie. A wrong email, a wrong
+// password and a member who may not sign in all get the same
+// `invalid_credentials`, in comparable time. The body must be sent as
+// `application/json`, which a form on another site cannot send;
+// anything else is refused `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its email and of its address
+// before the password is checked, and is taken back when the password
+// was right or could not be checked. Five consecutive failures lock the
+// email, a hundred from one address in fifteen minutes throttle the
+// address; either is refused before the password is checked.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
+func (c *Client) SignIn(ctx context.Context, body SignInJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSignInRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SignOut Sign out
+//
+// Ends the session the request is signed in to and clears its cookie. An API token has no session to end and is refused `session_required`, so a script never believes it ended something.
+//
+// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
+func (c *Client) SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSignOutRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1679,6 +1853,100 @@ func NewListAuditEntriesRequest(server string, params *ListAuditEntriesParams) (
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAuthMethodsRequest constructs an http.Request for the GetAuthMethods method
+func NewGetAuthMethodsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/methods")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSignInRequest calls the generic SignIn builder with application/json body
+func NewSignInRequest(server string, body SignInJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSignInRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSignInRequestWithBody constructs an http.Request for the SignIn method, with any body, and a specified content type
+func NewSignInRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/sign-in")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSignOutRequest constructs an http.Request for the SignOut method
+func NewSignOutRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/sign-out")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -2850,6 +3118,62 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /audit (the `ListAuditEntries` operationId).
 	ListAuditEntriesWithResponse(ctx context.Context, params *ListAuditEntriesParams, reqEditors ...RequestEditorFn) (*ListAuditEntriesResponse, error)
 
+	// GetAuthMethodsWithResponse How members sign in
+	//
+	// The ways the sign-in page offers, read before anyone is signed in.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
+	GetAuthMethodsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthMethodsResponse, error)
+
+	// SignInWithBodyWithResponse Sign in with an email and a password
+	//
+	// Opens a fresh session and sets its cookie. A wrong email, a wrong
+	// password and a member who may not sign in all get the same
+	// `invalid_credentials`, in comparable time. The body must be sent as
+	// `application/json`, which a form on another site cannot send;
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its email and of its address
+	// before the password is checked, and is taken back when the password
+	// was right or could not be checked. Five consecutive failures lock the
+	// email, a hundred from one address in fifteen minutes throttle the
+	// address; either is refused before the password is checked.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
+	SignInWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SignInResponse, error)
+
+	// SignInWithResponse Sign in with an email and a password
+	//
+	// Opens a fresh session and sets its cookie. A wrong email, a wrong
+	// password and a member who may not sign in all get the same
+	// `invalid_credentials`, in comparable time. The body must be sent as
+	// `application/json`, which a form on another site cannot send;
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its email and of its address
+	// before the password is checked, and is taken back when the password
+	// was right or could not be checked. Five consecutive failures lock the
+	// email, a hundred from one address in fifteen minutes throttle the
+	// address; either is refused before the password is checked.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
+	SignInWithResponse(ctx context.Context, body SignInJSONRequestBody, reqEditors ...RequestEditorFn) (*SignInResponse, error)
+
+	// SignOutWithResponse Sign out
+	//
+	// Ends the session the request is signed in to and clears its cookie. An API token has no session to end and is refused `session_required`, so a script never believes it ended something.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
+	SignOutWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignOutResponse, error)
+
 	// GetMeWithResponse Who the caller is
 	//
 	// The member the credential in use acts for, the credential itself, and the address the request came from.
@@ -3181,6 +3505,234 @@ func (r ListAuditEntriesResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListAuditEntriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetAuthMethodsResponse401Headers the declared response headers of an HTTP 401 response for GetAuthMethods
+type GetAuthMethodsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetAuthMethodsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthMethods
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetAuthMethodsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuthMethodsResponse) GetJSON200() *AuthMethods {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetAuthMethodsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuthMethodsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthMethodsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthMethodsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuthMethodsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SignInResponse200Headers the declared response headers of an HTTP 200 response for SignIn
+type SignInResponse200Headers struct {
+	SetCookie *string
+}
+
+// SignInResponse401Headers the declared response headers of an HTTP 401 response for SignIn
+type SignInResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+// SignInResponse429Headers the declared response headers of an HTTP 429 response for SignIn
+type SignInResponse429Headers struct {
+	RetryAfter *int
+}
+
+// SignInResponse503Headers the declared response headers of an HTTP 503 response for SignIn
+type SignInResponse503Headers struct {
+	RetryAfter *int
+}
+
+type SignInResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Me
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *RequestTooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *UnsupportedMediaType
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyAttempts
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *Busy
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SignInResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SignInResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *SignInResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *SignInResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SignInResponse) GetJSON200() *Me {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON413() *RequestTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON415() *UnsupportedMediaType {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON429() *TooManyAttempts {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON503() *Busy {
+	return r.ApplicationproblemJSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r SignInResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SignInResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SignInResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SignInResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SignOutResponse204Headers the declared response headers of an HTTP 204 response for SignOut
+type SignOutResponse204Headers struct {
+	SetCookie *string
+}
+
+// SignOutResponse401Headers the declared response headers of an HTTP 401 response for SignOut
+type SignOutResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type SignOutResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *SignOutResponse204Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SignOutResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SignOutResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SignOutResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r SignOutResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SignOutResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SignOutResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SignOutResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4916,6 +5468,86 @@ func (c *ClientWithResponses) ListAuditEntriesWithResponse(ctx context.Context, 
 	return ParseListAuditEntriesResponse(rsp)
 }
 
+// GetAuthMethodsWithResponse How members sign in
+//
+// The ways the sign-in page offers, read before anyone is signed in.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /auth/methods (the `GetAuthMethods` operationId).
+func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthMethodsResponse, error) {
+	rsp, err := c.GetAuthMethods(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthMethodsResponse(rsp)
+}
+
+// SignInWithBodyWithResponse Sign in with an email and a password
+//
+// Opens a fresh session and sets its cookie. A wrong email, a wrong
+// password and a member who may not sign in all get the same
+// `invalid_credentials`, in comparable time. The body must be sent as
+// `application/json`, which a form on another site cannot send;
+// anything else is refused `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its email and of its address
+// before the password is checked, and is taken back when the password
+// was right or could not be checked. Five consecutive failures lock the
+// email, a hundred from one address in fifteen minutes throttle the
+// address; either is refused before the password is checked.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
+func (c *ClientWithResponses) SignInWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SignInResponse, error) {
+	rsp, err := c.SignInWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignInResponse(rsp)
+}
+
+// SignInWithResponse Sign in with an email and a password
+//
+// Opens a fresh session and sets its cookie. A wrong email, a wrong
+// password and a member who may not sign in all get the same
+// `invalid_credentials`, in comparable time. The body must be sent as
+// `application/json`, which a form on another site cannot send;
+// anything else is refused `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its email and of its address
+// before the password is checked, and is taken back when the password
+// was right or could not be checked. Five consecutive failures lock the
+// email, a hundred from one address in fifteen minutes throttle the
+// address; either is refused before the password is checked.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/sign-in (the `SignIn` operationId).
+func (c *ClientWithResponses) SignInWithResponse(ctx context.Context, body SignInJSONRequestBody, reqEditors ...RequestEditorFn) (*SignInResponse, error) {
+	rsp, err := c.SignIn(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignInResponse(rsp)
+}
+
+// SignOutWithResponse Sign out
+//
+// Ends the session the request is signed in to and clears its cookie. An API token has no session to end and is refused `session_required`, so a script never believes it ended something.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
+func (c *ClientWithResponses) SignOutWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignOutResponse, error) {
+	rsp, err := c.SignOut(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignOutResponse(rsp)
+}
+
 // GetMeWithResponse Who the caller is
 //
 // The member the credential in use acts for, the credential itself, and the address the request came from.
@@ -5422,6 +6054,222 @@ func ParseListAuditEntriesResponse(rsp *http.Response) (*ListAuditEntriesRespons
 	switch {
 	case rsp.StatusCode == 401:
 		var headers ListAuditEntriesResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthMethodsResponse parses an HTTP response from a GetAuthMethodsWithResponse call
+func ParseGetAuthMethodsResponse(rsp *http.Response) (*GetAuthMethodsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthMethodsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthMethods
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetAuthMethodsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseSignInResponse parses an HTTP response from a SignInWithResponse call
+func ParseSignInResponse(rsp *http.Response) (*SignInResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SignInResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Me
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest RequestTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest UnsupportedMediaType
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyAttempts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Busy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers SignInResponse200Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers SignInResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers SignInResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers SignInResponse503Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseSignOutResponse parses an HTTP response from a SignOutWithResponse call
+func ParseSignOutResponse(rsp *http.Response) (*SignOutResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SignOutResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		var headers SignOutResponse204Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers204 = &headers
+	case rsp.StatusCode == 401:
+		var headers SignOutResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -6945,6 +7793,15 @@ type ServerInterface interface {
 	// ListAuditEntries The instance's audit log
 	// (GET /audit)
 	ListAuditEntries(w http.ResponseWriter, r *http.Request, params ListAuditEntriesParams)
+	// GetAuthMethods How members sign in
+	// (GET /auth/methods)
+	GetAuthMethods(w http.ResponseWriter, r *http.Request)
+	// SignIn Sign in with an email and a password
+	// (POST /auth/sign-in)
+	SignIn(w http.ResponseWriter, r *http.Request)
+	// SignOut Sign out
+	// (POST /auth/sign-out)
+	SignOut(w http.ResponseWriter, r *http.Request)
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -7195,6 +8052,48 @@ func (siw *ServerInterfaceWrapper) ListAuditEntries(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAuditEntries(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAuthMethods operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthMethods(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthMethods(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SignIn operation middleware
+func (siw *ServerInterfaceWrapper) SignIn(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SignIn(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SignOut operation middleware
+func (siw *ServerInterfaceWrapper) SignOut(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SignOut(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8136,6 +9035,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/sign-in", wrapper.SignIn)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/sign-out", wrapper.SignOut)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/methods", wrapper.GetAuthMethods)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/roles", wrapper.ListRoles)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects", wrapper.ListProjects)
@@ -8167,6 +9069,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 type BadRequestApplicationProblemPlusJSONResponse Problem
 
+type BusyResponseHeaders struct {
+	RetryAfter *int
+}
+type BusyApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers BusyResponseHeaders
+}
+
 type ConflictApplicationProblemPlusJSONResponse Problem
 
 type ForbiddenApplicationProblemPlusJSONResponse Problem
@@ -8174,6 +9085,17 @@ type ForbiddenApplicationProblemPlusJSONResponse Problem
 type InvalidApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type RequestTooLargeApplicationProblemPlusJSONResponse Problem
+
+type TooManyAttemptsResponseHeaders struct {
+	RetryAfter *int
+}
+type TooManyAttemptsApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers TooManyAttemptsResponseHeaders
+}
 
 type UnauthenticatedResponseHeaders struct {
 	WWWAuthenticate *string
@@ -8183,6 +9105,8 @@ type UnauthenticatedApplicationProblemPlusJSONResponse struct {
 
 	Headers UnauthenticatedResponseHeaders
 }
+
+type UnsupportedMediaTypeApplicationProblemPlusJSONResponse Problem
 
 type ListAuditEntriesRequestObject struct {
 	Params ListAuditEntriesParams
@@ -8269,6 +9193,241 @@ func (response ListAuditEntries404ApplicationProblemPlusJSONResponse) VisitListA
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthMethodsRequestObject struct {
+}
+
+type GetAuthMethodsResponseObject interface {
+	VisitGetAuthMethodsResponse(w http.ResponseWriter) error
+}
+
+type GetAuthMethods200JSONResponse AuthMethods
+
+func (response GetAuthMethods200JSONResponse) VisitGetAuthMethodsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthMethods401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthMethods401ApplicationProblemPlusJSONResponse) VisitGetAuthMethodsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignInRequestObject struct {
+	Body *SignInJSONRequestBody
+}
+
+type SignInResponseObject interface {
+	VisitSignInResponse(w http.ResponseWriter) error
+}
+
+type SignIn200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type SignIn200JSONResponse struct {
+	Body    Me
+	Headers SignIn200ResponseHeaders
+}
+
+func (response SignIn200JSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn400ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn401ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn413ApplicationProblemPlusJSONResponse struct {
+	RequestTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn413ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn415ApplicationProblemPlusJSONResponse struct {
+	UnsupportedMediaTypeApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn415ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn429ApplicationProblemPlusJSONResponse struct {
+	TooManyAttemptsApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn429ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn503ApplicationProblemPlusJSONResponse struct {
+	BusyApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn503ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignOutRequestObject struct {
+}
+
+type SignOutResponseObject interface {
+	VisitSignOutResponse(w http.ResponseWriter) error
+}
+
+type SignOut204ResponseHeaders struct {
+	SetCookie *string
+}
+
+type SignOut204Response struct {
+	Headers SignOut204ResponseHeaders
+}
+
+func (response SignOut204Response) VisitSignOutResponse(w http.ResponseWriter) error {
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type SignOut401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response SignOut401ApplicationProblemPlusJSONResponse) VisitSignOutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignOut403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SignOut403ApplicationProblemPlusJSONResponse) VisitSignOutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -10203,6 +11362,15 @@ type StrictServerInterface interface {
 	// ListAuditEntries The instance's audit log
 	// (GET /audit)
 	ListAuditEntries(ctx context.Context, request ListAuditEntriesRequestObject) (ListAuditEntriesResponseObject, error)
+	// GetAuthMethods How members sign in
+	// (GET /auth/methods)
+	GetAuthMethods(ctx context.Context, request GetAuthMethodsRequestObject) (GetAuthMethodsResponseObject, error)
+	// SignIn Sign in with an email and a password
+	// (POST /auth/sign-in)
+	SignIn(ctx context.Context, request SignInRequestObject) (SignInResponseObject, error)
+	// SignOut Sign out
+	// (POST /auth/sign-out)
+	SignOut(ctx context.Context, request SignOutRequestObject) (SignOutResponseObject, error)
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -10335,6 +11503,85 @@ func (sh *strictHandler) ListAuditEntries(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListAuditEntriesResponseObject); ok {
 		if err := validResponse.VisitListAuditEntriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAuthMethods operation middleware
+func (sh *strictHandler) GetAuthMethods(w http.ResponseWriter, r *http.Request) {
+	var request GetAuthMethodsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthMethods(ctx, request.(GetAuthMethodsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthMethods")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthMethodsResponseObject); ok {
+		if err := validResponse.VisitGetAuthMethodsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SignIn operation middleware
+func (sh *strictHandler) SignIn(w http.ResponseWriter, r *http.Request) {
+	var request SignInRequestObject
+
+	var body SignInJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SignIn(ctx, request.(SignInRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SignIn")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SignInResponseObject); ok {
+		if err := validResponse.VisitSignInResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SignOut operation middleware
+func (sh *strictHandler) SignOut(w http.ResponseWriter, r *http.Request) {
+	var request SignOutRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SignOut(ctx, request.(SignOutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SignOut")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SignOutResponseObject); ok {
+		if err := validResponse.VisitSignOutResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

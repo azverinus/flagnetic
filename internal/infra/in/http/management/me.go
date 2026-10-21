@@ -5,13 +5,18 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 )
 
 // GetMe answers who the caller is: the member, the credential in use and
 // the address the request came from.
 func (a *api) GetMe(ctx context.Context, _ GetMeRequestObject) (GetMeResponseObject, error) {
-	c := callerOf(ctx)
+	return GetMe200JSONResponse(meOf(ctx, callerOf(ctx))), nil
+}
+
+// meOf describes c, calling from the request ctx belongs to.
+func meOf(ctx context.Context, c access.Caller) Me {
 	me := Me{
 		ClientIp:   flaghttp.ClientOf(ctx).IP.String(),
 		Credential: Credential{Method: CredentialMethod(c.Method)},
@@ -30,5 +35,5 @@ func (a *api) GetMe(ctx context.Context, _ GetMeRequestObject) (GetMeResponseObj
 			me.Member.Locale = &locale
 		}
 	}
-	return GetMe200JSONResponse(me), nil
+	return me
 }

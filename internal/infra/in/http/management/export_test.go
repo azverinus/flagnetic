@@ -7,12 +7,13 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/management/operations"
 )
 
 // SeamFor returns next behind the permission seam judging op, so a test can
 // judge an operation the document does not declare yet, such as a public
 // one.
 func SeamFor(edge *flaghttp.Server, h Handlers, op access.Operation, next http.Handler) http.Handler {
-	a := &api{edge: edge, h: h, refusals: newRefusals(prometheus.NewRegistry())}
-	return a.seam(op, next)
+	a := newAPI(edge, h, newRefusals(prometheus.NewRegistry()), Options{})
+	return a.seam(operations.Entry{Operation: op}, next)
 }

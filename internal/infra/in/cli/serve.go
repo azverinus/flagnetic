@@ -14,6 +14,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
@@ -82,7 +83,10 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	edgeOpts := flaghttp.OptionsFrom(cfg)
 	edgeOpts.Logger, edgeOpts.DB, edgeOpts.Metrics = log, pool, flaghttp.NewMetrics(reg)
 	edge := flaghttp.New(edgeOpts)
-	compose.Management(edge, compose.NewDeps(pool, clock.System{}), reg)
+	compose.Management(edge, compose.NewDeps(pool, clock.System{}), reg, compose.Options{
+		Keyring: secret.NewKeyring(cfg.SecretKey), PasswordHashConcurrency: cfg.PasswordHashConcurrency,
+		Options: management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
+	})
 	for _, r := range o.routes {
 		edge.Handle(r.pattern, r.handler)
 	}

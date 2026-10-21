@@ -29,9 +29,12 @@ const BaseURL = "/api/v1"
 
 // Handlers are the use cases the management API serves.
 type Handlers struct {
-	AuthenticateToken  *appaccess.AuthenticateToken
-	ProjectPermissions *appaccess.ProjectPermissions
-	WorkingProjects    *appaccess.WorkingProjects
+	AuthenticateToken   *appaccess.AuthenticateToken
+	AuthenticateSession *appaccess.AuthenticateSession
+	SignIn              *appaccess.SignIn
+	SignOut             *appaccess.SignOut
+	ProjectPermissions  *appaccess.ProjectPermissions
+	WorkingProjects     *appaccess.WorkingProjects
 
 	FindProject   *appworkspace.FindProject
 	ListProjects  *appworkspace.ListProjects
@@ -64,6 +67,8 @@ type Handlers struct {
 type api struct {
 	edge     *flaghttp.Server
 	h        Handlers
+	opts     Options
+	origins  *http.CrossOriginProtection
 	refusals *prometheus.CounterVec
 }
 
@@ -71,8 +76,8 @@ var _ StrictServerInterface = (*api)(nil)
 
 // Mount serves the management API on edge, each operation behind the
 // permission seam, and registers its metrics on reg.
-func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer) {
-	a := &api{edge: edge, h: h, refusals: newRefusals(reg)}
+func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Options) {
+	a := newAPI(edge, h, newRefusals(reg), opts)
 	invalidRequest := func(w http.ResponseWriter, r *http.Request, err error) {
 		edge.WriteError(w, r, flaghttp.InvalidRequest(err.Error()))
 	}
@@ -85,6 +90,18 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer) {
 		BaseRouter:       router{a},
 		ErrorHandlerFunc: invalidRequest,
 	})
+}
+
+func newAPI(edge *flaghttp.Server, h Handlers, refusals *prometheus.CounterVec, opts Options) *api {
+	origins := http.NewCrossOriginProtection()
+	if opts.BaseURL != nil {
+		// A proxy in front may rewrite Host, so the console's own origin is
+		// trusted by name rather than judged against the request's host.
+		if err := origins.AddTrustedOrigin(opts.BaseURL.Scheme + "://" + opts.BaseURL.Host); err != nil {
+			panic("management: trusting the base URL's origin: " + err.Error())
+		}
+	}
+	return &api{edge: edge, h: h, opts: opts, origins: origins, refusals: refusals}
 }
 
 // newRefusals returns the counter of the seam's refusals, registered on reg.
@@ -110,7 +127,11 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 		// route without an entry is a stale build, refused at start.
 		panic("management: no operation table entry for " + pattern + "; run task generate")
 	}
-	rt.a.edge.Handle(pattern, rt.a.seam(op, http.HandlerFunc(h)))
+	var opts []flaghttp.RouteOption
+	if op.ChecksPassword {
+		opts = append(opts, flaghttp.MaxBodyBytes(operations.PasswordBodyLimit))
+	}
+	rt.a.edge.Handle(pattern, rt.a.seam(op, http.HandlerFunc(h)), opts...)
 }
 
 func (rt router) ServeHTTP(w http.ResponseWriter, r *http.Request) { rt.a.edge.ServeHTTP(w, r) }
@@ -148,28 +169,39 @@ func requestOf(ctx context.Context) governance.Request {
 }
 
 // seam judges a request to op before its handler runs: it authenticates the
-// caller and authorizes them for op, and refuses the request otherwise. The
-// caller then travels in the request's context. A credential is
-// authenticated even for a public operation, so a bad one is refused there
-// as everywhere; only the absence of any credential is how anyone calls it.
-func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
+// caller, refuses a request signed in by the session cookie that comes from
+// another origin, and authorizes the caller for op, and refuses the request
+// otherwise. The caller then travels in the request's context. A bearer
+// credential is authenticated even for a public operation, so a bad one is
+// refused there as everywhere; only the absence of any credential is how
+// anyone calls it.
+func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		caller, err := a.authenticate(r)
+		ctx := context.WithValue(r.Context(), browserKey{}, browser{
+			secureCookies: a.opts.secureCookies(flaghttp.ClientOf(r.Context()).Scheme, r.Host),
+			userAgent:     r.UserAgent(),
+		})
+		r = r.WithContext(ctx)
+		caller, err := a.authenticate(r, op.Operation)
 		var in *addressed
 		switch {
+		case err == nil && caller.Method == access.MethodSession && a.crossOrigin(r):
+			err = errCrossOrigin
 		case err == nil && op.InProject():
 			in, err = a.address(ctx, caller, r.PathValue("project"))
 			if err == nil {
-				err = access.Authorize(caller, op, &access.ProjectAccess{Project: in.project.ID, Permissions: in.permissions})
+				err = access.Authorize(caller, op.Operation, &access.ProjectAccess{Project: in.project.ID, Permissions: in.permissions})
 			}
 		case err == nil:
-			err = access.Authorize(caller, op, nil)
+			err = access.Authorize(caller, op.Operation, nil)
 		case errors.Is(err, errUnauthenticated) && op.Requirement == access.RequirePublic:
 			err = nil
 		}
+		if err == nil && op.OpensSession && !isJSON(r) {
+			err = errNotJSON
+		}
 		if err != nil {
-			a.refuse(w, r, op, err)
+			a.refuse(w, r, op.Operation, err)
 			return
 		}
 		ctx = context.WithValue(ctx, callerKey{}, caller)
@@ -178,6 +210,18 @@ func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// crossOrigin reports whether the browser says r comes from an origin other
+// than the console's. The standard check lets safe methods through, since a
+// read changes nothing; a session is only ever used by the console on its
+// own origin, though, so a read from another origin is refused too: what it
+// answers is no other page's business. The check is therefore made as if r
+// were a write.
+func (a *api) crossOrigin(r *http.Request) bool {
+	asWrite := r.WithContext(r.Context()) // a shallow copy, whose method alone changes
+	asWrite.Method = http.MethodPost
+	return a.origins.Check(asWrite) != nil
 }
 
 // address finds the project with key and what caller holds there; an
@@ -199,22 +243,34 @@ func (a *api) address(ctx context.Context, caller access.Caller, key string) (*a
 
 // errUnauthenticated answers a request that presents no credential.
 var errUnauthenticated = apperrors.Unauthenticated("unauthenticated",
-	"authentication is required: an API token in the Authorization header as Bearer")
+	"authentication is required: an API token in the Authorization header as Bearer, or a signed-in session")
 
 // authenticate resolves the request's credential. Any Authorization header
-// is an attempt at an API token presented as Bearer, so a malformed one is refused rather than
-// ignored; a token anywhere else, such as the query string, is never read,
-// since URLs end up in logs and browser histories.
-func (a *api) authenticate(r *http.Request) (access.Caller, error) {
-	if _, present := r.Header["Authorization"]; !present {
+// is an attempt at an API token presented as Bearer, so a malformed one is
+// refused rather than ignored, and it is judged instead of any session
+// cookie; a token anywhere else, such as the query string, is never read,
+// since URLs end up in logs and browser histories. Without one, the session
+// cookie is the credential, except for a public operation: an ended session
+// must not stand between a member and signing in again. A cookie the server
+// did not issue is no credential at all.
+func (a *api) authenticate(r *http.Request, op access.Operation) (access.Caller, error) {
+	if _, present := r.Header["Authorization"]; present {
+		scheme, value, _ := strings.Cut(r.Header.Get("Authorization"), " ")
+		value = strings.TrimSpace(value)
+		if !strings.EqualFold(scheme, "Bearer") || value == "" {
+			return access.Caller{}, access.ErrInvalidToken
+		}
+		return a.h.AuthenticateToken.Handle(r.Context(), value)
+	}
+	cookie, err := r.Cookie(SessionCookie)
+	if err != nil || op.Requirement == access.RequirePublic {
 		return access.Caller{}, errUnauthenticated
 	}
-	scheme, value, _ := strings.Cut(r.Header.Get("Authorization"), " ")
-	value = strings.TrimSpace(value)
-	if !strings.EqualFold(scheme, "Bearer") || value == "" {
-		return access.Caller{}, access.ErrInvalidToken
+	caller, err := a.h.AuthenticateSession.Handle(r.Context(), cookie.Value)
+	if errors.Is(err, appaccess.ErrNoSession) {
+		return access.Caller{}, errUnauthenticated
 	}
-	return a.h.AuthenticateToken.Handle(r.Context(), value)
+	return caller, err
 }
 
 // refuse answers a request the seam turns away, and counts a refusal by the
@@ -223,12 +279,16 @@ func (a *api) authenticate(r *http.Request) (access.Caller, error) {
 func (a *api) refuse(w http.ResponseWriter, r *http.Request, op access.Operation, err error) {
 	if e, ok := apperrors.From(err); ok && (e.Kind == apperrors.KindUnauthenticated || e.Kind == apperrors.KindForbidden ||
 		e.Kind == apperrors.KindNotFound) {
-		if e.Kind == apperrors.KindUnauthenticated {
-			challenge := "Bearer"
-			if e.Code != errUnauthenticated.Code {
-				challenge = `Bearer error="invalid_token", error_description="` + e.Code + `"`
-			}
-			w.Header().Set("WWW-Authenticate", challenge)
+		switch {
+		case e.Code == access.ErrSessionExpired.Code:
+			// The browser drops the cookie of a session that has ended, so
+			// it stops sending what can no longer sign anyone in.
+			w.Header().Set("Set-Cookie", sessionCookie(r.Context(), ""))
+			w.Header().Set("WWW-Authenticate", "Bearer")
+		case e.Code == errUnauthenticated.Code:
+			w.Header().Set("WWW-Authenticate", "Bearer")
+		case e.Kind == apperrors.KindUnauthenticated:
+			w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token", error_description="`+e.Code+`"`)
 		}
 		a.refusals.WithLabelValues(op.Name, e.Code).Inc()
 	}

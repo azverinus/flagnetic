@@ -150,6 +150,15 @@ func TestRateLimitedWritesRetryAfter(t *testing.T) {
 	}
 }
 
+func TestAnUnavailableErrorWithARetryDelayWritesRetryAfter(t *testing.T) {
+	srv := testkit.StartServer(t, failing("GET /test/busy", apperrors.Unavailable("busy", "no slot").WithRetryAfter(time.Second)))
+	p := request(t, "GET", srv.URL+"/test/busy", nil)
+	checkProblem(t, p, 503, "busy", "Unavailable")
+	if got := p.header.Get("Retry-After"); got != "1" || p.body["retry_after"] != 1.0 {
+		t.Errorf("Retry-After = %q, retry_after = %v; want 1", got, p.body["retry_after"])
+	}
+}
+
 func TestAnErrorWithoutAKindIsInternalAndLogged(t *testing.T) {
 	srv := testkit.StartServer(t, failing("GET /test/broken", fmt.Errorf("query flags: %w", errors.New("connection reset"))))
 	p := request(t, "GET", srv.URL+"/test/broken", nil)
@@ -169,6 +178,7 @@ func TestAdapterOnlyProblems(t *testing.T) {
 	srv := testkit.StartServer(t,
 		failing("POST /test/decode", flaghttp.InvalidRequest("the body is not JSON")),
 		failing("PUT /test/write", flaghttp.PreconditionRequired("send If-Match with the version you read")),
+		failing("POST /test/form", flaghttp.UnsupportedMediaType("the body must be sent as application/json")),
 	)
 	p := request(t, "POST", srv.URL+"/test/decode", nil)
 	checkProblem(t, p, 400, "invalid_request", "Invalid request")
@@ -176,6 +186,7 @@ func TestAdapterOnlyProblems(t *testing.T) {
 		t.Errorf("detail = %v", p.body["detail"])
 	}
 	checkProblem(t, request(t, "PUT", srv.URL+"/test/write", nil), 428, "precondition_required", "Precondition required")
+	checkProblem(t, request(t, "POST", srv.URL+"/test/form", nil), 415, "unsupported_media_type", "Unsupported media type")
 }
 
 func TestUnmatchedRoutesAreProblems(t *testing.T) {

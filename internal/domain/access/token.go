@@ -36,7 +36,6 @@ var prefixes = map[TokenKind]string{TokenPersonal: "fn_pat_", TokenProject: "fn_
 const (
 	tokenBodyLength = 40
 	hintBodyLength  = 4
-	passwordLength  = 24
 	maxTokenName    = 200
 )
 
@@ -63,12 +62,6 @@ func NewTokenValue(kind TokenKind, random io.Reader) TokenValue {
 		Hint:  v[:len(prefixes[kind])+hintBodyLength],
 		Hash:  sha256.Sum256([]byte(v)),
 	}
-}
-
-// GeneratePassword draws a password of 24 base62 characters, about 143
-// bits, for an instance admin created without one.
-func GeneratePassword(random io.Reader) secret.String {
-	return secret.New(base62(random, passwordLength))
 }
 
 const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"

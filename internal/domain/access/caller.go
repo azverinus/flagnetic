@@ -22,8 +22,15 @@ type Caller struct {
 	Method Method
 	// Token is the API token presented, for MethodToken.
 	Token *APIToken
+	// Session is the session signed in to, for MethodSession.
+	Session *Session
 	// Member is the member the credential acts for; nil for a project token.
 	Member *Member
+}
+
+// SessionCaller returns the caller signed in to s as holder.
+func SessionCaller(s Session, holder Member) Caller {
+	return Caller{Method: MethodSession, Session: &s, Member: &holder}
 }
 
 // TokenCaller returns the caller presenting tok, held by holder (nil for a
@@ -91,7 +98,7 @@ func Authorize(c Caller, op Operation, in *ProjectAccess) error {
 		return apperrors.Forbidden("forbidden", "a project token reaches only its project")
 	}
 	if op.SessionRequired && c.Method != MethodSession {
-		return apperrors.Forbidden("session_required", "this operation needs a signed-in session; an API token cannot perform it")
+		return ErrSessionRequired
 	}
 	if !c.hasScope(op.Scope) {
 		return apperrors.Forbidden("insufficient_scope", "the API token does not carry the scope "+string(op.Scope))
@@ -115,6 +122,10 @@ func Authorize(c Caller, op Operation, in *ProjectAccess) error {
 	}
 	return nil
 }
+
+// ErrSessionRequired refuses an API token an operation only a signed-in
+// session performs.
+var ErrSessionRequired = apperrors.Forbidden("session_required", "this operation needs a signed-in session; an API token cannot perform it")
 
 // ErrProjectNotFound answers an operation addressing a project no project's
 // key names. It is answered before any permission is judged, so a caller

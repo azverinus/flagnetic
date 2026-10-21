@@ -1,5 +1,5 @@
-// Package access is the PostgreSQL repository of the access context: members
-// and API tokens.
+// Package access is the PostgreSQL repository of the access context: members,
+// API tokens and sessions.
 package access
 
 import (

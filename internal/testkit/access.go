@@ -25,7 +25,7 @@ import (
 const (
 	InstanceAdminEmail    = "admin@example.com"
 	InstanceAdminName     = "Test Admin"
-	InstanceAdminPassword = "correct horse battery staple"
+	InstanceAdminPassword = "lantern-quartz-meadow-2291"
 )
 
 var (
