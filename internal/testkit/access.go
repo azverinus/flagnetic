@@ -62,6 +62,8 @@ func Bootstrap(t testing.TB, pool *pgxpool.Pool) string {
 		t.Fatalf("bootstrapping the instance admin: %v", err)
 	}
 	admins[pool] = res.Token.Reveal()
+	RecordSecret(InstanceAdminPassword)
+	RecordSecret(admins[pool])
 	return admins[pool]
 }
 
@@ -82,10 +84,12 @@ func FreshPool(t testing.TB) *pgxpool.Pool {
 }
 
 // Client returns a client of the management API of srv presenting token as
-// a bearer, or no credential when token is "".
+// a bearer, or no credential when token is "". The secrets its requests and
+// responses carry are recorded for the audit guard.
 func Client(t testing.TB, srv *Server, token string) *management.ClientWithResponses {
 	t.Helper()
-	var opts []management.ClientOption
+	RecordSecret(token)
+	opts := []management.ClientOption{management.WithHTTPClient(&http.Client{Transport: recordingTransport{}})}
 	if token != "" {
 		opts = append(opts, management.WithRequestEditorFn(func(_ context.Context, r *http.Request) error {
 			r.Header.Set("Authorization", "Bearer "+token)
@@ -128,6 +132,7 @@ func PersonalToken(t testing.TB, pool *pgxpool.Pool, member access.MemberID, nam
 	if err := pgaccess.NewStore(pool).CreateToken(t.Context(), tok); err != nil {
 		t.Fatal(err)
 	}
+	RecordSecret(v.Value.Reveal())
 	return v.Value.Reveal()
 }
 
@@ -147,5 +152,6 @@ func ProjectToken(t testing.TB, pool *pgxpool.Pool, project workspace.ProjectID,
 	if err := pgaccess.NewStore(pool).CreateToken(t.Context(), tok); err != nil {
 		t.Fatal(err)
 	}
+	RecordSecret(v.Value.Reveal())
 	return v.Value.Reveal()
 }

@@ -30,11 +30,17 @@ func TestMain(m *testing.M) { os.Exit(testkit.Main(m)) }
 
 var cli = governance.CLIActor("admin bootstrap")
 
+// givenPassword is the password every bootstrap of these tests gives.
+const givenPassword = "a long enough password"
+
 func bootstrap(t *testing.T, pool *pgxpool.Pool, email string) (appaccess.BootstrapResult, error) {
 	t.Helper()
 	c := testkit.Clock()
-	return compose.Bootstrap(compose.Deps{Pool: pool, Clock: c, IDs: testkit.IDs(c)}).Handle(t.Context(),
-		appaccess.BootstrapCommand{Email: email, Password: secret.New("a long enough password"), Request: governance.Request{Actor: cli}})
+	testkit.RecordSecret(givenPassword)
+	res, err := compose.Bootstrap(compose.Deps{Pool: pool, Clock: c, IDs: testkit.IDs(c)}).Handle(t.Context(),
+		appaccess.BootstrapCommand{Email: email, Password: secret.New(givenPassword), Request: governance.Request{Actor: cli}})
+	testkit.RecordSecret(res.Token.Reveal())
+	return res, err
 }
 
 func TestTheBootstrapTokenCarriesEveryScope(t *testing.T) {
@@ -144,6 +150,8 @@ func TestABootstrapWithoutAPasswordGeneratesOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	testkit.RecordSecret(res.GeneratedPassword.Reveal())
+	testkit.RecordSecret(res.Token.Reveal())
 	if len(res.GeneratedPassword.Reveal()) != 24 {
 		t.Errorf("generated password = %d characters, want 24", len(res.GeneratedPassword.Reveal()))
 	}
