@@ -261,6 +261,10 @@ msgstr "Оформление"
 msgid "Apply filters"
 msgstr "Применить фильтры"
 
+#: src/lib/access-names.ts
+msgid "archive and delete flags"
+msgstr "архивировать и удалять флаги"
+
 #: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
@@ -345,6 +349,10 @@ msgstr "Отмена"
 #: src/lib/personal-tokens.ts
 msgid "Change experiments."
 msgstr "Изменять эксперименты."
+
+#: src/lib/access-names.ts
+msgid "change flag configurations"
+msgstr "изменять конфигурации флагов"
 
 #: src/lib/personal-tokens.ts
 msgid "Change flags, segments and declarations."
@@ -538,6 +546,10 @@ msgstr "Удалить атрибут"
 msgid "Delete environment"
 msgstr "Удалить окружение"
 
+#: src/lib/access-names.ts
+msgid "delete segments"
+msgstr "удалять сегменты"
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete unit type"
 msgstr "Удалить тип единицы"
@@ -579,6 +591,14 @@ msgstr "Изменить {key}"
 #: src/components/member-actions.tsx
 msgid "Edit {name}"
 msgstr "Изменить участника {name}"
+
+#: src/lib/access-names.ts
+msgid "edit flags"
+msgstr "изменять флаги"
+
+#: src/lib/access-names.ts
+msgid "edit segments"
+msgstr "изменять сегменты"
 
 #: src/lib/access-names.ts
 msgid "edit the project"
@@ -1536,6 +1556,10 @@ msgstr "Статус"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
 msgstr "Строка"
+
+#: src/lib/access-names.ts
+msgid "switch flags off with the kill switch"
+msgstr "выключать флаги аварийным выключателем"
 
 #. A kind of actor in the audit log.
 #: src/lib/audit.ts

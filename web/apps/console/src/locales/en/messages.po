@@ -261,6 +261,10 @@ msgstr "Appearance"
 msgid "Apply filters"
 msgstr "Apply filters"
 
+#: src/lib/access-names.ts
+msgid "archive and delete flags"
+msgstr "archive and delete flags"
+
 #: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
@@ -345,6 +349,10 @@ msgstr "Cancel"
 #: src/lib/personal-tokens.ts
 msgid "Change experiments."
 msgstr "Change experiments."
+
+#: src/lib/access-names.ts
+msgid "change flag configurations"
+msgstr "change flag configurations"
 
 #: src/lib/personal-tokens.ts
 msgid "Change flags, segments and declarations."
@@ -538,6 +546,10 @@ msgstr "Delete attribute"
 msgid "Delete environment"
 msgstr "Delete environment"
 
+#: src/lib/access-names.ts
+msgid "delete segments"
+msgstr "delete segments"
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete unit type"
 msgstr "Delete unit type"
@@ -579,6 +591,14 @@ msgstr "Edit {key}"
 #: src/components/member-actions.tsx
 msgid "Edit {name}"
 msgstr "Edit {name}"
+
+#: src/lib/access-names.ts
+msgid "edit flags"
+msgstr "edit flags"
+
+#: src/lib/access-names.ts
+msgid "edit segments"
+msgstr "edit segments"
 
 #: src/lib/access-names.ts
 msgid "edit the project"
@@ -1536,6 +1556,10 @@ msgstr "Status"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
 msgstr "String"
+
+#: src/lib/access-names.ts
+msgid "switch flags off with the kill switch"
+msgstr "switch flags off with the kill switch"
 
 #. A kind of actor in the audit log.
 #: src/lib/audit.ts

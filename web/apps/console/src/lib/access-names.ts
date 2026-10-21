@@ -9,9 +9,10 @@ import { msg } from "@lingui/core/macro";
  */
 
 /**
- * The permissions the console asks about. The server's catalog names more
- * as later screens arrive; a screen asks only for one listed here, so a
- * misspelt permission fails to compile instead of hiding an action.
+ * Every permission of the server's catalog, each with a display name below,
+ * so a role is described in words and never by a catalog name. A screen asks
+ * only for one listed here, so a misspelt permission fails to compile
+ * instead of hiding an action.
  */
 export type Permission =
   | "project.read"
@@ -19,7 +20,13 @@ export type Permission =
   | "environment.manage"
   | "declaration.manage"
   | "grant.manage"
-  | "project_token.manage";
+  | "project_token.manage"
+  | "flag.edit"
+  | "flag.archive"
+  | "flag_configuration.update"
+  | "flag_configuration.kill"
+  | "segment.edit"
+  | "segment.delete";
 
 /** Each permission as what it lets a member do, to complete "the permission to …". */
 const permissionNames: Record<Permission, MessageDescriptor> = {
@@ -29,6 +36,12 @@ const permissionNames: Record<Permission, MessageDescriptor> = {
   "declaration.manage": msg`manage unit types and attributes`,
   "grant.manage": msg`manage who has access`,
   "project_token.manage": msg`manage project tokens`,
+  "flag.edit": msg`edit flags`,
+  "flag.archive": msg`archive and delete flags`,
+  "flag_configuration.update": msg`change flag configurations`,
+  "flag_configuration.kill": msg`switch flags off with the kill switch`,
+  "segment.edit": msg`edit segments`,
+  "segment.delete": msg`delete segments`,
 };
 
 const roleNames: Record<string, MessageDescriptor> = {
