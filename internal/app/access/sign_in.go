@@ -102,7 +102,7 @@ type SignInResult struct {
 // reasonWrongPassword is why a sign-in failed when its password was wrong,
 // recorded in its audit entry while the caller is told only
 // invalid_credentials; a member who is not active is recorded with their
-// status instead.
+// status instead when the password was right, or when they hold none.
 const reasonWrongPassword = "wrong_password"
 
 // Handle signs the member in, opening a fresh session, or refuses with
@@ -142,6 +142,10 @@ func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, e
 	switch {
 	case !known:
 		return SignInResult{}, ErrInvalidCredentials
+	case hash == "" && member.Status != access.MemberActive:
+		// An invited member holds no password until they accept: no
+		// password was wrong, they may not sign in yet.
+		return SignInResult{}, h.fail(ctx, cmd, member, reserved, string(member.Status))
 	case !ok || hash == "":
 		return SignInResult{}, h.fail(ctx, cmd, member, reserved, reasonWrongPassword)
 	case member.Status != access.MemberActive:

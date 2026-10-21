@@ -43,7 +43,8 @@ func WithStatus(s access.MemberStatus) MemberOption { return func(m *access.Memb
 func WithEmail(email string) MemberOption { return func(m *access.Member) { m.Email = email } }
 
 // NewMember creates an active member on pool, who holds no grant and signs
-// in with MemberPassword.
+// in with MemberPassword. An invited member holds no password, as one who
+// has not accepted their invitation.
 func NewMember(t testing.TB, pool *pgxpool.Pool, opts ...MemberOption) Member {
 	t.Helper()
 	m := access.Member{
@@ -54,9 +55,12 @@ func NewMember(t testing.TB, pool *pgxpool.Pool, opts ...MemberOption) Member {
 		opt(&m)
 	}
 	RecordSecret(MemberPassword)
-	hash, err := compose.Hasher().Hash(t.Context(), secret.New(MemberPassword))
-	if err != nil {
-		t.Fatal(err)
+	var hash string
+	if m.Status != access.MemberInvited {
+		var err error
+		if hash, err = compose.Hasher().Hash(t.Context(), secret.New(MemberPassword)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := pgaccess.NewStore(pool).CreateMember(t.Context(), m, hash); err != nil {
 		t.Fatal(err)

@@ -231,6 +231,18 @@ func TestADeactivatedMemberCannotSignIn(t *testing.T) {
 	}
 }
 
+func TestAnInvitedMemberCannotSignInAndIsAuditedAsInvited(t *testing.T) {
+	srv := testkit.StartServer(t, testkit.WithClock(testkit.Clock()), trustLoopback())
+	m := testkit.NewMember(t, testkit.Pool(t), testkit.WithStatus(access.MemberInvited))
+	if status, code, _ := signInAs(t, fromAddress(t, srv, someAddress()), m.Email, m.Password); status != 401 || code != "invalid_credentials" {
+		t.Fatalf("an invited member signing in: %d %s, want 401 invalid_credentials", status, code)
+	}
+	failed := auditOf(t, srv, "auth.sign_in_failed", m.ID.String())
+	if len(failed) != 1 || failed[0].After.(map[string]any)["reason"] != "invited" {
+		t.Errorf("sign_in_failed entries = %+v, want one with the reason invited: they hold no password yet", failed)
+	}
+}
+
 func TestAuthBodiesOver8KiBAreRefusedBeforeAnything(t *testing.T) {
 	srv := testkit.StartServer(t)
 	body := `{"email":"a@example.com","password":"` + strings.Repeat("x", 8<<10) + `"}`
