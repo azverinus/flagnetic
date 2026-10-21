@@ -28,6 +28,12 @@ type Deps struct {
 	IDs   *id.Source
 }
 
+// NewDeps returns the dependencies of a replica on pool, timed by c, minting
+// identifiers from c.
+func NewDeps(pool *pgxpool.Pool, c clock.Clock) Deps {
+	return Deps{Pool: pool, Clock: c, IDs: id.NewSource(c)}
+}
+
 // Management mounts the management API on edge, its metrics on reg.
 func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer) {
 	store := pgaccess.NewStore(d.Pool)
@@ -39,6 +45,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer) {
 // Bootstrap returns the use case creating the first instance admin.
 func Bootstrap(d Deps) *appaccess.Bootstrap {
 	return appaccess.NewBootstrap(postgres.NewTransactor(d.Pool), pgaccess.NewStore(d.Pool),
-		password.NewHasher(password.DefaultParams), pggovernance.NewAuditLog(d.Pool, d.Clock, d.IDs),
+		password.NewHasher(password.DefaultParams), pggovernance.NewAuditLog(d.Pool),
 		d.Clock, d.IDs, rand.Reader)
+}
+
+// InstanceAdminExists returns the query telling whether the instance has an
+// instance admin.
+func InstanceAdminExists(d Deps) *appaccess.InstanceAdminExists {
+	return appaccess.NewInstanceAdminExists(pgaccess.NewStore(d.Pool))
 }

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,13 +10,11 @@ import (
 	"os"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
-	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
-	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
@@ -59,12 +56,6 @@ func admin(ctx context.Context, cl commandLine, cfg config.Config, log *slog.Log
 	return adminBootstrap(ctx, cl, cfg, log, o)
 }
 
-// cliActor is the actor audit entries name for a change made from the
-// command line, which runs with the database's own credentials.
-func cliActor(command string) governance.Actor {
-	return governance.Actor{Kind: governance.ActorCLI, ID: "cli", Name: "flagnetic " + command}
-}
-
 func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log *slog.Logger, o options) int {
 	fs := flag.NewFlagSet("admin bootstrap", flag.ContinueOnError)
 	fs.SetOutput(cl.stderr)
@@ -89,16 +80,11 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 		return fail(log, "admin bootstrap failed", err)
 	}
 
-	password, generated := secret.String{}, false
-	if v, _ := cl.lookupEnv("FLAGNETIC_ADMIN_PASSWORD"); v != "" {
-		password = secret.New(v)
-	} else {
-		password, generated = access.GeneratePassword(rand.Reader), true
-	}
-	ctx = governance.WithRequest(ctx, governance.Request{Actor: cliActor("admin bootstrap")})
-	c := clock.System{}
-	res, err := compose.Bootstrap(compose.Deps{Pool: pool, Clock: c, IDs: id.NewSource(c)}).Handle(ctx,
-		appaccess.BootstrapCommand{Email: *email, DisplayName: *name, Password: password})
+	password, _ := cl.lookupEnv("FLAGNETIC_ADMIN_PASSWORD")
+	res, err := compose.Bootstrap(compose.NewDeps(pool, clock.System{})).Handle(ctx, appaccess.BootstrapCommand{
+		Email: *email, DisplayName: *name, Password: secret.New(password),
+		Request: governance.Request{Actor: governance.CLIActor("admin bootstrap")},
+	})
 	if e, ok := apperrors.From(err); ok {
 		switch {
 		case e.Code == appaccess.ErrInstanceAdminExists.Code && *ifAbsent:
@@ -116,8 +102,8 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 		return fail(log, "admin bootstrap failed", err)
 	}
 
-	if generated {
-		fmt.Fprintf(cl.stderr, "The instance admin's password is shown once; store it now:\nPassword: %s\n", password.Reveal())
+	if !res.GeneratedPassword.IsZero() {
+		fmt.Fprintf(cl.stderr, "The instance admin's password is shown once; store it now:\nPassword: %s\n", res.GeneratedPassword.Reveal())
 	}
 	if *tokenFile != "" {
 		if err := writeSecretFile(*tokenFile, res.Token.Reveal()+"\n"); err != nil {

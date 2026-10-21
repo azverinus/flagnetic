@@ -20,7 +20,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
-	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 // Server is a replica's public handler served in-process, for black-box HTTP
@@ -155,7 +154,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	if c == nil {
 		c = clock.System{}
 	}
-	compose.Management(h, compose.Deps{Pool: o.pool, Clock: c, IDs: id.NewSource(c)}, reg)
+	compose.Management(h, compose.NewDeps(o.pool, c), reg)
 	for _, r := range o.routes {
 		h.Handle(r.pattern, r.build(h), r.opts...)
 	}

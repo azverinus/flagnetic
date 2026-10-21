@@ -28,16 +28,23 @@ type PasswordHasher interface {
 // AuditLog records the audit entry of a change, in the unit of work of the
 // change.
 type AuditLog interface {
-	Record(ctx context.Context, r governance.Record) error
+	Record(ctx context.Context, e governance.Entry) error
+}
+
+// InstanceAdmins tells whether the instance has an instance admin.
+type InstanceAdmins interface {
+	// AnyInstanceAdmin reports whether an instance admin exists, whatever
+	// their status.
+	AnyInstanceAdmin(ctx context.Context) (bool, error)
 }
 
 // BootstrapStore is what bootstrapping needs of the stored members and
 // tokens.
 type BootstrapStore interface {
+	InstanceAdmins
 	// LockBootstrap serializes bootstraps until the unit of work ends, so two
 	// running at once cannot both find no instance admin.
 	LockBootstrap(ctx context.Context) error
-	AnyInstanceAdmin(ctx context.Context) (bool, error)
 	CreateMember(ctx context.Context, m access.Member, passwordHash string) error
 	CreateToken(ctx context.Context, t access.APIToken) error
 }
@@ -62,17 +69,22 @@ type Bootstrap struct {
 	random io.Reader
 }
 
-// NewBootstrap returns the handler. random is the source token values are
-// drawn from.
+// NewBootstrap returns the handler. random is the source token values and
+// generated passwords are drawn from.
 func NewBootstrap(tx Transactor, store BootstrapStore, hasher PasswordHasher, audit AuditLog, c clock.Clock, ids *id.Source, random io.Reader) *Bootstrap {
 	return &Bootstrap{tx: tx, store: store, hasher: hasher, audit: audit, clock: c, ids: ids, random: random}
 }
 
 // BootstrapCommand names the first instance admin.
 type BootstrapCommand struct {
-	Email       string
+	Email string
+	// DisplayName is "" to name the member after their email's local part.
 	DisplayName string
-	Password    secret.String
+	// Password is the instance admin's password, or zero to have one
+	// generated: unattended provisioning need not invent one.
+	Password secret.String
+	// Request names who bootstraps, for the audit entries.
+	Request governance.Request
 }
 
 // BootstrapResult is the instance admin created and their token's value,
@@ -80,6 +92,9 @@ type BootstrapCommand struct {
 type BootstrapResult struct {
 	Member access.Member
 	Token  secret.String
+	// GeneratedPassword is the password generated for a command that gave
+	// none, shown once; zero when the command gave one.
+	GeneratedPassword secret.String
 }
 
 // Handle creates the instance admin and their token, carrying every scope
@@ -97,23 +112,39 @@ func (h *Bootstrap) Handle(ctx context.Context, cmd BootstrapCommand) (Bootstrap
 	if err != nil {
 		return BootstrapResult{}, err
 	}
-	// Hashing is slow by design, so it runs before the unit of work rather
-	// than holding a connection and the lock.
-	hash, err := h.hasher.Hash(ctx, cmd.Password)
+	memberEntry, err := governance.NewEntry(id.New[governance.Entry](h.ids), now, cmd.Request, memberCreated(member))
 	if err != nil {
 		return BootstrapResult{}, err
+	}
+	tokenEntry, err := governance.NewEntry(id.New[governance.Entry](h.ids), now, cmd.Request, tokenCreated(token, member))
+	if err != nil {
+		return BootstrapResult{}, err
+	}
+	res := BootstrapResult{Member: member, Token: value.Value}
+	password := cmd.Password
+	if password.IsZero() {
+		password = access.GeneratePassword(h.random)
+		res.GeneratedPassword = password
 	}
 
-	err = h.tx.Within(ctx, func(ctx context.Context) error { return h.create(ctx, member, hash, token) })
-	if err != nil {
+	admin := newAdmin{member: member, password: password, token: token, memberEntry: memberEntry, tokenEntry: tokenEntry}
+	if err := h.tx.Within(ctx, func(ctx context.Context) error { return h.create(ctx, admin) }); err != nil {
 		return BootstrapResult{}, err
 	}
-	return BootstrapResult{Member: member, Token: value.Value}, nil
+	return res, nil
+}
+
+// newAdmin is what a bootstrap stores, prepared before its unit of work.
+type newAdmin struct {
+	member                  access.Member
+	password                secret.String
+	token                   access.APIToken
+	memberEntry, tokenEntry governance.Entry
 }
 
 // create stores the instance admin and their token unless the instance has
 // an instance admin already, in the unit of work ctx carries.
-func (h *Bootstrap) create(ctx context.Context, member access.Member, hash string, token access.APIToken) error {
+func (h *Bootstrap) create(ctx context.Context, a newAdmin) error {
 	if err := h.store.LockBootstrap(ctx); err != nil {
 		return err
 	}
@@ -124,16 +155,39 @@ func (h *Bootstrap) create(ctx context.Context, member access.Member, hash strin
 	if exists {
 		return ErrInstanceAdminExists
 	}
-	if err := h.store.CreateMember(ctx, member, hash); err != nil {
+	// Hashed only once the instance is known to need its admin, so a
+	// bootstrap that is refused spends no hashing on a password.
+	hash, err := h.hasher.Hash(ctx, a.password)
+	if err != nil {
 		return err
 	}
-	if err := h.audit.Record(ctx, memberCreated(member)); err != nil {
+	if err := h.store.CreateMember(ctx, a.member, hash); err != nil {
 		return err
 	}
-	if err := h.store.CreateToken(ctx, token); err != nil {
+	if err := h.audit.Record(ctx, a.memberEntry); err != nil {
 		return err
 	}
-	return h.audit.Record(ctx, tokenCreated(token, member))
+	if err := h.store.CreateToken(ctx, a.token); err != nil {
+		return err
+	}
+	return h.audit.Record(ctx, a.tokenEntry)
+}
+
+// InstanceAdminExists answers whether the instance has an instance admin, so
+// provisioning that bootstraps on every deploy learns there is nothing to do
+// before it prepares anything.
+type InstanceAdminExists struct {
+	store InstanceAdmins
+}
+
+// NewInstanceAdminExists returns the handler.
+func NewInstanceAdminExists(store InstanceAdmins) *InstanceAdminExists {
+	return &InstanceAdminExists{store: store}
+}
+
+// Handle reports whether an instance admin exists.
+func (h *InstanceAdminExists) Handle(ctx context.Context) (bool, error) {
+	return h.store.AnyInstanceAdmin(ctx)
 }
 
 func memberCreated(m access.Member) governance.Record {

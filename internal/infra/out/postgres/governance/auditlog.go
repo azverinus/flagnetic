@@ -10,31 +10,22 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
-	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 // AuditLog writes audit entries, each in the unit of work of the change it
 // records.
 type AuditLog struct {
-	pool  *pgxpool.Pool
-	clock clock.Clock
-	ids   *id.Source
+	pool *pgxpool.Pool
 }
 
-// NewAuditLog returns the audit log on pool, timing and identifying entries
-// with c and ids.
-func NewAuditLog(pool *pgxpool.Pool, c clock.Clock, ids *id.Source) *AuditLog {
-	return &AuditLog{pool: pool, clock: c, ids: ids}
-}
+// NewAuditLog returns the audit log on pool.
+func NewAuditLog(pool *pgxpool.Pool) *AuditLog { return &AuditLog{pool: pool} }
 
-// Record writes the entry of r, naming the actor and request ctx carries.
-func (l *AuditLog) Record(ctx context.Context, r governance.Record) error {
-	e, err := governance.NewEntry(ctx, id.New[governance.Entry](l.ids), l.clock.Now(), r)
-	if err != nil {
-		return err
-	}
+// Record writes e as the handler that made the change built it.
+func (l *AuditLog) Record(ctx context.Context, e governance.Entry) error {
 	before, err := encode(e.Before)
 	if err != nil {
 		return fmt.Errorf("audit entry %s: before: %w", e.Action, err)
@@ -99,10 +90,10 @@ func (l *AuditLog) Latest(ctx context.Context, limit int) ([]governance.Entry, e
 		}
 		e.ID, e.Actor.Kind = id.FromBytes[governance.Entry](entryID), governance.ActorKind(kind)
 		if project != nil {
-			e.Project = id.FromBytes[governance.Project](*project)
+			e.Project = id.FromBytes[workspace.Project](*project)
 		}
 		if environment != nil {
-			e.Environment = id.FromBytes[governance.Environment](*environment)
+			e.Environment = id.FromBytes[workspace.Environment](*environment)
 		}
 		if before != nil {
 			e.Before = json.RawMessage(before)

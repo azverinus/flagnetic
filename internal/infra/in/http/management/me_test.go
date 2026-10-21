@@ -20,7 +20,7 @@ func TestMain(m *testing.M) { os.Exit(testkit.Main(m)) }
 
 func TestMeShowsTheBootstrapAdminAndTheTokenInUse(t *testing.T) {
 	srv := testkit.StartServer(t)
-	res, err := testkit.Client(t, srv, testkit.AdminToken(t)).GetMeWithResponse(t.Context())
+	res, err := testkit.Client(t, srv, testkit.InstanceAdminToken(t)).GetMeWithResponse(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestMeShowsTheBootstrapAdminAndTheTokenInUse(t *testing.T) {
 		t.Fatalf("GET /me = %d: %s", res.StatusCode(), res.Body)
 	}
 	me := res.JSON200
-	if m := me.Member; m == nil || m.Email != testkit.AdminEmail || m.DisplayName != testkit.AdminName ||
+	if m := me.Member; m == nil || m.Email != testkit.InstanceAdminEmail || m.DisplayName != testkit.InstanceAdminName ||
 		m.Status != management.MemberStatusActive || !m.InstanceAdmin || m.Locale != nil || m.Id == [16]byte{} {
 		t.Errorf("member = %+v, want the active bootstrap instance admin", me.Member)
 	}
@@ -44,7 +44,7 @@ func TestMeShowsTheBootstrapAdminAndTheTokenInUse(t *testing.T) {
 
 func TestATokenInTheQueryStringIsNotAccepted(t *testing.T) {
 	srv := testkit.StartServer(t)
-	tok := testkit.AdminToken(t)
+	tok := testkit.InstanceAdminToken(t)
 	for _, param := range []string{"access_token", "token"} {
 		res := get(t, srv.URL+"/api/v1/me?"+param+"="+tok, nil)
 		if res.StatusCode != http.StatusUnauthorized {
@@ -73,7 +73,7 @@ func TestManagementAPIRefusesARequestWithoutCredentials(t *testing.T) {
 
 func TestManagementAPIRefusesAMalformedOrUnknownToken(t *testing.T) {
 	srv := testkit.StartServer(t)
-	tok := testkit.AdminToken(t)
+	tok := testkit.InstanceAdminToken(t)
 	for name, header := range map[string]string{
 		"unknown token":   "Bearer fn_pat_" + strings.Repeat("0", 40),
 		"malformed token": "Bearer not-a-token",

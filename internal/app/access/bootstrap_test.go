@@ -2,6 +2,7 @@ package access_test
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"os"
 	"slices"
@@ -15,6 +16,8 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/compose"
+	"github.com/azverinus/flagnetic/internal/infra/out/password"
+	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -25,14 +28,13 @@ import (
 
 func TestMain(m *testing.M) { os.Exit(testkit.Main(m)) }
 
-var cli = governance.Actor{Kind: governance.ActorCLI, ID: "cli", Name: "flagnetic admin bootstrap"}
+var cli = governance.CLIActor("admin bootstrap")
 
 func bootstrap(t *testing.T, pool *pgxpool.Pool, email string) (appaccess.BootstrapResult, error) {
 	t.Helper()
 	c := testkit.Clock()
-	ctx := governance.WithRequest(t.Context(), governance.Request{Actor: cli})
-	return compose.Bootstrap(compose.Deps{Pool: pool, Clock: c, IDs: testkit.IDs(c)}).Handle(ctx,
-		appaccess.BootstrapCommand{Email: email, Password: secret.New("a long enough password")})
+	return compose.Bootstrap(compose.Deps{Pool: pool, Clock: c, IDs: testkit.IDs(c)}).Handle(t.Context(),
+		appaccess.BootstrapCommand{Email: email, Password: secret.New("a long enough password"), Request: governance.Request{Actor: cli}})
 }
 
 func TestTheBootstrapTokenCarriesEveryScope(t *testing.T) {
@@ -64,7 +66,7 @@ func TestBootstrapIsAuditedAsTheCommandLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err := pggovernance.NewAuditLog(pool, testkit.Clock(), testkit.IDs(testkit.Clock())).Latest(t.Context(), 10)
+	entries, err := pggovernance.NewAuditLog(pool).Latest(t.Context(), 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +81,7 @@ func TestBootstrapIsAuditedAsTheCommandLine(t *testing.T) {
 		t.Errorf("second entry = %+v, want api_token.created of the bootstrap token", token)
 	}
 	for _, e := range entries {
-		if e.Actor != cli || !e.OccurredAt.Equal(testkit.Start) || !e.Project.IsZero() {
+		if e.Actor != cli || !e.OccurredAt.Equal(testkit.Start) || !e.OccurredAt.Equal(res.Member.CreatedAt) || !e.Project.IsZero() {
 			t.Errorf("%s: actor %+v at %v in project %v, want the CLI at the clock's time on the instance", e.Action, e.Actor, e.OccurredAt, e.Project)
 		}
 	}
@@ -120,6 +122,9 @@ func TestABootstrapWithoutAnActorLeavesNothing(t *testing.T) {
 	if err == nil {
 		t.Fatal("bootstrap without an actor succeeded")
 	}
+	if e, ok := apperrors.From(err); ok {
+		t.Errorf("err = %v of kind %v, want a failure of no kind: a missing actor is a programming error", e, e.Kind)
+	}
 	if exists, err := pgaccess.NewStore(pool).AnyInstanceAdmin(t.Context()); err != nil || exists {
 		t.Errorf("AnyInstanceAdmin = %v, %v; want the change rolled back", exists, err)
 	}
@@ -129,5 +134,72 @@ func TestABootstrapNeedsAnEmail(t *testing.T) {
 	_, err := bootstrap(t, testkit.FreshPool(t), "not an email")
 	if !apperrors.IsKind(err, apperrors.KindInvalid) {
 		t.Errorf("err = %v, want invalid", err)
+	}
+}
+
+func TestABootstrapWithoutAPasswordGeneratesOne(t *testing.T) {
+	c := testkit.Clock()
+	res, err := compose.Bootstrap(compose.Deps{Pool: testkit.FreshPool(t), Clock: c, IDs: testkit.IDs(c)}).Handle(t.Context(),
+		appaccess.BootstrapCommand{Email: "first@example.com", Request: governance.Request{Actor: cli}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.GeneratedPassword.Reveal()) != 24 {
+		t.Errorf("generated password = %d characters, want 24", len(res.GeneratedPassword.Reveal()))
+	}
+	given, err := bootstrap(t, testkit.FreshPool(t), "first@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !given.GeneratedPassword.IsZero() {
+		t.Error("a password was generated although the command gave one")
+	}
+}
+
+// countingHasher counts the passwords it hashes.
+type countingHasher struct {
+	*password.Hasher
+	mu     sync.Mutex
+	hashed int
+}
+
+func (h *countingHasher) Hash(ctx context.Context, p secret.String) (string, error) {
+	h.mu.Lock()
+	h.hashed++
+	h.mu.Unlock()
+	return h.Hasher.Hash(ctx, p)
+}
+
+func TestARefusedBootstrapHashesNoPassword(t *testing.T) {
+	pool := testkit.FreshPool(t)
+	if _, err := bootstrap(t, pool, "first@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	c := testkit.Clock()
+	hasher := &countingHasher{Hasher: password.NewHasher(password.DefaultParams)}
+	h := appaccess.NewBootstrap(postgres.NewTransactor(pool), pgaccess.NewStore(pool), hasher,
+		pggovernance.NewAuditLog(pool), c, id.NewSource(c), rand.Reader)
+	_, err := h.Handle(t.Context(), appaccess.BootstrapCommand{
+		Email: "second@example.com", Password: secret.New("a long enough password"), Request: governance.Request{Actor: cli},
+	})
+	if e, _ := apperrors.From(err); e == nil || e.Code != "instance_admin_exists" {
+		t.Fatalf("err = %v, want instance_admin_exists", err)
+	}
+	if hasher.hashed != 0 {
+		t.Errorf("%d passwords hashed, want none: the instance admin is looked for under the lock first", hasher.hashed)
+	}
+}
+
+func TestWhetherAnInstanceAdminExistsIsAnswered(t *testing.T) {
+	pool := testkit.FreshPool(t)
+	q := compose.InstanceAdminExists(compose.NewDeps(pool, testkit.Clock()))
+	if exists, err := q.Handle(t.Context()); err != nil || exists {
+		t.Fatalf("on a fresh instance: %v, %v; want false", exists, err)
+	}
+	if _, err := bootstrap(t, pool, "first@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if exists, err := q.Handle(t.Context()); err != nil || !exists {
+		t.Errorf("after bootstrap: %v, %v; want true", exists, err)
 	}
 }

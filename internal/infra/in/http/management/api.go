@@ -13,7 +13,6 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	"github.com/azverinus/flagnetic/internal/domain/access"
-	"github.com/azverinus/flagnetic/internal/domain/governance"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management/operations"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
@@ -92,8 +91,7 @@ func callerOf(ctx context.Context) access.Caller {
 
 // seam judges a request to op before its handler runs: it authenticates the
 // caller and authorizes them for op, and refuses the request otherwise. The
-// caller then travels in the request's context, with the actor every audit
-// entry of the request names.
+// caller then travels in the request's context.
 func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if op.Requirement == access.RequirePublic {
@@ -108,9 +106,7 @@ func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
 			a.refuse(w, r, op, err)
 			return
 		}
-		ctx := context.WithValue(r.Context(), callerKey{}, caller)
-		ctx = governance.WithRequest(ctx, governance.Request{Actor: actorOf(caller), ID: flaghttp.RequestIDOf(ctx)})
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, caller)))
 	})
 }
 
@@ -152,19 +148,4 @@ func (a *api) refuse(w http.ResponseWriter, r *http.Request, op access.Operation
 		}
 	}
 	a.edge.WriteError(w, r, err)
-}
-
-// actorOf returns the actor audit entries name for c.
-func actorOf(c access.Caller) governance.Actor {
-	switch {
-	case c.Token != nil:
-		a := governance.Actor{Kind: governance.ActorToken, ID: c.Token.ID.String(), Name: c.Token.Name}
-		if c.Member != nil {
-			a.MemberID = c.Member.ID.String()
-		}
-		return a
-	case c.Member != nil:
-		return governance.Actor{Kind: governance.ActorMember, ID: c.Member.ID.String(), Name: c.Member.DisplayName, MemberID: c.Member.ID.String()}
-	}
-	return governance.Actor{}
 }

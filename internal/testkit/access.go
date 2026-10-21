@@ -13,16 +13,14 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
-	"github.com/azverinus/flagnetic/internal/shared/clock"
-	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
 // The instance admin every test kit database is bootstrapped with.
 const (
-	AdminEmail    = "admin@example.com"
-	AdminName     = "Test Admin"
-	AdminPassword = "correct horse battery staple"
+	InstanceAdminEmail    = "admin@example.com"
+	InstanceAdminName     = "Test Admin"
+	InstanceAdminPassword = "correct horse battery staple"
 )
 
 var (
@@ -32,15 +30,16 @@ var (
 	admins = map[*pgxpool.Pool]string{}
 )
 
-// AdminToken returns the bootstrap token of the package's database,
+// InstanceAdminToken returns the bootstrap token of the package's database,
 // bootstrapping its instance admin on first use.
-func AdminToken(t testing.TB) string {
+func InstanceAdminToken(t testing.TB) string {
 	t.Helper()
 	return Bootstrap(t, Pool(t))
 }
 
 // Bootstrap returns the bootstrap token of the instance on pool, running
-// `admin bootstrap` as AdminEmail on first use.
+// `admin bootstrap` as InstanceAdminEmail on first use, at the test kit's
+// Start.
 func Bootstrap(t testing.TB, pool *pgxpool.Pool) string {
 	t.Helper()
 	adminsMu.Lock()
@@ -48,12 +47,12 @@ func Bootstrap(t testing.TB, pool *pgxpool.Pool) string {
 	if tok, ok := admins[pool]; ok {
 		return tok
 	}
-	c := clock.System{}
-	ctx := governance.WithRequest(context.Background(), governance.Request{
-		Actor: governance.Actor{Kind: governance.ActorCLI, ID: "cli", Name: "flagnetic admin bootstrap"},
+	// Identifiers are drawn at random rather than deterministically, since
+	// the tests sharing the database mint their own from the same instant.
+	res, err := compose.Bootstrap(compose.NewDeps(pool, Clock())).Handle(context.Background(), appaccess.BootstrapCommand{
+		Email: InstanceAdminEmail, DisplayName: InstanceAdminName, Password: secret.New(InstanceAdminPassword),
+		Request: governance.Request{Actor: governance.CLIActor("admin bootstrap")},
 	})
-	res, err := compose.Bootstrap(compose.Deps{Pool: pool, Clock: c, IDs: id.NewSource(c)}).Handle(ctx,
-		appaccess.BootstrapCommand{Email: AdminEmail, DisplayName: AdminName, Password: secret.New(AdminPassword)})
 	if err != nil {
 		t.Fatalf("bootstrapping the instance admin: %v", err)
 	}

@@ -19,7 +19,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
-	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
@@ -83,8 +82,7 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	edgeOpts := flaghttp.OptionsFrom(cfg)
 	edgeOpts.Logger, edgeOpts.DB, edgeOpts.Metrics = log, pool, flaghttp.NewMetrics(reg)
 	edge := flaghttp.New(edgeOpts)
-	system := clock.System{}
-	compose.Management(edge, compose.Deps{Pool: pool, Clock: system, IDs: id.NewSource(system)}, reg)
+	compose.Management(edge, compose.NewDeps(pool, clock.System{}), reg)
 	for _, r := range o.routes {
 		edge.Handle(r.pattern, r.handler)
 	}
