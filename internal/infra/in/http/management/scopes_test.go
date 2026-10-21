@@ -51,6 +51,10 @@ func TestATokenLackingTheOperationsScopeIsRefused(t *testing.T) {
 			res := do(c.CreateUnitTypeWithResponse(t.Context(), p.Key, management.UnitTypeCreate{Key: projectKey(), Name: "Scoped"}))
 			return res.StatusCode(), res.Body
 		}, access.ScopeFlagsWrite},
+		"createFlag": {func(c *management.ClientWithResponses) (int, []byte) {
+			res := do(c.CreateFlagWithResponse(t.Context(), p.Key, management.FlagCreate{Key: projectKey(), Type: management.FlagTypeBoolean, Name: "Scoped"}))
+			return res.StatusCode(), res.Body
+		}, access.ScopeFlagsWrite},
 	} {
 		status, body := tc.call(readOnly)
 		if pr := assertProblem(t, name, status, body, http.StatusForbidden, "insufficient_scope"); pr.Detail == nil ||

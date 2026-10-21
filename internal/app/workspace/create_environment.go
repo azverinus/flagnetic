@@ -17,16 +17,26 @@ type EnvironmentCreator interface {
 	CreateEnvironment(ctx context.Context, e workspace.Environment) error
 }
 
-// CreateEnvironment adds an environment to a project.
-type CreateEnvironment struct {
-	tx    Transactor
-	store EnvironmentCreator
-	rec   Recorder
+// EnvironmentConfigurer configures what a project holds in one of its
+// environments, such as every flag's configuration, as the environment is
+// created.
+type EnvironmentConfigurer interface {
+	// ConfigureEnvironment configures e, in the unit of work ctx carries.
+	ConfigureEnvironment(ctx context.Context, e workspace.Environment) error
 }
 
-// NewCreateEnvironment returns the handler.
-func NewCreateEnvironment(tx Transactor, store EnvironmentCreator, rec Recorder) *CreateEnvironment {
-	return &CreateEnvironment{tx: tx, store: store, rec: rec}
+// CreateEnvironment adds an environment to a project.
+type CreateEnvironment struct {
+	tx        Transactor
+	store     EnvironmentCreator
+	configure EnvironmentConfigurer
+	rec       Recorder
+}
+
+// NewCreateEnvironment returns the handler, which has configure set the new
+// environment up for what the project already holds.
+func NewCreateEnvironment(tx Transactor, store EnvironmentCreator, configure EnvironmentConfigurer, rec Recorder) *CreateEnvironment {
+	return &CreateEnvironment{tx: tx, store: store, configure: configure, rec: rec}
 }
 
 // CreateEnvironmentCommand names the environment to add.
@@ -37,7 +47,8 @@ type CreateEnvironmentCommand struct {
 }
 
 // Handle adds the environment after the project's others, under the
-// project's row lock so two created at once never share a place.
+// project's row lock so two created at once never share a place and no flag
+// created meanwhile misses a configuration in it.
 func (h *CreateEnvironment) Handle(ctx context.Context, cmd CreateEnvironmentCommand) (workspace.Environment, error) {
 	now := h.rec.clock.Now()
 	var e workspace.Environment
@@ -54,6 +65,11 @@ func (h *CreateEnvironment) Handle(ctx context.Context, cmd CreateEnvironmentCom
 			return err
 		}
 		if err := h.store.CreateEnvironment(ctx, e); err != nil {
+			return err
+		}
+		// Every flag exists in every environment, so the new one starts
+		// with each flag's configuration, switched off.
+		if err := h.configure.ConfigureEnvironment(ctx, e); err != nil {
 			return err
 		}
 		return h.rec.record(ctx, now, cmd.Request, governance.Record{

@@ -12,6 +12,9 @@ import type {
   CreateEnvironmentData,
   CreateEnvironmentErrors,
   CreateEnvironmentResponses,
+  CreateFlagData,
+  CreateFlagErrors,
+  CreateFlagResponses,
   CreateGrantData,
   CreateGrantErrors,
   CreateGrantResponses,
@@ -54,6 +57,9 @@ import type {
   GetEnvironmentData,
   GetEnvironmentErrors,
   GetEnvironmentResponses,
+  GetFlagData,
+  GetFlagErrors,
+  GetFlagResponses,
   GetInvitationData,
   GetInvitationErrors,
   GetInvitationResponses,
@@ -87,6 +93,9 @@ import type {
   ListEnvironmentsData,
   ListEnvironmentsErrors,
   ListEnvironmentsResponses,
+  ListFlagsData,
+  ListFlagsErrors,
+  ListFlagsResponses,
   ListGrantsData,
   ListGrantsErrors,
   ListGrantsResponses,
@@ -162,6 +171,9 @@ import type {
   UpdateEnvironmentData,
   UpdateEnvironmentErrors,
   UpdateEnvironmentResponses,
+  UpdateFlagData,
+  UpdateFlagErrors,
+  UpdateFlagResponses,
   UpdateMemberData,
   UpdateMemberErrors,
   UpdateMemberResponses,
@@ -928,6 +940,110 @@ export const updateAttribute = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/attributes/{attribute}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * The project's flags
+ *
+ * The project's flags by key, in byte order (capitals before lower
+ * case). Page with `cursor` set to the `next_cursor` of the previous
+ * page.
+ *
+ */
+export const listFlags = <ThrowOnError extends boolean = false>(
+  options: Options<ListFlagsData, ThrowOnError>,
+): RequestResult<ListFlagsResponses, ListFlagsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListFlagsResponses, ListFlagsErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags",
+    ...options,
+  });
+
+/**
+ * Create a flag
+ *
+ * The flag arrives switched off in every environment of the project,
+ * serving `false` when off and `true` when on for a boolean flag, and
+ * its first variation either way for any other type. A boolean flag
+ * needs no variations listed. The owner defaults to the calling
+ * member; a project token names one. A key in use is `already_exists`.
+ *
+ */
+export const createFlag = <ThrowOnError extends boolean = false>(
+  options: Options<CreateFlagData, ThrowOnError>,
+): RequestResult<CreateFlagResponses, CreateFlagErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateFlagResponses, CreateFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * A flag with its configuration in every environment
+ */
+export const getFlag = <ThrowOnError extends boolean = false>(
+  options: Options<GetFlagData, ThrowOnError>,
+): RequestResult<GetFlagResponses, GetFlagErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetFlagResponses, GetFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}",
+    ...options,
+  });
+
+/**
+ * Change a flag's definition
+ *
+ * Changes the name, description, owner, tags, lifetime, variations or
+ * automatic exposure, for every environment at once; the key and type
+ * never change (`immutable`). Variations are replaced as a list and
+ * matched by key: removing one that a configuration still serves is
+ * `in_use`, listing what serves it. A change to the values the flag
+ * already has changes nothing and records nothing.
+ *
+ */
+export const updateFlag = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateFlagData, ThrowOnError>,
+): RequestResult<UpdateFlagResponses, UpdateFlagErrors, ThrowOnError> =>
+  (options.client ?? client).patch<UpdateFlagResponses, UpdateFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}",
     ...options,
     headers: {
       "Content-Type": "application/json",

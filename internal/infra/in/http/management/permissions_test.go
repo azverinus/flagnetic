@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -45,6 +47,12 @@ func matrix(t *testing.T) []matrixRow {
 			res := do(c.CreateUnitTypeWithResponse(t.Context(), p.Key, management.UnitTypeCreate{Key: projectKey(), Name: "Matrix"}))
 			return res.StatusCode(), res.Body
 		}},
+		{"flag.edit", "createFlag", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			res := do(c.CreateFlagWithResponse(t.Context(), p.Key, management.FlagCreate{
+				Key: projectKey(), Type: management.FlagTypeBoolean, Name: "Matrix", Owner: ptr(openapi_types.UUID(target.ID.Bytes())),
+			}))
+			return res.StatusCode(), res.Body
+		}},
 		{"grant.manage", "createGrant", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
 			res := do(c.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: target.ID.Bytes(), Role: "viewer"}))
 			if res.JSON201 != nil {
@@ -74,6 +82,7 @@ func TestThePermissionMatrixHoldsRowByRow(t *testing.T) {
 		"declaration.manage":   {access.RoleMaintainer, access.RoleOwner},
 		"grant.manage":         {access.RoleOwner},
 		"project_token.manage": {access.RoleOwner},
+		"flag.edit":            {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
 	}
 	callers := map[string]*management.ClientWithResponses{
 		"instance admin": testkit.Client(t, srv, testkit.InstanceAdminToken(t)),
@@ -108,9 +117,9 @@ func TestProjectMeAnswersGrantsAndPermissionsPerRole(t *testing.T) {
 	p := createProject(t, admin, projectKey())
 	for role, want := range map[access.RoleName][]string{
 		access.RoleViewer:     {"project.read"},
-		access.RoleDeveloper:  {"project.read"},
-		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage"},
-		access.RoleOwner:      {"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage"},
+		access.RoleDeveloper:  {"project.read", "flag.edit"},
+		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit"},
+		access.RoleOwner:      {"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit"},
 	} {
 		got := projectMe(t, testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), role)), p.Key)
 		if !slices.Equal(got.Permissions, want) || !slices.Equal(rolesOf(got.Grants), []string{string(role)}) {

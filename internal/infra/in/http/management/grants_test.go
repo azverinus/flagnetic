@@ -204,14 +204,14 @@ func TestAMembersPermissionsAreTheUnionOfTheirGrantsAndRemovingOneKeepsTheOthers
 
 	grant(t, admin, p.Key, m.ID, "developer")
 	maintainer := grant(t, admin, p.Key, m.ID, "maintainer")
-	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read", "environment.manage", "declaration.manage"}) ||
+	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read", "environment.manage", "declaration.manage", "flag.edit"}) ||
 		!slices.Equal(rolesOf(got.Grants), []string{"developer", "maintainer"}) {
 		t.Errorf("with two grants: %+v, want the union of developer and maintainer", got)
 	}
 	if res := do(admin.DeleteGrantWithResponse(t.Context(), p.Key, maintainer.Id.String())); res.StatusCode() != http.StatusNoContent {
 		t.Fatalf("removing the maintainer grant = %d: %s", res.StatusCode(), res.Body)
 	}
-	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read"}) ||
+	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read", "flag.edit"}) ||
 		!slices.Equal(rolesOf(got.Grants), []string{"developer"}) {
 		t.Errorf("after removing one: %+v, want the developer grant alone", got)
 	}
@@ -270,7 +270,12 @@ func TestAScopedTokenGrantsOnlyRolesWithinWhatItsScopesLeaveIt(t *testing.T) {
 		"role_not_allowed"); pr.Permission == nil || *pr.Permission != "declaration.manage" {
 		t.Errorf("the refusal names %v, want declaration.manage", pr.Permission)
 	}
-	if res := do(noFlags.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.ID.Bytes(), Role: "developer"})); res.JSON201 == nil {
-		t.Errorf("developer = %d: %s", res.StatusCode(), res.Body)
+	dev := do(noFlags.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.ID.Bytes(), Role: "developer"}))
+	if pr := assertProblem(t, "developer without flags:write", dev.StatusCode(), dev.Body, http.StatusUnprocessableEntity,
+		"role_not_allowed"); pr.Permission == nil || *pr.Permission != "flag.edit" {
+		t.Errorf("the refusal names %v, want flag.edit", pr.Permission)
+	}
+	if res := do(noFlags.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: m.ID.Bytes(), Role: "viewer"})); res.JSON201 == nil {
+		t.Errorf("viewer = %d: %s", res.StatusCode(), res.Body)
 	}
 }

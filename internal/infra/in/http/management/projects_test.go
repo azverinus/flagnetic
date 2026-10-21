@@ -340,13 +340,13 @@ func TestProjectMeAnswersGrantsAndPermissionsNarrowedByScopes(t *testing.T) {
 		want  []string
 	}{
 		"an instance admin holds every permission": {testkit.InstanceAdminToken(t),
-			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage"}},
+			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit"}},
 		"a maintainer's project token, narrowed to read": {
 			testkit.ProjectToken(t, testkit.Pool(t), projectIDOf(p), access.RoleMaintainer, access.ScopeRead),
 			[]string{"project.read"}},
 		"an owner's project token never changes who has access": {
 			testkit.ProjectToken(t, testkit.Pool(t), projectIDOf(p), access.RoleOwner),
-			[]string{"project.read", "project.update", "environment.manage", "declaration.manage"}},
+			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "flag.edit"}},
 	} {
 		res, err := testkit.Client(t, srv, tc.token).GetProjectMeWithResponse(t.Context(), p.Key)
 		if err != nil {
@@ -377,9 +377,9 @@ func TestEveryRoleIsListedWithItsPermissions(t *testing.T) {
 		t.Fatalf("GET /roles = %d %s", res.StatusCode(), res.Body)
 	}
 	want := []management.Role{
-		{Name: "owner", Permissions: []string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage"}},
-		{Name: "maintainer", Permissions: []string{"project.read", "environment.manage", "declaration.manage"}},
-		{Name: "developer", Permissions: []string{"project.read"}},
+		{Name: "owner", Permissions: []string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit"}},
+		{Name: "maintainer", Permissions: []string{"project.read", "environment.manage", "declaration.manage", "flag.edit"}},
+		{Name: "developer", Permissions: []string{"project.read", "flag.edit"}},
 		{Name: "viewer", Permissions: []string{"project.read"}},
 	}
 	if got := res.JSON200.Items; !slices.EqualFunc(got, want, func(a, b management.Role) bool {

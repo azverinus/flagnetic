@@ -28,6 +28,14 @@ export type Problem = {
    * The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
    */
   permission?: string;
+  /**
+   * The version the entity has now, for `version_mismatch`.
+   */
+  current_version?: number;
+  /**
+   * What still names what the write would remove or hide, for `in_use`.
+   */
+  references?: Array<Reference>;
   errors?: Array<Violation>;
 };
 
@@ -666,6 +674,177 @@ export type AuditEntryList = {
   next_cursor: string | null;
 };
 
+export type Reference = {
+  /**
+   * What names it, such as `flag` or `segment`.
+   */
+  kind: string;
+  key: string;
+  /**
+   * The key of the environment it is named in; null when it is named in every environment.
+   */
+  environment: string | null;
+};
+
+/**
+ * Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+ */
+export type Version = number;
+
+export type FlagType = "boolean" | "string" | "number" | "json";
+
+/**
+ * A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+ */
+export type Lifetime = "permanent" | "temporary";
+
+export type VariationKey = string;
+
+/**
+ * A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+ */
+export type VariationValue = unknown;
+
+export type Variation = {
+  key: VariationKey;
+  value: VariationValue;
+  name: string;
+  description: string;
+};
+
+export type VariationInput = {
+  key: VariationKey;
+  value: VariationValue;
+  /**
+   * Defaults to the key.
+   */
+  name?: string;
+  description?: Description;
+};
+
+export type FlagDefinition = {
+  id: string;
+  /**
+   * Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.
+   */
+  key: string;
+  type: FlagType;
+  name: Name;
+  description: Description;
+  /**
+   * The member accountable for the flag.
+   */
+  owner: string;
+  tags: Array<string>;
+  lifetime: Lifetime;
+  /**
+   * When a temporary flag is expected to be removed; null for a permanent one.
+   */
+  expected_removal_at: string | null;
+  /**
+   * SDKs record an exposure after every evaluation whose result carries an experiment.
+   */
+  automatic_exposure: boolean;
+  variations: Array<Variation>;
+  /**
+   * When the flag was archived, hidden from SDKs; null while it is not.
+   */
+  archived_at: string | null;
+  /**
+   * The member who created the flag; null when a project token did.
+   */
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  version: Version;
+};
+
+/**
+ * A flag's definition with its configuration in every environment, by the environments' order.
+ */
+export type Flag = FlagDefinition & {
+  environments: Array<FlagConfiguration>;
+};
+
+/**
+ * What the flag serves in one environment.
+ */
+export type FlagConfiguration = {
+  environment: Key;
+  on: boolean;
+  /**
+   * The variation served while the flag is off.
+   */
+  off_variation: string;
+  /**
+   * The variation served when the flag is on and no rule matches.
+   */
+  fallthrough: string;
+  updated_at: string;
+  version: Version;
+};
+
+export type FlagList = {
+  items: Array<FlagDefinition>;
+  /**
+   * Pass as `cursor` for the next page; null on the last.
+   */
+  next_cursor: string | null;
+};
+
+export type FlagCreate = {
+  /**
+   * Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.
+   */
+  key: string;
+  type: FlagType;
+  name: Name;
+  description?: Description;
+  /**
+   * An active member holding a grant in the project, or an instance admin (`invalid_owner` otherwise); the calling member when absent, which a project token cannot leave it.
+   */
+  owner?: string;
+  tags?: Array<string>;
+  lifetime?: Lifetime;
+  /**
+   * For a temporary flag only; 90 days from now when absent.
+   */
+  expected_removal_at?: string;
+  automatic_exposure?: boolean;
+  /**
+   * Required unless the flag is boolean, whose variations are always `true` and `false`.
+   */
+  variations?: Array<VariationInput>;
+};
+
+export type FlagPatch = {
+  /**
+   * Refused with `immutable` whatever its value.
+   */
+  key?: string;
+  /**
+   * Refused with `immutable` whatever its value.
+   */
+  type?: string;
+  name?: Name;
+  description?: Description;
+  /**
+   * A new owner must be an active member holding a grant in the project, or an instance admin.
+   */
+  owner?: string;
+  tags?: Array<string>;
+  lifetime?: Lifetime;
+  /**
+   * For a temporary flag only. Becoming temporary without one sets 90 days from now; becoming permanent clears it.
+   */
+  expected_removal_at?: string;
+  automatic_exposure?: boolean;
+  /**
+   * Every variation, in order, matched to the current ones by key.
+   */
+  variations?: Array<VariationInput>;
+};
+
 /**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
@@ -717,6 +896,21 @@ export type Cursor = string;
  * How many entries a page holds at most.
  */
 export type Limit = number;
+
+/**
+ * The flag's key.
+ */
+export type FlagKey = string;
+
+/**
+ * The version of the entity this write is based on, as its `ETag`
+ * answered it (`"7"`, or `7`). Required: without it the write is
+ * refused `428 precondition_required`, and with any other version than
+ * the current one `412 version_mismatch`, both judged after the request
+ * is validated.
+ *
+ */
+export type IfMatch = string;
 
 /**
  * The environment's key.
@@ -2372,6 +2566,258 @@ export type UpdateAttributeResponses = {
 };
 
 export type UpdateAttributeResponse = UpdateAttributeResponses[keyof UpdateAttributeResponses];
+
+export type ListFlagsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: {
+    /**
+     * The `next_cursor` of the previous page.
+     */
+    cursor?: string;
+    /**
+     * How many entries a page holds at most.
+     */
+    limit?: number;
+  };
+  url: "/projects/{project}/flags";
+};
+
+export type ListFlagsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListFlagsError = ListFlagsErrors[keyof ListFlagsErrors];
+
+export type ListFlagsResponses = {
+  /**
+   * One page of flags.
+   */
+  200: FlagList;
+};
+
+export type ListFlagsResponse = ListFlagsResponses[keyof ListFlagsResponses];
+
+export type CreateFlagData = {
+  body: FlagCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/flags";
+};
+
+export type CreateFlagErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateFlagError = CreateFlagErrors[keyof CreateFlagErrors];
+
+export type CreateFlagResponses = {
+  /**
+   * Created, with its configuration in every environment.
+   */
+  201: Flag;
+};
+
+export type CreateFlagResponse = CreateFlagResponses[keyof CreateFlagResponses];
+
+export type GetFlagData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The flag's key.
+     */
+    flag: string;
+  };
+  query?: never;
+  url: "/projects/{project}/flags/{flag}";
+};
+
+export type GetFlagErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetFlagError = GetFlagErrors[keyof GetFlagErrors];
+
+export type GetFlagResponses = {
+  /**
+   * The flag; its `ETag` is the definition's version, and each configuration carries its own.
+   */
+  200: Flag;
+};
+
+export type GetFlagResponse = GetFlagResponses[keyof GetFlagResponses];
+
+export type UpdateFlagData = {
+  body: FlagPatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The flag's key.
+     */
+    flag: string;
+  };
+  query?: never;
+  url: "/projects/{project}/flags/{flag}";
+};
+
+export type UpdateFlagErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type UpdateFlagError = UpdateFlagErrors[keyof UpdateFlagErrors];
+
+export type UpdateFlagResponses = {
+  /**
+   * The flag as changed.
+   */
+  200: Flag;
+};
+
+export type UpdateFlagResponse = UpdateFlagResponses[keyof UpdateFlagResponses];
 
 export type ListProjectMembersData = {
   body?: never;
