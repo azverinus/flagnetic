@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"errors"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -73,4 +74,35 @@ func (h *WorkingProjects) Handle(ctx context.Context, caller access.Caller) (all
 	}
 	only, err = h.grants.GrantedProjects(ctx, caller.Member.ID)
 	return false, only, err
+}
+
+// OwnershipReader reads what decides whether a member may own a flag.
+type OwnershipReader interface {
+	GrantReader
+	// MemberByID returns the member, or ErrNotFound.
+	MemberByID(ctx context.Context, member access.MemberID) (access.Member, error)
+}
+
+// Ownership answers whether a member may be named owner of a flag in a
+// project: someone the project's members can ask before deleting it.
+type Ownership struct{ store OwnershipReader }
+
+// NewOwnership returns the handler.
+func NewOwnership(store OwnershipReader) *Ownership { return &Ownership{store: store} }
+
+// MayOwn reports whether member is active and either an instance admin or
+// holds a grant in project. An unknown member may not.
+func (h *Ownership) MayOwn(ctx context.Context, project workspace.ProjectID, member access.MemberID) (bool, error) {
+	m, err := h.store.MemberByID(ctx, member)
+	if errors.Is(err, ErrNotFound) {
+		return false, nil
+	}
+	if err != nil || m.Status != access.MemberActive {
+		return false, err
+	}
+	if m.InstanceAdmin {
+		return true, nil
+	}
+	grants, err := h.store.MemberGrants(ctx, member, project)
+	return len(grants) > 0, err
 }

@@ -6,6 +6,9 @@ import type {
   AcceptInvitationData,
   AcceptInvitationErrors,
   AcceptInvitationResponses,
+  ArchiveFlagData,
+  ArchiveFlagErrors,
+  ArchiveFlagResponses,
   ChangeMyPasswordData,
   ChangeMyPasswordErrors,
   ChangeMyPasswordResponses,
@@ -15,6 +18,9 @@ import type {
   CreateEnvironmentData,
   CreateEnvironmentErrors,
   CreateEnvironmentResponses,
+  CreateFlagData,
+  CreateFlagErrors,
+  CreateFlagResponses,
   CreateGrantData,
   CreateGrantErrors,
   CreateGrantResponses,
@@ -27,6 +33,9 @@ import type {
   CreateProjectTokenData,
   CreateProjectTokenErrors,
   CreateProjectTokenResponses,
+  CreateSegmentData,
+  CreateSegmentErrors,
+  CreateSegmentResponses,
   CreateUnitTypeData,
   CreateUnitTypeErrors,
   CreateUnitTypeResponses,
@@ -39,9 +48,15 @@ import type {
   DeleteEnvironmentData,
   DeleteEnvironmentErrors,
   DeleteEnvironmentResponses,
+  DeleteFlagData,
+  DeleteFlagErrors,
+  DeleteFlagResponses,
   DeleteGrantData,
   DeleteGrantErrors,
   DeleteGrantResponses,
+  DeleteSegmentData,
+  DeleteSegmentErrors,
+  DeleteSegmentResponses,
   DeleteUnitTypeData,
   DeleteUnitTypeErrors,
   DeleteUnitTypeResponses,
@@ -57,6 +72,9 @@ import type {
   GetEnvironmentData,
   GetEnvironmentErrors,
   GetEnvironmentResponses,
+  GetFlagData,
+  GetFlagErrors,
+  GetFlagResponses,
   GetInvitationData,
   GetInvitationErrors,
   GetInvitationResponses,
@@ -75,6 +93,9 @@ import type {
   GetProjectMeErrors,
   GetProjectMeResponses,
   GetProjectResponses,
+  GetSegmentData,
+  GetSegmentErrors,
+  GetSegmentResponses,
   GetUnitTypeData,
   GetUnitTypeErrors,
   GetUnitTypeResponses,
@@ -90,6 +111,9 @@ import type {
   ListEnvironmentsData,
   ListEnvironmentsErrors,
   ListEnvironmentsResponses,
+  ListFlagsData,
+  ListFlagsErrors,
+  ListFlagsResponses,
   ListGrantsData,
   ListGrantsErrors,
   ListGrantsResponses,
@@ -123,6 +147,12 @@ import type {
   ListRolesData,
   ListRolesErrors,
   ListRolesResponses,
+  ListSegmentsData,
+  ListSegmentsErrors,
+  ListSegmentsResponses,
+  ListSegmentUsagesData,
+  ListSegmentUsagesErrors,
+  ListSegmentUsagesResponses,
   ListUnitTypesData,
   ListUnitTypesErrors,
   ListUnitTypesResponses,
@@ -132,6 +162,9 @@ import type {
   ReissueInvitationData,
   ReissueInvitationErrors,
   ReissueInvitationResponses,
+  RestoreFlagData,
+  RestoreFlagErrors,
+  RestoreFlagResponses,
   RevokeMemberSessionsData,
   RevokeMemberSessionsErrors,
   RevokeMemberSessionsResponses,
@@ -165,6 +198,9 @@ import type {
   UpdateEnvironmentData,
   UpdateEnvironmentErrors,
   UpdateEnvironmentResponses,
+  UpdateFlagData,
+  UpdateFlagErrors,
+  UpdateFlagResponses,
   UpdateMeData,
   UpdateMeErrors,
   UpdateMemberData,
@@ -174,6 +210,9 @@ import type {
   UpdateProjectData,
   UpdateProjectErrors,
   UpdateProjectResponses,
+  UpdateSegmentData,
+  UpdateSegmentErrors,
+  UpdateSegmentResponses,
   UpdateUnitTypeData,
   UpdateUnitTypeErrors,
   UpdateUnitTypeResponses,
@@ -1007,6 +1046,317 @@ export const updateAttribute = <ThrowOnError extends boolean = false>(
       ...options.headers,
     },
   });
+
+/**
+ * The project's flags
+ *
+ * The project's flags by key, in byte order (capitals before lower
+ * case). Page with `cursor` set to the `next_cursor` of the previous
+ * page.
+ *
+ */
+export const listFlags = <ThrowOnError extends boolean = false>(
+  options: Options<ListFlagsData, ThrowOnError>,
+): RequestResult<ListFlagsResponses, ListFlagsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListFlagsResponses, ListFlagsErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags",
+    ...options,
+  });
+
+/**
+ * Create a flag
+ *
+ * The flag arrives switched off in every environment of the project,
+ * serving `false` when off and `true` when on for a boolean flag, and
+ * its first variation either way for any other type. A boolean flag
+ * needs no variations listed. The owner defaults to the calling
+ * member; a project token names one. A key in use is `already_exists`.
+ *
+ */
+export const createFlag = <ThrowOnError extends boolean = false>(
+  options: Options<CreateFlagData, ThrowOnError>,
+): RequestResult<CreateFlagResponses, CreateFlagErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateFlagResponses, CreateFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete an archived flag
+ *
+ * Deletes the flag with its configuration in every environment. Only
+ * an archived flag is deleted (`not_archived` otherwise), so deleting
+ * is a deliberate second step after archiving.
+ *
+ */
+export const deleteFlag = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteFlagData, ThrowOnError>,
+): RequestResult<DeleteFlagResponses, DeleteFlagErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteFlagResponses, DeleteFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}",
+    ...options,
+  });
+
+/**
+ * A flag with its configuration in every environment
+ */
+export const getFlag = <ThrowOnError extends boolean = false>(
+  options: Options<GetFlagData, ThrowOnError>,
+): RequestResult<GetFlagResponses, GetFlagErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetFlagResponses, GetFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}",
+    ...options,
+  });
+
+/**
+ * Change a flag's definition
+ *
+ * Changes the name, description, owner, tags, lifetime, variations or
+ * automatic exposure, for every environment at once; the key and type
+ * never change (`immutable`). Variations are replaced as a list and
+ * matched by key: removing one that a configuration still serves is
+ * `in_use`, listing what serves it. A change to the values the flag
+ * already has changes nothing and records nothing.
+ *
+ */
+export const updateFlag = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateFlagData, ThrowOnError>,
+): RequestResult<UpdateFlagResponses, UpdateFlagErrors, ThrowOnError> =>
+  (options.client ?? client).patch<UpdateFlagResponses, UpdateFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Archive a flag
+ *
+ * Hides the flag from SDKs in every environment, keeping its
+ * definition and configurations until it is restored or deleted.
+ * Archiving an archived flag changes nothing.
+ *
+ */
+export const archiveFlag = <ThrowOnError extends boolean = false>(
+  options: Options<ArchiveFlagData, ThrowOnError>,
+): RequestResult<ArchiveFlagResponses, ArchiveFlagErrors, ThrowOnError> =>
+  (options.client ?? client).post<ArchiveFlagResponses, ArchiveFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/archive",
+    ...options,
+  });
+
+/**
+ * Restore an archived flag
+ *
+ * Brings an archived flag back to SDKs as it was archived. Restoring a flag that is not archived changes nothing.
+ */
+export const restoreFlag = <ThrowOnError extends boolean = false>(
+  options: Options<RestoreFlagData, ThrowOnError>,
+): RequestResult<RestoreFlagResponses, RestoreFlagErrors, ThrowOnError> =>
+  (options.client ?? client).post<RestoreFlagResponses, RestoreFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/restore",
+    ...options,
+  });
+
+/**
+ * The project's segments
+ */
+export const listSegments = <ThrowOnError extends boolean = false>(
+  options: Options<ListSegmentsData, ThrowOnError>,
+): RequestResult<ListSegmentsResponses, ListSegmentsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListSegmentsResponses, ListSegmentsErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments",
+    ...options,
+  });
+
+/**
+ * Create a segment
+ *
+ * A segment holds at most 20 attribute conditions, each naming an
+ * attribute or unit type the project declares with an operator
+ * defined for its type and a value that operator accepts; segments do
+ * not nest. A key in use is `already_exists`.
+ *
+ */
+export const createSegment = <ThrowOnError extends boolean = false>(
+  options: Options<CreateSegmentData, ThrowOnError>,
+): RequestResult<CreateSegmentResponses, CreateSegmentErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateSegmentResponses, CreateSegmentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a segment
+ */
+export const deleteSegment = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteSegmentData, ThrowOnError>,
+): RequestResult<DeleteSegmentResponses, DeleteSegmentErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteSegmentResponses, DeleteSegmentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments/{segment}",
+    ...options,
+  });
+
+/**
+ * A segment
+ */
+export const getSegment = <ThrowOnError extends boolean = false>(
+  options: Options<GetSegmentData, ThrowOnError>,
+): RequestResult<GetSegmentResponses, GetSegmentErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetSegmentResponses, GetSegmentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments/{segment}",
+    ...options,
+  });
+
+/**
+ * Change a segment
+ *
+ * Changes the name, description, private switch or conditions; the
+ * key never changes (`immutable`). Conditions are replaced as a list.
+ * A change to the values the segment already has changes nothing and
+ * records nothing.
+ *
+ */
+export const updateSegment = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateSegmentData, ThrowOnError>,
+): RequestResult<UpdateSegmentResponses, UpdateSegmentErrors, ThrowOnError> =>
+  (options.client ?? client).patch<UpdateSegmentResponses, UpdateSegmentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments/{segment}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Where a segment is used
+ *
+ * Every flag and environment whose rules name the segment, archived flags included, by flag key and then environment order.
+ */
+export const listSegmentUsages = <ThrowOnError extends boolean = false>(
+  options: Options<ListSegmentUsagesData, ThrowOnError>,
+): RequestResult<ListSegmentUsagesResponses, ListSegmentUsagesErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListSegmentUsagesResponses, ListSegmentUsagesErrors, ThrowOnError>(
+    {
+      security: [
+        { scheme: "bearer", type: "http" },
+        {
+          in: "cookie",
+          name: "flagnetic_session",
+          type: "apiKey",
+        },
+      ],
+      url: "/projects/{project}/segments/{segment}/usages",
+      ...options,
+    },
+  );
 
 /**
  * The members holding grants in a project

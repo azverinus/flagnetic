@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -22,6 +23,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management/operations"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // BaseURL is where the management API is served.
@@ -85,6 +87,21 @@ type Handlers struct {
 	UpdateAttribute *appworkspace.UpdateAttribute
 	DeleteAttribute *appworkspace.DeleteAttribute
 
+	ListFlags   *appflags.ListFlags
+	CreateFlag  *appflags.CreateFlag
+	GetFlag     *appflags.GetFlag
+	UpdateFlag  *appflags.UpdateFlag
+	ArchiveFlag *appflags.ArchiveFlag
+	RestoreFlag *appflags.RestoreFlag
+	DeleteFlag  *appflags.DeleteFlag
+
+	ListSegments      *appflags.ListSegments
+	GetSegment        *appflags.GetSegment
+	CreateSegment     *appflags.CreateSegment
+	UpdateSegment     *appflags.UpdateSegment
+	DeleteSegment     *appflags.DeleteSegment
+	ListSegmentUsages *appflags.ListSegmentUsages
+
 	ListAuditEntries *appgovernance.ListAuditEntries
 	GetAuditEntry    *appgovernance.GetAuditEntry
 }
@@ -109,7 +126,7 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 	}
 	strict := NewStrictHandlerWithOptions(a, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  invalidRequest,
-		ResponseErrorHandlerFunc: edge.WriteError,
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) { edge.WriteError(w, r, httpError(err)) },
 	})
 	// The links invitations hand out carry their secret in the path the
 	// browser opens.
@@ -119,6 +136,22 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 		BaseRouter:       router{a},
 		ErrorHandlerFunc: invalidRequest,
 	})
+}
+
+// errPreconditionRequired answers a write of a versioned entity that names
+// no version: a problem of the HTTP request, which carries the version in
+// If-Match.
+var errPreconditionRequired = flaghttp.PreconditionRequired(
+	"send If-Match with the version of the entity this write is based on, as its ETag answered it")
+
+// httpError returns err as the edge answers it: a write naming no version,
+// which the application refuses once the request is validated, is the HTTP
+// adapter's own 428.
+func httpError(err error) error {
+	if errors.Is(err, precondition.ErrRequired) {
+		return errPreconditionRequired
+	}
+	return err
 }
 
 func newAPI(edge *flaghttp.Server, h Handlers, refusals *prometheus.CounterVec, opts Options) *api {

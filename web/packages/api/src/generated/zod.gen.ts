@@ -9,21 +9,6 @@ export const zViolation = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
 });
 
-/**
- * A problem document (RFC 9457). Code-specific values are further members.
- */
-export const zProblem = z.object({
-  type: z.string(),
-  title: z.string(),
-  status: z.int(),
-  code: z.string(),
-  detail: z.string().optional(),
-  request_id: z.string(),
-  retry_after: z.int().optional(),
-  permission: z.string().optional(),
-  errors: z.array(zViolation).optional(),
-});
-
 export const zSignInRequest = z.object({
   email: z.string(),
   password: z.string(),
@@ -478,6 +463,200 @@ export const zAuditEntryList = z.object({
   next_cursor: z.string().nullable(),
 });
 
+export const zReference = z.object({
+  kind: z.string(),
+  key: z.string(),
+  environment: z.string().nullable(),
+});
+
+/**
+ * A problem document (RFC 9457). Code-specific values are further members.
+ */
+export const zProblem = z.object({
+  type: z.string(),
+  title: z.string(),
+  status: z.int(),
+  code: z.string(),
+  detail: z.string().optional(),
+  request_id: z.string(),
+  retry_after: z.int().optional(),
+  permission: z.string().optional(),
+  current_version: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    })
+    .optional(),
+  references: z.array(zReference).optional(),
+  errors: z.array(zViolation).optional(),
+});
+
+/**
+ * Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+ */
+export const zVersion = z.coerce
+  .bigint()
+  .gte(BigInt(1))
+  .max(BigInt("9223372036854775807"), {
+    error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+  });
+
+export const zFlagType = z.enum(["boolean", "string", "number", "json"]);
+
+/**
+ * A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+ */
+export const zLifetime = z.enum(["permanent", "temporary"]);
+
+export const zVariationKey = z.string().regex(/^[a-zA-Z0-9_.-]{1,64}$/);
+
+/**
+ * A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+ */
+export const zVariationValue = z.unknown();
+
+export const zVariation = z.object({
+  key: zVariationKey,
+  value: zVariationValue,
+  name: z.string(),
+  description: z.string(),
+});
+
+export const zVariationInput = z.object({
+  key: zVariationKey,
+  value: zVariationValue,
+  name: z.string().optional(),
+  description: zDescription.optional(),
+});
+
+export const zFlagDefinition = z.object({
+  id: z.uuid(),
+  key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
+  type: zFlagType,
+  name: zName,
+  description: zDescription,
+  owner: z.uuid(),
+  tags: z.array(z.string()),
+  lifetime: zLifetime,
+  expected_removal_at: z.iso.datetime().nullable(),
+  automatic_exposure: z.boolean(),
+  variations: z.array(zVariation),
+  archived_at: z.iso.datetime().nullable(),
+  created_by: z.uuid().nullable(),
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
+  version: zVersion,
+});
+
+/**
+ * What the flag serves in one environment.
+ */
+export const zFlagConfiguration = z.object({
+  environment: zKey,
+  on: z.boolean(),
+  off_variation: z.string(),
+  fallthrough: z.string(),
+  updated_at: z.iso.datetime(),
+  version: zVersion,
+});
+
+/**
+ * A flag's definition with its configuration in every environment, by the environments' order.
+ */
+export const zFlag = zFlagDefinition.and(
+  z.object({
+    environments: z.array(zFlagConfiguration),
+  }),
+);
+
+export const zFlagList = z.object({
+  items: z.array(zFlagDefinition),
+  next_cursor: z.string().nullable(),
+});
+
+export const zFlagCreate = z.object({
+  key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
+  type: zFlagType,
+  name: zName,
+  description: zDescription.optional(),
+  owner: z.uuid().optional(),
+  tags: z.array(z.string().min(1).max(64)).max(50).optional(),
+  lifetime: zLifetime.optional(),
+  expected_removal_at: z.iso.datetime().optional(),
+  automatic_exposure: z.boolean().optional(),
+  variations: z.array(zVariationInput).optional(),
+});
+
+export const zFlagPatch = z.object({
+  key: z.string().optional(),
+  type: z.string().optional(),
+  name: zName.optional(),
+  description: zDescription.optional(),
+  owner: z.uuid().optional(),
+  tags: z.array(z.string().min(1).max(64)).max(50).optional(),
+  lifetime: zLifetime.optional(),
+  expected_removal_at: z.iso.datetime().optional(),
+  automatic_exposure: z.boolean().optional(),
+  variations: z.array(zVariationInput).optional(),
+});
+
+export const zReferenceList = z.object({
+  items: z.array(zReference),
+});
+
+/**
+ * One comparison inside a rule or a segment. An `attribute` condition
+ * names an attribute or unit type, an operator (`op`) and a `value`
+ * (none for `exists`, `not_exists` and `is_empty`); `in_segment` and
+ * `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+ * one of its `variation`s. A segment holds attribute conditions only.
+ *
+ */
+export const zCondition = z.object({
+  kind: z.string(),
+  attribute: z.string().optional(),
+  op: z.string().optional(),
+  value: z.unknown().optional(),
+  segment: z.string().optional(),
+  flag: z.string().optional(),
+  variation: z.string().optional(),
+});
+
+export const zSegment = z.object({
+  id: z.uuid(),
+  key: zKey,
+  name: zName,
+  description: zDescription,
+  private: z.boolean(),
+  conditions: z.array(zCondition),
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
+  version: zVersion,
+});
+
+export const zSegmentList = z.object({
+  items: z.array(zSegment),
+});
+
+export const zSegmentCreate = z.object({
+  key: zKey,
+  name: zName,
+  description: zDescription.optional(),
+  private: z.boolean().optional(),
+  conditions: z.array(zCondition).max(20).optional(),
+});
+
+export const zSegmentPatch = z.object({
+  key: z.string().optional(),
+  name: zName.optional(),
+  description: zDescription.optional(),
+  private: z.boolean().optional(),
+  conditions: z.array(zCondition).max(20).optional(),
+});
+
 /**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
@@ -529,6 +708,26 @@ export const zCursor = z.string();
  * How many entries a page holds at most.
  */
 export const zLimit = z.int().gte(1).lte(200).default(50);
+
+/**
+ * The flag's key.
+ */
+export const zFlagKey = z.string();
+
+/**
+ * The segment's key.
+ */
+export const zSegmentKey = z.string();
+
+/**
+ * The version of the entity this write is based on, as its `ETag`
+ * answered it (`"7"`, or `7`). Required: without it the write is
+ * refused `428 precondition_required`, and with any other version than
+ * the current one `412 version_mismatch`, both judged after the request
+ * is validated.
+ *
+ */
+export const zIfMatch = z.string();
 
 /**
  * The environment's key.
@@ -871,6 +1070,170 @@ export const zUpdateAttributePath = z.object({
  * As changed.
  */
 export const zUpdateAttributeResponse = zAttribute;
+
+export const zListFlagsPath = z.object({
+  project: z.string(),
+});
+
+export const zListFlagsQuery = z.object({
+  archived: z.boolean().optional().default(false),
+  cursor: z.string().optional(),
+  limit: z.int().gte(1).lte(200).optional().default(50),
+});
+
+/**
+ * One page of flags.
+ */
+export const zListFlagsResponse = zFlagList;
+
+export const zCreateFlagBody = zFlagCreate;
+
+export const zCreateFlagPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * Created, with its configuration in every environment.
+ */
+export const zCreateFlagResponse = zFlag;
+
+export const zDeleteFlagHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zDeleteFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteFlagResponse = z.void();
+
+export const zGetFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+});
+
+/**
+ * The flag; its `ETag` is the definition's version, and each configuration carries its own.
+ */
+export const zGetFlagResponse = zFlag;
+
+export const zUpdateFlagBody = zFlagPatch;
+
+export const zUpdateFlagHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+});
+
+/**
+ * The flag as changed.
+ */
+export const zUpdateFlagResponse = zFlag;
+
+export const zArchiveFlagHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zArchiveFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+});
+
+/**
+ * The flag as it is now.
+ */
+export const zArchiveFlagResponse = zFlag;
+
+export const zRestoreFlagHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zRestoreFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+});
+
+/**
+ * The flag as it is now.
+ */
+export const zRestoreFlagResponse = zFlag;
+
+export const zListSegmentsPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The segments, by key.
+ */
+export const zListSegmentsResponse = zSegmentList;
+
+export const zCreateSegmentBody = zSegmentCreate;
+
+export const zCreateSegmentPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * Created.
+ */
+export const zCreateSegmentResponse = zSegment;
+
+export const zDeleteSegmentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zDeleteSegmentPath = z.object({
+  project: z.string(),
+  segment: z.string(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteSegmentResponse = z.void();
+
+export const zGetSegmentPath = z.object({
+  project: z.string(),
+  segment: z.string(),
+});
+
+/**
+ * The segment.
+ */
+export const zGetSegmentResponse = zSegment;
+
+export const zUpdateSegmentBody = zSegmentPatch;
+
+export const zUpdateSegmentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateSegmentPath = z.object({
+  project: z.string(),
+  segment: z.string(),
+});
+
+/**
+ * The segment as changed.
+ */
+export const zUpdateSegmentResponse = zSegment;
+
+export const zListSegmentUsagesPath = z.object({
+  project: z.string(),
+  segment: z.string(),
+});
+
+/**
+ * The usages.
+ */
+export const zListSegmentUsagesResponse = zReferenceList;
 
 export const zListProjectMembersPath = z.object({
   project: z.string(),

@@ -94,6 +94,30 @@ func (e CredentialMethod) Valid() bool {
 	}
 }
 
+// Defines values for FlagType.
+const (
+	FlagTypeBoolean FlagType = "boolean"
+	FlagTypeJson    FlagType = "json"
+	FlagTypeNumber  FlagType = "number"
+	FlagTypeString  FlagType = "string"
+)
+
+// Valid indicates whether the value is a known member of the FlagType enum.
+func (e FlagType) Valid() bool {
+	switch e {
+	case FlagTypeBoolean:
+		return true
+	case FlagTypeJson:
+		return true
+	case FlagTypeNumber:
+		return true
+	case FlagTypeString:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GrantSource.
 const (
 	GrantSourceManual GrantSource = "manual"
@@ -103,6 +127,24 @@ const (
 func (e GrantSource) Valid() bool {
 	switch e {
 	case GrantSourceManual:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Lifetime.
+const (
+	LifetimePermanent Lifetime = "permanent"
+	LifetimeTemporary Lifetime = "temporary"
+)
+
+// Valid indicates whether the value is a known member of the Lifetime enum.
+func (e Lifetime) Valid() bool {
+	switch e {
+	case LifetimePermanent:
+		return true
+	case LifetimeTemporary:
 		return true
 	default:
 		return false
@@ -369,6 +411,25 @@ type AuthSettings struct {
 	TokenMaxLifetimeSeconds int64 `json:"token_max_lifetime_seconds"`
 }
 
+// Condition One comparison inside a rule or a segment. An `attribute` condition
+// names an attribute or unit type, an operator (`op`) and a `value`
+// (none for `exists`, `not_exists` and `is_empty`); `in_segment` and
+// `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+// one of its `variation`s. A segment holds attribute conditions only.
+type Condition struct {
+	Attribute *string `json:"attribute,omitempty"`
+	Flag      *string `json:"flag,omitempty"`
+
+	// Kind `attribute`, `in_segment`, `not_in_segment` or `prerequisite`.
+	Kind    string  `json:"kind"`
+	Op      *string `json:"op,omitempty"`
+	Segment *string `json:"segment,omitempty"`
+
+	// Value A string, number, boolean or list, as the operator and the attribute's type need; null is no value.
+	Value     interface{} `json:"value,omitempty"`
+	Variation *string     `json:"variation,omitempty"`
+}
+
 // CreatedApiToken A personal access token just created, with its value.
 type CreatedApiToken struct {
 	// Token A personal access token, by its hint; its value is shown only when it is created.
@@ -437,6 +498,155 @@ type EnvironmentPatch struct {
 	Name *Name   `json:"name,omitempty"`
 }
 
+// Flag A flag's definition with its configuration in every environment, by the environments' order.
+type Flag struct {
+	// ArchivedAt When the flag was archived, hidden from SDKs; null while it is not.
+	ArchivedAt *time.Time `json:"archived_at"`
+
+	// AutomaticExposure SDKs record an exposure after every evaluation whose result carries an experiment.
+	AutomaticExposure bool      `json:"automatic_exposure"`
+	CreatedAt         time.Time `json:"created_at"`
+
+	// CreatedBy The member who created the flag; null when a project token did.
+	CreatedBy    *openapi_types.UUID `json:"created_by"`
+	Description  Description         `json:"description"`
+	Environments []FlagConfiguration `json:"environments"`
+
+	// ExpectedRemovalAt When a temporary flag is expected to be removed; null for a permanent one.
+	ExpectedRemovalAt *time.Time         `json:"expected_removal_at"`
+	Id                openapi_types.UUID `json:"id"`
+
+	// Key Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.
+	Key string `json:"key"`
+
+	// Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+	Lifetime Lifetime `json:"lifetime"`
+	Name     Name     `json:"name"`
+
+	// Owner The member accountable for the flag.
+	Owner      openapi_types.UUID `json:"owner"`
+	Tags       []string           `json:"tags"`
+	Type       FlagType           `json:"type"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+	Variations []Variation        `json:"variations"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+}
+
+// FlagConfiguration What the flag serves in one environment.
+type FlagConfiguration struct {
+	// Environment Names the entity in URLs, SDK calls and rules, and never changes.
+	Environment Key `json:"environment"`
+
+	// Fallthrough The variation served when the flag is on and no rule matches.
+	Fallthrough string `json:"fallthrough"`
+
+	// OffVariation The variation served while the flag is off.
+	OffVariation string    `json:"off_variation"`
+	On           bool      `json:"on"`
+	UpdatedAt    time.Time `json:"updated_at"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+}
+
+// FlagCreate defines model for FlagCreate.
+type FlagCreate struct {
+	AutomaticExposure *bool        `json:"automatic_exposure,omitempty"`
+	Description       *Description `json:"description,omitempty"`
+
+	// ExpectedRemovalAt For a temporary flag only, which a flag is when `lifetime` is absent; 90 days from now when absent.
+	ExpectedRemovalAt *time.Time `json:"expected_removal_at,omitempty"`
+
+	// Key Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.
+	Key string `json:"key"`
+
+	// Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+	Lifetime *Lifetime `json:"lifetime,omitempty"`
+	Name     Name      `json:"name"`
+
+	// Owner An active member holding a grant in the project, or an instance admin (`invalid_owner` otherwise); the calling member when absent, which a project token cannot leave it.
+	Owner *openapi_types.UUID `json:"owner,omitempty"`
+	Tags  *[]string           `json:"tags,omitempty"`
+	Type  FlagType            `json:"type"`
+
+	// Variations Required unless the flag is boolean, whose variations are always `true` and `false`.
+	Variations *[]VariationInput `json:"variations,omitempty"`
+}
+
+// FlagDefinition defines model for FlagDefinition.
+type FlagDefinition struct {
+	// ArchivedAt When the flag was archived, hidden from SDKs; null while it is not.
+	ArchivedAt *time.Time `json:"archived_at"`
+
+	// AutomaticExposure SDKs record an exposure after every evaluation whose result carries an experiment.
+	AutomaticExposure bool      `json:"automatic_exposure"`
+	CreatedAt         time.Time `json:"created_at"`
+
+	// CreatedBy The member who created the flag; null when a project token did.
+	CreatedBy   *openapi_types.UUID `json:"created_by"`
+	Description Description         `json:"description"`
+
+	// ExpectedRemovalAt When a temporary flag is expected to be removed; null for a permanent one.
+	ExpectedRemovalAt *time.Time         `json:"expected_removal_at"`
+	Id                openapi_types.UUID `json:"id"`
+
+	// Key Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.
+	Key string `json:"key"`
+
+	// Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+	Lifetime Lifetime `json:"lifetime"`
+	Name     Name     `json:"name"`
+
+	// Owner The member accountable for the flag.
+	Owner      openapi_types.UUID `json:"owner"`
+	Tags       []string           `json:"tags"`
+	Type       FlagType           `json:"type"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+	Variations []Variation        `json:"variations"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+}
+
+// FlagList defines model for FlagList.
+type FlagList struct {
+	Items []FlagDefinition `json:"items"`
+
+	// NextCursor Pass as `cursor` for the next page; null on the last.
+	NextCursor *string `json:"next_cursor"`
+}
+
+// FlagPatch defines model for FlagPatch.
+type FlagPatch struct {
+	AutomaticExposure *bool        `json:"automatic_exposure,omitempty"`
+	Description       *Description `json:"description,omitempty"`
+
+	// ExpectedRemovalAt For a temporary flag only. Becoming temporary without one sets 90 days from now; becoming permanent clears it.
+	ExpectedRemovalAt *time.Time `json:"expected_removal_at,omitempty"`
+
+	// Key Refused with `immutable` whatever its value.
+	Key *string `json:"key,omitempty"`
+
+	// Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+	Lifetime *Lifetime `json:"lifetime,omitempty"`
+	Name     *Name     `json:"name,omitempty"`
+
+	// Owner A new owner must be an active member holding a grant in the project, or an instance admin.
+	Owner *openapi_types.UUID `json:"owner,omitempty"`
+	Tags  *[]string           `json:"tags,omitempty"`
+
+	// Type Refused with `immutable` whatever its value.
+	Type *string `json:"type,omitempty"`
+
+	// Variations Every variation, in order, matched to the current ones by key.
+	Variations *[]VariationInput `json:"variations,omitempty"`
+}
+
+// FlagType defines model for FlagType.
+type FlagType string
+
 // Grant One role held by one member in one project.
 type Grant struct {
 	CreatedAt time.Time `json:"created_at"`
@@ -490,6 +700,9 @@ type IssuedInvitation struct {
 
 // Key Names the entity in URLs, SDK calls and rules, and never changes.
 type Key = string
+
+// Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+type Lifetime string
 
 // Me defines model for Me.
 type Me struct {
@@ -599,13 +812,19 @@ type Problem struct {
 	// Code Stable snake_case name of the problem, which clients branch on.
 	Code string `json:"code"`
 
+	// CurrentVersion The version the entity has now, for `version_mismatch`.
+	CurrentVersion *int64 `json:"current_version,omitempty"`
+
 	// Detail An English explanation for humans; never what a client branches on.
 	Detail *string      `json:"detail,omitempty"`
 	Errors *[]Violation `json:"errors,omitempty"`
 
 	// Permission The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
 	Permission *string `json:"permission,omitempty"`
-	RequestId  string  `json:"request_id"`
+
+	// References What still names what the write would remove or hide, for `in_use`.
+	References *[]Reference `json:"references,omitempty"`
+	RequestId  string       `json:"request_id"`
 
 	// RetryAfter Seconds to wait before retrying, for a rate limit.
 	RetryAfter *int   `json:"retry_after,omitempty"`
@@ -722,6 +941,21 @@ type ProjectTokenList struct {
 	Items []ProjectToken `json:"items"`
 }
 
+// Reference defines model for Reference.
+type Reference struct {
+	// Environment The key of the environment it is named in; null when it is named in every environment.
+	Environment *string `json:"environment"`
+	Key         string  `json:"key"`
+
+	// Kind What names it, such as `flag` or `segment`.
+	Kind string `json:"kind"`
+}
+
+// ReferenceList defines model for ReferenceList.
+type ReferenceList struct {
+	Items []Reference `json:"items"`
+}
+
 // Role defines model for Role.
 type Role struct {
 	Name        RoleName     `json:"name"`
@@ -738,6 +972,52 @@ type RoleName string
 
 // Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
 type Scope string
+
+// Segment defines model for Segment.
+type Segment struct {
+	Conditions  []Condition        `json:"conditions"`
+	CreatedAt   time.Time          `json:"created_at"`
+	Description Description        `json:"description"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Key Names the entity in URLs, SDK calls and rules, and never changes.
+	Key  Key  `json:"key"`
+	Name Name `json:"name"`
+
+	// Private Its conditions never leave the server; only server-side evaluation uses it.
+	Private   bool      `json:"private"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+}
+
+// SegmentCreate defines model for SegmentCreate.
+type SegmentCreate struct {
+	Conditions  *[]Condition `json:"conditions,omitempty"`
+	Description *Description `json:"description,omitempty"`
+
+	// Key Names the entity in URLs, SDK calls and rules, and never changes.
+	Key     Key   `json:"key"`
+	Name    Name  `json:"name"`
+	Private *bool `json:"private,omitempty"`
+}
+
+// SegmentList defines model for SegmentList.
+type SegmentList struct {
+	Items []Segment `json:"items"`
+}
+
+// SegmentPatch defines model for SegmentPatch.
+type SegmentPatch struct {
+	Conditions  *[]Condition `json:"conditions,omitempty"`
+	Description *Description `json:"description,omitempty"`
+
+	// Key Refused with `immutable` whatever its value.
+	Key     *string `json:"key,omitempty"`
+	Name    *Name   `json:"name,omitempty"`
+	Private *bool   `json:"private,omitempty"`
+}
 
 // Session One device a member is signed in on.
 type Session struct {
@@ -815,6 +1095,37 @@ type UnitTypePatch struct {
 	Name *Name   `json:"name,omitempty"`
 }
 
+// Variation defines model for Variation.
+type Variation struct {
+	Description string       `json:"description"`
+	Key         VariationKey `json:"key"`
+	Name        string       `json:"name"`
+
+	// Value A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+	Value VariationValue `json:"value"`
+}
+
+// VariationInput defines model for VariationInput.
+type VariationInput struct {
+	Description *Description `json:"description,omitempty"`
+	Key         VariationKey `json:"key"`
+
+	// Name Defaults to the key.
+	Name *string `json:"name,omitempty"`
+
+	// Value A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+	Value VariationValue `json:"value"`
+}
+
+// VariationKey defines model for VariationKey.
+type VariationKey = string
+
+// VariationValue A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+type VariationValue = json.RawMessage
+
+// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+type Version = int64
+
 // Violation defines model for Violation.
 type Violation struct {
 	Code   string `json:"code"`
@@ -863,8 +1174,14 @@ type Cursor = string
 // EnvironmentKey defines model for EnvironmentKey.
 type EnvironmentKey = string
 
+// FlagKey defines model for FlagKey.
+type FlagKey = string
+
 // GrantID defines model for GrantID.
 type GrantID = string
+
+// IfMatch defines model for IfMatch.
+type IfMatch = string
 
 // Limit defines model for Limit.
 type Limit = int
@@ -874,6 +1191,9 @@ type MemberID = string
 
 // ProjectKey defines model for ProjectKey.
 type ProjectKey = string
+
+// SegmentKey defines model for SegmentKey.
+type SegmentKey = string
 
 // SessionID defines model for SessionID.
 type SessionID = string
@@ -905,6 +1225,9 @@ type InvitationGone = Problem
 // NotFound A problem document (RFC 9457). Code-specific values are further members.
 type NotFound = Problem
 
+// PreconditionRequired A problem document (RFC 9457). Code-specific values are further members.
+type PreconditionRequired = Problem
+
 // RequestTooLarge A problem document (RFC 9457). Code-specific values are further members.
 type RequestTooLarge = Problem
 
@@ -916,6 +1239,9 @@ type Unauthenticated = Problem
 
 // UnsupportedMediaType A problem document (RFC 9457). Code-specific values are further members.
 type UnsupportedMediaType = Problem
+
+// VersionMismatch A problem document (RFC 9457). Code-specific values are further members.
+type VersionMismatch = Problem
 
 // ListAuditEntriesParams defines parameters for ListAuditEntries.
 type ListAuditEntriesParams struct {
@@ -1003,6 +1329,78 @@ type ListProjectAuditEntriesParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListFlagsParams defines parameters for ListFlags.
+type ListFlagsParams struct {
+	// Archived Lists the archived flags instead of the others.
+	Archived *bool `form:"archived,omitempty" json:"archived,omitempty"`
+
+	// Cursor The `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit How many entries a page holds at most.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// DeleteFlagParams defines parameters for DeleteFlag.
+type DeleteFlagParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// UpdateFlagParams defines parameters for UpdateFlag.
+type UpdateFlagParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ArchiveFlagParams defines parameters for ArchiveFlag.
+type ArchiveFlagParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// RestoreFlagParams defines parameters for RestoreFlag.
+type RestoreFlagParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// DeleteSegmentParams defines parameters for DeleteSegment.
+type DeleteSegmentParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// UpdateSegmentParams defines parameters for UpdateSegment.
+type UpdateSegmentParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
 type AcceptInvitationJSONRequestBody = InvitationAcceptance
 
@@ -1045,8 +1443,20 @@ type CreateEnvironmentJSONRequestBody = EnvironmentCreate
 // UpdateEnvironmentJSONRequestBody defines body for UpdateEnvironment for application/json ContentType.
 type UpdateEnvironmentJSONRequestBody = EnvironmentPatch
 
+// CreateFlagJSONRequestBody defines body for CreateFlag for application/json ContentType.
+type CreateFlagJSONRequestBody = FlagCreate
+
+// UpdateFlagJSONRequestBody defines body for UpdateFlag for application/json ContentType.
+type UpdateFlagJSONRequestBody = FlagPatch
+
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody = GrantCreate
+
+// CreateSegmentJSONRequestBody defines body for CreateSegment for application/json ContentType.
+type CreateSegmentJSONRequestBody = SegmentCreate
+
+// UpdateSegmentJSONRequestBody defines body for UpdateSegment for application/json ContentType.
+type UpdateSegmentJSONRequestBody = SegmentPatch
 
 // CreateProjectTokenJSONRequestBody defines body for CreateProjectToken for application/json ContentType.
 type CreateProjectTokenJSONRequestBody = ProjectTokenCreate
@@ -1709,6 +2119,99 @@ type ClientInterface interface {
 	// Renames the environment; the key never changes (`key_immutable`).
 	UpdateEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListFlags The project's flags
+	//
+	// The project's flags by key, in byte order (capitals before lower
+	// case). Page with `cursor` set to the `next_cursor` of the previous
+	// page.
+	//
+	// Corresponds with GET /projects/{project}/flags (the `ListFlags` operationId).
+	ListFlags(ctx context.Context, project ProjectKey, params *ListFlagsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateFlagWithBody Create a flag
+	//
+	// The flag arrives switched off in every environment of the project,
+	// serving `false` when off and `true` when on for a boolean flag, and
+	// its first variation either way for any other type. A boolean flag
+	// needs no variations listed. The owner defaults to the calling
+	// member; a project token names one. A key in use is `already_exists`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/flags (the `CreateFlag` operationId).
+	CreateFlagWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateFlag Create a flag
+	//
+	// The flag arrives switched off in every environment of the project,
+	// serving `false` when off and `true` when on for a boolean flag, and
+	// its first variation either way for any other type. A boolean flag
+	// needs no variations listed. The owner defaults to the calling
+	// member; a project token names one. A key in use is `already_exists`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/flags (the `CreateFlag` operationId).
+	CreateFlag(ctx context.Context, project ProjectKey, body CreateFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteFlag Delete an archived flag
+	//
+	// Deletes the flag with its configuration in every environment. Only
+	// an archived flag is deleted (`not_archived` otherwise), so deleting
+	// is a deliberate second step after archiving.
+	//
+	// Corresponds with DELETE /projects/{project}/flags/{flag} (the `DeleteFlag` operationId).
+	DeleteFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *DeleteFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFlag A flag with its configuration in every environment
+	//
+	// Corresponds with GET /projects/{project}/flags/{flag} (the `GetFlag` operationId).
+	GetFlag(ctx context.Context, project ProjectKey, flag FlagKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateFlagWithBody Change a flag's definition
+	//
+	// Changes the name, description, owner, tags, lifetime, variations or
+	// automatic exposure, for every environment at once; the key and type
+	// never change (`immutable`). Variations are replaced as a list and
+	// matched by key: removing one that a configuration still serves is
+	// `in_use`, listing what serves it. A change to the values the flag
+	// already has changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /projects/{project}/flags/{flag} (the `UpdateFlag` operationId).
+	UpdateFlagWithBody(ctx context.Context, project ProjectKey, flag FlagKey, params *UpdateFlagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateFlag Change a flag's definition
+	//
+	// Changes the name, description, owner, tags, lifetime, variations or
+	// automatic exposure, for every environment at once; the key and type
+	// never change (`immutable`). Variations are replaced as a list and
+	// matched by key: removing one that a configuration still serves is
+	// `in_use`, listing what serves it. A change to the values the flag
+	// already has changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /projects/{project}/flags/{flag} (the `UpdateFlag` operationId).
+	UpdateFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *UpdateFlagParams, body UpdateFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ArchiveFlag Archive a flag
+	//
+	// Hides the flag from SDKs in every environment, keeping its
+	// definition and configurations until it is restored or deleted.
+	// Archiving an archived flag changes nothing.
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
+	ArchiveFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RestoreFlag Restore an archived flag
+	//
+	// Brings an archived flag back to SDKs as it was archived. Restoring a flag that is not archived changes nothing.
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/restore (the `RestoreFlag` operationId).
+	RestoreFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *RestoreFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListGrants The grants of a project
 	//
 	// Every grant of the project, oldest first.
@@ -1775,6 +2278,76 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/members (the `ListProjectMembers` operationId).
 	ListProjectMembers(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSegments The project's segments
+	//
+	// Corresponds with GET /projects/{project}/segments (the `ListSegments` operationId).
+	ListSegments(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSegmentWithBody Create a segment
+	//
+	// A segment holds at most 20 attribute conditions, each naming an
+	// attribute or unit type the project declares with an operator
+	// defined for its type and a value that operator accepts; segments do
+	// not nest. A key in use is `already_exists`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/segments (the `CreateSegment` operationId).
+	CreateSegmentWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSegment Create a segment
+	//
+	// A segment holds at most 20 attribute conditions, each naming an
+	// attribute or unit type the project declares with an operator
+	// defined for its type and a value that operator accepts; segments do
+	// not nest. A key in use is `already_exists`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/segments (the `CreateSegment` operationId).
+	CreateSegment(ctx context.Context, project ProjectKey, body CreateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSegment Delete a segment
+	//
+	// Corresponds with DELETE /projects/{project}/segments/{segment} (the `DeleteSegment` operationId).
+	DeleteSegment(ctx context.Context, project ProjectKey, segment SegmentKey, params *DeleteSegmentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSegment A segment
+	//
+	// Corresponds with GET /projects/{project}/segments/{segment} (the `GetSegment` operationId).
+	GetSegment(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSegmentWithBody Change a segment
+	//
+	// Changes the name, description, private switch or conditions; the
+	// key never changes (`immutable`). Conditions are replaced as a list.
+	// A change to the values the segment already has changes nothing and
+	// records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /projects/{project}/segments/{segment} (the `UpdateSegment` operationId).
+	UpdateSegmentWithBody(ctx context.Context, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSegment Change a segment
+	//
+	// Changes the name, description, private switch or conditions; the
+	// key never changes (`immutable`). Conditions are replaced as a list.
+	// A change to the values the segment already has changes nothing and
+	// records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /projects/{project}/segments/{segment} (the `UpdateSegment` operationId).
+	UpdateSegment(ctx context.Context, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, body UpdateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSegmentUsages Where a segment is used
+	//
+	// Every flag and environment whose rules name the segment, archived flags included, by flag key and then environment order.
+	//
+	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
+	ListSegmentUsages(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProjectTokens The tokens of a project
 	//
@@ -3037,6 +3610,189 @@ func (c *Client) UpdateEnvironment(ctx context.Context, project ProjectKey, envi
 	return c.Client.Do(req)
 }
 
+// ListFlags The project's flags
+//
+// The project's flags by key, in byte order (capitals before lower
+// case). Page with `cursor` set to the `next_cursor` of the previous
+// page.
+//
+// Corresponds with GET /projects/{project}/flags (the `ListFlags` operationId).
+func (c *Client) ListFlags(ctx context.Context, project ProjectKey, params *ListFlagsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListFlagsRequest(c.Server, project, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateFlagWithBody Create a flag
+//
+// The flag arrives switched off in every environment of the project,
+// serving `false` when off and `true` when on for a boolean flag, and
+// its first variation either way for any other type. A boolean flag
+// needs no variations listed. The owner defaults to the calling
+// member; a project token names one. A key in use is `already_exists`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/flags (the `CreateFlag` operationId).
+func (c *Client) CreateFlagWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateFlagRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateFlag Create a flag
+//
+// The flag arrives switched off in every environment of the project,
+// serving `false` when off and `true` when on for a boolean flag, and
+// its first variation either way for any other type. A boolean flag
+// needs no variations listed. The owner defaults to the calling
+// member; a project token names one. A key in use is `already_exists`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/flags (the `CreateFlag` operationId).
+func (c *Client) CreateFlag(ctx context.Context, project ProjectKey, body CreateFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateFlagRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteFlag Delete an archived flag
+//
+// Deletes the flag with its configuration in every environment. Only
+// an archived flag is deleted (`not_archived` otherwise), so deleting
+// is a deliberate second step after archiving.
+//
+// Corresponds with DELETE /projects/{project}/flags/{flag} (the `DeleteFlag` operationId).
+func (c *Client) DeleteFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *DeleteFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteFlagRequest(c.Server, project, flag, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFlag A flag with its configuration in every environment
+//
+// Corresponds with GET /projects/{project}/flags/{flag} (the `GetFlag` operationId).
+func (c *Client) GetFlag(ctx context.Context, project ProjectKey, flag FlagKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFlagRequest(c.Server, project, flag)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateFlagWithBody Change a flag's definition
+//
+// Changes the name, description, owner, tags, lifetime, variations or
+// automatic exposure, for every environment at once; the key and type
+// never change (`immutable`). Variations are replaced as a list and
+// matched by key: removing one that a configuration still serves is
+// `in_use`, listing what serves it. A change to the values the flag
+// already has changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /projects/{project}/flags/{flag} (the `UpdateFlag` operationId).
+func (c *Client) UpdateFlagWithBody(ctx context.Context, project ProjectKey, flag FlagKey, params *UpdateFlagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateFlagRequestWithBody(c.Server, project, flag, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateFlag Change a flag's definition
+//
+// Changes the name, description, owner, tags, lifetime, variations or
+// automatic exposure, for every environment at once; the key and type
+// never change (`immutable`). Variations are replaced as a list and
+// matched by key: removing one that a configuration still serves is
+// `in_use`, listing what serves it. A change to the values the flag
+// already has changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /projects/{project}/flags/{flag} (the `UpdateFlag` operationId).
+func (c *Client) UpdateFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *UpdateFlagParams, body UpdateFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateFlagRequest(c.Server, project, flag, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ArchiveFlag Archive a flag
+//
+// Hides the flag from SDKs in every environment, keeping its
+// definition and configurations until it is restored or deleted.
+// Archiving an archived flag changes nothing.
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
+func (c *Client) ArchiveFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewArchiveFlagRequest(c.Server, project, flag, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RestoreFlag Restore an archived flag
+//
+// Brings an archived flag back to SDKs as it was archived. Restoring a flag that is not archived changes nothing.
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/restore (the `RestoreFlag` operationId).
+func (c *Client) RestoreFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *RestoreFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRestoreFlagRequest(c.Server, project, flag, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListGrants The grants of a project
 //
 // Every grant of the project, oldest first.
@@ -3154,6 +3910,156 @@ func (c *Client) GetProjectMe(ctx context.Context, project ProjectKey, reqEditor
 // Corresponds with GET /projects/{project}/members (the `ListProjectMembers` operationId).
 func (c *Client) ListProjectMembers(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListProjectMembersRequest(c.Server, project)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSegments The project's segments
+//
+// Corresponds with GET /projects/{project}/segments (the `ListSegments` operationId).
+func (c *Client) ListSegments(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSegmentsRequest(c.Server, project)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSegmentWithBody Create a segment
+//
+// A segment holds at most 20 attribute conditions, each naming an
+// attribute or unit type the project declares with an operator
+// defined for its type and a value that operator accepts; segments do
+// not nest. A key in use is `already_exists`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/segments (the `CreateSegment` operationId).
+func (c *Client) CreateSegmentWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSegmentRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSegment Create a segment
+//
+// A segment holds at most 20 attribute conditions, each naming an
+// attribute or unit type the project declares with an operator
+// defined for its type and a value that operator accepts; segments do
+// not nest. A key in use is `already_exists`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/segments (the `CreateSegment` operationId).
+func (c *Client) CreateSegment(ctx context.Context, project ProjectKey, body CreateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSegmentRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteSegment Delete a segment
+//
+// Corresponds with DELETE /projects/{project}/segments/{segment} (the `DeleteSegment` operationId).
+func (c *Client) DeleteSegment(ctx context.Context, project ProjectKey, segment SegmentKey, params *DeleteSegmentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSegmentRequest(c.Server, project, segment, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSegment A segment
+//
+// Corresponds with GET /projects/{project}/segments/{segment} (the `GetSegment` operationId).
+func (c *Client) GetSegment(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSegmentRequest(c.Server, project, segment)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSegmentWithBody Change a segment
+//
+// Changes the name, description, private switch or conditions; the
+// key never changes (`immutable`). Conditions are replaced as a list.
+// A change to the values the segment already has changes nothing and
+// records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /projects/{project}/segments/{segment} (the `UpdateSegment` operationId).
+func (c *Client) UpdateSegmentWithBody(ctx context.Context, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSegmentRequestWithBody(c.Server, project, segment, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSegment Change a segment
+//
+// Changes the name, description, private switch or conditions; the
+// key never changes (`immutable`). Conditions are replaced as a list.
+// A change to the values the segment already has changes nothing and
+// records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /projects/{project}/segments/{segment} (the `UpdateSegment` operationId).
+func (c *Client) UpdateSegment(ctx context.Context, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, body UpdateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSegmentRequest(c.Server, project, segment, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSegmentUsages Where a segment is used
+//
+// Every flag and environment whose rules name the segment, archived flags included, by flag key and then environment order.
+//
+// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
+func (c *Client) ListSegmentUsages(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSegmentUsagesRequest(c.Server, project, segment)
 	if err != nil {
 		return nil, err
 	}
@@ -5373,6 +6279,416 @@ func NewUpdateEnvironmentRequestWithBody(server string, project ProjectKey, envi
 	return req, nil
 }
 
+// NewListFlagsRequest constructs an http.Request for the ListFlags method
+func NewListFlagsRequest(server string, project ProjectKey, params *ListFlagsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Archived != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "archived", *params.Archived, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateFlagRequest calls the generic CreateFlag builder with application/json body
+func NewCreateFlagRequest(server string, project ProjectKey, body CreateFlagJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateFlagRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewCreateFlagRequestWithBody constructs an http.Request for the CreateFlag method, with any body, and a specified content type
+func NewCreateFlagRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteFlagRequest constructs an http.Request for the DeleteFlag method
+func NewDeleteFlagRequest(server string, project ProjectKey, flag FlagKey, params *DeleteFlagParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetFlagRequest constructs an http.Request for the GetFlag method
+func NewGetFlagRequest(server string, project ProjectKey, flag FlagKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateFlagRequest calls the generic UpdateFlag builder with application/json body
+func NewUpdateFlagRequest(server string, project ProjectKey, flag FlagKey, params *UpdateFlagParams, body UpdateFlagJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateFlagRequestWithBody(server, project, flag, params, "application/json", bodyReader)
+}
+
+// NewUpdateFlagRequestWithBody constructs an http.Request for the UpdateFlag method, with any body, and a specified content type
+func NewUpdateFlagRequestWithBody(server string, project ProjectKey, flag FlagKey, params *UpdateFlagParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewArchiveFlagRequest constructs an http.Request for the ArchiveFlag method
+func NewArchiveFlagRequest(server string, project ProjectKey, flag FlagKey, params *ArchiveFlagParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/archive", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewRestoreFlagRequest constructs an http.Request for the RestoreFlag method
+func NewRestoreFlagRequest(server string, project ProjectKey, flag FlagKey, params *RestoreFlagParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/restore", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewListGrantsRequest constructs an http.Request for the ListGrants method
 func NewListGrantsRequest(server string, project ProjectKey) (*http.Request, error) {
 	var err error
@@ -5546,6 +6862,294 @@ func NewListProjectMembersRequest(server string, project ProjectKey) (*http.Requ
 	}
 
 	operationPath := fmt.Sprintf("/projects/%s/members", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListSegmentsRequest constructs an http.Request for the ListSegments method
+func NewListSegmentsRequest(server string, project ProjectKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/segments", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSegmentRequest calls the generic CreateSegment builder with application/json body
+func NewCreateSegmentRequest(server string, project ProjectKey, body CreateSegmentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSegmentRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewCreateSegmentRequestWithBody constructs an http.Request for the CreateSegment method, with any body, and a specified content type
+func NewCreateSegmentRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/segments", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteSegmentRequest constructs an http.Request for the DeleteSegment method
+func NewDeleteSegmentRequest(server string, project ProjectKey, segment SegmentKey, params *DeleteSegmentParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "segment", segment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/segments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetSegmentRequest constructs an http.Request for the GetSegment method
+func NewGetSegmentRequest(server string, project ProjectKey, segment SegmentKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "segment", segment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/segments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateSegmentRequest calls the generic UpdateSegment builder with application/json body
+func NewUpdateSegmentRequest(server string, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, body UpdateSegmentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSegmentRequestWithBody(server, project, segment, params, "application/json", bodyReader)
+}
+
+// NewUpdateSegmentRequestWithBody constructs an http.Request for the UpdateSegment method, with any body, and a specified content type
+func NewUpdateSegmentRequestWithBody(server string, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "segment", segment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/segments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListSegmentUsagesRequest constructs an http.Request for the ListSegmentUsages method
+func NewListSegmentUsagesRequest(server string, project ProjectKey, segment SegmentKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "segment", segment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/segments/%s/usages", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -6615,6 +8219,109 @@ type ClientWithResponsesInterface interface {
 	// Renames the environment; the key never changes (`key_immutable`).
 	UpdateEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error)
 
+	// ListFlagsWithResponse The project's flags
+	//
+	// The project's flags by key, in byte order (capitals before lower
+	// case). Page with `cursor` set to the `next_cursor` of the previous
+	// page.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/flags (the `ListFlags` operationId).
+	ListFlagsWithResponse(ctx context.Context, project ProjectKey, params *ListFlagsParams, reqEditors ...RequestEditorFn) (*ListFlagsResponse, error)
+
+	// CreateFlagWithBodyWithResponse Create a flag
+	//
+	// The flag arrives switched off in every environment of the project,
+	// serving `false` when off and `true` when on for a boolean flag, and
+	// its first variation either way for any other type. A boolean flag
+	// needs no variations listed. The owner defaults to the calling
+	// member; a project token names one. A key in use is `already_exists`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags (the `CreateFlag` operationId).
+	CreateFlagWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateFlagResponse, error)
+
+	// CreateFlagWithResponse Create a flag
+	//
+	// The flag arrives switched off in every environment of the project,
+	// serving `false` when off and `true` when on for a boolean flag, and
+	// its first variation either way for any other type. A boolean flag
+	// needs no variations listed. The owner defaults to the calling
+	// member; a project token names one. A key in use is `already_exists`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags (the `CreateFlag` operationId).
+	CreateFlagWithResponse(ctx context.Context, project ProjectKey, body CreateFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateFlagResponse, error)
+
+	// DeleteFlagWithResponse Delete an archived flag
+	//
+	// Deletes the flag with its configuration in every environment. Only
+	// an archived flag is deleted (`not_archived` otherwise), so deleting
+	// is a deliberate second step after archiving.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/flags/{flag} (the `DeleteFlag` operationId).
+	DeleteFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *DeleteFlagParams, reqEditors ...RequestEditorFn) (*DeleteFlagResponse, error)
+
+	// GetFlagWithResponse A flag with its configuration in every environment
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/flags/{flag} (the `GetFlag` operationId).
+	GetFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, reqEditors ...RequestEditorFn) (*GetFlagResponse, error)
+
+	// UpdateFlagWithBodyWithResponse Change a flag's definition
+	//
+	// Changes the name, description, owner, tags, lifetime, variations or
+	// automatic exposure, for every environment at once; the key and type
+	// never change (`immutable`). Variations are replaced as a list and
+	// matched by key: removing one that a configuration still serves is
+	// `in_use`, listing what serves it. A change to the values the flag
+	// already has changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/flags/{flag} (the `UpdateFlag` operationId).
+	UpdateFlagWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *UpdateFlagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateFlagResponse, error)
+
+	// UpdateFlagWithResponse Change a flag's definition
+	//
+	// Changes the name, description, owner, tags, lifetime, variations or
+	// automatic exposure, for every environment at once; the key and type
+	// never change (`immutable`). Variations are replaced as a list and
+	// matched by key: removing one that a configuration still serves is
+	// `in_use`, listing what serves it. A change to the values the flag
+	// already has changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/flags/{flag} (the `UpdateFlag` operationId).
+	UpdateFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *UpdateFlagParams, body UpdateFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateFlagResponse, error)
+
+	// ArchiveFlagWithResponse Archive a flag
+	//
+	// Hides the flag from SDKs in every environment, keeping its
+	// definition and configurations until it is restored or deleted.
+	// Archiving an archived flag changes nothing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
+	ArchiveFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*ArchiveFlagResponse, error)
+
+	// RestoreFlagWithResponse Restore an archived flag
+	//
+	// Brings an archived flag back to SDKs as it was archived. Restoring a flag that is not archived changes nothing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/restore (the `RestoreFlag` operationId).
+	RestoreFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *RestoreFlagParams, reqEditors ...RequestEditorFn) (*RestoreFlagResponse, error)
+
 	// ListGrantsWithResponse The grants of a project
 	//
 	// Every grant of the project, oldest first.
@@ -6689,6 +8396,84 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/members (the `ListProjectMembers` operationId).
 	ListProjectMembersWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListProjectMembersResponse, error)
+
+	// ListSegmentsWithResponse The project's segments
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/segments (the `ListSegments` operationId).
+	ListSegmentsWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListSegmentsResponse, error)
+
+	// CreateSegmentWithBodyWithResponse Create a segment
+	//
+	// A segment holds at most 20 attribute conditions, each naming an
+	// attribute or unit type the project declares with an operator
+	// defined for its type and a value that operator accepts; segments do
+	// not nest. A key in use is `already_exists`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/segments (the `CreateSegment` operationId).
+	CreateSegmentWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSegmentResponse, error)
+
+	// CreateSegmentWithResponse Create a segment
+	//
+	// A segment holds at most 20 attribute conditions, each naming an
+	// attribute or unit type the project declares with an operator
+	// defined for its type and a value that operator accepts; segments do
+	// not nest. A key in use is `already_exists`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/segments (the `CreateSegment` operationId).
+	CreateSegmentWithResponse(ctx context.Context, project ProjectKey, body CreateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSegmentResponse, error)
+
+	// DeleteSegmentWithResponse Delete a segment
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/segments/{segment} (the `DeleteSegment` operationId).
+	DeleteSegmentWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, params *DeleteSegmentParams, reqEditors ...RequestEditorFn) (*DeleteSegmentResponse, error)
+
+	// GetSegmentWithResponse A segment
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/segments/{segment} (the `GetSegment` operationId).
+	GetSegmentWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*GetSegmentResponse, error)
+
+	// UpdateSegmentWithBodyWithResponse Change a segment
+	//
+	// Changes the name, description, private switch or conditions; the
+	// key never changes (`immutable`). Conditions are replaced as a list.
+	// A change to the values the segment already has changes nothing and
+	// records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/segments/{segment} (the `UpdateSegment` operationId).
+	UpdateSegmentWithBodyWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSegmentResponse, error)
+
+	// UpdateSegmentWithResponse Change a segment
+	//
+	// Changes the name, description, private switch or conditions; the
+	// key never changes (`immutable`). Conditions are replaced as a list.
+	// A change to the values the segment already has changes nothing and
+	// records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/segments/{segment} (the `UpdateSegment` operationId).
+	UpdateSegmentWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, body UpdateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSegmentResponse, error)
+
+	// ListSegmentUsagesWithResponse Where a segment is used
+	//
+	// Every flag and environment whose rules name the segment, archived flags included, by flag key and then environment order.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
+	ListSegmentUsagesWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*ListSegmentUsagesResponse, error)
 
 	// ListProjectTokensWithResponse The tokens of a project
 	//
@@ -10011,6 +11796,643 @@ func (r UpdateEnvironmentResponse) ContentType() string {
 	return ""
 }
 
+// ListFlagsResponse401Headers the declared response headers of an HTTP 401 response for ListFlags
+type ListFlagsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListFlagsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListFlagsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListFlagsResponse) GetJSON200() *FlagList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListFlagsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListFlagsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListFlagsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListFlagsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListFlagsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListFlagsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListFlagsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListFlagsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateFlagResponse201Headers the declared response headers of an HTTP 201 response for CreateFlag
+type CreateFlagResponse201Headers struct {
+	ETag *string
+}
+
+// CreateFlagResponse401Headers the declared response headers of an HTTP 401 response for CreateFlag
+type CreateFlagResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateFlagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Flag
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateFlagResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateFlagResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateFlagResponse) GetJSON201() *Flag {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateFlagResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateFlagResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateFlagResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateFlagResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateFlagResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateFlagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateFlagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateFlagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateFlagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteFlagResponse401Headers the declared response headers of an HTTP 401 response for DeleteFlag
+type DeleteFlagResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteFlagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteFlagResponse401Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeleteFlagResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteFlagResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteFlagResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteFlagResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteFlagResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r DeleteFlagResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r DeleteFlagResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteFlagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteFlagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteFlagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteFlagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetFlagResponse200Headers the declared response headers of an HTTP 200 response for GetFlag
+type GetFlagResponse200Headers struct {
+	ETag *string
+}
+
+// GetFlagResponse401Headers the declared response headers of an HTTP 401 response for GetFlag
+type GetFlagResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetFlagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Flag
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetFlagResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetFlagResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFlagResponse) GetJSON200() *Flag {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetFlagResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetFlagResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetFlagResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFlagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFlagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFlagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFlagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateFlagResponse200Headers the declared response headers of an HTTP 200 response for UpdateFlag
+type UpdateFlagResponse200Headers struct {
+	ETag *string
+}
+
+// UpdateFlagResponse401Headers the declared response headers of an HTTP 401 response for UpdateFlag
+type UpdateFlagResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateFlagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Flag
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateFlagResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateFlagResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateFlagResponse) GetJSON200() *Flag {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateFlagResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateFlagResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateFlagResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateFlagResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateFlagResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateFlagResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateFlagResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateFlagResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateFlagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateFlagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateFlagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateFlagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ArchiveFlagResponse200Headers the declared response headers of an HTTP 200 response for ArchiveFlag
+type ArchiveFlagResponse200Headers struct {
+	ETag *string
+}
+
+// ArchiveFlagResponse401Headers the declared response headers of an HTTP 401 response for ArchiveFlag
+type ArchiveFlagResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ArchiveFlagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Flag
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ArchiveFlagResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ArchiveFlagResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ArchiveFlagResponse) GetJSON200() *Flag {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ArchiveFlagResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ArchiveFlagResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ArchiveFlagResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ArchiveFlagResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r ArchiveFlagResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r ArchiveFlagResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r ArchiveFlagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ArchiveFlagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ArchiveFlagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ArchiveFlagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RestoreFlagResponse200Headers the declared response headers of an HTTP 200 response for RestoreFlag
+type RestoreFlagResponse200Headers struct {
+	ETag *string
+}
+
+// RestoreFlagResponse401Headers the declared response headers of an HTTP 401 response for RestoreFlag
+type RestoreFlagResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RestoreFlagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Flag
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RestoreFlagResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RestoreFlagResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RestoreFlagResponse) GetJSON200() *Flag {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r RestoreFlagResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RestoreFlagResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RestoreFlagResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RestoreFlagResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r RestoreFlagResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r RestoreFlagResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r RestoreFlagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RestoreFlagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RestoreFlagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RestoreFlagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListGrantsResponse401Headers the declared response headers of an HTTP 401 response for ListGrants
 type ListGrantsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -10364,6 +12786,504 @@ func (r ListProjectMembersResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListProjectMembersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListSegmentsResponse401Headers the declared response headers of an HTTP 401 response for ListSegments
+type ListSegmentsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListSegmentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SegmentList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListSegmentsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSegmentsResponse) GetJSON200() *SegmentList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListSegmentsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListSegmentsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListSegmentsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSegmentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSegmentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSegmentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSegmentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateSegmentResponse201Headers the declared response headers of an HTTP 201 response for CreateSegment
+type CreateSegmentResponse201Headers struct {
+	ETag *string
+}
+
+// CreateSegmentResponse401Headers the declared response headers of an HTTP 401 response for CreateSegment
+type CreateSegmentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateSegmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Segment
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateSegmentResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateSegmentResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateSegmentResponse) GetJSON201() *Segment {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateSegmentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateSegmentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateSegmentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateSegmentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateSegmentResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateSegmentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSegmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSegmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateSegmentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteSegmentResponse401Headers the declared response headers of an HTTP 401 response for DeleteSegment
+type DeleteSegmentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteSegmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteSegmentResponse401Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeleteSegmentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteSegmentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteSegmentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteSegmentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteSegmentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r DeleteSegmentResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r DeleteSegmentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteSegmentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSegmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSegmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteSegmentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetSegmentResponse200Headers the declared response headers of an HTTP 200 response for GetSegment
+type GetSegmentResponse200Headers struct {
+	ETag *string
+}
+
+// GetSegmentResponse401Headers the declared response headers of an HTTP 401 response for GetSegment
+type GetSegmentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetSegmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Segment
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetSegmentResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetSegmentResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSegmentResponse) GetJSON200() *Segment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetSegmentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetSegmentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetSegmentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSegmentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSegmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSegmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSegmentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateSegmentResponse200Headers the declared response headers of an HTTP 200 response for UpdateSegment
+type UpdateSegmentResponse200Headers struct {
+	ETag *string
+}
+
+// UpdateSegmentResponse401Headers the declared response headers of an HTTP 401 response for UpdateSegment
+type UpdateSegmentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateSegmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Segment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateSegmentResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateSegmentResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateSegmentResponse) GetJSON200() *Segment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateSegmentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateSegmentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateSegmentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateSegmentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateSegmentResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateSegmentResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateSegmentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateSegmentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSegmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSegmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateSegmentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListSegmentUsagesResponse401Headers the declared response headers of an HTTP 401 response for ListSegmentUsages
+type ListSegmentUsagesResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListSegmentUsagesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ReferenceList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListSegmentUsagesResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSegmentUsagesResponse) GetJSON200() *ReferenceList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListSegmentUsagesResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListSegmentUsagesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListSegmentUsagesResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSegmentUsagesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSegmentUsagesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSegmentUsagesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSegmentUsagesResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -11988,6 +14908,163 @@ func (c *ClientWithResponses) UpdateEnvironmentWithResponse(ctx context.Context,
 	return ParseUpdateEnvironmentResponse(rsp)
 }
 
+// ListFlagsWithResponse The project's flags
+//
+// The project's flags by key, in byte order (capitals before lower
+// case). Page with `cursor` set to the `next_cursor` of the previous
+// page.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/flags (the `ListFlags` operationId).
+func (c *ClientWithResponses) ListFlagsWithResponse(ctx context.Context, project ProjectKey, params *ListFlagsParams, reqEditors ...RequestEditorFn) (*ListFlagsResponse, error) {
+	rsp, err := c.ListFlags(ctx, project, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListFlagsResponse(rsp)
+}
+
+// CreateFlagWithBodyWithResponse Create a flag
+//
+// The flag arrives switched off in every environment of the project,
+// serving `false` when off and `true` when on for a boolean flag, and
+// its first variation either way for any other type. A boolean flag
+// needs no variations listed. The owner defaults to the calling
+// member; a project token names one. A key in use is `already_exists`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags (the `CreateFlag` operationId).
+func (c *ClientWithResponses) CreateFlagWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateFlagResponse, error) {
+	rsp, err := c.CreateFlagWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateFlagResponse(rsp)
+}
+
+// CreateFlagWithResponse Create a flag
+//
+// The flag arrives switched off in every environment of the project,
+// serving `false` when off and `true` when on for a boolean flag, and
+// its first variation either way for any other type. A boolean flag
+// needs no variations listed. The owner defaults to the calling
+// member; a project token names one. A key in use is `already_exists`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags (the `CreateFlag` operationId).
+func (c *ClientWithResponses) CreateFlagWithResponse(ctx context.Context, project ProjectKey, body CreateFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateFlagResponse, error) {
+	rsp, err := c.CreateFlag(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateFlagResponse(rsp)
+}
+
+// DeleteFlagWithResponse Delete an archived flag
+//
+// Deletes the flag with its configuration in every environment. Only
+// an archived flag is deleted (`not_archived` otherwise), so deleting
+// is a deliberate second step after archiving.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/flags/{flag} (the `DeleteFlag` operationId).
+func (c *ClientWithResponses) DeleteFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *DeleteFlagParams, reqEditors ...RequestEditorFn) (*DeleteFlagResponse, error) {
+	rsp, err := c.DeleteFlag(ctx, project, flag, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteFlagResponse(rsp)
+}
+
+// GetFlagWithResponse A flag with its configuration in every environment
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/flags/{flag} (the `GetFlag` operationId).
+func (c *ClientWithResponses) GetFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, reqEditors ...RequestEditorFn) (*GetFlagResponse, error) {
+	rsp, err := c.GetFlag(ctx, project, flag, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFlagResponse(rsp)
+}
+
+// UpdateFlagWithBodyWithResponse Change a flag's definition
+//
+// Changes the name, description, owner, tags, lifetime, variations or
+// automatic exposure, for every environment at once; the key and type
+// never change (`immutable`). Variations are replaced as a list and
+// matched by key: removing one that a configuration still serves is
+// `in_use`, listing what serves it. A change to the values the flag
+// already has changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/flags/{flag} (the `UpdateFlag` operationId).
+func (c *ClientWithResponses) UpdateFlagWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *UpdateFlagParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateFlagResponse, error) {
+	rsp, err := c.UpdateFlagWithBody(ctx, project, flag, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateFlagResponse(rsp)
+}
+
+// UpdateFlagWithResponse Change a flag's definition
+//
+// Changes the name, description, owner, tags, lifetime, variations or
+// automatic exposure, for every environment at once; the key and type
+// never change (`immutable`). Variations are replaced as a list and
+// matched by key: removing one that a configuration still serves is
+// `in_use`, listing what serves it. A change to the values the flag
+// already has changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/flags/{flag} (the `UpdateFlag` operationId).
+func (c *ClientWithResponses) UpdateFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *UpdateFlagParams, body UpdateFlagJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateFlagResponse, error) {
+	rsp, err := c.UpdateFlag(ctx, project, flag, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateFlagResponse(rsp)
+}
+
+// ArchiveFlagWithResponse Archive a flag
+//
+// Hides the flag from SDKs in every environment, keeping its
+// definition and configurations until it is restored or deleted.
+// Archiving an archived flag changes nothing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
+func (c *ClientWithResponses) ArchiveFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*ArchiveFlagResponse, error) {
+	rsp, err := c.ArchiveFlag(ctx, project, flag, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseArchiveFlagResponse(rsp)
+}
+
+// RestoreFlagWithResponse Restore an archived flag
+//
+// Brings an archived flag back to SDKs as it was archived. Restoring a flag that is not archived changes nothing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/restore (the `RestoreFlag` operationId).
+func (c *ClientWithResponses) RestoreFlagWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, params *RestoreFlagParams, reqEditors ...RequestEditorFn) (*RestoreFlagResponse, error) {
+	rsp, err := c.RestoreFlag(ctx, project, flag, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRestoreFlagResponse(rsp)
+}
+
 // ListGrantsWithResponse The grants of a project
 //
 // Every grant of the project, oldest first.
@@ -12097,6 +15174,132 @@ func (c *ClientWithResponses) ListProjectMembersWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseListProjectMembersResponse(rsp)
+}
+
+// ListSegmentsWithResponse The project's segments
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/segments (the `ListSegments` operationId).
+func (c *ClientWithResponses) ListSegmentsWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListSegmentsResponse, error) {
+	rsp, err := c.ListSegments(ctx, project, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSegmentsResponse(rsp)
+}
+
+// CreateSegmentWithBodyWithResponse Create a segment
+//
+// A segment holds at most 20 attribute conditions, each naming an
+// attribute or unit type the project declares with an operator
+// defined for its type and a value that operator accepts; segments do
+// not nest. A key in use is `already_exists`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/segments (the `CreateSegment` operationId).
+func (c *ClientWithResponses) CreateSegmentWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSegmentResponse, error) {
+	rsp, err := c.CreateSegmentWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSegmentResponse(rsp)
+}
+
+// CreateSegmentWithResponse Create a segment
+//
+// A segment holds at most 20 attribute conditions, each naming an
+// attribute or unit type the project declares with an operator
+// defined for its type and a value that operator accepts; segments do
+// not nest. A key in use is `already_exists`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/segments (the `CreateSegment` operationId).
+func (c *ClientWithResponses) CreateSegmentWithResponse(ctx context.Context, project ProjectKey, body CreateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSegmentResponse, error) {
+	rsp, err := c.CreateSegment(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSegmentResponse(rsp)
+}
+
+// DeleteSegmentWithResponse Delete a segment
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/segments/{segment} (the `DeleteSegment` operationId).
+func (c *ClientWithResponses) DeleteSegmentWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, params *DeleteSegmentParams, reqEditors ...RequestEditorFn) (*DeleteSegmentResponse, error) {
+	rsp, err := c.DeleteSegment(ctx, project, segment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSegmentResponse(rsp)
+}
+
+// GetSegmentWithResponse A segment
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/segments/{segment} (the `GetSegment` operationId).
+func (c *ClientWithResponses) GetSegmentWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*GetSegmentResponse, error) {
+	rsp, err := c.GetSegment(ctx, project, segment, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSegmentResponse(rsp)
+}
+
+// UpdateSegmentWithBodyWithResponse Change a segment
+//
+// Changes the name, description, private switch or conditions; the
+// key never changes (`immutable`). Conditions are replaced as a list.
+// A change to the values the segment already has changes nothing and
+// records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/segments/{segment} (the `UpdateSegment` operationId).
+func (c *ClientWithResponses) UpdateSegmentWithBodyWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSegmentResponse, error) {
+	rsp, err := c.UpdateSegmentWithBody(ctx, project, segment, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSegmentResponse(rsp)
+}
+
+// UpdateSegmentWithResponse Change a segment
+//
+// Changes the name, description, private switch or conditions; the
+// key never changes (`immutable`). Conditions are replaced as a list.
+// A change to the values the segment already has changes nothing and
+// records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/segments/{segment} (the `UpdateSegment` operationId).
+func (c *ClientWithResponses) UpdateSegmentWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, params *UpdateSegmentParams, body UpdateSegmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSegmentResponse, error) {
+	rsp, err := c.UpdateSegment(ctx, project, segment, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSegmentResponse(rsp)
+}
+
+// ListSegmentUsagesWithResponse Where a segment is used
+//
+// Every flag and environment whose rules name the segment, archived flags included, by flag key and then environment order.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
+func (c *ClientWithResponses) ListSegmentUsagesWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*ListSegmentUsagesResponse, error) {
+	rsp, err := c.ListSegmentUsages(ctx, project, segment, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSegmentUsagesResponse(rsp)
 }
 
 // ListProjectTokensWithResponse The tokens of a project
@@ -15152,6 +18355,598 @@ func ParseUpdateEnvironmentResponse(rsp *http.Response) (*UpdateEnvironmentRespo
 	return response, nil
 }
 
+// ParseListFlagsResponse parses an HTTP response from a ListFlagsWithResponse call
+func ParseListFlagsResponse(rsp *http.Response) (*ListFlagsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListFlagsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListFlagsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateFlagResponse parses an HTTP response from a CreateFlagWithResponse call
+func ParseCreateFlagResponse(rsp *http.Response) (*CreateFlagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateFlagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Flag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateFlagResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CreateFlagResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteFlagResponse parses an HTTP response from a DeleteFlagWithResponse call
+func ParseDeleteFlagResponse(rsp *http.Response) (*DeleteFlagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteFlagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteFlagResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetFlagResponse parses an HTTP response from a GetFlagWithResponse call
+func ParseGetFlagResponse(rsp *http.Response) (*GetFlagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFlagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Flag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetFlagResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetFlagResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateFlagResponse parses an HTTP response from a UpdateFlagWithResponse call
+func ParseUpdateFlagResponse(rsp *http.Response) (*UpdateFlagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateFlagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Flag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateFlagResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers UpdateFlagResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseArchiveFlagResponse parses an HTTP response from a ArchiveFlagWithResponse call
+func ParseArchiveFlagResponse(rsp *http.Response) (*ArchiveFlagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ArchiveFlagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Flag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ArchiveFlagResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ArchiveFlagResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRestoreFlagResponse parses an HTTP response from a RestoreFlagWithResponse call
+func ParseRestoreFlagResponse(rsp *http.Response) (*RestoreFlagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RestoreFlagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Flag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RestoreFlagResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RestoreFlagResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListGrantsResponse parses an HTTP response from a ListGrantsWithResponse call
 func ParseListGrantsResponse(rsp *http.Response) (*ListGrantsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -15456,6 +19251,462 @@ func ParseListProjectMembersResponse(rsp *http.Response) (*ListProjectMembersRes
 	switch {
 	case rsp.StatusCode == 401:
 		var headers ListProjectMembersResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListSegmentsResponse parses an HTTP response from a ListSegmentsWithResponse call
+func ParseListSegmentsResponse(rsp *http.Response) (*ListSegmentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSegmentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SegmentList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListSegmentsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateSegmentResponse parses an HTTP response from a CreateSegmentWithResponse call
+func ParseCreateSegmentResponse(rsp *http.Response) (*CreateSegmentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSegmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Segment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateSegmentResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CreateSegmentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSegmentResponse parses an HTTP response from a DeleteSegmentWithResponse call
+func ParseDeleteSegmentResponse(rsp *http.Response) (*DeleteSegmentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSegmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteSegmentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetSegmentResponse parses an HTTP response from a GetSegmentWithResponse call
+func ParseGetSegmentResponse(rsp *http.Response) (*GetSegmentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSegmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Segment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetSegmentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetSegmentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSegmentResponse parses an HTTP response from a UpdateSegmentWithResponse call
+func ParseUpdateSegmentResponse(rsp *http.Response) (*UpdateSegmentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSegmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Segment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateSegmentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers UpdateSegmentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListSegmentUsagesResponse parses an HTTP response from a ListSegmentUsagesWithResponse call
+func ParseListSegmentUsagesResponse(rsp *http.Response) (*ListSegmentUsagesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSegmentUsagesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ReferenceList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListSegmentUsagesResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -16156,6 +20407,27 @@ type ServerInterface interface {
 
 	// (PATCH /projects/{project}/environments/{environment})
 	UpdateEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	// ListFlags The project's flags
+	// (GET /projects/{project}/flags)
+	ListFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListFlagsParams)
+	// CreateFlag Create a flag
+	// (POST /projects/{project}/flags)
+	CreateFlag(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// DeleteFlag Delete an archived flag
+	// (DELETE /projects/{project}/flags/{flag})
+	DeleteFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params DeleteFlagParams)
+	// GetFlag A flag with its configuration in every environment
+	// (GET /projects/{project}/flags/{flag})
+	GetFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey)
+	// UpdateFlag Change a flag's definition
+	// (PATCH /projects/{project}/flags/{flag})
+	UpdateFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params UpdateFlagParams)
+	// ArchiveFlag Archive a flag
+	// (POST /projects/{project}/flags/{flag}/archive)
+	ArchiveFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params ArchiveFlagParams)
+	// RestoreFlag Restore an archived flag
+	// (POST /projects/{project}/flags/{flag}/restore)
+	RestoreFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params RestoreFlagParams)
 	// ListGrants The grants of a project
 	// (GET /projects/{project}/grants)
 	ListGrants(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -16171,6 +20443,24 @@ type ServerInterface interface {
 	// ListProjectMembers The members holding grants in a project
 	// (GET /projects/{project}/members)
 	ListProjectMembers(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// ListSegments The project's segments
+	// (GET /projects/{project}/segments)
+	ListSegments(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// CreateSegment Create a segment
+	// (POST /projects/{project}/segments)
+	CreateSegment(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// DeleteSegment Delete a segment
+	// (DELETE /projects/{project}/segments/{segment})
+	DeleteSegment(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey, params DeleteSegmentParams)
+	// GetSegment A segment
+	// (GET /projects/{project}/segments/{segment})
+	GetSegment(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey)
+	// UpdateSegment Change a segment
+	// (PATCH /projects/{project}/segments/{segment})
+	UpdateSegment(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey, params UpdateSegmentParams)
+	// ListSegmentUsages Where a segment is used
+	// (GET /projects/{project}/segments/{segment}/usages)
+	ListSegmentUsages(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey)
 	// ListProjectTokens The tokens of a project
 	// (GET /projects/{project}/tokens)
 	ListProjectTokens(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -17580,6 +21870,371 @@ func (siw *ServerInterfaceWrapper) UpdateEnvironment(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListFlags operation middleware
+func (siw *ServerInterfaceWrapper) ListFlags(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListFlagsParams
+
+	// ------------- Optional query parameter "archived" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "archived", r.URL.Query(), &params.Archived, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "archived"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "archived", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListFlags(w, r, project, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateFlag operation middleware
+func (siw *ServerInterfaceWrapper) CreateFlag(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateFlag(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteFlag operation middleware
+func (siw *ServerInterfaceWrapper) DeleteFlag(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteFlagParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteFlag(w, r, project, flag, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFlag operation middleware
+func (siw *ServerInterfaceWrapper) GetFlag(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFlag(w, r, project, flag)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateFlag operation middleware
+func (siw *ServerInterfaceWrapper) UpdateFlag(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateFlagParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateFlag(w, r, project, flag, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ArchiveFlag operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveFlag(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ArchiveFlagParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ArchiveFlag(w, r, project, flag, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RestoreFlag operation middleware
+func (siw *ServerInterfaceWrapper) RestoreFlag(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RestoreFlagParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RestoreFlag(w, r, project, flag, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListGrants operation middleware
 func (siw *ServerInterfaceWrapper) ListGrants(w http.ResponseWriter, r *http.Request) {
 
@@ -17710,6 +22365,246 @@ func (siw *ServerInterfaceWrapper) ListProjectMembers(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListProjectMembers(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSegments operation middleware
+func (siw *ServerInterfaceWrapper) ListSegments(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSegments(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSegment operation middleware
+func (siw *ServerInterfaceWrapper) CreateSegment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSegment(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSegment operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSegment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "segment" -------------
+	var segment SegmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "segment", r.PathValue("segment"), &segment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "segment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteSegmentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSegment(w, r, project, segment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSegment operation middleware
+func (siw *ServerInterfaceWrapper) GetSegment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "segment" -------------
+	var segment SegmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "segment", r.PathValue("segment"), &segment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "segment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSegment(w, r, project, segment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSegment operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSegment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "segment" -------------
+	var segment SegmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "segment", r.PathValue("segment"), &segment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "segment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateSegmentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSegment(w, r, project, segment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSegmentUsages operation middleware
+func (siw *ServerInterfaceWrapper) ListSegmentUsages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "segment" -------------
+	var segment SegmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "segment", r.PathValue("segment"), &segment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "segment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSegmentUsages(w, r, project, segment)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18132,6 +23027,19 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.DeleteAttribute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.GetAttribute)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.UpdateAttribute)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/flags", wrapper.ListFlags)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags", wrapper.CreateFlag)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/flags/{flag}", wrapper.DeleteFlag)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/flags/{flag}", wrapper.GetFlag)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/flags/{flag}", wrapper.UpdateFlag)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/archive", wrapper.ArchiveFlag)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/restore", wrapper.RestoreFlag)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/segments", wrapper.ListSegments)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/segments", wrapper.CreateSegment)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/segments/{segment}", wrapper.DeleteSegment)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/segments/{segment}", wrapper.GetSegment)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/segments/{segment}", wrapper.UpdateSegment)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/segments/{segment}/usages", wrapper.ListSegmentUsages)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/members", wrapper.ListProjectMembers)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/grants", wrapper.ListGrants)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/grants", wrapper.CreateGrant)
@@ -18180,6 +23088,8 @@ type InvitationGoneApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
+type PreconditionRequiredApplicationProblemPlusJSONResponse Problem
+
 type RequestTooLargeApplicationProblemPlusJSONResponse Problem
 
 type TooManyAttemptsResponseHeaders struct {
@@ -18201,6 +23111,8 @@ type UnauthenticatedApplicationProblemPlusJSONResponse struct {
 }
 
 type UnsupportedMediaTypeApplicationProblemPlusJSONResponse Problem
+
+type VersionMismatchApplicationProblemPlusJSONResponse Problem
 
 type ListAuditEntriesRequestObject struct {
 	Params ListAuditEntriesParams
@@ -21759,6 +26671,861 @@ func (response UpdateEnvironment422ApplicationProblemPlusJSONResponse) VisitUpda
 	return err
 }
 
+type ListFlagsRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Params  ListFlagsParams
+}
+
+type ListFlagsResponseObject interface {
+	VisitListFlagsResponse(w http.ResponseWriter) error
+}
+
+type ListFlags200JSONResponse FlagList
+
+func (response ListFlags200JSONResponse) VisitListFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFlags400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListFlags400ApplicationProblemPlusJSONResponse) VisitListFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFlags401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListFlags401ApplicationProblemPlusJSONResponse) VisitListFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFlags403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListFlags403ApplicationProblemPlusJSONResponse) VisitListFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListFlags404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListFlags404ApplicationProblemPlusJSONResponse) VisitListFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFlagRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *CreateFlagJSONRequestBody
+}
+
+type CreateFlagResponseObject interface {
+	VisitCreateFlagResponse(w http.ResponseWriter) error
+}
+
+type CreateFlag201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateFlag201JSONResponse struct {
+	Body    Flag
+	Headers CreateFlag201ResponseHeaders
+}
+
+func (response CreateFlag201JSONResponse) VisitCreateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFlag401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateFlag401ApplicationProblemPlusJSONResponse) VisitCreateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFlag403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateFlag403ApplicationProblemPlusJSONResponse) VisitCreateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFlag404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateFlag404ApplicationProblemPlusJSONResponse) VisitCreateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFlag409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateFlag409ApplicationProblemPlusJSONResponse) VisitCreateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateFlag422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateFlag422ApplicationProblemPlusJSONResponse) VisitCreateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFlagRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Flag    FlagKey    `json:"flag"`
+	Params  DeleteFlagParams
+}
+
+type DeleteFlagResponseObject interface {
+	VisitDeleteFlagResponse(w http.ResponseWriter) error
+}
+
+type DeleteFlag204Response struct {
+}
+
+func (response DeleteFlag204Response) VisitDeleteFlagResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteFlag400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFlag400ApplicationProblemPlusJSONResponse) VisitDeleteFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFlag401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFlag401ApplicationProblemPlusJSONResponse) VisitDeleteFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFlag403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFlag403ApplicationProblemPlusJSONResponse) VisitDeleteFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFlag404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFlag404ApplicationProblemPlusJSONResponse) VisitDeleteFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFlag409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFlag409ApplicationProblemPlusJSONResponse) VisitDeleteFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFlag412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFlag412ApplicationProblemPlusJSONResponse) VisitDeleteFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteFlag428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteFlag428ApplicationProblemPlusJSONResponse) VisitDeleteFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Flag    FlagKey    `json:"flag"`
+}
+
+type GetFlagResponseObject interface {
+	VisitGetFlagResponse(w http.ResponseWriter) error
+}
+
+type GetFlag200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetFlag200JSONResponse struct {
+	Body    Flag
+	Headers GetFlag200ResponseHeaders
+}
+
+func (response GetFlag200JSONResponse) VisitGetFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlag401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlag401ApplicationProblemPlusJSONResponse) VisitGetFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlag403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlag403ApplicationProblemPlusJSONResponse) VisitGetFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlag404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlag404ApplicationProblemPlusJSONResponse) VisitGetFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFlagRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Flag    FlagKey    `json:"flag"`
+	Params  UpdateFlagParams
+	Body    *UpdateFlagJSONRequestBody
+}
+
+type UpdateFlagResponseObject interface {
+	VisitUpdateFlagResponse(w http.ResponseWriter) error
+}
+
+type UpdateFlag200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateFlag200JSONResponse struct {
+	Body    Flag
+	Headers UpdateFlag200ResponseHeaders
+}
+
+func (response UpdateFlag200JSONResponse) VisitUpdateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFlag400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateFlag400ApplicationProblemPlusJSONResponse) VisitUpdateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFlag401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateFlag401ApplicationProblemPlusJSONResponse) VisitUpdateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFlag403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateFlag403ApplicationProblemPlusJSONResponse) VisitUpdateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFlag404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateFlag404ApplicationProblemPlusJSONResponse) VisitUpdateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFlag409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateFlag409ApplicationProblemPlusJSONResponse) VisitUpdateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFlag412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateFlag412ApplicationProblemPlusJSONResponse) VisitUpdateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFlag422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateFlag422ApplicationProblemPlusJSONResponse) VisitUpdateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateFlag428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateFlag428ApplicationProblemPlusJSONResponse) VisitUpdateFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveFlagRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Flag    FlagKey    `json:"flag"`
+	Params  ArchiveFlagParams
+}
+
+type ArchiveFlagResponseObject interface {
+	VisitArchiveFlagResponse(w http.ResponseWriter) error
+}
+
+type ArchiveFlag200ResponseHeaders struct {
+	ETag *string
+}
+
+type ArchiveFlag200JSONResponse struct {
+	Body    Flag
+	Headers ArchiveFlag200ResponseHeaders
+}
+
+func (response ArchiveFlag200JSONResponse) VisitArchiveFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveFlag400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveFlag400ApplicationProblemPlusJSONResponse) VisitArchiveFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveFlag401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveFlag401ApplicationProblemPlusJSONResponse) VisitArchiveFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveFlag403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveFlag403ApplicationProblemPlusJSONResponse) VisitArchiveFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveFlag404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveFlag404ApplicationProblemPlusJSONResponse) VisitArchiveFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveFlag412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveFlag412ApplicationProblemPlusJSONResponse) VisitArchiveFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveFlag428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveFlag428ApplicationProblemPlusJSONResponse) VisitArchiveFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreFlagRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Flag    FlagKey    `json:"flag"`
+	Params  RestoreFlagParams
+}
+
+type RestoreFlagResponseObject interface {
+	VisitRestoreFlagResponse(w http.ResponseWriter) error
+}
+
+type RestoreFlag200ResponseHeaders struct {
+	ETag *string
+}
+
+type RestoreFlag200JSONResponse struct {
+	Body    Flag
+	Headers RestoreFlag200ResponseHeaders
+}
+
+func (response RestoreFlag200JSONResponse) VisitRestoreFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreFlag400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreFlag400ApplicationProblemPlusJSONResponse) VisitRestoreFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreFlag401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreFlag401ApplicationProblemPlusJSONResponse) VisitRestoreFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreFlag403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreFlag403ApplicationProblemPlusJSONResponse) VisitRestoreFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreFlag404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreFlag404ApplicationProblemPlusJSONResponse) VisitRestoreFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreFlag412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreFlag412ApplicationProblemPlusJSONResponse) VisitRestoreFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RestoreFlag428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response RestoreFlag428ApplicationProblemPlusJSONResponse) VisitRestoreFlagResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListGrantsRequestObject struct {
 	Project ProjectKey `json:"project"`
 }
@@ -22157,6 +27924,636 @@ type ListProjectMembers404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ListProjectMembers404ApplicationProblemPlusJSONResponse) VisitListProjectMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegmentsRequestObject struct {
+	Project ProjectKey `json:"project"`
+}
+
+type ListSegmentsResponseObject interface {
+	VisitListSegmentsResponse(w http.ResponseWriter) error
+}
+
+type ListSegments200JSONResponse SegmentList
+
+func (response ListSegments200JSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegments401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegments401ApplicationProblemPlusJSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegments403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegments403ApplicationProblemPlusJSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegments404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegments404ApplicationProblemPlusJSONResponse) VisitListSegmentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSegmentRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *CreateSegmentJSONRequestBody
+}
+
+type CreateSegmentResponseObject interface {
+	VisitCreateSegmentResponse(w http.ResponseWriter) error
+}
+
+type CreateSegment201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateSegment201JSONResponse struct {
+	Body    Segment
+	Headers CreateSegment201ResponseHeaders
+}
+
+func (response CreateSegment201JSONResponse) VisitCreateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSegment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSegment401ApplicationProblemPlusJSONResponse) VisitCreateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSegment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSegment403ApplicationProblemPlusJSONResponse) VisitCreateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSegment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSegment404ApplicationProblemPlusJSONResponse) VisitCreateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSegment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSegment409ApplicationProblemPlusJSONResponse) VisitCreateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSegment422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSegment422ApplicationProblemPlusJSONResponse) VisitCreateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSegmentRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Segment SegmentKey `json:"segment"`
+	Params  DeleteSegmentParams
+}
+
+type DeleteSegmentResponseObject interface {
+	VisitDeleteSegmentResponse(w http.ResponseWriter) error
+}
+
+type DeleteSegment204Response struct {
+}
+
+func (response DeleteSegment204Response) VisitDeleteSegmentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteSegment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSegment400ApplicationProblemPlusJSONResponse) VisitDeleteSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSegment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSegment401ApplicationProblemPlusJSONResponse) VisitDeleteSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSegment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSegment403ApplicationProblemPlusJSONResponse) VisitDeleteSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSegment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSegment404ApplicationProblemPlusJSONResponse) VisitDeleteSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSegment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSegment409ApplicationProblemPlusJSONResponse) VisitDeleteSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSegment412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSegment412ApplicationProblemPlusJSONResponse) VisitDeleteSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSegment428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSegment428ApplicationProblemPlusJSONResponse) VisitDeleteSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSegmentRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Segment SegmentKey `json:"segment"`
+}
+
+type GetSegmentResponseObject interface {
+	VisitGetSegmentResponse(w http.ResponseWriter) error
+}
+
+type GetSegment200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetSegment200JSONResponse struct {
+	Body    Segment
+	Headers GetSegment200ResponseHeaders
+}
+
+func (response GetSegment200JSONResponse) VisitGetSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSegment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetSegment401ApplicationProblemPlusJSONResponse) VisitGetSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSegment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetSegment403ApplicationProblemPlusJSONResponse) VisitGetSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSegment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetSegment404ApplicationProblemPlusJSONResponse) VisitGetSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSegmentRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Segment SegmentKey `json:"segment"`
+	Params  UpdateSegmentParams
+	Body    *UpdateSegmentJSONRequestBody
+}
+
+type UpdateSegmentResponseObject interface {
+	VisitUpdateSegmentResponse(w http.ResponseWriter) error
+}
+
+type UpdateSegment200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateSegment200JSONResponse struct {
+	Body    Segment
+	Headers UpdateSegment200ResponseHeaders
+}
+
+func (response UpdateSegment200JSONResponse) VisitUpdateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSegment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSegment400ApplicationProblemPlusJSONResponse) VisitUpdateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSegment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSegment401ApplicationProblemPlusJSONResponse) VisitUpdateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSegment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSegment403ApplicationProblemPlusJSONResponse) VisitUpdateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSegment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSegment404ApplicationProblemPlusJSONResponse) VisitUpdateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSegment412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSegment412ApplicationProblemPlusJSONResponse) VisitUpdateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSegment422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSegment422ApplicationProblemPlusJSONResponse) VisitUpdateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSegment428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSegment428ApplicationProblemPlusJSONResponse) VisitUpdateSegmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegmentUsagesRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Segment SegmentKey `json:"segment"`
+}
+
+type ListSegmentUsagesResponseObject interface {
+	VisitListSegmentUsagesResponse(w http.ResponseWriter) error
+}
+
+type ListSegmentUsages200JSONResponse ReferenceList
+
+func (response ListSegmentUsages200JSONResponse) VisitListSegmentUsagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegmentUsages401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegmentUsages401ApplicationProblemPlusJSONResponse) VisitListSegmentUsagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegmentUsages403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegmentUsages403ApplicationProblemPlusJSONResponse) VisitListSegmentUsagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSegmentUsages404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSegmentUsages404ApplicationProblemPlusJSONResponse) VisitListSegmentUsagesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -23001,6 +29398,27 @@ type StrictServerInterface interface {
 
 	// (PATCH /projects/{project}/environments/{environment})
 	UpdateEnvironment(ctx context.Context, request UpdateEnvironmentRequestObject) (UpdateEnvironmentResponseObject, error)
+	// ListFlags The project's flags
+	// (GET /projects/{project}/flags)
+	ListFlags(ctx context.Context, request ListFlagsRequestObject) (ListFlagsResponseObject, error)
+	// CreateFlag Create a flag
+	// (POST /projects/{project}/flags)
+	CreateFlag(ctx context.Context, request CreateFlagRequestObject) (CreateFlagResponseObject, error)
+	// DeleteFlag Delete an archived flag
+	// (DELETE /projects/{project}/flags/{flag})
+	DeleteFlag(ctx context.Context, request DeleteFlagRequestObject) (DeleteFlagResponseObject, error)
+	// GetFlag A flag with its configuration in every environment
+	// (GET /projects/{project}/flags/{flag})
+	GetFlag(ctx context.Context, request GetFlagRequestObject) (GetFlagResponseObject, error)
+	// UpdateFlag Change a flag's definition
+	// (PATCH /projects/{project}/flags/{flag})
+	UpdateFlag(ctx context.Context, request UpdateFlagRequestObject) (UpdateFlagResponseObject, error)
+	// ArchiveFlag Archive a flag
+	// (POST /projects/{project}/flags/{flag}/archive)
+	ArchiveFlag(ctx context.Context, request ArchiveFlagRequestObject) (ArchiveFlagResponseObject, error)
+	// RestoreFlag Restore an archived flag
+	// (POST /projects/{project}/flags/{flag}/restore)
+	RestoreFlag(ctx context.Context, request RestoreFlagRequestObject) (RestoreFlagResponseObject, error)
 	// ListGrants The grants of a project
 	// (GET /projects/{project}/grants)
 	ListGrants(ctx context.Context, request ListGrantsRequestObject) (ListGrantsResponseObject, error)
@@ -23016,6 +29434,24 @@ type StrictServerInterface interface {
 	// ListProjectMembers The members holding grants in a project
 	// (GET /projects/{project}/members)
 	ListProjectMembers(ctx context.Context, request ListProjectMembersRequestObject) (ListProjectMembersResponseObject, error)
+	// ListSegments The project's segments
+	// (GET /projects/{project}/segments)
+	ListSegments(ctx context.Context, request ListSegmentsRequestObject) (ListSegmentsResponseObject, error)
+	// CreateSegment Create a segment
+	// (POST /projects/{project}/segments)
+	CreateSegment(ctx context.Context, request CreateSegmentRequestObject) (CreateSegmentResponseObject, error)
+	// DeleteSegment Delete a segment
+	// (DELETE /projects/{project}/segments/{segment})
+	DeleteSegment(ctx context.Context, request DeleteSegmentRequestObject) (DeleteSegmentResponseObject, error)
+	// GetSegment A segment
+	// (GET /projects/{project}/segments/{segment})
+	GetSegment(ctx context.Context, request GetSegmentRequestObject) (GetSegmentResponseObject, error)
+	// UpdateSegment Change a segment
+	// (PATCH /projects/{project}/segments/{segment})
+	UpdateSegment(ctx context.Context, request UpdateSegmentRequestObject) (UpdateSegmentResponseObject, error)
+	// ListSegmentUsages Where a segment is used
+	// (GET /projects/{project}/segments/{segment}/usages)
+	ListSegmentUsages(ctx context.Context, request ListSegmentUsagesRequestObject) (ListSegmentUsagesResponseObject, error)
 	// ListProjectTokens The tokens of a project
 	// (GET /projects/{project}/tokens)
 	ListProjectTokens(ctx context.Context, request ListProjectTokensRequestObject) (ListProjectTokensResponseObject, error)
@@ -24307,6 +30743,212 @@ func (sh *strictHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// ListFlags operation middleware
+func (sh *strictHandler) ListFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListFlagsParams) {
+	var request ListFlagsRequestObject
+
+	request.Project = project
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListFlags(ctx, request.(ListFlagsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListFlags")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListFlagsResponseObject); ok {
+		if err := validResponse.VisitListFlagsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateFlag operation middleware
+func (sh *strictHandler) CreateFlag(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request CreateFlagRequestObject
+
+	request.Project = project
+
+	var body CreateFlagJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateFlag(ctx, request.(CreateFlagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateFlag")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateFlagResponseObject); ok {
+		if err := validResponse.VisitCreateFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteFlag operation middleware
+func (sh *strictHandler) DeleteFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params DeleteFlagParams) {
+	var request DeleteFlagRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteFlag(ctx, request.(DeleteFlagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteFlag")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteFlagResponseObject); ok {
+		if err := validResponse.VisitDeleteFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFlag operation middleware
+func (sh *strictHandler) GetFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey) {
+	var request GetFlagRequestObject
+
+	request.Project = project
+	request.Flag = flag
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFlag(ctx, request.(GetFlagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFlag")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFlagResponseObject); ok {
+		if err := validResponse.VisitGetFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateFlag operation middleware
+func (sh *strictHandler) UpdateFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params UpdateFlagParams) {
+	var request UpdateFlagRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Params = params
+
+	var body UpdateFlagJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateFlag(ctx, request.(UpdateFlagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateFlag")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateFlagResponseObject); ok {
+		if err := validResponse.VisitUpdateFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ArchiveFlag operation middleware
+func (sh *strictHandler) ArchiveFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params ArchiveFlagParams) {
+	var request ArchiveFlagRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ArchiveFlag(ctx, request.(ArchiveFlagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ArchiveFlag")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ArchiveFlagResponseObject); ok {
+		if err := validResponse.VisitArchiveFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RestoreFlag operation middleware
+func (sh *strictHandler) RestoreFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, params RestoreFlagParams) {
+	var request RestoreFlagRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RestoreFlag(ctx, request.(RestoreFlagRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RestoreFlag")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RestoreFlagResponseObject); ok {
+		if err := validResponse.VisitRestoreFlagResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListGrants operation middleware
 func (sh *strictHandler) ListGrants(w http.ResponseWriter, r *http.Request, project ProjectKey) {
 	var request ListGrantsRequestObject
@@ -24438,6 +31080,182 @@ func (sh *strictHandler) ListProjectMembers(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListProjectMembersResponseObject); ok {
 		if err := validResponse.VisitListProjectMembersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSegments operation middleware
+func (sh *strictHandler) ListSegments(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request ListSegmentsRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSegments(ctx, request.(ListSegmentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSegments")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSegmentsResponseObject); ok {
+		if err := validResponse.VisitListSegmentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSegment operation middleware
+func (sh *strictHandler) CreateSegment(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request CreateSegmentRequestObject
+
+	request.Project = project
+
+	var body CreateSegmentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSegment(ctx, request.(CreateSegmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSegment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSegmentResponseObject); ok {
+		if err := validResponse.VisitCreateSegmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSegment operation middleware
+func (sh *strictHandler) DeleteSegment(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey, params DeleteSegmentParams) {
+	var request DeleteSegmentRequestObject
+
+	request.Project = project
+	request.Segment = segment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSegment(ctx, request.(DeleteSegmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSegment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSegmentResponseObject); ok {
+		if err := validResponse.VisitDeleteSegmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSegment operation middleware
+func (sh *strictHandler) GetSegment(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey) {
+	var request GetSegmentRequestObject
+
+	request.Project = project
+	request.Segment = segment
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSegment(ctx, request.(GetSegmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSegment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSegmentResponseObject); ok {
+		if err := validResponse.VisitGetSegmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSegment operation middleware
+func (sh *strictHandler) UpdateSegment(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey, params UpdateSegmentParams) {
+	var request UpdateSegmentRequestObject
+
+	request.Project = project
+	request.Segment = segment
+	request.Params = params
+
+	var body UpdateSegmentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSegment(ctx, request.(UpdateSegmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSegment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSegmentResponseObject); ok {
+		if err := validResponse.VisitUpdateSegmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSegmentUsages operation middleware
+func (sh *strictHandler) ListSegmentUsages(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey) {
+	var request ListSegmentUsagesRequestObject
+
+	request.Project = project
+	request.Segment = segment
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSegmentUsages(ctx, request.(ListSegmentUsagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSegmentUsages")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSegmentUsagesResponseObject); ok {
+		if err := validResponse.VisitListSegmentUsagesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

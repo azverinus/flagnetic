@@ -12,6 +12,8 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/config"
@@ -22,6 +24,8 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
+	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
@@ -75,6 +79,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	tx, auditLog := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
 	rec := appworkspace.NewRecorder(auditLog, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
+	flagStore, flagRec := pgflags.NewStore(d.Pool), appflags.NewRecorder(auditLog, d.Clock, d.IDs)
+	// Every write changing what SDKs receive moves the rulesets it changed
+	// on, through the delivery context.
+	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(d.Pool))
+	owners := appaccess.NewOwnership(accessStore)
+	archival := appflags.ArchivalDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	sessionKey := o.Keyring.Key(secret.UseSessionCookie)
 	// Every request judging a session reads the settings: the replica keeps
 	// a copy, which a notification of each change drops.
@@ -135,7 +145,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 
 		ListEnvironments:  appworkspace.NewListEnvironments(ws),
 		GetEnvironment:    appworkspace.NewGetEnvironment(ws),
-		CreateEnvironment: appworkspace.NewCreateEnvironment(tx, ws, rec),
+		CreateEnvironment: appworkspace.NewCreateEnvironment(tx, ws, appflags.NewConfigureEnvironment(flagStore), rec),
 		UpdateEnvironment: appworkspace.NewUpdateEnvironment(tx, ws, rec),
 		DeleteEnvironment: appworkspace.NewDeleteEnvironment(tx, ws, rec),
 
@@ -150,6 +160,34 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateAttribute: appworkspace.NewCreateAttribute(tx, ws, rec),
 		UpdateAttribute: appworkspace.NewUpdateAttribute(tx, ws, rec),
 		DeleteAttribute: appworkspace.NewDeleteAttribute(tx, ws, rec),
+
+		ListFlags: appflags.NewListFlags(flagStore),
+		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
+			Tx: tx, Projects: flagStore, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		GetFlag: appflags.NewGetFlag(tx, flagStore),
+		UpdateFlag: appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
+			Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
+		}),
+
+		ArchiveFlag: appflags.NewArchiveFlag(archival),
+		RestoreFlag: appflags.NewRestoreFlag(archival),
+		DeleteFlag: appflags.NewDeleteFlag(appflags.DeleteFlagDeps{
+			Tx: tx, Projects: flagStore, Store: flagStore, Recorder: flagRec,
+		}),
+
+		ListSegments: appflags.NewListSegments(flagStore),
+		GetSegment:   appflags.NewGetSegment(flagStore),
+		CreateSegment: appflags.NewCreateSegment(appflags.CreateSegmentDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		UpdateSegment: appflags.NewUpdateSegment(appflags.UpdateSegmentDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		DeleteSegment: appflags.NewDeleteSegment(appflags.DeleteSegmentDeps{
+			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		ListSegmentUsages: appflags.NewListSegmentUsages(tx, flagStore),
 
 		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),

@@ -933,6 +933,420 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /projects/{project}/flags:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listFlags
+      summary: The project's flags
+      description: |
+        The project's flags by key, in byte order (capitals before lower
+        case). Page with `cursor` set to the `next_cursor` of the previous
+        page.
+      x-permission: project.read
+      tags: [flags]
+      parameters:
+        - name: archived
+          in: query
+          description: Lists the archived flags instead of the others.
+          schema:
+            type: boolean
+            default: false
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of flags.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlagList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createFlag
+      summary: Create a flag
+      description: |
+        The flag arrives switched off in every environment of the project,
+        serving `false` when off and `true` when on for a boolean flag, and
+        its first variation either way for any other type. A boolean flag
+        needs no variations listed. The owner defaults to the calling
+        member; a project token names one. A key in use is `already_exists`.
+      x-permission: flag.edit
+      tags: [flags]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlagCreate"
+      responses:
+        "201":
+          description: Created, with its configuration in every environment.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flag"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/flags/{flag}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/FlagKey"
+    get:
+      operationId: getFlag
+      summary: A flag with its configuration in every environment
+      x-permission: project.read
+      tags: [flags]
+      responses:
+        "200":
+          description: The flag; its `ETag` is the definition's version, and each configuration carries its own.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flag"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateFlag
+      summary: Change a flag's definition
+      description: |
+        Changes the name, description, owner, tags, lifetime, variations or
+        automatic exposure, for every environment at once; the key and type
+        never change (`immutable`). Variations are replaced as a list and
+        matched by key: removing one that a configuration still serves is
+        `in_use`, listing what serves it. A change to the values the flag
+        already has changes nothing and records nothing.
+      x-permission: flag.edit
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlagPatch"
+      responses:
+        "200":
+          description: The flag as changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flag"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+    delete:
+      operationId: deleteFlag
+      summary: Delete an archived flag
+      description: |
+        Deletes the flag with its configuration in every environment. Only
+        an archived flag is deleted (`not_archived` otherwise), so deleting
+        is a deliberate second step after archiving.
+      x-permission: flag.archive
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/flags/{flag}/archive:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/FlagKey"
+    post:
+      operationId: archiveFlag
+      summary: Archive a flag
+      description: |
+        Hides the flag from SDKs in every environment, keeping its
+        definition and configurations until it is restored or deleted.
+        Archiving an archived flag changes nothing.
+      x-permission: flag.archive
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The flag as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flag"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/flags/{flag}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/FlagKey"
+    post:
+      operationId: restoreFlag
+      summary: Restore an archived flag
+      description: Brings an archived flag back to SDKs as it was archived. Restoring a flag that is not archived changes nothing.
+      x-permission: flag.archive
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The flag as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Flag"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/segments:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listSegments
+      summary: The project's segments
+      x-permission: project.read
+      tags: [segments]
+      responses:
+        "200":
+          description: The segments, by key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SegmentList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createSegment
+      summary: Create a segment
+      description: |
+        A segment holds at most 20 attribute conditions, each naming an
+        attribute or unit type the project declares with an operator
+        defined for its type and a value that operator accepts; segments do
+        not nest. A key in use is `already_exists`.
+      x-permission: segment.edit
+      tags: [segments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SegmentCreate"
+      responses:
+        "201":
+          description: Created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/segments/{segment}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SegmentKey"
+    get:
+      operationId: getSegment
+      summary: A segment
+      x-permission: project.read
+      tags: [segments]
+      responses:
+        "200":
+          description: The segment.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateSegment
+      summary: Change a segment
+      description: |
+        Changes the name, description, private switch or conditions; the
+        key never changes (`immutable`). Conditions are replaced as a list.
+        A change to the values the segment already has changes nothing and
+        records nothing.
+      x-permission: segment.edit
+      tags: [segments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SegmentPatch"
+      responses:
+        "200":
+          description: The segment as changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+    delete:
+      operationId: deleteSegment
+      summary: Delete a segment
+      x-permission: segment.delete
+      tags: [segments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/segments/{segment}/usages:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SegmentKey"
+    get:
+      operationId: listSegmentUsages
+      summary: Where a segment is used
+      description: Every flag and environment whose rules name the segment, archived flags included, by flag key and then environment order.
+      x-permission: project.read
+      tags: [segments]
+      responses:
+        "200":
+          description: The usages.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferenceList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/members:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -1642,6 +2056,31 @@ components:
         minimum: 1
         maximum: 200
         default: 50
+    FlagKey:
+      name: flag
+      in: path
+      required: true
+      description: The flag's key.
+      schema:
+        type: string
+    SegmentKey:
+      name: segment
+      in: path
+      required: true
+      description: The segment's key.
+      schema:
+        type: string
+    IfMatch:
+      name: If-Match
+      in: header
+      description: |
+        The version of the entity this write is based on, as its `ETag`
+        answered it (`"7"`, or `7`). Required: without it the write is
+        refused `428 precondition_required`, and with any other version than
+        the current one `412 version_mismatch`, both judged after the request
+        is validated.
+      schema:
+        type: string
     EnvironmentKey:
       name: environment
       in: path
@@ -1696,6 +2135,11 @@ components:
       in: path
       required: true
       description: The project's key.
+      schema:
+        type: string
+  headers:
+    ETag:
+      description: The entity's version as a strong entity tag, such as `"7"`, to send back in `If-Match`.
       schema:
         type: string
   securitySchemes:
@@ -1796,6 +2240,18 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+    VersionMismatch:
+      description: "`version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    PreconditionRequired:
+      description: "`precondition_required`: the write names no version in `If-Match`."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
     Forbidden:
       description: |
         The caller may not perform the operation: `forbidden` (with the
@@ -1832,6 +2288,15 @@ components:
         permission:
           type: string
           description: The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
+        current_version:
+          type: integer
+          format: int64
+          description: The version the entity has now, for `version_mismatch`.
+        references:
+          type: array
+          description: What still names what the write would remove or hide, for `in_use`.
+          items:
+            $ref: "#/components/schemas/Reference"
         errors:
           type: array
           items:
@@ -2667,3 +3132,341 @@ components:
           type: string
           nullable: true
           description: Pass as `cursor` for the next page; null on the last.
+    Reference:
+      type: object
+      required: [kind, key, environment]
+      properties:
+        kind:
+          type: string
+          description: What names it, such as `flag` or `segment`.
+        key:
+          type: string
+        environment:
+          type: string
+          nullable: true
+          description: The key of the environment it is named in; null when it is named in every environment.
+    Version:
+      type: integer
+      format: int64
+      minimum: 1
+      description: Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+    FlagType:
+      type: string
+      enum: [boolean, string, number, json]
+    Lifetime:
+      type: string
+      enum: [permanent, temporary]
+      description: A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+    VariationKey:
+      type: string
+      pattern: "^[a-zA-Z0-9_.-]{1,64}$"
+    VariationValue:
+      description: A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+      # The generated code imports encoding/json already, so the type needs
+      # no import of its own.
+      x-go-type: json.RawMessage
+    Variation:
+      type: object
+      required: [key, value, name, description]
+      properties:
+        key:
+          $ref: "#/components/schemas/VariationKey"
+        value:
+          $ref: "#/components/schemas/VariationValue"
+        name:
+          type: string
+        description:
+          type: string
+    VariationInput:
+      type: object
+      required: [key, value]
+      properties:
+        key:
+          $ref: "#/components/schemas/VariationKey"
+        value:
+          $ref: "#/components/schemas/VariationValue"
+        name:
+          type: string
+          description: Defaults to the key.
+        description:
+          $ref: "#/components/schemas/Description"
+    FlagDefinition:
+      type: object
+      required: [id, key, type, name, description, owner, tags, lifetime, expected_removal_at, automatic_exposure,
+        variations, archived_at, created_by, created_at, updated_at, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          pattern: "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"
+          description: Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.
+        type:
+          $ref: "#/components/schemas/FlagType"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        owner:
+          type: string
+          format: uuid
+          description: The member accountable for the flag.
+        tags:
+          type: array
+          items:
+            type: string
+        lifetime:
+          $ref: "#/components/schemas/Lifetime"
+        expected_removal_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When a temporary flag is expected to be removed; null for a permanent one.
+        automatic_exposure:
+          type: boolean
+          description: SDKs record an exposure after every evaluation whose result carries an experiment.
+        variations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Variation"
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the flag was archived, hidden from SDKs; null while it is not.
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member who created the flag; null when a project token did.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          $ref: "#/components/schemas/Version"
+    Flag:
+      description: A flag's definition with its configuration in every environment, by the environments' order.
+      allOf:
+        - $ref: "#/components/schemas/FlagDefinition"
+        - type: object
+          required: [environments]
+          properties:
+            environments:
+              type: array
+              items:
+                $ref: "#/components/schemas/FlagConfiguration"
+    FlagConfiguration:
+      type: object
+      description: What the flag serves in one environment.
+      required: [environment, on, off_variation, fallthrough, updated_at, version]
+      properties:
+        environment:
+          $ref: "#/components/schemas/Key"
+        "on":
+          type: boolean
+        off_variation:
+          type: string
+          description: The variation served while the flag is off.
+        fallthrough:
+          type: string
+          description: The variation served when the flag is on and no rule matches.
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          $ref: "#/components/schemas/Version"
+    FlagList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlagDefinition"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` for the next page; null on the last.
+    FlagCreate:
+      type: object
+      required: [key, type, name]
+      properties:
+        key:
+          type: string
+          pattern: "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"
+          description: Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.
+        type:
+          $ref: "#/components/schemas/FlagType"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        owner:
+          type: string
+          format: uuid
+          description: An active member holding a grant in the project, or an instance admin (`invalid_owner` otherwise); the calling member when absent, which a project token cannot leave it.
+        tags:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+        lifetime:
+          $ref: "#/components/schemas/Lifetime"
+        expected_removal_at:
+          type: string
+          format: date-time
+          description: For a temporary flag only, which a flag is when `lifetime` is absent; 90 days from now when absent.
+        automatic_exposure:
+          type: boolean
+        variations:
+          type: array
+          description: Required unless the flag is boolean, whose variations are always `true` and `false`.
+          items:
+            $ref: "#/components/schemas/VariationInput"
+    FlagPatch:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Refused with `immutable` whatever its value.
+        type:
+          type: string
+          description: Refused with `immutable` whatever its value.
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        owner:
+          type: string
+          format: uuid
+          description: A new owner must be an active member holding a grant in the project, or an instance admin.
+        tags:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+        lifetime:
+          $ref: "#/components/schemas/Lifetime"
+        expected_removal_at:
+          type: string
+          format: date-time
+          description: For a temporary flag only. Becoming temporary without one sets 90 days from now; becoming permanent clears it.
+        automatic_exposure:
+          type: boolean
+        variations:
+          type: array
+          description: Every variation, in order, matched to the current ones by key.
+          items:
+            $ref: "#/components/schemas/VariationInput"
+    ReferenceList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reference"
+    Condition:
+      type: object
+      description: |
+        One comparison inside a rule or a segment. An `attribute` condition
+        names an attribute or unit type, an operator (`op`) and a `value`
+        (none for `exists`, `not_exists` and `is_empty`); `in_segment` and
+        `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+        one of its `variation`s. A segment holds attribute conditions only.
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          description: "`attribute`, `in_segment`, `not_in_segment` or `prerequisite`."
+        attribute:
+          type: string
+        op:
+          type: string
+        value:
+          description: A string, number, boolean or list, as the operator and the attribute's type need; null is no value.
+          nullable: true
+        segment:
+          type: string
+        flag:
+          type: string
+        variation:
+          type: string
+    Segment:
+      type: object
+      required: [id, key, name, description, private, conditions, created_at, updated_at, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        private:
+          type: boolean
+          description: Its conditions never leave the server; only server-side evaluation uses it.
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Condition"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          $ref: "#/components/schemas/Version"
+    SegmentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Segment"
+    SegmentCreate:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        private:
+          type: boolean
+        conditions:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/Condition"
+    SegmentPatch:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Refused with `immutable` whatever its value.
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        private:
+          type: boolean
+        conditions:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/Condition"

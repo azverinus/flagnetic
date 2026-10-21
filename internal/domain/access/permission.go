@@ -54,6 +54,14 @@ const (
 	PermGrantManage Permission = "grant.manage"
 	// PermProjectTokenManage lists, creates and revokes project tokens.
 	PermProjectTokenManage Permission = "project_token.manage"
+	// PermFlagEdit creates flags and changes their definition.
+	PermFlagEdit Permission = "flag.edit"
+	// PermFlagArchive archives, restores and deletes flags.
+	PermFlagArchive Permission = "flag.archive"
+	// PermSegmentEdit creates segments and changes them.
+	PermSegmentEdit Permission = "segment.edit"
+	// PermSegmentDelete deletes segments.
+	PermSegmentDelete Permission = "segment.delete"
 )
 
 // catalog is every permission an operation can require. Each context adds
@@ -68,6 +76,10 @@ var catalog = []PermissionSpec{
 	{Name: PermDeclarationManage, Scope: ScopeFlagsWrite},
 	{Name: PermGrantManage, Scope: ScopeProjectAdmin, MembersOnly: true},
 	{Name: PermProjectTokenManage, Scope: ScopeProjectAdmin, MembersOnly: true},
+	{Name: PermFlagEdit, Scope: ScopeFlagsWrite},
+	{Name: PermFlagArchive, Scope: ScopeFlagsWrite},
+	{Name: PermSegmentEdit, Scope: ScopeFlagsWrite},
+	{Name: PermSegmentDelete, Scope: ScopeFlagsWrite},
 }
 
 // Catalog returns the permission catalog.
@@ -155,10 +167,13 @@ type Role struct {
 var roles = []Role{
 	{Name: RoleOwner, Permissions: []Permission{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermDeclarationManage,
-		PermGrantManage, PermProjectTokenManage,
+		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermSegmentEdit, PermSegmentDelete,
 	}},
-	{Name: RoleMaintainer, Permissions: []Permission{PermProjectRead, PermEnvironmentManage, PermDeclarationManage}},
-	{Name: RoleDeveloper, Permissions: []Permission{PermProjectRead}},
+	{Name: RoleMaintainer, Permissions: []Permission{
+		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
+		PermSegmentEdit, PermSegmentDelete,
+	}},
+	{Name: RoleDeveloper, Permissions: []Permission{PermProjectRead, PermFlagEdit, PermSegmentEdit}},
 	{Name: RoleViewer, Permissions: []Permission{PermProjectRead}},
 }
 

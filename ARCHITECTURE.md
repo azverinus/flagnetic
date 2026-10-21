@@ -48,8 +48,7 @@ Data crosses layers as: HTTP DTO → command → domain model → result → HTT
 |---|---|
 | workspace | projects, environments, unit types, declared and discovered attributes |
 | access | members, sessions, tokens, permissions, roles, grants, SSO and SCIM identities |
-| flags | flags, variations, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch |
-| segments | segments and their conditions |
+| flags | flags, variations, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch, segments and their conditions |
 | experiments | experiments, their status machine, assignment, the sample-ratio check |
 | delivery | rulesets, their versions and materialization, SDK keys |
 | events | exposures, aliases, evaluation summaries, rollups, retention |
