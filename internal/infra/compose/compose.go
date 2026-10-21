@@ -160,7 +160,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
 			Tx: tx, Projects: flagStore, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		GetFlag: appflags.NewGetFlag(flagStore),
+		GetFlag: appflags.NewGetFlag(tx, flagStore),
 		UpdateFlag: appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
@@ -182,7 +182,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		DeleteSegment: appflags.NewDeleteSegment(appflags.DeleteSegmentDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		ListSegmentUsages: appflags.NewListSegmentUsages(flagStore),
+		ListSegmentUsages: appflags.NewListSegmentUsages(tx, flagStore),
 
 		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),

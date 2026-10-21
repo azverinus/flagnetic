@@ -8,19 +8,31 @@ import (
 )
 
 // GetFlag reads a flag with its configuration in every environment.
-type GetFlag struct{ store FlagReader }
+type GetFlag struct {
+	snapshots Snapshotter
+	store     FlagReader
+}
 
 // NewGetFlag returns the handler.
-func NewGetFlag(store FlagReader) *GetFlag { return &GetFlag{store: store} }
+func NewGetFlag(snapshots Snapshotter, store FlagReader) *GetFlag {
+	return &GetFlag{snapshots: snapshots, store: store}
+}
 
-// Handle returns project's flag with key, or not_found.
+// Handle returns project's flag with key, or not_found. The definition and
+// the configurations are read in one snapshot, so they are never those of a
+// flag deleted and created again in between.
 func (h *GetFlag) Handle(ctx context.Context, project workspace.ProjectID, key string) (FlagView, error) {
-	f, err := h.store.FlagByKey(ctx, project, key)
-	if err != nil {
-		return FlagView{}, flagNotFound(err)
-	}
-	configs, err := h.store.Configurations(ctx, f.ID)
-	return FlagView{Flag: f, Configurations: configs}, err
+	var v FlagView
+	err := h.snapshots.Snapshot(ctx, func(ctx context.Context) error {
+		f, err := h.store.FlagByKey(ctx, project, key)
+		if err != nil {
+			return flagNotFound(err)
+		}
+		configs, err := h.store.Configurations(ctx, f.ID)
+		v = FlagView{Flag: f, Configurations: configs}
+		return err
+	})
+	return v, err
 }
 
 // FlagPage asks for one page of a project's flags, by key.

@@ -56,18 +56,29 @@ func (h *GetSegment) Handle(ctx context.Context, project workspace.ProjectID, ke
 }
 
 // ListSegmentUsages reads where a segment is used.
-type ListSegmentUsages struct{ store SegmentReader }
+type ListSegmentUsages struct {
+	snapshots Snapshotter
+	store     SegmentReader
+}
 
 // NewListSegmentUsages returns the handler.
-func NewListSegmentUsages(store SegmentReader) *ListSegmentUsages {
-	return &ListSegmentUsages{store: store}
+func NewListSegmentUsages(snapshots Snapshotter, store SegmentReader) *ListSegmentUsages {
+	return &ListSegmentUsages{snapshots: snapshots, store: store}
 }
 
 // Handle returns every flag and environment whose rules name project's
-// segment key, or not_found for a segment the project does not have.
+// segment key, or not_found for a segment the project does not have. The
+// segment and its usages are read in one snapshot, so the usages are those
+// of the segment found.
 func (h *ListSegmentUsages) Handle(ctx context.Context, project workspace.ProjectID, key string) ([]flags.Reference, error) {
-	if _, err := h.store.SegmentByKey(ctx, project, key); err != nil {
-		return nil, segmentNotFound(err)
-	}
-	return h.store.SegmentUsages(ctx, project, key)
+	var usages []flags.Reference
+	err := h.snapshots.Snapshot(ctx, func(ctx context.Context) error {
+		if _, err := h.store.SegmentByKey(ctx, project, key); err != nil {
+			return segmentNotFound(err)
+		}
+		var err error
+		usages, err = h.store.SegmentUsages(ctx, project, key)
+		return err
+	})
+	return usages, err
 }
