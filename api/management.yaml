@@ -515,8 +515,189 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /projects/{project}/audit:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listProjectAuditEntries
+      summary: The project's audit log
+      description: |
+        Every change made in the project, newest first, filtered by every
+        parameter given. Page with `cursor` set to the `next_cursor` of the
+        previous page: entries written meanwhile never shift a page.
+      x-permission: project.read
+      tags: [audit]
+      parameters:
+      - $ref: "#/components/parameters/AuditActor"
+      - $ref: "#/components/parameters/AuditActorKind"
+      - $ref: "#/components/parameters/AuditAction"
+      - $ref: "#/components/parameters/AuditEntityKind"
+      - $ref: "#/components/parameters/AuditEntityID"
+      - $ref: "#/components/parameters/AuditEnvironment"
+      - $ref: "#/components/parameters/AuditFrom"
+      - $ref: "#/components/parameters/AuditTo"
+      - $ref: "#/components/parameters/AuditQ"
+      - $ref: "#/components/parameters/Cursor"
+      - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of entries, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEntryList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/audit/{entry}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - name: entry
+        in: path
+        required: true
+        description: The entry's identifier.
+        schema:
+          type: string
+    get:
+      operationId: getProjectAuditEntry
+      summary: One audit entry of the project
+      description: An entry of another project, or of none, is not found here.
+      x-permission: project.read
+      tags: [audit]
+      responses:
+        "200":
+          description: The entry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEntry"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /audit:
+    get:
+      operationId: listAuditEntries
+      summary: The instance's audit log
+      description: |
+        Every entry of the instance, of every project and of none (members,
+        sign-ins, settings), newest first. `project` narrows it to one
+        project's entries.
+      x-permission: instance_admin
+      tags: [audit]
+      parameters:
+        - name: project
+          in: query
+          description: The key of the project whose entries to list; an unknown key is not found.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/AuditActor"
+        - $ref: "#/components/parameters/AuditActorKind"
+        - $ref: "#/components/parameters/AuditAction"
+        - $ref: "#/components/parameters/AuditEntityKind"
+        - $ref: "#/components/parameters/AuditEntityID"
+        - $ref: "#/components/parameters/AuditEnvironment"
+        - $ref: "#/components/parameters/AuditFrom"
+        - $ref: "#/components/parameters/AuditTo"
+        - $ref: "#/components/parameters/AuditQ"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of entries, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEntryList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
+    AuditActor:
+      name: actor
+      in: query
+      description: A member's identifier; their own changes and those of their personal access tokens.
+      schema:
+        type: string
+        format: uuid
+    AuditActorKind:
+      name: actor_kind
+      in: query
+      schema:
+        $ref: "#/components/schemas/ActorKind"
+    AuditAction:
+      name: action
+      in: query
+      description: An action, such as `environment.updated`.
+      schema:
+        type: string
+    AuditEntityKind:
+      name: entity_kind
+      in: query
+      description: A kind of entity, such as `environment`.
+      schema:
+        type: string
+    AuditEntityID:
+      name: entity_id
+      in: query
+      description: An entity's identifier, which follows the entity whatever key it had.
+      schema:
+        type: string
+    AuditEnvironment:
+      name: environment
+      in: query
+      description: An environment's identifier; entries addressing no environment are left out.
+      schema:
+        type: string
+        format: uuid
+    AuditFrom:
+      name: from
+      in: query
+      description: The earliest time of an entry, included.
+      schema:
+        type: string
+        format: date-time
+    AuditTo:
+      name: to
+      in: query
+      description: The latest time of an entry, included.
+      schema:
+        type: string
+        format: date-time
+    AuditQ:
+      name: q
+      in: query
+      description: Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
+      schema:
+        type: string
+    Cursor:
+      name: cursor
+      in: query
+      description: The `next_cursor` of the previous page.
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      description: How many entries a page holds at most.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
     EnvironmentKey:
       name: environment
       in: path
@@ -551,6 +732,12 @@ components:
       scheme: bearer
       description: An API token, `fn_pat_…` for a personal access token or `fn_prj_…` for a project token, in the `Authorization` header. A token in the query string is never read.
   responses:
+    BadRequest:
+      description: "`invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
     NotFound:
       description: "`not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged."
       content:
@@ -930,3 +1117,84 @@ components:
           $ref: "#/components/schemas/Name"
         description:
           $ref: "#/components/schemas/Description"
+    ActorKind:
+      type: string
+      enum: [member, token, cli, system]
+    AuditEntry:
+      type: object
+      description: Who changed what, when, from which value to which. Secrets are never recorded; a token appears by its hint.
+      required: [id, occurred_at, project_id, environment_id, actor, action, entity, before, after, request_id]
+      properties:
+        id:
+          type: string
+          format: uuid
+        occurred_at:
+          type: string
+          format: date-time
+        project_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The project the change belongs to, kept after the project is gone; null for the instance.
+        environment_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The environment the change addressed, if any.
+        actor:
+          $ref: "#/components/schemas/Actor"
+        action:
+          type: string
+          description: entity.verb, such as `environment.updated`.
+        entity:
+          $ref: "#/components/schemas/AuditEntity"
+        before:
+          nullable: true
+          description: The entity's values before the change; null when it was created.
+        after:
+          nullable: true
+          description: The entity's values after the change; null when it was deleted.
+        request_id:
+          type: string
+          nullable: true
+          description: The request that made the change; null outside a request, such as for the command line.
+    Actor:
+      type: object
+      required: [kind, id, name, member_id]
+      properties:
+        kind:
+          $ref: "#/components/schemas/ActorKind"
+        id:
+          type: string
+          description: The member's or token's identifier, or a fixed name for the command line and the system.
+        name:
+          type: string
+          description: The actor's name when the change was made.
+        member_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member who acted, directly or through their personal access token.
+    AuditEntity:
+      type: object
+      required: [kind, id, key]
+      properties:
+        kind:
+          type: string
+        id:
+          type: string
+        key:
+          type: string
+          description: The entity's key or name when the change was made.
+    AuditEntryList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEntry"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` for the next page; null on the last.

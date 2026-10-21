@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -52,6 +53,9 @@ type Handlers struct {
 	CreateAttribute *appworkspace.CreateAttribute
 	UpdateAttribute *appworkspace.UpdateAttribute
 	DeleteAttribute *appworkspace.DeleteAttribute
+
+	ListAuditEntries *appgovernance.ListAuditEntries
+	GetAuditEntry    *appgovernance.GetAuditEntry
 }
 
 // api serves every operation of the document.

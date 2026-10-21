@@ -206,6 +206,8 @@ func TestUnknownProjectIsNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertProblem(t, "GET me", me.StatusCode(), me.Body, http.StatusNotFound, "not_found")
+	audit := do(admin.ListProjectAuditEntriesWithResponse(t.Context(), "no-such-project", &management.ListProjectAuditEntriesParams{}))
+	assertProblem(t, "GET audit", audit.StatusCode(), audit.Body, http.StatusNotFound, "not_found")
 }
 
 func TestAnUnknownProjectIsNotFoundBeforeThePermissionIsJudged(t *testing.T) {

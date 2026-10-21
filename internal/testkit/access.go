@@ -104,23 +104,28 @@ func Client(t testing.TB, srv *Server, token string) *management.ClientWithRespo
 // is no instance admin and holds no grant.
 func MemberToken(t testing.TB, pool *pgxpool.Pool, scopes ...access.Scope) string {
 	t.Helper()
-	ids := id.NewSource(Clock())
 	now := Clock().Now()
 	m := access.Member{
-		ID: id.New[access.Member](ids), Email: rand.Text() + "@example.com", DisplayName: "Test Member",
+		ID: id.New[access.Member](id.NewSource(Clock())), Email: rand.Text() + "@example.com", DisplayName: "Test Member",
 		Status: access.MemberActive, CreatedAt: now,
 	}
-	store := pgaccess.NewStore(pool)
-	if err := store.CreateMember(t.Context(), m, ""); err != nil {
+	if err := pgaccess.NewStore(pool).CreateMember(t.Context(), m, ""); err != nil {
 		t.Fatal(err)
 	}
-	tok, v, err := access.NewPersonalToken(id.New[access.APIToken](ids), access.NewPersonalTokenInput{
-		Member: m.ID, Name: "test", Scopes: scopes, Now: now,
+	return PersonalToken(t, pool, m.ID, "test", scopes...)
+}
+
+// PersonalToken returns the value of a new personal access token called
+// name of member on pool, carrying scopes (read alone when none).
+func PersonalToken(t testing.TB, pool *pgxpool.Pool, member access.MemberID, name string, scopes ...access.Scope) string {
+	t.Helper()
+	tok, v, err := access.NewPersonalToken(id.New[access.APIToken](id.NewSource(Clock())), access.NewPersonalTokenInput{
+		Member: member, Name: name, Scopes: scopes, Now: Clock().Now(),
 	}, rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CreateToken(t.Context(), tok); err != nil {
+	if err := pgaccess.NewStore(pool).CreateToken(t.Context(), tok); err != nil {
 		t.Fatal(err)
 	}
 	return v.Value.Reveal()

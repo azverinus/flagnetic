@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
@@ -38,8 +39,8 @@ func NewDeps(pool *pgxpool.Pool, c clock.Clock) Deps {
 
 // Management mounts the management API on edge, its metrics on reg.
 func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer) {
-	tx := postgres.NewTransactor(d.Pool)
-	rec := appworkspace.NewRecorder(pggovernance.NewAuditLog(d.Pool), d.Clock, d.IDs)
+	tx, auditLog := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
+	rec := appworkspace.NewRecorder(auditLog, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
 	management.Mount(edge, management.Handlers{
 		AuthenticateToken: appaccess.NewAuthenticateToken(accessStore, d.Clock),
@@ -66,6 +67,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer) {
 		CreateAttribute: appworkspace.NewCreateAttribute(tx, ws, rec),
 		UpdateAttribute: appworkspace.NewUpdateAttribute(tx, ws, rec),
 		DeleteAttribute: appworkspace.NewDeleteAttribute(tx, ws, rec),
+
+		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
+		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
 	}, reg)
 }
 
