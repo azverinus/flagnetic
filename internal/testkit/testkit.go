@@ -24,12 +24,13 @@ import (
 var Start = time.Date(2026, time.January, 1, 9, 0, 0, 0, time.UTC)
 
 // Main gives the package one schema with the server's migrations applied,
-// runs its tests and drops the schema. It returns the exit code for os.Exit.
+// runs its tests, fails the package if its audit log holds a secret value the
+// tests recorded, and drops the schema. It returns the exit code for os.Exit.
 func Main(m *testing.M) int {
 	return pgtest.Main(m, func(ctx context.Context, pool *pgxpool.Pool) error {
 		_, err := postgres.Migrate(ctx, pool, postgres.Migrations())
 		return err
-	})
+	}, auditHoldsNoRecordedSecret)
 }
 
 // Pool returns the pool on the package's migrated schema, shared by the
@@ -46,10 +47,13 @@ func DatabaseURL(t testing.TB) string {
 }
 
 // EmptyDatabase returns the connection string of a new schema with nothing in
-// it, not even the migrations, dropped when the test ends.
+// it, not even the migrations, dropped when the test ends. If the test
+// migrates it, its audit log is guarded as the package's is.
 func EmptyDatabase(t testing.TB) string {
 	t.Helper()
-	return pgtest.NewSchema(t)
+	url := pgtest.NewSchema(t)
+	guardDatabase(t, url)
+	return url
 }
 
 // Clock returns a fake clock reading Start.

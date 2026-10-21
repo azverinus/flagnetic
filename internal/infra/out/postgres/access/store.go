@@ -14,6 +14,7 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -65,14 +66,18 @@ func (s *Store) CreateMember(ctx context.Context, m access.Member, passwordHash 
 
 // CreateToken stores t.
 func (s *Store) CreateToken(ctx context.Context, t access.APIToken) error {
-	var member any
+	var member, project any
 	if !t.Member.IsZero() {
 		member = t.Member.Bytes()
 	}
+	if !t.Project.IsZero() {
+		project = t.Project.Bytes()
+	}
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO api_tokens (id, kind, member_id, name, hint, token_hash, scopes, expires_at, revoked_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		t.ID.Bytes(), string(t.Kind), member, t.Name, t.Hint, t.Hash[:], scopeStrings(t.Scopes), t.ExpiresAt, t.RevokedAt, t.CreatedAt)
+		INSERT INTO api_tokens (id, kind, member_id, project_id, role, name, hint, token_hash, scopes, expires_at, revoked_at, created_at)
+		VALUES ($1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8, $9, $10, $11, $12)`,
+		t.ID.Bytes(), string(t.Kind), member, project, string(t.Role), t.Name, t.Hint, t.Hash[:], scopeStrings(t.Scopes),
+		t.ExpiresAt, t.RevokedAt, t.CreatedAt)
 	return err
 }
 
@@ -90,14 +95,16 @@ func (s *Store) TokenByHash(ctx context.Context, hash access.TokenHash) (access.
 		instanceAdmin   *bool
 		memberCreatedAt *time.Time
 		tokenHash       []byte
+		projectID       *[16]byte
+		role            *string
 	)
 	err := s.db(ctx).QueryRow(ctx, `
-		SELECT t.id, t.kind, t.name, t.hint, t.token_hash, t.scopes, t.expires_at, t.revoked_at, t.created_at,
+		SELECT t.id, t.kind, t.project_id, t.role, t.name, t.hint, t.token_hash, t.scopes, t.expires_at, t.revoked_at, t.created_at,
 		       m.id, m.email, m.display_name, m.status, m.instance_admin, m.locale, m.created_at
 		FROM api_tokens t
 		LEFT JOIN members m ON m.id = t.member_id
 		WHERE t.token_hash = $1`, hash[:]).Scan(
-		&tokenID, &kind, &t.Name, &t.Hint, &tokenHash, &scopes, &t.ExpiresAt, &t.RevokedAt, &t.CreatedAt,
+		&tokenID, &kind, &projectID, &role, &t.Name, &t.Hint, &tokenHash, &scopes, &t.ExpiresAt, &t.RevokedAt, &t.CreatedAt,
 		&memberID, &email, &name, &status, &instanceAdmin, &locale, &memberCreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return access.APIToken{}, nil, appaccess.ErrNotFound
@@ -108,6 +115,12 @@ func (s *Store) TokenByHash(ctx context.Context, hash access.TokenHash) (access.
 	t.ID, t.Kind, t.Hash = id.FromBytes[access.APIToken](tokenID), access.TokenKind(kind), access.TokenHash(tokenHash)
 	for _, sc := range scopes {
 		t.Scopes = append(t.Scopes, access.Scope(sc))
+	}
+	if projectID != nil {
+		t.Project = id.FromBytes[workspace.Project](*projectID)
+	}
+	if role != nil {
+		t.Role = access.RoleName(*role)
 	}
 	if memberID == nil {
 		return t, nil, nil

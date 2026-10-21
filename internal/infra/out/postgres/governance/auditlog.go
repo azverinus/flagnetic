@@ -5,10 +5,15 @@ package governance
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
@@ -64,44 +69,121 @@ func optional[T any](v id.Of[T]) any {
 // Latest returns the newest limit entries of the whole instance, newest
 // first.
 func (l *AuditLog) Latest(ctx context.Context, limit int) ([]governance.Entry, error) {
-	rows, err := pgxtx.Querier(ctx, l.pool).Query(ctx, `
-		SELECT id, occurred_at, project_id, environment_id, actor_kind, actor_id, actor_name,
-		       coalesce(actor_member_id::text, ''), action, entity_kind, entity_id, entity_key,
-		       before, after, coalesce(request_id, '')
-		FROM audit_entries
-		ORDER BY id DESC
-		LIMIT $1`, limit)
+	return l.Entries(ctx, appgovernance.AuditFilter{}, governance.EntryID{}, limit)
+}
+
+func scanEntry(row pgx.Row) (governance.Entry, error) {
+	var (
+		e                    governance.Entry
+		entryID              [16]byte
+		project, environment *[16]byte
+		kind                 string
+		before, after        []byte
+	)
+	if err := row.Scan(&entryID, &e.OccurredAt, &project, &environment, &kind, &e.Actor.ID, &e.Actor.Name,
+		&e.Actor.MemberID, &e.Action, &e.Entity.Kind, &e.Entity.ID, &e.Entity.Key, &before, &after, &e.RequestID); err != nil {
+		return governance.Entry{}, err
+	}
+	e.ID, e.Actor.Kind = id.FromBytes[governance.Entry](entryID), governance.ActorKind(kind)
+	if project != nil {
+		e.Project = id.FromBytes[workspace.Project](*project)
+	}
+	if environment != nil {
+		e.Environment = id.FromBytes[workspace.Environment](*environment)
+	}
+	if before != nil {
+		e.Before = json.RawMessage(before)
+	}
+	if after != nil {
+		e.After = json.RawMessage(after)
+	}
+	return e, nil
+}
+
+const entryColumns = `id, occurred_at, project_id, environment_id, actor_kind, actor_id, actor_name,
+	coalesce(actor_member_id::text, ''), action, entity_kind, entity_id, entity_key,
+	before, after, coalesce(request_id, '')`
+
+// Entries returns at most limit entries matching f, older than after unless
+// it is zero, newest first.
+func (l *AuditLog) Entries(ctx context.Context, f appgovernance.AuditFilter, after governance.EntryID, limit int) ([]governance.Entry, error) {
+	var (
+		conds []string
+		args  []any
+	)
+	where := func(cond string, arg any) {
+		args = append(args, arg)
+		conds = append(conds, strings.ReplaceAll(cond, "$?", "$"+strconv.Itoa(len(args))))
+	}
+	if !f.Project.IsZero() {
+		where("project_id = $?", f.Project.Bytes())
+	}
+	if !f.Actor.IsZero() {
+		where("actor_member_id = $?", f.Actor.Bytes())
+	}
+	if f.ActorKind != "" {
+		where("actor_kind = $?", string(f.ActorKind))
+	}
+	if f.Action != "" {
+		where("action = $?", f.Action)
+	}
+	if f.EntityKind != "" {
+		where("entity_kind = $?", f.EntityKind)
+	}
+	if f.EntityID != "" {
+		where("entity_id = $?", f.EntityID)
+	}
+	if !f.Environment.IsZero() {
+		where("environment_id = $?", f.Environment.Bytes())
+	}
+	if !f.From.IsZero() {
+		where("occurred_at >= $?", f.From)
+	}
+	if !f.To.IsZero() {
+		where("occurred_at <= $?", f.To)
+	}
+	if f.Q != "" {
+		// The expression is the search index's, so the index answers it.
+		where(`(entity_key || E'\n' || actor_name || E'\n' || action) ILIKE '%' || $? || '%' ESCAPE '\'`, escapeLike(f.Q))
+	}
+	if !after.IsZero() {
+		where("id < $?", after.Bytes())
+	}
+	sql := `SELECT ` + entryColumns + ` FROM audit_entries`
+	if len(conds) > 0 {
+		sql += ` WHERE ` + strings.Join(conds, ` AND `)
+	}
+	args = append(args, limit)
+	sql += ` ORDER BY id DESC LIMIT $` + strconv.Itoa(len(args))
+	rows, err := pgxtx.Querier(ctx, l.pool).Query(ctx, sql, args...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("listing audit entries: %w", err)
 	}
 	defer rows.Close()
-	var out []governance.Entry
+	out := []governance.Entry{}
 	for rows.Next() {
-		var (
-			e                    governance.Entry
-			entryID              [16]byte
-			project, environment *[16]byte
-			kind                 string
-			before, after        []byte
-		)
-		if err := rows.Scan(&entryID, &e.OccurredAt, &project, &environment, &kind, &e.Actor.ID, &e.Actor.Name,
-			&e.Actor.MemberID, &e.Action, &e.Entity.Kind, &e.Entity.ID, &e.Entity.Key, &before, &after, &e.RequestID); err != nil {
+		e, err := scanEntry(rows)
+		if err != nil {
 			return nil, err
-		}
-		e.ID, e.Actor.Kind = id.FromBytes[governance.Entry](entryID), governance.ActorKind(kind)
-		if project != nil {
-			e.Project = id.FromBytes[workspace.Project](*project)
-		}
-		if environment != nil {
-			e.Environment = id.FromBytes[workspace.Environment](*environment)
-		}
-		if before != nil {
-			e.Before = json.RawMessage(before)
-		}
-		if after != nil {
-			e.After = json.RawMessage(after)
 		}
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+// escapeLike makes every character of s match itself in a LIKE pattern
+// escaped by a backslash, so a search for 50% finds 50% and nothing else.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
+// Entry returns the entry of project with entryID, or
+// appgovernance.ErrNotFound.
+func (l *AuditLog) Entry(ctx context.Context, project workspace.ProjectID, entryID governance.EntryID) (governance.Entry, error) {
+	e, err := scanEntry(pgxtx.Querier(ctx, l.pool).QueryRow(ctx,
+		`SELECT `+entryColumns+` FROM audit_entries WHERE project_id = $1 AND id = $2`, project.Bytes(), entryID.Bytes()))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return governance.Entry{}, appgovernance.ErrNotFound
+	}
+	return e, err
 }

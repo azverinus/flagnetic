@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -73,9 +74,12 @@ func TestTheScopeOfAnOperationFollowsItsRequirement(t *testing.T) {
 		{"member", true, ""},
 		{"instance_admin", true, access.ScopeRead},
 		{"instance_admin", false, access.ScopeInstanceAdmin},
+		{"project.read", true, access.ScopeRead},
+		{"project.update", false, access.ScopeProjectAdmin},
+		{"declaration.manage", false, access.ScopeFlagsWrite},
 		// A name outside the catalog falls under no scope; the operation
 		// table refuses such a requirement before any operation is served.
-		{"project.update", false, ""},
+		{"project.delete", false, ""},
 	} {
 		if got := access.ScopeOf(tc.requirement, tc.read); got != tc.want {
 			t.Errorf("ScopeOf(%s, read %v) = %q, want %q", tc.requirement, tc.read, got, tc.want)
@@ -98,57 +102,92 @@ func tokenCaller(t *testing.T, instanceAdmin bool, scopes ...access.Scope) acces
 	return access.TokenCaller(tok, &member)
 }
 
-func projectTokenCaller() access.Caller {
-	tok := access.APIToken{Kind: access.TokenProject, Scopes: access.AllScopes()}
+// projectTokenCaller returns a caller presenting a project token of
+// project holding role, with scopes.
+func projectTokenCaller(project workspace.ProjectID, role access.RoleName, scopes ...access.Scope) access.Caller {
+	if len(scopes) == 0 {
+		scopes = access.AllScopes()
+	}
+	tok := access.APIToken{Kind: access.TokenProject, Project: project, Role: role, Scopes: scopes}
 	return access.TokenCaller(tok, nil)
+}
+
+// sessionCaller returns a caller signed in as a member, an instance admin or
+// not.
+func sessionCaller(instanceAdmin bool) access.Caller {
+	m := access.Member{ID: id.New[access.Member](newIDs()), Status: access.MemberActive, InstanceAdmin: instanceAdmin}
+	return access.Caller{Method: access.MethodSession, Member: &m}
 }
 
 func refusal(err error) string {
 	if err == nil {
 		return ""
 	}
-	if e, ok := apperrors.From(err); ok && e.Kind == apperrors.KindForbidden {
+	if e, ok := apperrors.From(err); ok && (e.Kind == apperrors.KindForbidden || e.Kind == apperrors.KindNotFound) {
 		return e.Code
 	}
 	return "not forbidden: " + err.Error()
 }
 
-func TestTheSeamJudgesReachThenSessionThenScopeThenPermission(t *testing.T) {
+func TestTheSeamJudgesReachThenSessionThenScopeThenProjectThenPermission(t *testing.T) {
 	getMe := access.Operation{Name: "getMe", Requirement: "member", Read: true, OpenToProjectTokens: true}
 	authMethods := access.Operation{Name: "listAuthMethods", Requirement: "public", Read: true}
 	updateProject := access.Operation{Name: "updateProject", Requirement: "project.update", Scope: access.ScopeProjectAdmin}
+	createProjectToken := access.Operation{Name: "createProjectToken", Requirement: "project_token.manage",
+		SessionRequired: true, Scope: access.ScopeProjectAdmin}
 	updateMe := access.Operation{Name: "updateMe", Requirement: "member", SessionRequired: true}
 	listMembers := access.Operation{Name: "listMembers", Requirement: "instance_admin", Read: true, Scope: access.ScopeRead}
 	updateMember := access.Operation{Name: "updateMember", Requirement: "instance_admin", Scope: access.ScopeInstanceAdmin}
 	listRoles := access.Operation{Name: "listRoles", Requirement: "member", Read: true}
 
+	ids := newIDs()
+	mobile, web := id.New[workspace.Project](ids), id.New[workspace.Project](ids)
+	holding := func(p workspace.ProjectID, perms ...access.Permission) *access.ProjectAccess {
+		return &access.ProjectAccess{Project: p, Permissions: perms}
+	}
+	unknown := &access.ProjectAccess{}
+	ownerOfMobile := projectTokenCaller(mobile, access.RoleOwner)
+
 	for name, tc := range map[string]struct {
 		caller access.Caller
 		op     access.Operation
+		in     *access.ProjectAccess
 		want   string
 	}{
-		"a token reads who it is":                       {tokenCaller(t, false), getMe, ""},
-		"a project token reads who it is":               {projectTokenCaller(), getMe, ""},
-		"a project token reaches nothing else":          {projectTokenCaller(), listRoles, "forbidden"},
-		"a project token is refused before the session": {projectTokenCaller(), updateMe, "forbidden"},
-		"a token never writes to its member's account":  {tokenCaller(t, true, access.AllScopes()...), updateMe, "session_required"},
-		"an instance admin's read token reads members":  {tokenCaller(t, true), listMembers, ""},
-		"an instance admin's read token writes nothing": {tokenCaller(t, true), updateMember, "insufficient_scope"},
-		"a scope is judged before the permission":       {tokenCaller(t, false), updateMember, "insufficient_scope"},
-		"an instance admin's admin token writes":        {tokenCaller(t, true, access.ScopeInstanceAdmin), updateMember, ""},
-		"a member is no instance admin":                 {tokenCaller(t, false, access.ScopeInstanceAdmin), updateMember, "forbidden"},
-		"a member reads what every member reads":        {tokenCaller(t, false), listRoles, ""},
-		"anyone calls a public operation":               {access.Caller{}, authMethods, ""},
-		"a token calls a public operation":              {tokenCaller(t, false), authMethods, ""},
-		"a project token calls a public operation":      {projectTokenCaller(), authMethods, ""},
-		"a scope is judged before a catalog permission": {tokenCaller(t, true), updateProject, "insufficient_scope"},
-		"a project token's project is judged later":     {projectTokenCaller(), updateProject, "forbidden"},
-		// Until a project is looked up and its grants judged, an operation
-		// needing a catalog permission is open to nobody, an instance admin
-		// included.
-		"a catalog permission is refused for now": {tokenCaller(t, true, access.AllScopes()...), updateProject, "forbidden"},
+		"a token reads who it is":                       {tokenCaller(t, false), getMe, nil, ""},
+		"a project token reads who it is":               {ownerOfMobile, getMe, nil, ""},
+		"a project token reaches nothing else":          {ownerOfMobile, listRoles, nil, "forbidden"},
+		"a project token is refused before the session": {ownerOfMobile, updateMe, nil, "forbidden"},
+		"a token never writes to its member's account":  {tokenCaller(t, true, access.AllScopes()...), updateMe, nil, "session_required"},
+		"an instance admin's read token reads members":  {tokenCaller(t, true), listMembers, nil, ""},
+		"an instance admin's read token writes nothing": {tokenCaller(t, true), updateMember, nil, "insufficient_scope"},
+		"a scope is judged before the permission":       {tokenCaller(t, false), updateMember, nil, "insufficient_scope"},
+		"an instance admin's admin token writes":        {tokenCaller(t, true, access.ScopeInstanceAdmin), updateMember, nil, ""},
+		"a member is no instance admin":                 {tokenCaller(t, false, access.ScopeInstanceAdmin), updateMember, nil, "forbidden"},
+		"a member reads what every member reads":        {tokenCaller(t, false), listRoles, nil, ""},
+		"anyone calls a public operation":               {access.Caller{}, authMethods, nil, ""},
+		"a token calls a public operation":              {tokenCaller(t, false), authMethods, nil, ""},
+		"a project token calls a public operation":      {ownerOfMobile, authMethods, nil, ""},
+
+		"a scope is judged before the project": {tokenCaller(t, true), updateProject, unknown, "insufficient_scope"},
+		"an unknown project is not found":      {tokenCaller(t, false, access.ScopeProjectAdmin), updateProject, unknown, "not_found"},
+		"the permission held is enough":        {sessionCaller(false), updateProject, holding(mobile, "project.update"), ""},
+		"a permission not held is refused": {sessionCaller(false), updateProject,
+			holding(mobile, "project.read"), "forbidden"},
+		"a project token acts in its project": {ownerOfMobile, updateProject,
+			holding(mobile, "project.update"), ""},
+		"a project token reaches no other project": {ownerOfMobile, updateProject,
+			holding(web, "project.update"), "forbidden"},
+		// Answered like another project's, so a project token learns
+		// nothing of which keys exist.
+		"a project token reaches no unknown project": {ownerOfMobile, updateProject, unknown, "forbidden"},
+		"a session is judged before the project": {tokenCaller(t, true, access.AllScopes()...), createProjectToken,
+			unknown, "session_required"},
+		// The project is judged in the seam; an operation needing a catalog
+		// permission judged without it is open to nobody.
+		"a catalog permission without its project is refused": {sessionCaller(true), updateProject, nil, "forbidden"},
 	} {
-		if got := refusal(access.Authorize(tc.caller, tc.op)); got != tc.want {
+		if got := refusal(access.Authorize(tc.caller, tc.op, tc.in)); got != tc.want {
 			t.Errorf("%s: refusal = %q, want %q", name, got, tc.want)
 		}
 	}
@@ -156,7 +195,7 @@ func TestTheSeamJudgesReachThenSessionThenScopeThenPermission(t *testing.T) {
 
 func TestARefusedPermissionIsNamed(t *testing.T) {
 	op := access.Operation{Name: "updateMember", Requirement: "instance_admin", Scope: access.ScopeInstanceAdmin}
-	e, _ := apperrors.From(access.Authorize(tokenCaller(t, false, access.ScopeInstanceAdmin), op))
+	e, _ := apperrors.From(access.Authorize(tokenCaller(t, false, access.ScopeInstanceAdmin), op, nil))
 	if e == nil || e.Extensions["permission"] != "instance_admin" {
 		t.Errorf("refusal = %+v, want the permission instance_admin named", e)
 	}
@@ -164,7 +203,8 @@ func TestARefusedPermissionIsNamed(t *testing.T) {
 
 func TestACatalogPermissionIsRefusedNamingIt(t *testing.T) {
 	op := access.Operation{Name: "updateProject", Requirement: "project.update", Scope: access.ScopeProjectAdmin}
-	e, _ := apperrors.From(access.Authorize(tokenCaller(t, true, access.AllScopes()...), op))
+	in := &access.ProjectAccess{Project: id.New[workspace.Project](newIDs()), Permissions: []access.Permission{"project.read"}}
+	e, _ := apperrors.From(access.Authorize(sessionCaller(false), op, in))
 	if e == nil || e.Code != "forbidden" || e.Extensions["permission"] != "project.update" {
 		t.Errorf("refusal = %+v, want forbidden naming project.update", e)
 	}

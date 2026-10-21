@@ -2,6 +2,7 @@ package testkit
 
 import (
 	"context"
+	"crypto/rand"
 	"net/http"
 	"sync"
 	"testing"
@@ -9,10 +10,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
@@ -57,6 +62,8 @@ func Bootstrap(t testing.TB, pool *pgxpool.Pool) string {
 		t.Fatalf("bootstrapping the instance admin: %v", err)
 	}
 	admins[pool] = res.Token.Reveal()
+	RecordSecret(InstanceAdminPassword)
+	RecordSecret(admins[pool])
 	return admins[pool]
 }
 
@@ -77,10 +84,12 @@ func FreshPool(t testing.TB) *pgxpool.Pool {
 }
 
 // Client returns a client of the management API of srv presenting token as
-// a bearer, or no credential when token is "".
+// a bearer, or no credential when token is "". The secrets its requests and
+// responses carry are recorded for the audit guard.
 func Client(t testing.TB, srv *Server, token string) *management.ClientWithResponses {
 	t.Helper()
-	var opts []management.ClientOption
+	RecordSecret(token)
+	opts := []management.ClientOption{management.WithHTTPClient(&http.Client{Transport: recordingTransport{}})}
 	if token != "" {
 		opts = append(opts, management.WithRequestEditorFn(func(_ context.Context, r *http.Request) error {
 			r.Header.Set("Authorization", "Bearer "+token)
@@ -92,4 +101,57 @@ func Client(t testing.TB, srv *Server, token string) *management.ClientWithRespo
 		t.Fatal(err)
 	}
 	return c
+}
+
+// MemberToken returns the value of a personal access token carrying scopes
+// (read alone when none) of a new active member of the instance on pool, who
+// is no instance admin and holds no grant.
+func MemberToken(t testing.TB, pool *pgxpool.Pool, scopes ...access.Scope) string {
+	t.Helper()
+	now := Clock().Now()
+	m := access.Member{
+		ID: id.New[access.Member](id.NewSource(Clock())), Email: rand.Text() + "@example.com", DisplayName: "Test Member",
+		Status: access.MemberActive, CreatedAt: now,
+	}
+	if err := pgaccess.NewStore(pool).CreateMember(t.Context(), m, ""); err != nil {
+		t.Fatal(err)
+	}
+	return PersonalToken(t, pool, m.ID, "test", scopes...)
+}
+
+// PersonalToken returns the value of a new personal access token called
+// name of member on pool, carrying scopes (read alone when none).
+func PersonalToken(t testing.TB, pool *pgxpool.Pool, member access.MemberID, name string, scopes ...access.Scope) string {
+	t.Helper()
+	tok, v, err := access.NewPersonalToken(id.New[access.APIToken](id.NewSource(Clock())), access.NewPersonalTokenInput{
+		Member: member, Name: name, Scopes: scopes, Now: Clock().Now(),
+	}, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pgaccess.NewStore(pool).CreateToken(t.Context(), tok); err != nil {
+		t.Fatal(err)
+	}
+	RecordSecret(v.Value.Reveal())
+	return v.Value.Reveal()
+}
+
+// ProjectToken returns the value of a project token of project on pool
+// holding role, with scopes (every scope a project token may carry when
+// none).
+func ProjectToken(t testing.TB, pool *pgxpool.Pool, project workspace.ProjectID, role access.RoleName, scopes ...access.Scope) string {
+	t.Helper()
+	if len(scopes) == 0 {
+		scopes = []access.Scope{access.ScopeRead, access.ScopeFlagsWrite, access.ScopeExperimentsWrite, access.ScopeProjectAdmin}
+	}
+	v := access.NewTokenValue(access.TokenProject, rand.Reader)
+	tok := access.APIToken{
+		ID: id.New[access.APIToken](id.NewSource(Clock())), Kind: access.TokenProject, Project: project, Role: role,
+		Name: "pipeline", Hint: v.Hint, Hash: v.Hash, Scopes: scopes, CreatedAt: Clock().Now(),
+	}
+	if err := pgaccess.NewStore(pool).CreateToken(t.Context(), tok); err != nil {
+		t.Fatal(err)
+	}
+	RecordSecret(v.Value.Reveal())
+	return v.Value.Reveal()
 }

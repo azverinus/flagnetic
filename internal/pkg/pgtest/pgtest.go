@@ -45,15 +45,25 @@ var pkg struct {
 }
 
 // Main creates the package schema, sets it up with setup through a pool whose
-// search_path points at it, runs the tests, then drops the schema and returns
-// the exit code for os.Exit.
-func Main(m *testing.M, setup func(ctx context.Context, pool *pgxpool.Pool) error) int {
+// search_path points at it, runs the tests, then runs each check on what the
+// tests left in the schema, drops the schema and returns the exit code for
+// os.Exit. A failing check fails the package as a failing test does.
+func Main(m *testing.M, setup func(ctx context.Context, pool *pgxpool.Pool) error, checks ...func(ctx context.Context, pool *pgxpool.Pool) error) int {
 	defer cleanUp()
 	if err := start(setup); err != nil {
 		fmt.Fprintf(os.Stderr, "pgtest: %v\n", err)
 		return 1
 	}
-	return m.Run()
+	code := m.Run()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	for _, check := range checks {
+		if err := check(ctx, pkg.pool); err != nil {
+			fmt.Fprintf(os.Stderr, "FAIL: after the tests: %v\n", err)
+			code = 1
+		}
+	}
+	return code
 }
 
 func start(setup func(ctx context.Context, pool *pgxpool.Pool) error) error {

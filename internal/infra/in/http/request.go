@@ -29,7 +29,10 @@ func stateOf(ctx context.Context) *requestState {
 	return st
 }
 
-func requestIDOf(ctx context.Context) string {
+// RequestIDOf returns the ID of the request ctx belongs to, which audit
+// entries record so a change leads back to the request that made it; "" for
+// a context of no request.
+func RequestIDOf(ctx context.Context) string {
 	if st := stateOf(ctx); st != nil {
 		return st.id
 	}

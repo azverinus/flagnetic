@@ -38,10 +38,37 @@ type PermissionSpec struct {
 	MembersOnly bool
 }
 
+// The permissions of the catalog.
+const (
+	// PermProjectRead covers every ordinary read in a project, its audit log
+	// included.
+	PermProjectRead Permission = "project.read"
+	// PermProjectUpdate renames a project and changes its description.
+	PermProjectUpdate Permission = "project.update"
+	// PermEnvironmentManage creates, renames and deletes environments.
+	PermEnvironmentManage Permission = "environment.manage"
+	// PermDeclarationManage creates, renames and deletes unit types and
+	// attributes.
+	PermDeclarationManage Permission = "declaration.manage"
+	// PermGrantManage makes and removes grants.
+	PermGrantManage Permission = "grant.manage"
+	// PermProjectTokenManage lists, creates and revokes project tokens.
+	PermProjectTokenManage Permission = "project_token.manage"
+)
+
 // catalog is every permission an operation can require. Each context adds
 // its permissions with the operations that need them, and writes them into
 // the built-in roles below.
-var catalog = []PermissionSpec{}
+var catalog = []PermissionSpec{
+	{Name: PermProjectRead, Scope: ScopeRead},
+	{Name: PermProjectUpdate, Scope: ScopeProjectAdmin},
+	{Name: PermEnvironmentManage, Scope: ScopeProjectAdmin},
+	// Unit types and attributes are what flags target, so changing them
+	// falls under the scope of a pipeline that writes flags.
+	{Name: PermDeclarationManage, Scope: ScopeFlagsWrite},
+	{Name: PermGrantManage, Scope: ScopeProjectAdmin, MembersOnly: true},
+	{Name: PermProjectTokenManage, Scope: ScopeProjectAdmin, MembersOnly: true},
+}
 
 // Catalog returns the permission catalog.
 func Catalog() []PermissionSpec { return slices.Clone(catalog) }
@@ -126,10 +153,13 @@ type Role struct {
 
 // roles lists the built-in roles, the most powerful first.
 var roles = []Role{
-	{Name: RoleOwner},
-	{Name: RoleMaintainer},
-	{Name: RoleDeveloper},
-	{Name: RoleViewer},
+	{Name: RoleOwner, Permissions: []Permission{
+		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermDeclarationManage,
+		PermGrantManage, PermProjectTokenManage,
+	}},
+	{Name: RoleMaintainer, Permissions: []Permission{PermProjectRead, PermEnvironmentManage, PermDeclarationManage}},
+	{Name: RoleDeveloper, Permissions: []Permission{PermProjectRead}},
+	{Name: RoleViewer, Permissions: []Permission{PermProjectRead}},
 }
 
 // Roles returns the built-in roles, the most powerful first.

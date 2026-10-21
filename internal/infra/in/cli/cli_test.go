@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -67,6 +69,7 @@ func run(env map[string]string, opts []cli.Option, args ...string) result {
 		return v, ok
 	}
 	code := cli.Main(args, lookup, &stdout, &stderr, make(chan os.Signal), opts...)
+	recordSecrets(env, args, stdout.String()+stderr.String())
 	return result{code: code, stdout: stdout.String(), stderr: stderr.String()}
 }
 
@@ -187,6 +190,25 @@ func TestUnknownCommandPrintsUsage(t *testing.T) {
 		}
 		if !strings.Contains(r.stderr, "Usage: flagnetic") {
 			t.Errorf("%v: stderr = %q, want the usage", args, r.stderr)
+		}
+	}
+}
+
+// generatedPassword is how a command prints a password it generated.
+var generatedPassword = regexp.MustCompile(`(?m)^Password: (\S+)$`)
+
+// recordSecrets records for the test kit's audit guard the secrets a command
+// was given or showed: the admin password, the passwords and token values it
+// printed, and the token it wrote to a token file.
+func recordSecrets(env map[string]string, args []string, output string) {
+	testkit.RecordSecret(env["FLAGNETIC_ADMIN_PASSWORD"])
+	testkit.RecordSecretsIn(output)
+	for _, m := range generatedPassword.FindAllStringSubmatch(output, -1) {
+		testkit.RecordSecret(m[1])
+	}
+	if i := slices.Index(args, "--token-file"); i >= 0 && i+1 < len(args) {
+		if written, err := os.ReadFile(args[i+1]); err == nil {
+			testkit.RecordSecretsIn(string(written))
 		}
 	}
 }
