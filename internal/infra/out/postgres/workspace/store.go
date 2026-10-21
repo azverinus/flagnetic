@@ -44,27 +44,27 @@ func keyTaken(err error) error {
 // CreateProject stores p.
 func (s *Store) CreateProject(ctx context.Context, p workspace.Project) error {
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO projects (id, key, name, description, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		p.ID.Bytes(), p.Key, p.Name, p.Description, p.CreatedAt, p.UpdatedAt)
+		INSERT INTO projects (id, key, name, description, created_at, updated_at, version)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		p.ID.Bytes(), p.Key, p.Name, p.Description, p.CreatedAt, p.UpdatedAt, p.Version)
 	return keyTaken(err)
 }
 
-// UpdateProject stores p's name and description.
+// UpdateProject stores p's name, description and version.
 func (s *Store) UpdateProject(ctx context.Context, p workspace.Project) error {
-	_, err := s.db(ctx).Exec(ctx, `UPDATE projects SET name = $2, description = $3, updated_at = $4 WHERE id = $1`,
-		p.ID.Bytes(), p.Name, p.Description, p.UpdatedAt)
+	_, err := s.db(ctx).Exec(ctx, `UPDATE projects SET name = $2, description = $3, updated_at = $4, version = $5 WHERE id = $1`,
+		p.ID.Bytes(), p.Name, p.Description, p.UpdatedAt, p.Version)
 	return err
 }
 
-const projectColumns = `id, key, name, description, created_at, updated_at`
+const projectColumns = `id, key, name, description, created_at, updated_at, version`
 
 func scanProject(row pgx.Row) (workspace.Project, error) {
 	var (
 		p  workspace.Project
 		pk [16]byte
 	)
-	if err := row.Scan(&pk, &p.Key, &p.Name, &p.Description, &p.CreatedAt, &p.UpdatedAt); err != nil {
+	if err := row.Scan(&pk, &p.Key, &p.Name, &p.Description, &p.CreatedAt, &p.UpdatedAt, &p.Version); err != nil {
 		return workspace.Project{}, err
 	}
 	p.ID = id.FromBytes[workspace.Project](pk)

@@ -80,7 +80,11 @@ test.describe("unit types", () => {
     for (const key of ["user", "anonymous"]) {
       must(
         `deleting ${key}`,
-        await deleteUnitType({ client, path: { project: projectKey, unit_type: key } }),
+        await deleteUnitType({
+          client,
+          path: { project: projectKey, unit_type: key },
+          headers: { "If-Match": '"1"' },
+        }),
       );
     }
 

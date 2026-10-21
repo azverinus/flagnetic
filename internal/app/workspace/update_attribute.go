@@ -5,6 +5,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // AttributeUpdater stores an attribute's changed name and description.
@@ -27,15 +28,18 @@ func NewUpdateAttribute(tx Transactor, store AttributeUpdater, rec Recorder) *Up
 	return &UpdateAttribute{tx: tx, store: store, rec: rec}
 }
 
-// UpdateAttributeCommand is a change to the attribute Key of Project.
+// UpdateAttributeCommand is a change to the attribute Key of Project,
+// based on the version Expected names.
 type UpdateAttributeCommand struct {
-	Project workspace.ProjectID
-	Key     string
-	Change  workspace.AttributeChange
-	Request governance.Request
+	Project  workspace.ProjectID
+	Key      string
+	Change   workspace.AttributeChange
+	Expected precondition.Version
+	Request  governance.Request
 }
 
-// Handle applies the change and returns the attribute as it is after it; a
+// Handle applies the change, validated first and then judged against the
+// version it was based on, and returns the attribute as it is after it; a
 // change to the values it already has stores and records nothing.
 func (h *UpdateAttribute) Handle(ctx context.Context, cmd UpdateAttributeCommand) (workspace.Attribute, error) {
 	now := h.rec.clock.Now()
@@ -46,9 +50,15 @@ func (h *UpdateAttribute) Handle(ctx context.Context, cmd UpdateAttributeCommand
 			return notFound(err, "attribute")
 		}
 		after, changed, err := before.Change(cmd.Change, now)
-		if err != nil || !changed {
-			out = before
+		if err != nil {
 			return err
+		}
+		if err = precondition.Check(cmd.Expected, before.Version); err != nil {
+			return err
+		}
+		if !changed {
+			out = before
+			return nil
 		}
 		if err := h.store.UpdateAttribute(ctx, after); err != nil {
 			return err

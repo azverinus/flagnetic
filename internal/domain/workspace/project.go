@@ -19,6 +19,9 @@ type Project struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	// Version counts the project's accepted changes, from 1, so a write can
+	// name the one it was based on.
+	Version int64
 }
 
 // NewProject returns a project with key, name and description, created at
@@ -28,7 +31,7 @@ func NewProject(projectID ProjectID, key, name, description string, now time.Tim
 	if err := f.err(); err != nil {
 		return Project{}, err
 	}
-	return Project{ID: projectID, Key: key, Name: f.name, Description: f.description, CreatedAt: now, UpdatedAt: now}, nil
+	return Project{ID: projectID, Key: key, Name: f.name, Description: f.description, CreatedAt: now, UpdatedAt: now, Version: 1}, nil
 }
 
 // ProjectChange is a change to a project; a nil field is left as it is.
@@ -54,6 +57,6 @@ func (p Project) Change(c ProjectChange, now time.Time) (Project, bool, error) {
 		return p, false, nil
 	}
 	out := p
-	out.Name, out.Description, out.UpdatedAt = f.name, f.description, now
+	out.Name, out.Description, out.UpdatedAt, out.Version = f.name, f.description, now, p.Version+1
 	return out, true, nil
 }

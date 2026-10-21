@@ -5,6 +5,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // UnitTypeDeleter deletes a unit type.
@@ -29,11 +30,13 @@ func NewDeleteUnitType(tx Transactor, store UnitTypeDeleter, guard DeclarationGu
 	return &DeleteUnitType{tx: tx, store: store, guard: guard, rulesets: rulesets, rec: rec}
 }
 
-// DeleteUnitTypeCommand names the unit type to delete.
+// DeleteUnitTypeCommand names the unit type to delete and the version of it
+// the deletion is based on.
 type DeleteUnitTypeCommand struct {
-	Project workspace.ProjectID
-	Key     string
-	Request governance.Request
+	Project  workspace.ProjectID
+	Key      string
+	Expected precondition.Version
+	Request  governance.Request
 }
 
 // Handle deletes the unit type unless a rule, rollout, override or segment
@@ -50,6 +53,9 @@ func (h *DeleteUnitType) Handle(ctx context.Context, cmd DeleteUnitTypeCommand) 
 		u, err := h.store.UnitTypeByKey(ctx, cmd.Project, cmd.Key, false)
 		if err != nil {
 			return notFound(err, "unit type")
+		}
+		if err = precondition.Check(cmd.Expected, u.Version); err != nil {
+			return err
 		}
 		if err := h.guard.RefuseReferenced(ctx, cmd.Project, u.Key); err != nil {
 			return err

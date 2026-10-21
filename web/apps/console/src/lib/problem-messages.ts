@@ -79,6 +79,10 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`Standard attributes are part of every project, so they cannot be deleted.`);
     case "type_immutable":
       return i18n._(msg`An attribute's type is fixed once it is declared.`);
+    case "version_mismatch":
+      return i18n._(
+        msg`Someone else changed this since you opened it. Reload to see their changes, then make yours again.`,
+      );
     case "key_immutable":
       return i18n._(msg`A key never changes once it is set.`);
     case "scope_not_allowed":

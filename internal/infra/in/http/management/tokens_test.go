@@ -342,7 +342,7 @@ func TestAPersonalTokensPermissionsAreNarrowedByItsScopes(t *testing.T) {
 	// which keys exist from a write it cannot make.
 	name := "x"
 	for _, key := range []string{p.Key, "no-such-project"} {
-		patch := do(reader.UpdateProjectWithResponse(t.Context(), key, management.ProjectPatch{Name: &name}))
+		patch := do(reader.UpdateProjectWithResponse(t.Context(), key, &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Name: &name}))
 		assertProblem(t, key, patch.StatusCode(), patch.Body, http.StatusForbidden, "insufficient_scope")
 	}
 }

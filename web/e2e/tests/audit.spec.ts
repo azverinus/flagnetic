@@ -23,6 +23,7 @@ async function seedHistory(): Promise<string> {
       client,
       path: { project, environment: "staging" },
       body: { name: "Pre-production" },
+      headers: { "If-Match": '"1"' },
     }),
   );
   must(
@@ -35,7 +36,11 @@ async function seedHistory(): Promise<string> {
   );
   must(
     "deleting sandbox",
-    await deleteEnvironment({ client, path: { project, environment: "sandbox" } }),
+    await deleteEnvironment({
+      client,
+      path: { project, environment: "sandbox" },
+      headers: { "If-Match": '"1"' },
+    }),
   );
   for (let i = 0; i < 50; i++) {
     must(

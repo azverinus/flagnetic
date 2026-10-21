@@ -239,7 +239,7 @@ func TestDeletingAnAttributeWhileARuleStartsNamingItNeverBothSucceed(t *testing.
 		}
 		codes := race(
 			func() error {
-				return a.undeclare.Handle(t.Context(), appworkspace.DeleteAttributeCommand{Project: p, Key: "plan", Request: a.req})
+				return a.undeclare.Handle(t.Context(), appworkspace.DeleteAttributeCommand{Project: p, Key: "plan", Expected: precondition.On(1), Request: a.req})
 			},
 			func() error {
 				return a.put(t.Context(), p, "banner", flags.ConfigurationInput{OffVariation: "false", Fallthrough: "false",

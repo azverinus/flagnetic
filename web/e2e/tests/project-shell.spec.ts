@@ -1,7 +1,8 @@
+import { updateProject } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { type Credentials, signIn } from "../support/console";
+import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
 import { admin, secondProject, seededProject, viewer } from "../support/instance";
 
 /** Signs in and lands on one project's overview. */
@@ -479,5 +480,30 @@ test.describe("renaming a project", () => {
     await expect(page.getByText("The project is saved.")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("After");
     await expect(switcher(page)).toHaveAccessibleName("Project: After");
+  });
+  test("refuses to overwrite a change someone else saved meanwhile", async ({ page }) => {
+    const key = await seedProject("conflict");
+    await signIn(page);
+    await page.goto(`/projects/${key}/settings`);
+    await page.getByLabel("Name").fill("Mine");
+
+    must(
+      "renaming it elsewhere",
+      await updateProject({
+        client: managementClient(),
+        path: { project: key },
+        body: { name: "Theirs" },
+        headers: { "If-Match": '"1"' },
+      }),
+    );
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(
+      page.getByText(
+        "Someone else changed this since you opened it. Reload to see their changes, then make yours again.",
+      ),
+    ).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Name")).toHaveValue("Theirs");
   });
 });

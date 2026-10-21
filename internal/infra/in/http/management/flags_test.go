@@ -196,7 +196,7 @@ func TestANewEnvironmentConfiguresEveryExistingFlag(t *testing.T) {
 	if v := rulesetVersions(t, p)["qa"]; v != 1 {
 		t.Errorf("qa's ruleset version = %d, want 1", v)
 	}
-	deleted := do(admin.DeleteEnvironmentWithResponse(t.Context(), p.Key, "qa"))
+	deleted := do(admin.DeleteEnvironmentWithResponse(t.Context(), p.Key, "qa", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
 	status(t, "delete qa", deleted.StatusCode(), deleted.Body, http.StatusNoContent)
 	var envs []string
 	for _, c := range getFlag(t, admin, p.Key, "limit").Environments {

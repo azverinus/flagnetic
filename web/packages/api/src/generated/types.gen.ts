@@ -236,6 +236,7 @@ export type Project = {
    * How many active members hold a grant in the project.
    */
   member_count: number;
+  version: Version;
 };
 
 export type ProjectList = {
@@ -546,6 +547,7 @@ export type Environment = {
    * Where the environment is listed among its project's, the first created first.
    */
   sort_order: number;
+  version: Version;
 };
 
 export type EnvironmentList = {
@@ -570,6 +572,7 @@ export type UnitType = {
   key: Key;
   name: Name;
   description: Description;
+  version: Version;
 };
 
 export type UnitTypeList = {
@@ -619,6 +622,7 @@ export type Attribute = {
    * Predeclared in every project; renamable, never deleted or retyped.
    */
   standard: boolean;
+  version: Version;
 };
 
 export type AttributeList = {
@@ -2176,6 +2180,17 @@ export type GetProjectResponse = GetProjectResponses[keyof GetProjectResponses];
 
 export type UpdateProjectData = {
   body: ProjectPatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
   path: {
     /**
      * The project's key.
@@ -2187,6 +2202,10 @@ export type UpdateProjectData = {
 };
 
 export type UpdateProjectErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
   /**
    * No credential, or one that is not accepted: `unauthenticated` without
    * a credential (a session cookie the server did not issue counts as
@@ -2210,9 +2229,17 @@ export type UpdateProjectErrors = {
    */
   404: Problem;
   /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
 };
 
 export type UpdateProjectError = UpdateProjectErrors[keyof UpdateProjectErrors];
@@ -2381,6 +2408,17 @@ export type CreateEnvironmentResponse =
 
 export type DeleteEnvironmentData = {
   body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
   path: {
     /**
      * The project's key.
@@ -2396,6 +2434,10 @@ export type DeleteEnvironmentData = {
 };
 
 export type DeleteEnvironmentErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
   /**
    * No credential, or one that is not accepted: `unauthenticated` without
    * a credential (a session cookie the server did not issue counts as
@@ -2422,6 +2464,14 @@ export type DeleteEnvironmentErrors = {
    * The change conflicts with what exists, such as `already_exists` for a key already in use.
    */
   409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
 };
 
 export type DeleteEnvironmentError = DeleteEnvironmentErrors[keyof DeleteEnvironmentErrors];
@@ -2490,6 +2540,17 @@ export type GetEnvironmentResponse = GetEnvironmentResponses[keyof GetEnvironmen
 
 export type UpdateEnvironmentData = {
   body: EnvironmentPatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
   path: {
     /**
      * The project's key.
@@ -2505,6 +2566,10 @@ export type UpdateEnvironmentData = {
 };
 
 export type UpdateEnvironmentErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
   /**
    * No credential, or one that is not accepted: `unauthenticated` without
    * a credential (a session cookie the server did not issue counts as
@@ -2528,9 +2593,17 @@ export type UpdateEnvironmentErrors = {
    */
   404: Problem;
   /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
 };
 
 export type UpdateEnvironmentError = UpdateEnvironmentErrors[keyof UpdateEnvironmentErrors];
@@ -2715,6 +2788,17 @@ export type CreateUnitTypeResponse = CreateUnitTypeResponses[keyof CreateUnitTyp
 
 export type DeleteUnitTypeData = {
   body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
   path: {
     /**
      * The project's key.
@@ -2730,6 +2814,10 @@ export type DeleteUnitTypeData = {
 };
 
 export type DeleteUnitTypeErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
   /**
    * No credential, or one that is not accepted: `unauthenticated` without
    * a credential (a session cookie the server did not issue counts as
@@ -2756,6 +2844,14 @@ export type DeleteUnitTypeErrors = {
    * The change conflicts with what exists, such as `already_exists` for a key already in use.
    */
   409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
 };
 
 export type DeleteUnitTypeError = DeleteUnitTypeErrors[keyof DeleteUnitTypeErrors];
@@ -2823,6 +2919,17 @@ export type GetUnitTypeResponse = GetUnitTypeResponses[keyof GetUnitTypeResponse
 
 export type UpdateUnitTypeData = {
   body: UnitTypePatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
   path: {
     /**
      * The project's key.
@@ -2838,6 +2945,10 @@ export type UpdateUnitTypeData = {
 };
 
 export type UpdateUnitTypeErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
   /**
    * No credential, or one that is not accepted: `unauthenticated` without
    * a credential (a session cookie the server did not issue counts as
@@ -2861,9 +2972,17 @@ export type UpdateUnitTypeErrors = {
    */
   404: Problem;
   /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
 };
 
 export type UpdateUnitTypeError = UpdateUnitTypeErrors[keyof UpdateUnitTypeErrors];
@@ -2983,6 +3102,17 @@ export type CreateAttributeResponse = CreateAttributeResponses[keyof CreateAttri
 
 export type DeleteAttributeData = {
   body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
   path: {
     /**
      * The project's key.
@@ -2998,6 +3128,10 @@ export type DeleteAttributeData = {
 };
 
 export type DeleteAttributeErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
   /**
    * No credential, or one that is not accepted: `unauthenticated` without
    * a credential (a session cookie the server did not issue counts as
@@ -3024,6 +3158,14 @@ export type DeleteAttributeErrors = {
    * The change conflicts with what exists, such as `already_exists` for a key already in use.
    */
   409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
 };
 
 export type DeleteAttributeError = DeleteAttributeErrors[keyof DeleteAttributeErrors];
@@ -3091,6 +3233,17 @@ export type GetAttributeResponse = GetAttributeResponses[keyof GetAttributeRespo
 
 export type UpdateAttributeData = {
   body: AttributePatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
   path: {
     /**
      * The project's key.
@@ -3106,6 +3259,10 @@ export type UpdateAttributeData = {
 };
 
 export type UpdateAttributeErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
   /**
    * No credential, or one that is not accepted: `unauthenticated` without
    * a credential (a session cookie the server did not issue counts as
@@ -3129,9 +3286,17 @@ export type UpdateAttributeErrors = {
    */
   404: Problem;
   /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
    * The request is well formed but breaks a rule; `errors` names each field to fix.
    */
   422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
 };
 
 export type UpdateAttributeError = UpdateAttributeErrors[keyof UpdateAttributeErrors];

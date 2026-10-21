@@ -20,6 +20,8 @@ type Environment struct {
 	SortOrder int
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// Version counts the environment's accepted changes, from 1.
+	Version int64
 }
 
 // EnvironmentID identifies an environment.
@@ -32,7 +34,7 @@ func NewEnvironment(environmentID EnvironmentID, project ProjectID, key, name st
 		return Environment{}, err
 	}
 	return Environment{
-		ID: environmentID, Project: project, Key: key, Name: f.name, SortOrder: sortOrder, CreatedAt: now, UpdatedAt: now,
+		ID: environmentID, Project: project, Key: key, Name: f.name, SortOrder: sortOrder, CreatedAt: now, UpdatedAt: now, Version: 1,
 	}, nil
 }
 
@@ -61,7 +63,7 @@ func (e Environment) Change(c EnvironmentChange, now time.Time) (Environment, bo
 		return e, false, nil
 	}
 	out := e
-	out.Name, out.UpdatedAt = f.name, now
+	out.Name, out.UpdatedAt, out.Version = f.name, now, e.Version+1
 	return out, true, nil
 }
 
@@ -89,6 +91,8 @@ type UnitType struct {
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	// Version counts the unit type's accepted changes, from 1.
+	Version int64
 }
 
 // UnitTypeID identifies a unit type.
@@ -101,7 +105,7 @@ func NewUnitType(unitTypeID UnitTypeID, project ProjectID, key, name, descriptio
 		return UnitType{}, err
 	}
 	return UnitType{
-		ID: unitTypeID, Project: project, Key: key, Name: f.name, Description: f.description, CreatedAt: now, UpdatedAt: now,
+		ID: unitTypeID, Project: project, Key: key, Name: f.name, Description: f.description, CreatedAt: now, UpdatedAt: now, Version: 1,
 	}, nil
 }
 
@@ -128,7 +132,7 @@ func (u UnitType) Change(c UnitTypeChange, now time.Time) (UnitType, bool, error
 		return u, false, nil
 	}
 	out := u
-	out.Name, out.Description, out.UpdatedAt = f.name, f.description, now
+	out.Name, out.Description, out.UpdatedAt, out.Version = f.name, f.description, now, u.Version+1
 	return out, true, nil
 }
 
@@ -171,6 +175,8 @@ type Attribute struct {
 	Standard  bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// Version counts the attribute's accepted changes, from 1.
+	Version int64
 }
 
 // AttributeID identifies an attribute.
@@ -208,7 +214,7 @@ func NewAttribute(attributeID AttributeID, project ProjectID, key, name, descrip
 	}
 	return Attribute{
 		ID: attributeID, Project: project, Key: key, Name: f.name, Description: f.description, Type: typ,
-		CreatedAt: now, UpdatedAt: now,
+		CreatedAt: now, UpdatedAt: now, Version: 1,
 	}, nil
 }
 
@@ -248,7 +254,7 @@ func (a Attribute) Change(c AttributeChange, now time.Time) (Attribute, bool, er
 		return a, false, nil
 	}
 	out := a
-	out.Name, out.Description, out.UpdatedAt = f.name, f.description, now
+	out.Name, out.Description, out.UpdatedAt, out.Version = f.name, f.description, now, a.Version+1
 	return out, true, nil
 }
 
@@ -321,19 +327,19 @@ func DefaultsOf(p Project, ids IDs) ProjectDefaults {
 	for i, e := range defaultEnvironments {
 		d.Environments = append(d.Environments, Environment{
 			ID: ids.Environment(), Project: p.ID, Key: e.Key, Name: e.Name, SortOrder: i + 1,
-			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt,
+			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt, Version: 1,
 		})
 	}
 	for _, u := range defaultUnitTypes {
 		d.UnitTypes = append(d.UnitTypes, UnitType{
 			ID: ids.UnitType(), Project: p.ID, Key: u.Key, Name: u.Name, Description: u.Description,
-			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt,
+			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt, Version: 1,
 		})
 	}
 	for _, a := range standardAttributes {
 		d.Attributes = append(d.Attributes, Attribute{
 			ID: ids.Attribute(), Project: p.ID, Key: a.Key, Name: a.Name, Type: a.Type, Standard: true,
-			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt,
+			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt, Version: 1,
 		})
 	}
 	return d

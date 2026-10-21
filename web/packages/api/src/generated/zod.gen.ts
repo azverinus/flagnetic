@@ -107,18 +107,6 @@ export const zName = z.string().min(1).max(200);
 
 export const zDescription = z.string().max(2000);
 
-export const zProject = z.object({
-  id: z.uuid(),
-  key: zKey,
-  name: zName,
-  description: zDescription,
-  member_count: z.int(),
-});
-
-export const zProjectList = z.object({
-  items: z.array(zProject),
-});
-
 export const zProjectCreate = z.object({
   key: zKey,
   name: zName,
@@ -351,17 +339,6 @@ export const zProjectMe = z.object({
   permissions: z.array(zPermission),
 });
 
-export const zEnvironment = z.object({
-  id: z.uuid(),
-  key: zKey,
-  name: zName,
-  sort_order: z.int(),
-});
-
-export const zEnvironmentList = z.object({
-  items: z.array(zEnvironment),
-});
-
 export const zEnvironmentCreate = z.object({
   key: zKey,
   name: zName,
@@ -372,13 +349,6 @@ export const zEnvironmentPatch = z.object({
   name: zName.optional(),
 });
 
-export const zUnitType = z.object({
-  id: z.uuid(),
-  key: zKey,
-  name: zName,
-  description: zDescription,
-});
-
 /**
  * How many flags (archived ones included, each counted once whatever
  * its environments) and segments name it, in a rule's condition, a
@@ -387,16 +357,6 @@ export const zUnitType = z.object({
  *
  */
 export const zDeclarationUsageCount = z.int().gte(0);
-
-export const zUnitTypeListItem = zUnitType.and(
-  z.object({
-    usage_count: zDeclarationUsageCount,
-  }),
-);
-
-export const zUnitTypeList = z.object({
-  items: z.array(zUnitTypeListItem),
-});
 
 export const zUnitTypeCreate = z.object({
   key: zKey,
@@ -414,25 +374,6 @@ export const zUnitTypePatch = z.object({
  * The type of an attribute's values; `semver` is a semantic version, `list` a list of strings.
  */
 export const zAttributeType = z.enum(["string", "number", "boolean", "semver", "date", "list"]);
-
-export const zAttribute = z.object({
-  id: z.uuid(),
-  key: zKey,
-  type: zAttributeType,
-  name: zName,
-  description: zDescription,
-  standard: z.boolean(),
-});
-
-export const zAttributeListItem = zAttribute.and(
-  z.object({
-    usage_count: zDeclarationUsageCount,
-  }),
-);
-
-export const zAttributeList = z.object({
-  items: z.array(zAttributeListItem),
-});
 
 export const zAttributeCreate = z.object({
   key: zKey,
@@ -525,6 +466,69 @@ export const zVersion = z.coerce
   .max(BigInt("9223372036854775807"), {
     error: "Invalid value: Expected int64 to be <= 9223372036854775807",
   });
+
+export const zProject = z.object({
+  id: z.uuid(),
+  key: zKey,
+  name: zName,
+  description: zDescription,
+  member_count: z.int(),
+  version: zVersion,
+});
+
+export const zProjectList = z.object({
+  items: z.array(zProject),
+});
+
+export const zEnvironment = z.object({
+  id: z.uuid(),
+  key: zKey,
+  name: zName,
+  sort_order: z.int(),
+  version: zVersion,
+});
+
+export const zEnvironmentList = z.object({
+  items: z.array(zEnvironment),
+});
+
+export const zUnitType = z.object({
+  id: z.uuid(),
+  key: zKey,
+  name: zName,
+  description: zDescription,
+  version: zVersion,
+});
+
+export const zUnitTypeListItem = zUnitType.and(
+  z.object({
+    usage_count: zDeclarationUsageCount,
+  }),
+);
+
+export const zUnitTypeList = z.object({
+  items: z.array(zUnitTypeListItem),
+});
+
+export const zAttribute = z.object({
+  id: z.uuid(),
+  key: zKey,
+  type: zAttributeType,
+  name: zName,
+  description: zDescription,
+  standard: z.boolean(),
+  version: zVersion,
+});
+
+export const zAttributeListItem = zAttribute.and(
+  z.object({
+    usage_count: zDeclarationUsageCount,
+  }),
+);
+
+export const zAttributeList = z.object({
+  items: z.array(zAttributeListItem),
+});
 
 export const zFlagType = z.enum(["boolean", "string", "number", "json"]);
 
@@ -1103,6 +1107,10 @@ export const zGetProjectResponse = zProject;
 
 export const zUpdateProjectBody = zProjectPatch;
 
+export const zUpdateProjectHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
 export const zUpdateProjectPath = z.object({
   project: z.string(),
 });
@@ -1141,6 +1149,10 @@ export const zCreateEnvironmentPath = z.object({
  */
 export const zCreateEnvironmentResponse = zEnvironment;
 
+export const zDeleteEnvironmentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
 export const zDeleteEnvironmentPath = z.object({
   project: z.string(),
   environment: z.string(),
@@ -1162,6 +1174,10 @@ export const zGetEnvironmentPath = z.object({
 export const zGetEnvironmentResponse = zEnvironment;
 
 export const zUpdateEnvironmentBody = zEnvironmentPatch;
+
+export const zUpdateEnvironmentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
 
 export const zUpdateEnvironmentPath = z.object({
   project: z.string(),
@@ -1205,6 +1221,10 @@ export const zCreateUnitTypePath = z.object({
  */
 export const zCreateUnitTypeResponse = zUnitType;
 
+export const zDeleteUnitTypeHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
 export const zDeleteUnitTypePath = z.object({
   project: z.string(),
   unit_type: z.string(),
@@ -1226,6 +1246,10 @@ export const zGetUnitTypePath = z.object({
 export const zGetUnitTypeResponse = zUnitType;
 
 export const zUpdateUnitTypeBody = zUnitTypePatch;
+
+export const zUpdateUnitTypeHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
 
 export const zUpdateUnitTypePath = z.object({
   project: z.string(),
@@ -1257,6 +1281,10 @@ export const zCreateAttributePath = z.object({
  */
 export const zCreateAttributeResponse = zAttribute;
 
+export const zDeleteAttributeHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
 export const zDeleteAttributePath = z.object({
   project: z.string(),
   attribute: z.string(),
@@ -1278,6 +1306,10 @@ export const zGetAttributePath = z.object({
 export const zGetAttributeResponse = zAttribute;
 
 export const zUpdateAttributeBody = zAttributePatch;
+
+export const zUpdateAttributeHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
 
 export const zUpdateAttributePath = z.object({
   project: z.string(),

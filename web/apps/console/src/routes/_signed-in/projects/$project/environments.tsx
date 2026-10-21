@@ -29,6 +29,7 @@ import { useCan } from "@/lib/access";
 import type { Permission } from "@/lib/access-names";
 import { ApiError, unwrap } from "@/lib/errors";
 import { keySchema, nameSchema } from "@/lib/forms";
+import { ifMatch } from "@/lib/http";
 import { useListMutation } from "@/lib/mutations";
 import { environmentsQuery } from "@/lib/queries";
 
@@ -125,7 +126,14 @@ function Environments() {
         // An environment will carry flag values and SDK keys: deleting
         // the wrong one is costly, so its key is typed out first.
         typeToConfirm
-        remove={(key) => unwrap(deleteEnvironment({ path: { project, environment: key } }))}
+        remove={(key) =>
+          unwrap(
+            deleteEnvironment({
+              path: { project, environment: key },
+              headers: deleting && ifMatch(deleting.version),
+            }),
+          )
+        }
         list={environmentsQuery(project).queryKey}
       >
         {(key) => (
@@ -204,7 +212,13 @@ function RenameEnvironment({
   });
   const rename = useListMutation(
     (body: Values) =>
-      unwrap(updateEnvironment({ path: { project, environment: environment.key }, body })),
+      unwrap(
+        updateEnvironment({
+          path: { project, environment: environment.key },
+          body,
+          headers: ifMatch(environment.version),
+        }),
+      ),
     environmentsQuery(project).queryKey,
     onDone,
   );

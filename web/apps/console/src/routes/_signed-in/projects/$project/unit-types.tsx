@@ -26,6 +26,7 @@ import { useCan } from "@/lib/access";
 import type { Permission } from "@/lib/access-names";
 import { ApiError, unwrap } from "@/lib/errors";
 import { descriptionSchema, keySchema, nameSchema } from "@/lib/forms";
+import { ifMatch } from "@/lib/http";
 import { useListMutation } from "@/lib/mutations";
 import { unitTypesQuery } from "@/lib/queries";
 
@@ -135,7 +136,14 @@ function UnitTypes() {
         onDone={() => setDeleting(undefined)}
         title={(key) => t`Delete ${key}`}
         confirmLabel={<Trans>Delete unit type</Trans>}
-        remove={(key) => unwrap(deleteUnitType({ path: { project, unit_type: key } }))}
+        remove={(key) =>
+          unwrap(
+            deleteUnitType({
+              path: { project, unit_type: key },
+              headers: deleting && ifMatch(deleting.version),
+            }),
+          )
+        }
         list={unitTypesQuery(project).queryKey}
       >
         {(key) => (
@@ -183,6 +191,7 @@ function UnitTypeForm({
           ? updateUnitType({
               path: { project, unit_type: unitType.key },
               body: { name, description },
+              headers: ifMatch(unitType.version),
             })
           : createUnitType({ path: { project }, body: { key: key ?? "", name, description } }),
       ),

@@ -511,6 +511,9 @@ paths:
       responses:
         "201":
           description: The project created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
@@ -534,6 +537,9 @@ paths:
       responses:
         "200":
           description: The project.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
@@ -550,6 +556,8 @@ paths:
       description: The key never changes; sending one is refused with `key_immutable`.
       x-permission: project.update
       tags: [projects]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
@@ -559,18 +567,27 @@ paths:
       responses:
         "200":
           description: The project as changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
         "422":
           $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/me:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -632,6 +649,9 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
@@ -657,6 +677,9 @@ paths:
       responses:
         "200":
           description: Found.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
@@ -672,6 +695,8 @@ paths:
       description: Renames the environment; the key never changes (`key_immutable`).
       x-permission: environment.manage
       tags: [environments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
@@ -681,26 +706,39 @@ paths:
       responses:
         "200":
           description: As changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Environment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
         "422":
           $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
     delete:
       operationId: deleteEnvironment
       description: Deletes the environment; the last one of a project is refused with `last_environment`.
       x-permission: environment.manage
       tags: [environments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       responses:
         "204":
           description: Deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -709,6 +747,10 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/environments/{environment}/evaluate:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -794,6 +836,9 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
@@ -819,6 +864,9 @@ paths:
       responses:
         "200":
           description: Found.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
@@ -834,6 +882,8 @@ paths:
       description: Renames the unit type or changes its description; the key never changes (`key_immutable`).
       x-permission: declaration.manage
       tags: [unit types]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
@@ -843,18 +893,27 @@ paths:
       responses:
         "200":
           description: As changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UnitType"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
         "422":
           $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
     delete:
       operationId: deleteUnitType
       description: |
@@ -863,9 +922,13 @@ paths:
         is refused with `in_use` listing what names it.
       x-permission: declaration.manage
       tags: [unit types]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       responses:
         "204":
           description: Deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -874,6 +937,10 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/attributes:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -910,6 +977,9 @@ paths:
       responses:
         "201":
           description: Created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
@@ -935,6 +1005,9 @@ paths:
       responses:
         "200":
           description: Found.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
@@ -950,6 +1023,8 @@ paths:
       description: Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
       x-permission: declaration.manage
       tags: [attributes]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
@@ -959,18 +1034,27 @@ paths:
       responses:
         "200":
           description: As changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Attribute"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
         "422":
           $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
     delete:
       operationId: deleteAttribute
       description: |
@@ -980,9 +1064,13 @@ paths:
         names it.
       x-permission: declaration.manage
       tags: [attributes]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
       responses:
         "204":
           description: Deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -991,6 +1079,10 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/flags:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -3028,7 +3120,7 @@ components:
       maxLength: 2000
     Project:
       type: object
-      required: [id, key, name, description, member_count]
+      required: [id, key, name, description, member_count, version]
       properties:
         id:
           type: string
@@ -3042,6 +3134,8 @@ components:
         member_count:
           type: integer
           description: How many active members hold a grant in the project.
+        version:
+          $ref: "#/components/schemas/Version"
     ProjectList:
       type: object
       required: [items]
@@ -3417,7 +3511,7 @@ components:
             $ref: "#/components/schemas/Permission"
     Environment:
       type: object
-      required: [id, key, name, sort_order]
+      required: [id, key, name, sort_order, version]
       properties:
         id:
           type: string
@@ -3429,6 +3523,8 @@ components:
         sort_order:
           type: integer
           description: Where the environment is listed among its project's, the first created first.
+        version:
+          $ref: "#/components/schemas/Version"
     EnvironmentList:
       type: object
       required: [items]
@@ -3455,7 +3551,7 @@ components:
           $ref: "#/components/schemas/Name"
     UnitType:
       type: object
-      required: [id, key, name, description]
+      required: [id, key, name, description, version]
       properties:
         id:
           type: string
@@ -3466,6 +3562,8 @@ components:
           $ref: "#/components/schemas/Name"
         description:
           $ref: "#/components/schemas/Description"
+        version:
+          $ref: "#/components/schemas/Version"
     UnitTypeList:
       type: object
       required: [items]
@@ -3516,7 +3614,7 @@ components:
       description: The type of an attribute's values; `semver` is a semantic version, `list` a list of strings.
     Attribute:
       type: object
-      required: [id, key, type, name, description, standard]
+      required: [id, key, type, name, description, standard, version]
       properties:
         id:
           type: string
@@ -3532,6 +3630,8 @@ components:
         standard:
           type: boolean
           description: Predeclared in every project; renamable, never deleted or retyped.
+        version:
+          $ref: "#/components/schemas/Version"
     AttributeList:
       type: object
       required: [items]

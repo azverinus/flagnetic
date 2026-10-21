@@ -34,11 +34,11 @@ func newProjectTokens(t *testing.T) projectTokens {
 	t.Helper()
 	pool, c := testkit.Pool(t), testkit.Clock()
 	ids := id.NewSource(c)
-	project := workspace.Project{
-		ID: id.New[workspace.Project](ids), Key: "p" + strings.ToLower(rand.Text()[:12]), Name: "Tokens",
-		CreatedAt: c.Now(), UpdatedAt: c.Now(),
+	project, err := workspace.NewProject(id.New[workspace.Project](ids), "p"+strings.ToLower(rand.Text()[:12]), "Tokens", "", c.Now())
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := pgworkspace.NewStore(pool).CreateProject(t.Context(), project); err != nil {
+	if err = pgworkspace.NewStore(pool).CreateProject(t.Context(), project); err != nil {
 		t.Fatal(err)
 	}
 	m := testkit.NewMember(t, pool)

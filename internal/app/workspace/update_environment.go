@@ -5,6 +5,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // EnvironmentUpdater stores an environment's changed name.
@@ -27,15 +28,18 @@ func NewUpdateEnvironment(tx Transactor, store EnvironmentUpdater, rec Recorder)
 	return &UpdateEnvironment{tx: tx, store: store, rec: rec}
 }
 
-// UpdateEnvironmentCommand is a change to the environment Key of Project.
+// UpdateEnvironmentCommand is a change to the environment Key of Project,
+// based on the version Expected names.
 type UpdateEnvironmentCommand struct {
-	Project workspace.ProjectID
-	Key     string
-	Change  workspace.EnvironmentChange
-	Request governance.Request
+	Project  workspace.ProjectID
+	Key      string
+	Change   workspace.EnvironmentChange
+	Expected precondition.Version
+	Request  governance.Request
 }
 
-// Handle applies the change and returns the environment as it is after it;
+// Handle applies the change, validated first and then judged against the
+// version it was based on, and returns the environment as it is after it;
 // a change to the values it already has stores and records nothing.
 func (h *UpdateEnvironment) Handle(ctx context.Context, cmd UpdateEnvironmentCommand) (workspace.Environment, error) {
 	now := h.rec.clock.Now()
@@ -46,9 +50,15 @@ func (h *UpdateEnvironment) Handle(ctx context.Context, cmd UpdateEnvironmentCom
 			return notFound(err, "environment")
 		}
 		after, changed, err := before.Change(cmd.Change, now)
-		if err != nil || !changed {
-			out = before
+		if err != nil {
 			return err
+		}
+		if err = precondition.Check(cmd.Expected, before.Version); err != nil {
+			return err
+		}
+		if !changed {
+			out = before
+			return nil
 		}
 		if err := h.store.UpdateEnvironment(ctx, after); err != nil {
 			return err

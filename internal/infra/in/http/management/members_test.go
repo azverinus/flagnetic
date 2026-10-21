@@ -336,7 +336,7 @@ func TestAProjectCountsItsMembers(t *testing.T) {
 	grant(t, admin, p.Key, members[0].ID, "owner")
 	do(admin.DeactivateMemberWithResponse(t.Context(), members[2].ID.String()))
 
-	if got := do(admin.UpdateProjectWithResponse(t.Context(), p.Key, management.ProjectPatch{Name: ptr("Counted")})); got.JSON200 == nil ||
+	if got := do(admin.UpdateProjectWithResponse(t.Context(), p.Key, &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Name: ptr("Counted")})); got.JSON200 == nil ||
 		got.JSON200.MemberCount != 2 {
 		t.Errorf("updated = %d %s, want two active members", got.StatusCode(), got.Body)
 	}

@@ -51,7 +51,7 @@ func writeAuditLog(t *testing.T) auditLog {
 	c.Advance(time.Minute)
 	l.qa = *do(l.second.CreateEnvironmentWithResponse(ctx, "mobile", management.EnvironmentCreate{Key: "qa", Name: "QA"})).JSON201
 	c.Advance(time.Minute)
-	do(l.second.UpdateEnvironmentWithResponse(ctx, "mobile", "qa", management.EnvironmentPatch{Name: ptr("Quality")}))
+	do(l.second.UpdateEnvironmentWithResponse(ctx, "mobile", "qa", &management.UpdateEnvironmentParams{IfMatch: ifMatch(1)}, management.EnvironmentPatch{Name: ptr("Quality")}))
 	c.Advance(time.Minute)
 	l.pipeline = testkit.Client(t, l.srv, testkit.ProjectToken(t, pool, projectIDOf(l.mobile), access.RoleMaintainer))
 	do(l.pipeline.CreateUnitTypeWithResponse(ctx, "mobile", management.UnitTypeCreate{Key: "device", Name: "Device"}))

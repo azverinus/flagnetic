@@ -50,6 +50,14 @@ describe("a refusal in the member's language", () => {
     );
   });
 
+  it("asks to reload when someone else saved since the form was opened", () => {
+    expect(
+      problemMessage(i18n, refusal(412, { code: "version_mismatch", current_version: 3 })),
+    ).toBe(
+      "Someone else changed this since you opened it. Reload to see their changes, then make yours again.",
+    );
+  });
+
   it("explains the refusals of administering members and accepting an invitation", () => {
     expect(problemMessage(i18n, refusal(409, { code: "last_instance_admin" }))).toBe(
       "This is the instance's last active instance admin. Make another member instance admin first.",
