@@ -15,6 +15,7 @@ Any number of replicas can run against one database; every replica serves every 
 |---|---|
 | `flagnetic serve` | Runs a replica. |
 | `flagnetic migrate` | Applies pending migrations and exits. Safe to run again, and safe to run from several places at once. |
+| `flagnetic admin bootstrap` | Creates the first instance admin and their API token; see [The first instance admin](#the-first-instance-admin). |
 | `flagnetic healthcheck` | Asks the replica on the configured listen address whether it is ready; exits 0 when it is, 1 otherwise. |
 | `flagnetic version` | Prints the version. |
 
@@ -31,6 +32,21 @@ With `FLAGNETIC_AUTO_MIGRATE=false`, `serve` compares the database's schema with
 - **Behind** (the job has not run yet): `serve` refuses to start, exit code 1, naming both versions and `flagnetic migrate`. New code never meets an old schema.
 - **Ahead** (a binary rolled back after a newer one migrated): `serve` starts and logs a warning naming both versions. Migrations only add to the schema in a way older binaries ignore, so a rollback keeps working.
 - **Equal**: `serve` starts without a word.
+
+## The first instance admin
+
+A fresh instance has no one who can sign in. `flagnetic admin bootstrap` creates the first instance admin, with a password and an API token, from the command line and the database's own configuration:
+
+```sh
+FLAGNETIC_ADMIN_PASSWORD='…' flagnetic admin bootstrap --email ops@example.com --name "Ops" --token-file /run/secrets/flagnetic-token --if-absent
+```
+
+- `--email` is required; `--name` defaults to the email's local part.
+- The password is `FLAGNETIC_ADMIN_PASSWORD`. Without it, one is generated and printed once on standard error.
+- The API token carries every scope and does not expire: whoever runs the command holds the database's credentials already. It is printed on standard output, or written to `--token-file` with mode 0600 instead, so a provisioning script can pick it up without it reaching a log.
+- Once an instance admin exists, bootstrap is refused with exit code 1, so it never adds a second one by accident. With `--if-absent` that is a success that does nothing (exit 0), which makes provisioning safe to rerun.
+- Two bootstraps running at once cannot both succeed. Both changes are recorded in the audit log with the CLI as their actor.
+- The schema must be migrated first (`flagnetic migrate`, or a replica started once).
 
 ## Probes
 

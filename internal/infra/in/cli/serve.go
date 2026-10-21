@@ -11,12 +11,15 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 // workerStopBound is how long the stop waits for worker rounds, and for
@@ -63,6 +66,8 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	edgeOpts := flaghttp.OptionsFrom(cfg)
 	edgeOpts.Logger, edgeOpts.DB, edgeOpts.Metrics = log, pool, flaghttp.NewMetrics(reg)
 	edge := flaghttp.New(edgeOpts)
+	system := clock.System{}
+	compose.Management(edge, compose.Deps{Pool: pool, Clock: system, IDs: id.NewSource(system)}, reg)
 	for _, r := range o.routes {
 		edge.Handle(r.pattern, r.handler)
 	}

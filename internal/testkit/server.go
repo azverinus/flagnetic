@@ -12,12 +12,15 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 // Server is a replica's public handler served in-process, for black-box HTTP
@@ -78,6 +81,7 @@ func (s *Server) Scrape(t testing.TB) string {
 }
 
 type serverOptions struct {
+	clock   clock.Clock
 	workers []worker.Worker
 	pool    *pgxpool.Pool
 	edge    []func(*flaghttp.Options)
@@ -111,6 +115,11 @@ func WithEdge(change func(*flaghttp.Options)) ServerOption {
 // ServerOption changes what the in-process server is built with.
 type ServerOption func(*serverOptions)
 
+// WithClock serves with c as the application clock instead of the wall clock.
+func WithClock(c clock.Clock) ServerOption {
+	return func(o *serverOptions) { o.clock = c }
+}
+
 // WithPool serves with pool instead of the package's migrated one, such as a
 // pool whose PostgreSQL is unreachable.
 func WithPool(pool *pgxpool.Pool) ServerOption {
@@ -142,6 +151,11 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		}
 	}
 	h := flaghttp.New(edge)
+	c := o.clock
+	if c == nil {
+		c = clock.System{}
+	}
+	compose.Management(h, compose.Deps{Pool: o.pool, Clock: c, IDs: id.NewSource(c)}, reg)
 	for _, r := range o.routes {
 		h.Handle(r.pattern, r.build(h), r.opts...)
 	}

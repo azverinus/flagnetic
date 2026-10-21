@@ -1,0 +1,100 @@
+package operations
+
+import (
+	"bytes"
+	"flag"
+	"os"
+	"strings"
+	"testing"
+)
+
+var update = flag.Bool("update", false, "write the operation table from the document")
+
+const documentPath = "../../../../../../api/management.yaml"
+
+// TestTheOperationTableIsTheDocument: the table the permission seam reads is
+// generated from the document's annotations, and `task generate` writes it.
+func TestTheOperationTableIsTheDocument(t *testing.T) {
+	doc, err := os.ReadFile(documentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ops, err := Read(doc)
+	if err != nil {
+		t.Fatalf("the document does not declare what every operation requires:\n%v", err)
+	}
+	want, err := render(ops)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *update {
+		if err = os.WriteFile("table.gen.go", want, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	got, err := os.ReadFile("table.gen.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Error("table.gen.go is stale; run task generate")
+	}
+}
+
+func TestEveryOperationOfTheDocumentIsInTheTableAndServed(t *testing.T) {
+	doc, err := os.ReadFile(documentPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ops, err := Read(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ops) != len(Table) {
+		t.Errorf("the document has %d operations, the table %d", len(ops), len(Table))
+	}
+	for pattern, op := range ops {
+		if Table[pattern] != op {
+			t.Errorf("%s: table holds %+v, the document says %+v", pattern, Table[pattern], op)
+		}
+	}
+}
+
+func TestAnOperationMustDeclareAKnownPermission(t *testing.T) {
+	for name, operation := range map[string]string{
+		"no annotation":            "operationId: listThings",
+		"unknown permission":       "operationId: listThings\n      x-permission: thing.read",
+		"a role, not a permission": "operationId: listThings\n      x-permission: owner",
+		"no identifier":            "x-permission: member",
+	} {
+		doc := "paths:\n  /things:\n    parameters: []\n    get:\n      " + operation + "\n"
+		_, err := Read([]byte(doc))
+		if err == nil || !strings.Contains(err.Error(), "GET /things") {
+			t.Errorf("%s: err = %v, want the operation refused", name, err)
+		}
+	}
+}
+
+func TestAnUnreadableDocumentIsRefused(t *testing.T) {
+	for name, doc := range map[string]string{
+		"not YAML":                   "paths: [",
+		"a session flag not boolean": "paths:\n  /me:\n    patch:\n      operationId: updateMe\n      x-permission: member\n      x-session-required: maybe\n",
+	} {
+		if _, err := Read([]byte(doc)); err == nil {
+			t.Errorf("%s: no error", name)
+		}
+	}
+}
+
+func TestTheSessionFlagAndTheScopeAreRead(t *testing.T) {
+	doc := "paths:\n  /members/{member}:\n    patch:\n      operationId: updateMember\n      x-permission: instance_admin\n      x-session-required: true\n"
+	ops, err := Read([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := ops["PATCH /members/{member}"]
+	if !op.SessionRequired || op.Read || op.Scope != "instance:admin" {
+		t.Errorf("operation = %+v", op)
+	}
+}

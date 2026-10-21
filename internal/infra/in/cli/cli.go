@@ -31,6 +31,7 @@ Commands:
   serve         Run the server
   migrate       Apply pending database migrations and exit
   healthcheck   Exit 0 when the local server is ready, 1 otherwise
+  admin         Administer the instance from the command line (admin help)
   version       Print the version and exit
   help          Print this help
 
@@ -135,6 +136,15 @@ func Main(args []string, lookupEnv func(string) (string, bool), stdout, stderr i
 		case "migrate":
 			exited <- withConfig(func(cfg config.Config, log *slog.Logger) int {
 				return migrate(stop, cfg, log, o)
+			})
+		case "admin":
+			if code, done := adminHelp(args[1:], stdout, stderr); done {
+				exited <- code
+				break
+			}
+			cl := commandLine{args: args[1:], lookupEnv: lookupEnv, stdout: stdout, stderr: stderr}
+			exited <- withConfig(func(cfg config.Config, log *slog.Logger) int {
+				return admin(stop, cl, cfg, log, o)
 			})
 		case "healthcheck":
 			code := withConfig(func(cfg config.Config, log *slog.Logger) int {

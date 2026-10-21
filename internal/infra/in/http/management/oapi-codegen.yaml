@@ -1,0 +1,15 @@
+# Generates the management API's models, standard-library server, strict
+# server and client from api/management.yaml (`task generate`).
+package: management
+output: api.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+  client: true
+output-options:
+  skip-prune: false
+compatibility:
+  # Enum values are named after their type (MemberStatusActive), so values of
+  # different enums never collide in the package.
+  always-prefix-enum-values: true
