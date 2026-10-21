@@ -58,6 +58,10 @@ func admin(ctx context.Context, cl commandLine, cfg config.Config, log *slog.Log
 	return adminBootstrap(ctx, cl, cfg, log, o)
 }
 
+// nothingToBootstrap is what --if-absent says on an instance that has an
+// instance admin.
+const nothingToBootstrap = "admin bootstrap: an instance admin exists; nothing done"
+
 func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log *slog.Logger, o options) int {
 	fs := flag.NewFlagSet("admin bootstrap", flag.ContinueOnError)
 	fs.SetOutput(cl.stderr)
@@ -91,7 +95,7 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 			return fail(log, "admin bootstrap failed", err)
 		}
 		if exists {
-			fmt.Fprintln(cl.stderr, "admin bootstrap: an instance admin exists; nothing done")
+			fmt.Fprintln(cl.stderr, nothingToBootstrap)
 			return exitOK
 		}
 	}
@@ -112,7 +116,7 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 	if e, ok := apperrors.From(err); ok {
 		switch {
 		case e.Code == appaccess.ErrInstanceAdminExists.Code && *ifAbsent:
-			fmt.Fprintln(cl.stderr, "admin bootstrap: an instance admin exists; nothing done")
+			fmt.Fprintln(cl.stderr, nothingToBootstrap)
 			return exitOK
 		case e.Kind == apperrors.KindInvalid:
 			fmt.Fprintf(cl.stderr, "admin bootstrap: %s\n", describe(e))

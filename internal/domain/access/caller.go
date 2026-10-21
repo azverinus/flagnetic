@@ -45,7 +45,7 @@ type Operation struct {
 	Name string
 	// Requirement is a catalog permission or a reserved value.
 	Requirement Requirement
-	// SessionRequired operations refuse every bearer token, so a leaked token
+	// SessionRequired operations refuse every API token, so a leaked token
 	// can neither mint another credential nor lock its member out.
 	SessionRequired bool
 	// Read operations change nothing.

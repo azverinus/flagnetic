@@ -50,7 +50,7 @@ FLAGNETIC_ADMIN_PASSWORD='…' flagnetic admin bootstrap --email ops@example.com
 
 - `--email` is required; `--name` defaults to the email's local part.
 - The password is `FLAGNETIC_ADMIN_PASSWORD`. Without it, one is generated and printed once on standard error.
-- The API token carries every scope and does not expire: whoever runs the command holds the database's credentials already. It is printed on standard output, or written to `--token-file` instead, so a provisioning script can pick it up without it reaching a log. The file is created new, with mode 0600, before anything else: a path that exists or cannot be created stops the command (exit code 1) with nothing created, and the token is then never printed. With `--if-absent` on an instance that has its admin, the file is not touched.
+- The API token carries every scope and does not expire: whoever runs the command holds the database's credentials already. It is printed on standard output, or written to `--token-file` instead, so a provisioning script can pick it up without it reaching a log. The file is created new, with mode 0600, before anything else: a path that exists or cannot be created stops the command (exit code 1) with nothing created, and the token is then never printed. With `--if-absent` on an instance that has an instance admin, the file is not touched.
 - Once an instance admin exists, bootstrap is refused with exit code 1, so it never adds a second one by accident. With `--if-absent` that is a success that does nothing (exit 0), which makes provisioning safe to rerun.
 - Two bootstraps running at once cannot both succeed. Both changes are recorded in the audit log with the CLI as their actor.
 - The schema must be migrated first (`flagnetic migrate`, or a replica started once).

@@ -119,7 +119,7 @@ var errUnauthenticated = apperrors.Unauthenticated("unauthenticated",
 	"authentication is required: an API token in the Authorization header as Bearer")
 
 // authenticate resolves the request's credential. Any Authorization header
-// is an attempt at a bearer token, so a malformed one is refused rather than
+// is an attempt at an API token presented as Bearer, so a malformed one is refused rather than
 // ignored; a token anywhere else, such as the query string, is never read,
 // since URLs end up in logs and browser histories.
 func (a *api) authenticate(r *http.Request) (access.Caller, error) {

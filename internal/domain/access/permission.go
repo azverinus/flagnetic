@@ -109,7 +109,8 @@ func ScopeOf(requirement Requirement, read bool) Scope {
 // RoleName names a built-in role.
 type RoleName string
 
-// The built-in roles. There are no others: a grant names one of these.
+// The built-in roles, fixed by the release so a name means the same on every
+// instance.
 const (
 	RoleOwner      RoleName = "owner"
 	RoleMaintainer RoleName = "maintainer"

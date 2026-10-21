@@ -4,6 +4,7 @@ package access
 
 import (
 	"context"
+	"errors"
 	"io"
 	"time"
 
@@ -112,12 +113,9 @@ func (h *Bootstrap) Handle(ctx context.Context, cmd BootstrapCommand) (Bootstrap
 	if err != nil {
 		return BootstrapResult{}, err
 	}
-	memberEntry, err := governance.NewEntry(id.New[governance.Entry](h.ids), now, cmd.Request, memberCreated(member))
-	if err != nil {
-		return BootstrapResult{}, err
-	}
-	tokenEntry, err := governance.NewEntry(id.New[governance.Entry](h.ids), now, cmd.Request, tokenCreated(token, member))
-	if err != nil {
+	memberEntry, memberErr := governance.NewEntry(id.New[governance.Entry](h.ids), now, cmd.Request, memberCreated(member))
+	tokenEntry, tokenErr := governance.NewEntry(id.New[governance.Entry](h.ids), now, cmd.Request, tokenCreated(token, member))
+	if err = errors.Join(memberErr, tokenErr); err != nil {
 		return BootstrapResult{}, err
 	}
 	res := BootstrapResult{Member: member, Token: value.Value}
@@ -127,15 +125,15 @@ func (h *Bootstrap) Handle(ctx context.Context, cmd BootstrapCommand) (Bootstrap
 		res.GeneratedPassword = password
 	}
 
-	admin := newAdmin{member: member, password: password, token: token, memberEntry: memberEntry, tokenEntry: tokenEntry}
-	if err := h.tx.Within(ctx, func(ctx context.Context) error { return h.create(ctx, admin) }); err != nil {
+	created := newInstanceAdmin{member: member, password: password, token: token, memberEntry: memberEntry, tokenEntry: tokenEntry}
+	if err := h.tx.Within(ctx, func(ctx context.Context) error { return h.create(ctx, created) }); err != nil {
 		return BootstrapResult{}, err
 	}
 	return res, nil
 }
 
-// newAdmin is what a bootstrap stores, prepared before its unit of work.
-type newAdmin struct {
+// newInstanceAdmin is what a bootstrap stores, prepared before its unit of work.
+type newInstanceAdmin struct {
 	member                  access.Member
 	password                secret.String
 	token                   access.APIToken
@@ -144,7 +142,7 @@ type newAdmin struct {
 
 // create stores the instance admin and their token unless the instance has
 // an instance admin already, in the unit of work ctx carries.
-func (h *Bootstrap) create(ctx context.Context, a newAdmin) error {
+func (h *Bootstrap) create(ctx context.Context, a newInstanceAdmin) error {
 	if err := h.store.LockBootstrap(ctx); err != nil {
 		return err
 	}
@@ -155,7 +153,7 @@ func (h *Bootstrap) create(ctx context.Context, a newAdmin) error {
 	if exists {
 		return ErrInstanceAdminExists
 	}
-	// Hashed only once the instance is known to need its admin, so a
+	// Hashed only once the instance is known to have no instance admin, so a
 	// bootstrap that is refused spends no hashing on a password.
 	hash, err := h.hasher.Hash(ctx, a.password)
 	if err != nil {

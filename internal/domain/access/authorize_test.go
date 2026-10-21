@@ -73,6 +73,9 @@ func TestTheScopeOfAnOperationFollowsItsRequirement(t *testing.T) {
 		{"member", true, ""},
 		{"instance_admin", true, access.ScopeRead},
 		{"instance_admin", false, access.ScopeInstanceAdmin},
+		// A name outside the catalog falls under no scope; the operation
+		// table refuses such a requirement before any operation is served.
+		{"project.update", false, ""},
 	} {
 		if got := access.ScopeOf(tc.requirement, tc.read); got != tc.want {
 			t.Errorf("ScopeOf(%s, read %v) = %q, want %q", tc.requirement, tc.read, got, tc.want)

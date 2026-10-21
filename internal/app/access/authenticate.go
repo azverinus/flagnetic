@@ -18,7 +18,8 @@ type TokenStore interface {
 	TokenByHash(ctx context.Context, hash access.TokenHash) (access.APIToken, *access.Member, error)
 }
 
-// AuthenticateToken resolves a bearer token's value into the caller
+// AuthenticateToken resolves the value of an API token presented as Bearer
+// into the caller
 // presenting it.
 type AuthenticateToken struct {
 	store TokenStore
