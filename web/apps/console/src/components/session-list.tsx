@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { QueryError } from "@/components/query-error";
 import { RowAction, withRowActions } from "@/components/row-dialogs";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table } from "@/components/ui/table";
@@ -21,6 +22,55 @@ import { mySessionsQuery } from "@/lib/queries";
 /** The sessions with the one this page is signed in to first, the rest newest first. */
 export function currentFirst(sessions: readonly Session[]): Session[] {
   return [...sessions].sort((a, b) => Number(b.current) - Number(a.current));
+}
+
+/**
+ * The columns of a list of sessions: the device, this one marked, its
+ * address, and when it signed in, was last seen and ends at the latest.
+ */
+export function useSessionColumns(): ColumnDef<Session, unknown>[] {
+  const { i18n, t } = useLingui();
+  return useMemo<ColumnDef<Session, unknown>[]>(
+    () => [
+      {
+        id: "device",
+        header: t`Device`,
+        cell: ({ row }) => (
+          <span className="flex flex-wrap items-center gap-2">
+            <span title={row.original.user_agent}>{deviceName(i18n, row.original.user_agent)}</span>
+            {row.original.current ? (
+              <Badge>
+                <Trans>This device</Trans>
+              </Badge>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        id: "address",
+        header: t`IP address`,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">{row.original.client_ip ?? t`Unknown`}</span>
+        ),
+      },
+      {
+        id: "created",
+        header: t`Signed in`,
+        cell: ({ row }) => formatDateTime(i18n, row.original.created_at),
+      },
+      {
+        id: "seen",
+        header: t`Last seen`,
+        cell: ({ row }) => formatDateTime(i18n, row.original.last_seen_at),
+      },
+      {
+        id: "ends",
+        header: t`Ends at the latest`,
+        cell: ({ row }) => formatDateTime(i18n, row.original.expires_at),
+      },
+    ],
+    [i18n, t],
+  );
 }
 
 /**
@@ -50,46 +100,9 @@ export function SessionList() {
     () => setRevokingOthers(false),
   );
 
+  const sessionColumns = useSessionColumns();
   const columns = useMemo<ColumnDef<Session, unknown>[]>(() => {
-    const columns: ColumnDef<Session, unknown>[] = [
-      {
-        id: "device",
-        header: t`Device`,
-        cell: ({ row }) => (
-          <span className="flex flex-wrap items-center gap-2">
-            <span title={row.original.user_agent}>{deviceName(i18n, row.original.user_agent)}</span>
-            {row.original.current ? (
-              <span className="rounded-sm border border-primary/40 px-1.5 py-0.5 text-xs text-primary">
-                <Trans>This device</Trans>
-              </span>
-            ) : null}
-          </span>
-        ),
-      },
-      {
-        id: "address",
-        header: t`IP address`,
-        cell: ({ row }) => (
-          <span className="font-mono text-xs">{row.original.client_ip ?? t`Unknown`}</span>
-        ),
-      },
-      {
-        id: "created",
-        header: t`Signed in`,
-        cell: ({ row }) => formatDateTime(i18n, row.original.created_at),
-      },
-      {
-        id: "seen",
-        header: t`Last seen`,
-        cell: ({ row }) => formatDateTime(i18n, row.original.last_seen_at),
-      },
-      {
-        id: "ends",
-        header: t`Ends at the latest`,
-        cell: ({ row }) => formatDateTime(i18n, row.original.expires_at),
-      },
-    ];
-    return withRowActions(columns, true, (session) => {
+    return withRowActions(sessionColumns, true, (session) => {
       if (session.current) return null;
       const device = deviceName(i18n, session.user_agent);
       return (
@@ -100,7 +113,7 @@ export function SessionList() {
         />
       );
     });
-  }, [i18n, t]);
+  }, [i18n, sessionColumns, t]);
 
   if (sessions.isError) {
     return <QueryError error={sessions.error} onRetry={() => void sessions.refetch()} />;

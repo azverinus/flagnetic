@@ -7,6 +7,14 @@ import {
   getProjectAuditEntry,
   listAuditEntries,
   listMembers,
+  getAuthSettings,
+  getInvitation,
+  getMember,
+  listMemberSessions,
+  listMemberTokens,
+  type AuthSettings,
+  type Invitation,
+  type MemberStatus,
   listProjectAuditEntries,
   listProjectMembers,
   type AuditEntry,
@@ -134,6 +142,56 @@ export const membersQuery = queryOptions<Member[]>({
   queryKey: ["members"],
   queryFn: async () => (await unwrap(listMembers())).items,
 });
+
+/** The members a search of the members screen finds, by text and by status. */
+export function memberSearchQuery(search: { q?: string; status?: MemberStatus }) {
+  return queryOptions<Member[]>({
+    queryKey: ["members", "search", search],
+    queryFn: async () => (await unwrap(listMembers({ query: search }))).items,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function memberQuery(member: string) {
+  return queryOptions<Member>({
+    queryKey: ["members", member],
+    queryFn: () => unwrap(getMember({ path: { member } })),
+    retry: false,
+  });
+}
+
+/** The devices a member is signed in on, for an instance admin. */
+export function memberSessionsQuery(member: string) {
+  return queryOptions<Session[]>({
+    queryKey: ["members", member, "sessions"],
+    queryFn: async () => (await unwrap(listMemberSessions({ path: { member } }))).items,
+  });
+}
+
+/** A member's personal access tokens, revoked and expired ones included, for an instance admin. */
+export function memberTokensQuery(member: string) {
+  return queryOptions<ApiToken[]>({
+    queryKey: ["members", member, "tokens"],
+    queryFn: async () => (await unwrap(listMemberTokens({ path: { member } }))).items,
+  });
+}
+
+/** The instance's rules for sessions, API tokens and passwords. */
+export const authSettingsQuery = queryOptions<AuthSettings>({
+  queryKey: ["instance", "auth-settings"],
+  queryFn: () => unwrap(getAuthSettings()),
+});
+
+/** What an invitation's link opens, read before anyone is signed in. */
+export function invitationQuery(secret: string) {
+  return queryOptions<Invitation>({
+    queryKey: ["invitations", secret],
+    queryFn: () => unwrap(getInvitation({ path: { secret } })),
+    retry: false,
+    staleTime: Infinity,
+    gcTime: 0,
+  });
+}
 
 /** What every read of an audit log is cached under. */
 export const auditQueryKey = ["audit"] as const;

@@ -85,6 +85,8 @@ export function TokenCreateForm({
       ),
     myTokensQuery.queryKey,
     () => undefined,
+    // The answer carries the token's value.
+    { secret: true },
   );
   const { errors } = form.formState;
   // A refused scope is named by its index in the list sent: shown under the list.

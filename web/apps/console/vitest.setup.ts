@@ -15,6 +15,14 @@ Element.prototype.hasPointerCapture ??= function hasPointerCapture() {
 };
 Element.prototype.releasePointerCapture ??= function releasePointerCapture() {};
 
+// Nor does it measure: Radix Switch watches its own size inside a form.
+// An observer that never reports leaves it at the size it rendered at.
+globalThis.ResizeObserver ??= class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 beforeEach(() => {
   activateForTests("en");
 });

@@ -21,6 +21,7 @@ import { z } from "zod";
 import { Can } from "@/components/can";
 import { QueryError } from "@/components/query-error";
 import { DeleteRowDialog, RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { DialogForm } from "@/components/ui/dialog-form";
@@ -85,9 +86,9 @@ function Attributes() {
           <span className="flex flex-wrap items-center gap-2">
             {row.original.name}
             {row.original.standard ? (
-              <span className="rounded-sm border px-1.5 py-0.5 text-xs text-muted-foreground">
+              <Badge variant="muted">
                 <Trans>Standard</Trans>
-              </span>
+              </Badge>
             ) : null}
           </span>
         ),

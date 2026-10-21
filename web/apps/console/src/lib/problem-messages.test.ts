@@ -4,7 +4,12 @@ import { describe, expect, it } from "vitest";
 import { activateForTests } from "@/test/render";
 
 import { ApiError } from "./errors";
-import { problemMessage, violationMessage, violationsByPointer } from "./problem-messages";
+import {
+  formRefusal,
+  problemMessage,
+  violationMessage,
+  violationsByPointer,
+} from "./problem-messages";
 
 function refusal(status: number, problem: Record<string, unknown>) {
   return new ApiError(status, { request_id: "req-1", ...problem });
@@ -42,6 +47,18 @@ describe("a refusal in the member's language", () => {
     );
     expect(problemMessage(i18n, refusal(422, { code: "type_immutable" }))).toBe(
       "An attribute's type is fixed once it is declared.",
+    );
+  });
+
+  it("explains the refusals of administering members and accepting an invitation", () => {
+    expect(problemMessage(i18n, refusal(409, { code: "last_instance_admin" }))).toBe(
+      "This is the instance's last active instance admin. Make another member instance admin first.",
+    );
+    expect(problemMessage(i18n, refusal(409, { code: "member_not_invited" }))).toBe(
+      "Only an invited member has an invitation to replace.",
+    );
+    expect(problemMessage(i18n, refusal(410, { code: "invitation_gone" }))).toBe(
+      "This invitation link no longer works: it was used, replaced by a newer one, or it expired.",
     );
   });
 
@@ -135,5 +152,25 @@ describe("a field violation", () => {
     expect(byPointer.get("/name")).toBe("Enter a name.");
     expect(byPointer.get("/key")).toMatch(/^Start with a lowercase letter/);
     expect(problemMessage(i18n, error)).toBe("Some fields need correcting.");
+  });
+});
+
+describe("the refusal a form explains above its actions", () => {
+  const fields = ["/email", "/display_name"];
+  const violation = (pointer: string) => ({ pointer, code: "too_long", detail: "", params: {} });
+
+  it("is none when one of the form's fields shows it", () => {
+    const error = refusal(422, { code: "invalid_member", errors: [violation("/email")] });
+
+    expect(formRefusal(error, fields)).toBeUndefined();
+  });
+
+  it("is the refusal when no field of the form shows it", () => {
+    const elsewhere = refusal(422, { code: "invalid_member", errors: [violation("/locale")] });
+    const conflict = refusal(409, { code: "last_instance_admin" });
+
+    expect(formRefusal(elsewhere, fields)).toBe(elsewhere);
+    expect(formRefusal(conflict, fields)).toBe(conflict);
+    expect(formRefusal(null, fields)).toBeNull();
   });
 });

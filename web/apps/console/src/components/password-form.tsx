@@ -10,8 +10,10 @@ import { z } from "zod";
 import { Field } from "@/components/ui/field";
 import { FormPage } from "@/components/ui/form-page";
 import { Input } from "@/components/ui/input";
-import { ApiError, unwrap } from "@/lib/errors";
+import { unwrap } from "@/lib/errors";
+import { formRefusal } from "@/lib/problem-messages";
 import { mySessionsQuery } from "@/lib/queries";
+import { forgetsSecret } from "@/lib/mutations";
 
 /** The fields whose refusals are shown under them. */
 const fieldPointers = ["/current_password", "/new_password"];
@@ -40,6 +42,8 @@ export function PasswordForm() {
   const change = useMutation({
     mutationFn: ({ current_password, new_password }: Values) =>
       unwrap(changeMyPassword({ body: { current_password, new_password } })),
+    // Both passwords are in the variables.
+    ...forgetsSecret,
     meta: { toast: false },
     onSuccess: () => {
       // Nothing typed lingers on the page once it is used.
@@ -50,11 +54,7 @@ export function PasswordForm() {
   });
   const { errors } = form.formState;
   // A refusal of one of the fields is shown under it; any other above the actions.
-  const refusal =
-    change.error instanceof ApiError &&
-    change.error.violations.some((v) => fieldPointers.includes(v.pointer))
-      ? undefined
-      : change.error;
+  const refusal = formRefusal(change.error, fieldPointers);
 
   return (
     <FormPage

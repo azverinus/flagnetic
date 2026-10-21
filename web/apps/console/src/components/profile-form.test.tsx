@@ -39,6 +39,20 @@ afterEach(() => {
 });
 
 describe("the profile form", () => {
+  it("puts the edit back on discard", async () => {
+    fakeServer({});
+    await renderWithRouter(() => <ProfileForm member={member} />);
+    const user = userEvent.setup();
+
+    const name = screen.getByLabelText("Display name");
+    await user.clear(name);
+    await user.type(name, "Someone Else");
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect(name).toHaveValue("Grace Hopper");
+    expect(screen.queryByRole("region", { name: "Unsaved changes" })).not.toBeInTheDocument();
+  });
+
   it("shows the email without letting it change, and renames the member", async () => {
     const server = fakeServer({ "PATCH /me": answered({ display_name: "Grace Brewster Hopper" }) });
     await renderWithRouter(() => <ProfileForm member={member} />);

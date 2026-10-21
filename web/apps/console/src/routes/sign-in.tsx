@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, isRedirect, redirect, useRouter } from "@tanstack/react-router";
 
 import { SignInForm } from "@/components/sign-in-form";
+import { SignedOutCard } from "@/components/signed-out-card";
 import { meQuery } from "@/lib/queries";
 import { safeReturnTo } from "@/lib/return-to";
 import { validateSignInSearch } from "@/lib/signed-in";
@@ -26,23 +27,17 @@ function SignInPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-muted/40 p-4">
-      <div className="flex w-full max-w-sm flex-col gap-6 rounded-lg border bg-card p-6 shadow-sm">
-        <div className="flex items-center gap-2">
-          <img src="/favicon.svg" alt="" className="size-7" />
-          <span className="text-lg font-semibold">Flagnetic</span>
-        </div>
-        <h1 className="text-xl font-semibold">
-          <Trans>Sign in</Trans>
-        </h1>
-        <SignInForm
-          ended={ended}
-          onSignedIn={(me) => {
-            queryClient.setQueryData(meQuery.queryKey, me);
-            void router.navigate({ href: safeReturnTo(returnTo), replace: true });
-          }}
-        />
-      </div>
-    </main>
+    <SignedOutCard className="max-w-sm">
+      <h1 className="text-xl font-semibold">
+        <Trans>Sign in</Trans>
+      </h1>
+      <SignInForm
+        ended={ended}
+        onSignedIn={(me) => {
+          queryClient.setQueryData(meQuery.queryKey, me);
+          void router.navigate({ href: safeReturnTo(returnTo), replace: true });
+        }}
+      />
+    </SignedOutCard>
   );
 }

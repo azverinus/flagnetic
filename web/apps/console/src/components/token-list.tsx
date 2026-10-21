@@ -1,9 +1,9 @@
 import { type ApiToken, type CreatedApiToken, revokeMyToken } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { useQuery } from "@tanstack/react-query";
+import { type QueryKey, useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { PlusIcon, Trash2Icon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { QueryError } from "@/components/query-error";
@@ -22,42 +22,18 @@ import { myTokensQuery } from "@/lib/queries";
 import { useNowPassing } from "@/lib/use-now";
 
 /**
- * The member's personal access tokens, by their hint, with creating one
- * (its value shown once) and revoking one.
+ * The columns of a list of personal access tokens: name and hint, scopes,
+ * expiry, creation, last use and where each is in its life at now.
  */
-export function TokenList({
-  instanceAdmin,
-  policy,
-}: {
-  instanceAdmin: boolean;
-  /** The instance's bound on a token's expiry, which a new token's expiries follow. */
-  policy: TokenPolicy;
-}) {
+export function useTokenColumns(now: Date): ColumnDef<ApiToken, unknown>[] {
   const { i18n, t } = useLingui();
-  const tokens = useQuery(myTokensQuery);
-  // A token that expires while the page is open shows so as it does.
-  const now = useNowPassing(
-    (tokens.data ?? []).filter((token) => !token.revoked_at).map((token) => token.expires_at),
-  );
-  const [creating, setCreating] = useState(false);
-  const [created, setCreated] = useState<CreatedApiToken>();
-  const [revoking, setRevoking] = useState<ApiToken>();
-  const revoke = useListMutation(
-    (token: ApiToken) => unwrap(revokeMyToken({ path: { token: token.id } })),
-    myTokensQuery.queryKey,
-    () => {
-      setRevoking(undefined);
-      toast.success(t`The token is revoked.`);
-    },
-  );
-
-  const columns = useMemo<ColumnDef<ApiToken, unknown>[]>(() => {
+  return useMemo<ColumnDef<ApiToken, unknown>[]>(() => {
     const stateName: Record<TokenState, string> = {
       active: t`Active`,
       expired: t`Expired`,
       revoked: t`Revoked`,
     };
-    const columns: ColumnDef<ApiToken, unknown>[] = [
+    return [
       {
         id: "name",
         header: t`Name`,
@@ -108,16 +84,31 @@ export function TokenList({
         cell: ({ row }) => stateName[tokenState(row.original, now)],
       },
     ];
-    return withRowActions(columns, true, (token) => {
-      if (token.revoked_at) return null;
-      const { name } = token;
-      return (
-        <RowAction label={t`Revoke ${name}`} icon={Trash2Icon} onClick={() => setRevoking(token)} />
-      );
-    });
   }, [i18n, now, t]);
+}
 
-  const revokingName = revoking?.name ?? "";
+/**
+ * The member's personal access tokens, by their hint, with creating one
+ * (its value shown once) and revoking one.
+ */
+export function TokenList({
+  instanceAdmin,
+  policy,
+}: {
+  instanceAdmin: boolean;
+  /** The instance's bound on a token's expiry, which a new token's expiries follow. */
+  policy: TokenPolicy;
+}) {
+  const { t } = useLingui();
+  const tokens = useQuery(myTokensQuery);
+  const [creating, setCreating] = useState(false);
+  const [created, setCreated] = useState<CreatedApiToken>();
+  const { columns, revokeDialog } = useRevocableTokens(
+    tokens.data,
+    (token) => unwrap(revokeMyToken({ path: { token: token.id } })),
+    myTokensQuery.queryKey,
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -169,25 +160,62 @@ export function TokenList({
           read it.
         </Trans>
       </RevealSecretDialog>
-      <ConfirmDialog
-        open={revoking !== undefined}
-        onOpenChange={(open) => {
-          if (!open) {
-            revoke.reset();
-            setRevoking(undefined);
-          }
-        }}
-        title={t`Revoke ${revokingName}`}
-        confirmLabel={<Trans>Revoke token</Trans>}
-        destructive
-        pending={revoke.isPending}
-        refusal={revoke.error}
-        onConfirm={() => revoking && revoke.mutate(revoking)}
-      >
-        <p>
-          <Trans>Whatever uses the token is refused from now on. This cannot be undone.</Trans>
-        </p>
-      </ConfirmDialog>
+      {revokeDialog}
     </div>
   );
+}
+
+/**
+ * The columns of a list of API tokens with revoking each live one, and the
+ * dialog that confirms it. A token that expires while the page is open
+ * shows so as it does.
+ */
+export function useRevocableTokens(
+  tokens: ApiToken[] | undefined,
+  revokeToken: (token: ApiToken) => Promise<unknown>,
+  list: QueryKey,
+): { columns: ColumnDef<ApiToken, unknown>[]; revokeDialog: ReactNode } {
+  const { t } = useLingui();
+  const now = useNowPassing(
+    (tokens ?? []).filter((token) => !token.revoked_at).map((token) => token.expires_at),
+  );
+  const [revoking, setRevoking] = useState<ApiToken>();
+  const revoke = useListMutation(revokeToken, list, () => {
+    setRevoking(undefined);
+    toast.success(t`The token is revoked.`);
+  });
+  const tokenColumns = useTokenColumns(now);
+  const columns = useMemo<ColumnDef<ApiToken, unknown>[]>(() => {
+    return withRowActions(tokenColumns, true, (token) => {
+      if (token.revoked_at) return null;
+      const { name } = token;
+      return (
+        <RowAction label={t`Revoke ${name}`} icon={Trash2Icon} onClick={() => setRevoking(token)} />
+      );
+    });
+  }, [t, tokenColumns]);
+
+  const revokingName = revoking?.name ?? "";
+  const revokeDialog = (
+    <ConfirmDialog
+      open={revoking !== undefined}
+      onOpenChange={(open) => {
+        if (!open) {
+          revoke.reset();
+          setRevoking(undefined);
+        }
+      }}
+      title={t`Revoke ${revokingName}`}
+      confirmLabel={<Trans>Revoke token</Trans>}
+      destructive
+      pending={revoke.isPending}
+      refusal={revoke.error}
+      onConfirm={() => revoking && revoke.mutate(revoking)}
+    >
+      <p>
+        <Trans>Whatever uses the token is refused from now on. This cannot be undone.</Trans>
+      </p>
+    </ConfirmDialog>
+  );
+  return { columns, revokeDialog };
 }

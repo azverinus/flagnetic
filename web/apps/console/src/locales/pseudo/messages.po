@@ -11,10 +11,75 @@ msgstr ""
 msgid "{browser} on {os}"
 msgstr ""
 
+#: src/components/duration-input.tsx
+msgid "{count, plural, one {day} other {days}}"
+msgstr ""
+
+#: src/components/duration-input.tsx
+msgid "{count, plural, one {hour} other {hours}}"
+msgstr ""
+
+#: src/components/duration-input.tsx
+msgid "{count, plural, one {minute} other {minutes}}"
+msgstr ""
+
+#: src/components/duration-input.tsx
+msgid "{count, plural, one {second} other {seconds}}"
+msgstr ""
+
+#: src/components/member-credentials.tsx
+msgid "{live, plural, one {Revoke # session} other {Revoke # sessions}}"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "{name} can sign in again. What deactivation revoked stays revoked: their sessions and API tokens do not come back."
+msgstr ""
+
+#: src/components/member-credentials.tsx
+msgid "{name} has no API token."
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "{name} is an instance admin."
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "{name} is deactivated."
+msgstr ""
+
+#: src/components/invitation-link-dialog.tsx
+msgid "{name} is invited"
+msgstr ""
+
+#: src/components/invitation-link-dialog.tsx
+msgid "{name} is invited again"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "{name} is no longer an instance admin."
+msgstr ""
+
+#: src/components/member-credentials.tsx
+msgid "{name} is not signed in anywhere."
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "{name} is reactivated."
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "{name} keeps only the roles their grants give them in each project."
+msgstr ""
+
+#: src/components/invitation-link-dialog.tsx
+msgid "{name} never set a password, so they join again through this link."
+msgstr ""
+
 #: src/components/session-list.tsx
 msgid "{others, plural, one {Revoke # session} other {Revoke # sessions}}"
 msgstr ""
 
+#: src/components/member-credentials.tsx
 #: src/components/session-list.tsx
 msgid "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
 msgstr ""
@@ -27,6 +92,14 @@ msgstr ""
 msgid "A key never changes once it is set."
 msgstr ""
 
+#: src/components/invitation-link-dialog.tsx
+msgid "A new invitation link for {name}"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "A new invitation link is issued."
+msgstr ""
+
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
 msgstr ""
@@ -35,8 +108,17 @@ msgstr ""
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr ""
 
+#: src/components/member-credentials.tsx
 #: src/components/session-list.tsx
 msgid "A revoked device is signed out at its next request."
+msgstr ""
+
+#: src/components/auth-settings-form.tsx
+msgid "A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older."
+msgstr ""
+
+#: src/components/auth-settings-form.tsx
+msgid "A session ends this long after its last request."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -55,6 +137,14 @@ msgstr ""
 msgid "A year"
 msgstr ""
 
+#: src/components/invitation-acceptance.tsx
+msgid "Accept invitation"
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
+msgid "Accept your invitation"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Action"
@@ -65,6 +155,7 @@ msgid "Actions"
 msgstr ""
 
 #: src/components/token-list.tsx
+#: src/lib/members.ts
 msgid "Active"
 msgstr ""
 
@@ -98,6 +189,18 @@ msgstr ""
 msgid "An attribute's type is fixed once it is declared."
 msgstr ""
 
+#: src/components/member-actions.tsx
+msgid "An instance admin administers every project, every member and the instance's settings."
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
+msgid "An invitation link works once, for seven days, and only until a newer one replaces it. Ask an instance admin for a new link, or sign in if you have already joined."
+msgstr ""
+
+#: src/components/member-form.tsx
+msgid "Another member already has this email address."
+msgstr ""
+
 #: src/components/audit-log.tsx
 msgid "Any"
 msgstr ""
@@ -116,6 +219,7 @@ msgstr ""
 msgid "API token revoked"
 msgstr ""
 
+#: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/tokens.tsx
 msgid "API tokens"
@@ -129,6 +233,7 @@ msgstr ""
 msgid "Apply filters"
 msgstr ""
 
+#: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
 msgstr ""
@@ -171,6 +276,11 @@ msgstr ""
 #: src/routes/_signed-in/admin/audit.tsx
 #: src/routes/_signed-in/projects/$project/audit.tsx
 msgid "Audit log"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/auth-settings.tsx
+msgid "Auth settings"
 msgstr ""
 
 #. A kind of entity in the audit log.
@@ -224,6 +334,10 @@ msgstr ""
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr ""
 
+#: src/components/invitation-acceptance.tsx
+msgid "Choose a password."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
 msgstr ""
@@ -273,6 +387,10 @@ msgstr ""
 
 #: src/components/password-form.tsx
 msgid "Confirm the new password"
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
+msgid "Confirm the password"
 msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
@@ -325,6 +443,26 @@ msgstr ""
 msgid "Date"
 msgstr ""
 
+#: src/components/member-actions.tsx
+msgid "Deactivate"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Deactivate {name}"
+msgstr ""
+
+#: src/lib/members.ts
+msgid "Deactivated"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Deactivation ends every session and API token of {name} at once, and they cannot sign in until reactivated. Project tokens they created keep working."
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Deactivation ends every session and API token of yours at once, this one included, and you cannot sign in until another instance admin reactivates you."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Declare the kinds of unit its flags are served to."
 msgstr ""
@@ -367,8 +505,13 @@ msgstr ""
 msgid "Discard"
 msgstr ""
 
+#: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Display name"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Edit"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -376,10 +519,15 @@ msgstr ""
 msgid "Edit {key}"
 msgstr ""
 
+#: src/components/member-actions.tsx
+msgid "Edit {name}"
+msgstr ""
+
 #: src/lib/access-names.ts
 msgid "edit the project"
 msgstr ""
 
+#: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 #: src/components/sign-in-form.tsx
 msgid "Email"
@@ -389,8 +537,13 @@ msgstr ""
 msgid "Ends at the latest"
 msgstr ""
 
+#: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Enter a display name."
+msgstr ""
+
+#: src/lib/auth-settings.ts
+msgid "Enter a duration from {from} to {to}."
 msgstr ""
 
 #: src/lib/forms.ts
@@ -408,6 +561,14 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Enter a value from {min} to {max}."
+msgstr ""
+
+#: src/lib/auth-settings.ts
+msgid "Enter a whole number."
+msgstr ""
+
+#: src/components/member-form.tsx
+msgid "Enter an email address."
 msgstr ""
 
 #: src/components/password-form.tsx
@@ -460,8 +621,36 @@ msgstr ""
 msgid "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
 msgstr ""
 
+#: src/components/member-credentials.tsx
+msgid "Every device {name} is signed in on is signed out at its next request. Their API tokens keep working."
+msgstr ""
+
 #: src/components/session-list.tsx
 msgid "Every device but this one is signed out at its next request and must sign in again."
+msgstr ""
+
+#: src/components/member-credentials.tsx
+msgid "Every device you are signed in on is signed out, this one included, and you will have to sign in again. Your API tokens keep working."
+msgstr ""
+
+#: src/components/invitation-link-dialog.tsx
+msgid "Every earlier link for {name} no longer works."
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Every earlier link for {name} stops working. The new one is shown once."
+msgstr ""
+
+#: src/components/auth-settings-form.tsx
+msgid "Every new API token must have an expiry; none may live forever."
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Every status"
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
 msgstr ""
 
 #: src/components/app-shell.tsx
@@ -503,6 +692,10 @@ msgstr ""
 msgid "From"
 msgstr ""
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Go to the members"
+msgstr ""
+
 #: src/components/not-found.tsx
 msgid "Go to the start page"
 msgstr ""
@@ -514,6 +707,10 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Grant removed"
+msgstr ""
+
+#: src/routes/_signed-in/admin/auth-settings.tsx
+msgid "How long sessions last, how long API tokens may live, and how long passwords must be. Every replica of the instance applies a change within a second."
 msgstr ""
 
 #: src/routes/_signed-in/admin/projects.tsx
@@ -540,6 +737,11 @@ msgstr ""
 msgid "Instance"
 msgstr ""
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Instance admin"
+msgstr ""
+
 #: src/routes/_signed-in/admin/route.tsx
 msgid "Instance administration"
 msgstr ""
@@ -552,12 +754,44 @@ msgstr ""
 msgid "Invitation issued again"
 msgstr ""
 
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Invite"
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Invite a member"
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Invite member"
+msgstr ""
+
+#: src/lib/members.ts
+msgid "Invited"
+msgstr ""
+
 #: src/components/session-list.tsx
 msgid "IP address"
 msgstr ""
 
+#: src/components/member-actions.tsx
+msgid "Issue a new invitation link"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Issue a new invitation link for {name}"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Issue link"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "It does not exist, or it was deleted."
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
+msgid "Joining…"
 msgstr ""
 
 #: src/components/theme-choice.tsx
@@ -584,6 +818,11 @@ msgstr ""
 
 #: src/components/session-list.tsx
 msgid "Last seen"
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Last sign-in"
 msgstr ""
 
 #: src/components/token-list.tsx
@@ -631,6 +870,14 @@ msgstr ""
 msgid "Maintainer"
 msgstr ""
 
+#: src/components/member-actions.tsx
+msgid "Make {name} an instance admin"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Make instance admin"
+msgstr ""
+
 #: src/lib/access-names.ts
 msgid "manage environments"
 msgstr ""
@@ -647,10 +894,16 @@ msgstr ""
 msgid "manage who has access"
 msgstr ""
 
+#: src/components/auth-settings-form.tsx
+msgid "Maximum token lifetime"
+msgstr ""
+
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
 #: src/components/audit-log.tsx
 #: src/lib/audit.ts
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
 msgid "Member"
 msgstr ""
 
@@ -666,15 +919,26 @@ msgstr ""
 msgid "Member invited"
 msgstr ""
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Member not found"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Member reactivated"
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Member since"
 msgstr ""
 
 #: src/lib/audit.ts
 msgid "Member updated"
 msgstr ""
 
+#: src/components/navigation.tsx
 #: src/components/projects-table.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
+#: src/routes/_signed-in/admin/members/route.tsx
 msgid "Members"
 msgstr ""
 
@@ -689,6 +953,10 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
+#: src/components/search-field.tsx
+msgid "Name or email"
+msgstr ""
+
 #: src/lib/access.ts
 msgid "Needs the permission to {name}, held by {list}."
 msgstr ""
@@ -699,6 +967,8 @@ msgstr ""
 
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
 msgid "Never"
 msgstr ""
 
@@ -731,12 +1001,28 @@ msgstr ""
 msgid "Newest entries"
 msgstr ""
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "No"
+msgstr ""
+
 #: src/components/audit-log.tsx
 msgid "No entry matches these filters."
 msgstr ""
 
 #: src/lib/audit.ts
 msgid "No longer an instance admin"
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "No member has this identifier. The link may be mistyped or old."
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "No member matches the search and the status filter."
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "No members yet."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/route.tsx
@@ -795,12 +1081,20 @@ msgstr ""
 msgid "One with this key already exists."
 msgstr ""
 
+#: src/components/member-credentials.tsx
+msgid "Only {name} creates their tokens. Project tokens they created belong to their projects, not to them."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Only a signed-in session can do this, not an API token."
 msgstr ""
 
 #: src/routes/_signed-in/admin/route.tsx
 msgid "Only an instance admin can open it."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Only an invited member has an invitation to replace."
 msgstr ""
 
 #: src/components/navigation.tsx
@@ -820,6 +1114,7 @@ msgstr ""
 msgid "Pages of entries"
 msgstr ""
 
+#: src/components/invitation-acceptance.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Password"
@@ -827,6 +1122,10 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Password changed"
+msgstr ""
+
+#: src/components/auth-settings-form.tsx
+msgid "Password minimum length"
 msgstr ""
 
 #: src/components/personal-menu.tsx
@@ -865,9 +1164,19 @@ msgstr ""
 
 #: src/components/navigation.tsx
 #: src/components/project-switcher.tsx
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/index.tsx
 msgid "Projects"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Reactivate"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Reactivate {name}"
 msgstr ""
 
 #: src/lib/personal-tokens.ts
@@ -907,6 +1216,18 @@ msgstr ""
 msgid "Revoke all other sessions"
 msgstr ""
 
+#: src/components/member-credentials.tsx
+msgid "Revoke all sessions"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Revoke instance admin"
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "Revoke instance admin from {name}"
+msgstr ""
+
 #: src/components/session-list.tsx
 msgid "Revoke session"
 msgstr ""
@@ -931,6 +1252,8 @@ msgstr ""
 msgid "Role granted"
 msgstr ""
 
+#: src/components/auth-settings-form.tsx
+#: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -946,6 +1269,7 @@ msgid "Scopes"
 msgstr ""
 
 #: src/components/audit-log.tsx
+#: src/components/search-field.tsx
 msgid "Search"
 msgstr ""
 
@@ -967,10 +1291,19 @@ msgstr ""
 msgid "Session"
 msgstr ""
 
+#: src/components/auth-settings-form.tsx
+msgid "Session absolute timeout"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Session ended"
 msgstr ""
 
+#: src/components/auth-settings-form.tsx
+msgid "Session idle timeout"
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/sessions.tsx
 msgid "Sessions"
@@ -985,6 +1318,11 @@ msgstr ""
 msgid "Sidebar"
 msgstr ""
 
+#: src/components/member-credentials.tsx
+msgid "Sign {name} out everywhere"
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/sign-in.tsx
 msgid "Sign in"
@@ -992,6 +1330,10 @@ msgstr ""
 
 #: src/components/personal-menu.tsx
 msgid "Sign out"
+msgstr ""
+
+#: src/components/member-credentials.tsx
+msgid "Sign yourself out everywhere"
 msgstr ""
 
 #: src/lib/audit.ts
@@ -1039,6 +1381,11 @@ msgstr ""
 msgid "State"
 msgstr ""
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Status"
+msgstr ""
+
 #. An attribute type.
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
@@ -1063,8 +1410,16 @@ msgstr ""
 msgid "That is not your current password."
 msgstr ""
 
+#: src/components/member-credentials.tsx
+msgid "The API tokens of {name}"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "The attribute {key} is no longer declared, and its key can be declared again."
+msgstr ""
+
+#: src/components/auth-settings-form.tsx
+msgid "The auth settings are saved."
 msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
@@ -1073,6 +1428,10 @@ msgstr ""
 
 #: src/components/profile-form.tsx
 msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
+msgstr ""
+
+#: src/components/member-credentials.tsx
+msgid "The devices {name} is signed in on"
 msgstr ""
 
 #: src/components/session-list.tsx
@@ -1091,12 +1450,28 @@ msgstr ""
 msgid "The environment {key} is deleted. This cannot be undone."
 msgstr ""
 
+#: src/components/auth-settings-form.tsx
+msgid "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
+msgstr ""
+
+#: src/components/auth-settings-form.tsx
+msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The idle timeout cannot be longer than the absolute timeout."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The member is deactivated. Reactivate them first."
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "The member is saved."
 msgstr ""
 
 #: src/lib/audit.ts
@@ -1117,6 +1492,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "The password must not contain your email address."
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
+msgid "The passwords do not match."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/settings.tsx
@@ -1192,6 +1571,10 @@ msgstr ""
 msgid "There is nothing at this address. The link may be old or mistyped."
 msgstr ""
 
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "They get a link to set their password, shown to you once. What they may do in a project comes from the grants a project owner gives them."
+msgstr ""
+
 #: src/components/session-list.tsx
 msgid "This device"
 msgstr ""
@@ -1213,8 +1596,24 @@ msgstr ""
 msgid "This instance requires every token to expire."
 msgstr ""
 
+#: src/components/invitation-link-dialog.tsx
+msgid "This instance sends no mail, so pass this link to {name} yourself. It works once, until {until}."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This invitation link no longer works: it was used, replaced by a newer one, or it expired."
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
+msgid "This invitation no longer works"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "This is further ahead than this instance allows."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This is the instance's last active instance admin. Make another member instance admin first."
 msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
@@ -1263,6 +1662,10 @@ msgstr ""
 msgid "To"
 msgstr ""
 
+#: src/components/auth-settings-form.tsx
+msgid "Token expiry required"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Too long."
 msgstr ""
@@ -1302,6 +1705,18 @@ msgstr ""
 
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
+msgstr ""
+
+#: src/components/auth-settings-form.tsx
+msgid "Unit of the maximum token lifetime"
+msgstr ""
+
+#: src/components/auth-settings-form.tsx
+msgid "Unit of the session absolute timeout"
+msgstr ""
+
+#: src/components/auth-settings-form.tsx
+msgid "Unit of the session idle timeout"
 msgstr ""
 
 #. A kind of entity in the audit log.
@@ -1367,6 +1782,10 @@ msgstr ""
 msgid "Welcome, {name}. Choose a project to work in."
 msgstr ""
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "What {name} holds"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
 msgstr ""
@@ -1385,6 +1804,14 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
+msgstr ""
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Yes"
+msgstr ""
+
+#: src/components/invitation-acceptance.tsx
+msgid "You are invited to this Flagnetic instance as {name} ({email}). Choose a password to join; the link works until {until}."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -1417,6 +1844,10 @@ msgstr ""
 
 #: src/routes/_signed-in/index.tsx
 msgid "You hold no grant in any project yet. Ask a project owner or an instance admin."
+msgstr ""
+
+#: src/components/member-actions.tsx
+msgid "You keep only the roles your grants give you, and lose the instance's screens at once."
 msgstr ""
 
 #: src/lib/problem-messages.ts
