@@ -1,6 +1,7 @@
 package management_test
 
 import (
+	"net/http"
 	"slices"
 	"testing"
 	"time"
@@ -224,4 +225,40 @@ func TestAnAuthSettingsChangeIsAppliedByAnotherReplicaWithinASecond(t *testing.T
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+func TestATokenBeyondTheChangedMaxLifetimeIsRefused(t *testing.T) {
+	c := testkit.Clock()
+	srv, pool, admin := freshInstance(t, c)
+	s := defaultSettings
+	s.TokenMaxLifetimeSeconds = 24 * 3600
+	putSettings(t, admin, s)
+	b := signedIn(t, srv, testkit.NewMember(t, pool))
+
+	beyond := c.Now().Add(25 * time.Hour)
+	res := createToken(t, b, management.ApiTokenCreate{Name: "too long", ExpiresAt: &beyond})
+	p := assertProblem(t, "a day and an hour", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_token_request")
+	if p.Errors == nil || len(*p.Errors) != 1 || (*p.Errors)[0].Code != "beyond_max_lifetime" ||
+		(*(*p.Errors)[0].Params)["max_lifetime_seconds"] != float64(24*3600) {
+		t.Errorf("violations = %+v, want beyond_max_lifetime naming a day", p.Errors)
+	}
+	within := c.Now().Add(23 * time.Hour)
+	mustCreateToken(t, b, management.ApiTokenCreate{Name: "within", ExpiresAt: &within})
+}
+
+func TestTokenExpiryRequiredRefusesATokenWithNoExpiry(t *testing.T) {
+	c := testkit.Clock()
+	srv, pool, admin := freshInstance(t, c)
+	s := defaultSettings
+	s.TokenExpiryRequired = true
+	putSettings(t, admin, s)
+	b := signedIn(t, srv, testkit.NewMember(t, pool))
+
+	res := createToken(t, b, management.ApiTokenCreate{Name: "forever"})
+	p := assertProblem(t, "no expiry", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "invalid_token_request")
+	if p.Errors == nil || len(*p.Errors) != 1 || (*p.Errors)[0].Pointer != "/expires_at" || (*p.Errors)[0].Code != "required" {
+		t.Errorf("violations = %+v, want required at /expires_at", p.Errors)
+	}
+	soon := c.Now().Add(time.Hour)
+	mustCreateToken(t, b, management.ApiTokenCreate{Name: "an hour", ExpiresAt: &soon})
 }

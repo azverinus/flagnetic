@@ -18,7 +18,7 @@ import (
 // the test's own.
 func TestAPublicOperationRefusesABadCredentialLikeAnyOther(t *testing.T) {
 	op := access.Operation{Name: "readPublic", Requirement: access.RequirePublic, Read: true}
-	handlers := management.Handlers{AuthenticateToken: appaccess.NewAuthenticateToken(pgaccess.NewStore(testkit.Pool(t)), clock.System{})}
+	handlers := management.Handlers{AuthenticateToken: appaccess.NewAuthenticateToken(pgaccess.NewStore(testkit.Pool(t)), appaccess.NewTokenUses(pgaccess.NewStore(testkit.Pool(t))), clock.System{})}
 	srv := testkit.StartServer(t, testkit.WithRoute("GET /public", func(edge *flaghttp.Server) http.Handler {
 		return management.SeamFor(edge, handlers, op, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusNoContent)

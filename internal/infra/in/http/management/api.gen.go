@@ -153,6 +153,33 @@ func (e RoleName) Valid() bool {
 	}
 }
 
+// Defines values for Scope.
+const (
+	ScopeExperimentsWrite Scope = "experiments:write"
+	ScopeFlagsWrite       Scope = "flags:write"
+	ScopeInstanceAdmin    Scope = "instance:admin"
+	ScopeProjectAdmin     Scope = "project:admin"
+	ScopeRead             Scope = "read"
+)
+
+// Valid indicates whether the value is a known member of the Scope enum.
+func (e Scope) Valid() bool {
+	switch e {
+	case ScopeExperimentsWrite:
+		return true
+	case ScopeFlagsWrite:
+		return true
+	case ScopeInstanceAdmin:
+		return true
+	case ScopeProjectAdmin:
+		return true
+	case ScopeRead:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SessionMethod.
 const (
 	SessionMethodLocal SessionMethod = "local"
@@ -183,6 +210,46 @@ type Actor struct {
 
 // ActorKind defines model for ActorKind.
 type ActorKind string
+
+// ApiToken A personal access token, by its hint; its value is shown only when it is created.
+type ApiToken struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// ExpiresAt When the token stops working; null for a token that never expires.
+	ExpiresAt *time.Time `json:"expires_at"`
+
+	// Hint The value's prefix and its first four characters, such as `fn_pat_Ab3d`.
+	Hint string             `json:"hint"`
+	Id   openapi_types.UUID `json:"id"`
+
+	// LastUsedAt When the token was last presented, recorded at most once a minute; null until it is used.
+	LastUsedAt *time.Time `json:"last_used_at"`
+
+	// LastUsedIp The address the token was last presented from.
+	LastUsedIp *string    `json:"last_used_ip"`
+	Name       string     `json:"name"`
+	RevokedAt  *time.Time `json:"revoked_at"`
+
+	// Scopes The scopes the token carries, `read` first.
+	Scopes []Scope `json:"scopes"`
+}
+
+// ApiTokenCreate defines model for ApiTokenCreate.
+type ApiTokenCreate struct {
+	// ExpiresAt When the token stops working; absent or null for a token that never expires, unless the instance requires an expiry.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// Name 1 to 200 characters, not blank, to tell the token apart.
+	Name string `json:"name"`
+
+	// Scopes The scopes the token carries; `read` alone when absent, and `read` is added to any write scope.
+	Scopes *[]Scope `json:"scopes,omitempty"`
+}
+
+// ApiTokenList defines model for ApiTokenList.
+type ApiTokenList struct {
+	Items []ApiToken `json:"items"`
+}
 
 // Attribute defines model for Attribute.
 type Attribute struct {
@@ -299,6 +366,15 @@ type AuthSettings struct {
 
 	// TokenMaxLifetimeSeconds The furthest ahead an API token may expire. 31536000 (365 days) on a fresh instance.
 	TokenMaxLifetimeSeconds int64 `json:"token_max_lifetime_seconds"`
+}
+
+// CreatedApiToken A personal access token just created, with its value.
+type CreatedApiToken struct {
+	// Token A personal access token, by its hint; its value is shown only when it is created.
+	Token ApiToken `json:"token"`
+
+	// Value The token's value, `fn_pat_` and 40 characters, shown this once.
+	Value string `json:"value"`
 }
 
 // Credential defines model for Credential.
@@ -543,6 +619,9 @@ type RoleList struct {
 // RoleName defines model for RoleName.
 type RoleName string
 
+// Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
+type Scope string
+
 // Session One device a member is signed in on.
 type Session struct {
 	// ClientIp The address the session opened from.
@@ -679,6 +758,9 @@ type ProjectKey = string
 // SessionID defines model for SessionID.
 type SessionID = string
 
+// TokenID defines model for TokenID.
+type TokenID = string
+
 // UnitTypeKey defines model for UnitTypeKey.
 type UnitTypeKey = string
 
@@ -809,6 +891,9 @@ type SignInJSONRequestBody = SignInRequest
 
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
+
+// CreateMyTokenJSONRequestBody defines body for CreateMyToken for application/json ContentType.
+type CreateMyTokenJSONRequestBody = ApiTokenCreate
 
 // InviteMemberJSONRequestBody defines body for InviteMember for application/json ContentType.
 type InviteMemberJSONRequestBody = MemberInvite
@@ -1093,6 +1178,59 @@ type ClientInterface interface {
 	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 	RevokeMySession(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListMyTokens The caller's personal access tokens
+	//
+	// Every personal access token of the caller, the newest first, revoked
+	// and expired ones included, by their hint: a token's value is shown
+	// only when it is created.
+	//
+	// Corresponds with GET /me/tokens (the `ListMyTokens` operationId).
+	ListMyTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateMyTokenWithBody Create a personal access token
+	//
+	// Creates a personal access token acting for the caller and answers its
+	// value, shown this once and never again. It carries `read` alone
+	// unless asked for more, and `read` beside every write scope; a scope
+	// the caller does not hold, `instance:admin` for a member who is no
+	// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+	// the future and at most the instance's maximum token lifetime ahead,
+	// and is required when the instance requires one; without one the
+	// token never expires. Only a session creates a token, so a leaked
+	// token can never multiply itself or outlive its revocation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+	CreateMyTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateMyToken Create a personal access token
+	//
+	// Creates a personal access token acting for the caller and answers its
+	// value, shown this once and never again. It carries `read` alone
+	// unless asked for more, and `read` beside every write scope; a scope
+	// the caller does not hold, `instance:admin` for a member who is no
+	// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+	// the future and at most the instance's maximum token lifetime ahead,
+	// and is required when the instance requires one; without one the
+	// token never expires. Only a session creates a token, so a leaked
+	// token can never multiply itself or outlive its revocation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+	CreateMyToken(ctx context.Context, body CreateMyTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeMyToken Revoke a personal access token
+	//
+	// Revokes one of the caller's tokens, which is refused `token_revoked`
+	// from then on. A token of another member, one already revoked or an
+	// identifier that names none is not found. Only a session may do this,
+	// so a leaked token cannot hide its siblings.
+	//
+	// Corresponds with DELETE /me/tokens/{token} (the `RevokeMyToken` operationId).
+	RevokeMyToken(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListMembers The instance's members
 	//
 	// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
@@ -1202,6 +1340,20 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
 	ListMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMemberTokens A member's personal access tokens
+	//
+	// Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+	//
+	// Corresponds with GET /members/{member}/tokens (the `ListMemberTokens` operationId).
+	ListMemberTokens(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeMemberToken Revoke a member's personal access token
+	//
+	// Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+	//
+	// Corresponds with DELETE /members/{member}/tokens/{token} (the `RevokeMemberToken` operationId).
+	RevokeMemberToken(ctx context.Context, member MemberID, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProjects The projects the caller works in
 	//
@@ -1748,6 +1900,99 @@ func (c *Client) RevokeMySession(ctx context.Context, session SessionID, reqEdit
 	return c.Client.Do(req)
 }
 
+// ListMyTokens The caller's personal access tokens
+//
+// Every personal access token of the caller, the newest first, revoked
+// and expired ones included, by their hint: a token's value is shown
+// only when it is created.
+//
+// Corresponds with GET /me/tokens (the `ListMyTokens` operationId).
+func (c *Client) ListMyTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMyTokensRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateMyTokenWithBody Create a personal access token
+//
+// Creates a personal access token acting for the caller and answers its
+// value, shown this once and never again. It carries `read` alone
+// unless asked for more, and `read` beside every write scope; a scope
+// the caller does not hold, `instance:admin` for a member who is no
+// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+// the future and at most the instance's maximum token lifetime ahead,
+// and is required when the instance requires one; without one the
+// token never expires. Only a session creates a token, so a leaked
+// token can never multiply itself or outlive its revocation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+func (c *Client) CreateMyTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateMyTokenRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateMyToken Create a personal access token
+//
+// Creates a personal access token acting for the caller and answers its
+// value, shown this once and never again. It carries `read` alone
+// unless asked for more, and `read` beside every write scope; a scope
+// the caller does not hold, `instance:admin` for a member who is no
+// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+// the future and at most the instance's maximum token lifetime ahead,
+// and is required when the instance requires one; without one the
+// token never expires. Only a session creates a token, so a leaked
+// token can never multiply itself or outlive its revocation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+func (c *Client) CreateMyToken(ctx context.Context, body CreateMyTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateMyTokenRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeMyToken Revoke a personal access token
+//
+// Revokes one of the caller's tokens, which is refused `token_revoked`
+// from then on. A token of another member, one already revoked or an
+// identifier that names none is not found. Only a session may do this,
+// so a leaked token cannot hide its siblings.
+//
+// Corresponds with DELETE /me/tokens/{token} (the `RevokeMyToken` operationId).
+func (c *Client) RevokeMyToken(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeMyTokenRequest(c.Server, token)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListMembers The instance's members
 //
 // Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
@@ -1958,6 +2203,40 @@ func (c *Client) RevokeMemberSessions(ctx context.Context, member MemberID, reqE
 // Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
 func (c *Client) ListMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListMemberSessionsRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMemberTokens A member's personal access tokens
+//
+// Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+//
+// Corresponds with GET /members/{member}/tokens (the `ListMemberTokens` operationId).
+func (c *Client) ListMemberTokens(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMemberTokensRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeMemberToken Revoke a member's personal access token
+//
+// Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+//
+// Corresponds with DELETE /members/{member}/tokens/{token} (the `RevokeMemberToken` operationId).
+func (c *Client) RevokeMemberToken(ctx context.Context, member MemberID, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeMemberTokenRequest(c.Server, member, token)
 	if err != nil {
 		return nil, err
 	}
@@ -3063,6 +3342,107 @@ func NewRevokeMySessionRequest(server string, session SessionID) (*http.Request,
 	return req, nil
 }
 
+// NewListMyTokensRequest constructs an http.Request for the ListMyTokens method
+func NewListMyTokensRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateMyTokenRequest calls the generic CreateMyToken builder with application/json body
+func NewCreateMyTokenRequest(server string, body CreateMyTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateMyTokenRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateMyTokenRequestWithBody constructs an http.Request for the CreateMyToken method, with any body, and a specified content type
+func NewCreateMyTokenRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeMyTokenRequest constructs an http.Request for the RevokeMyToken method
+func NewRevokeMyTokenRequest(server string, token TokenID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "token", token, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/tokens/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListMembersRequest constructs an http.Request for the ListMembers method
 func NewListMembersRequest(server string, params *ListMembersParams) (*http.Request, error) {
 	var err error
@@ -3413,6 +3793,81 @@ func NewListMemberSessionsRequest(server string, member MemberID) (*http.Request
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMemberTokensRequest constructs an http.Request for the ListMemberTokens method
+func NewListMemberTokensRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/tokens", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRevokeMemberTokenRequest constructs an http.Request for the RevokeMemberToken method
+func NewRevokeMemberTokenRequest(server string, member MemberID, token TokenID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "token", token, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/tokens/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -4743,6 +5198,63 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 	RevokeMySessionWithResponse(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*RevokeMySessionResponse, error)
 
+	// ListMyTokensWithResponse The caller's personal access tokens
+	//
+	// Every personal access token of the caller, the newest first, revoked
+	// and expired ones included, by their hint: a token's value is shown
+	// only when it is created.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /me/tokens (the `ListMyTokens` operationId).
+	ListMyTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyTokensResponse, error)
+
+	// CreateMyTokenWithBodyWithResponse Create a personal access token
+	//
+	// Creates a personal access token acting for the caller and answers its
+	// value, shown this once and never again. It carries `read` alone
+	// unless asked for more, and `read` beside every write scope; a scope
+	// the caller does not hold, `instance:admin` for a member who is no
+	// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+	// the future and at most the instance's maximum token lifetime ahead,
+	// and is required when the instance requires one; without one the
+	// token never expires. Only a session creates a token, so a leaked
+	// token can never multiply itself or outlive its revocation.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+	CreateMyTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateMyTokenResponse, error)
+
+	// CreateMyTokenWithResponse Create a personal access token
+	//
+	// Creates a personal access token acting for the caller and answers its
+	// value, shown this once and never again. It carries `read` alone
+	// unless asked for more, and `read` beside every write scope; a scope
+	// the caller does not hold, `instance:admin` for a member who is no
+	// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+	// the future and at most the instance's maximum token lifetime ahead,
+	// and is required when the instance requires one; without one the
+	// token never expires. Only a session creates a token, so a leaked
+	// token can never multiply itself or outlive its revocation.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+	CreateMyTokenWithResponse(ctx context.Context, body CreateMyTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateMyTokenResponse, error)
+
+	// RevokeMyTokenWithResponse Revoke a personal access token
+	//
+	// Revokes one of the caller's tokens, which is refused `token_revoked`
+	// from then on. A token of another member, one already revoked or an
+	// identifier that names none is not found. Only a session may do this,
+	// so a leaked token cannot hide its siblings.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /me/tokens/{token} (the `RevokeMyToken` operationId).
+	RevokeMyTokenWithResponse(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*RevokeMyTokenResponse, error)
+
 	// ListMembersWithResponse The instance's members
 	//
 	// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
@@ -4866,6 +5378,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
 	ListMemberSessionsWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberSessionsResponse, error)
+
+	// ListMemberTokensWithResponse A member's personal access tokens
+	//
+	// Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /members/{member}/tokens (the `ListMemberTokens` operationId).
+	ListMemberTokensWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberTokensResponse, error)
+
+	// RevokeMemberTokenWithResponse Revoke a member's personal access token
+	//
+	// Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /members/{member}/tokens/{token} (the `RevokeMemberToken` operationId).
+	RevokeMemberTokenWithResponse(ctx context.Context, member MemberID, token TokenID, reqEditors ...RequestEditorFn) (*RevokeMemberTokenResponse, error)
 
 	// ListProjectsWithResponse The projects the caller works in
 	//
@@ -6003,6 +6533,199 @@ func (r RevokeMySessionResponse) ContentType() string {
 	return ""
 }
 
+// ListMyTokensResponse401Headers the declared response headers of an HTTP 401 response for ListMyTokens
+type ListMyTokensResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMyTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ApiTokenList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMyTokensResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMyTokensResponse) GetJSON200() *ApiTokenList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMyTokensResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMyTokensResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMyTokensResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMyTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMyTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMyTokensResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateMyTokenResponse401Headers the declared response headers of an HTTP 401 response for CreateMyToken
+type CreateMyTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateMyTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CreatedApiToken
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateMyTokenResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateMyTokenResponse) GetJSON201() *CreatedApiToken {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateMyTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateMyTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateMyTokenResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateMyTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateMyTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateMyTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateMyTokenResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeMyTokenResponse401Headers the declared response headers of an HTTP 401 response for RevokeMyToken
+type RevokeMyTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeMyTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeMyTokenResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeMyTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeMyTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevokeMyTokenResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeMyTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeMyTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeMyTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeMyTokenResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListMembersResponse401Headers the declared response headers of an HTTP 401 response for ListMembers
 type ListMembersResponse401Headers struct {
 	WWWAuthenticate *string
@@ -6660,6 +7383,137 @@ func (r ListMemberSessionsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListMemberSessionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListMemberTokensResponse401Headers the declared response headers of an HTTP 401 response for ListMemberTokens
+type ListMemberTokensResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMemberTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ApiTokenList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMemberTokensResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMemberTokensResponse) GetJSON200() *ApiTokenList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMemberTokensResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMemberTokensResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListMemberTokensResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMemberTokensResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMemberTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMemberTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMemberTokensResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeMemberTokenResponse401Headers the declared response headers of an HTTP 401 response for RevokeMemberToken
+type RevokeMemberTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeMemberTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeMemberTokenResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeMemberTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeMemberTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevokeMemberTokenResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeMemberTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeMemberTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeMemberTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeMemberTokenResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8603,6 +9457,87 @@ func (c *ClientWithResponses) RevokeMySessionWithResponse(ctx context.Context, s
 	return ParseRevokeMySessionResponse(rsp)
 }
 
+// ListMyTokensWithResponse The caller's personal access tokens
+//
+// Every personal access token of the caller, the newest first, revoked
+// and expired ones included, by their hint: a token's value is shown
+// only when it is created.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/tokens (the `ListMyTokens` operationId).
+func (c *ClientWithResponses) ListMyTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyTokensResponse, error) {
+	rsp, err := c.ListMyTokens(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyTokensResponse(rsp)
+}
+
+// CreateMyTokenWithBodyWithResponse Create a personal access token
+//
+// Creates a personal access token acting for the caller and answers its
+// value, shown this once and never again. It carries `read` alone
+// unless asked for more, and `read` beside every write scope; a scope
+// the caller does not hold, `instance:admin` for a member who is no
+// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+// the future and at most the instance's maximum token lifetime ahead,
+// and is required when the instance requires one; without one the
+// token never expires. Only a session creates a token, so a leaked
+// token can never multiply itself or outlive its revocation.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+func (c *ClientWithResponses) CreateMyTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateMyTokenResponse, error) {
+	rsp, err := c.CreateMyTokenWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateMyTokenResponse(rsp)
+}
+
+// CreateMyTokenWithResponse Create a personal access token
+//
+// Creates a personal access token acting for the caller and answers its
+// value, shown this once and never again. It carries `read` alone
+// unless asked for more, and `read` beside every write scope; a scope
+// the caller does not hold, `instance:admin` for a member who is no
+// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+// the future and at most the instance's maximum token lifetime ahead,
+// and is required when the instance requires one; without one the
+// token never expires. Only a session creates a token, so a leaked
+// token can never multiply itself or outlive its revocation.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+func (c *ClientWithResponses) CreateMyTokenWithResponse(ctx context.Context, body CreateMyTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateMyTokenResponse, error) {
+	rsp, err := c.CreateMyToken(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateMyTokenResponse(rsp)
+}
+
+// RevokeMyTokenWithResponse Revoke a personal access token
+//
+// Revokes one of the caller's tokens, which is refused `token_revoked`
+// from then on. A token of another member, one already revoked or an
+// identifier that names none is not found. Only a session may do this,
+// so a leaked token cannot hide its siblings.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/tokens/{token} (the `RevokeMyToken` operationId).
+func (c *ClientWithResponses) RevokeMyTokenWithResponse(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*RevokeMyTokenResponse, error) {
+	rsp, err := c.RevokeMyToken(ctx, token, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeMyTokenResponse(rsp)
+}
+
 // ListMembersWithResponse The instance's members
 //
 // Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
@@ -8791,6 +9726,36 @@ func (c *ClientWithResponses) ListMemberSessionsWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseListMemberSessionsResponse(rsp)
+}
+
+// ListMemberTokensWithResponse A member's personal access tokens
+//
+// Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /members/{member}/tokens (the `ListMemberTokens` operationId).
+func (c *ClientWithResponses) ListMemberTokensWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberTokensResponse, error) {
+	rsp, err := c.ListMemberTokens(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMemberTokensResponse(rsp)
+}
+
+// RevokeMemberTokenWithResponse Revoke a member's personal access token
+//
+// Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /members/{member}/tokens/{token} (the `RevokeMemberToken` operationId).
+func (c *ClientWithResponses) RevokeMemberTokenWithResponse(ctx context.Context, member MemberID, token TokenID, reqEditors ...RequestEditorFn) (*RevokeMemberTokenResponse, error) {
+	rsp, err := c.RevokeMemberToken(ctx, member, token, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeMemberTokenResponse(rsp)
 }
 
 // ListProjectsWithResponse The projects the caller works in
@@ -10039,6 +11004,175 @@ func ParseRevokeMySessionResponse(rsp *http.Response) (*RevokeMySessionResponse,
 	return response, nil
 }
 
+// ParseListMyTokensResponse parses an HTTP response from a ListMyTokensWithResponse call
+func ParseListMyTokensResponse(rsp *http.Response) (*ListMyTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMyTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiTokenList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMyTokensResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateMyTokenResponse parses an HTTP response from a CreateMyTokenWithResponse call
+func ParseCreateMyTokenResponse(rsp *http.Response) (*CreateMyTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateMyTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CreatedApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers CreateMyTokenResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeMyTokenResponse parses an HTTP response from a RevokeMyTokenWithResponse call
+func ParseRevokeMyTokenResponse(rsp *http.Response) (*RevokeMyTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeMyTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RevokeMyTokenResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListMembersResponse parses an HTTP response from a ListMembersWithResponse call
 func ParseListMembersResponse(rsp *http.Response) (*ListMembersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -10611,6 +11745,122 @@ func ParseListMemberSessionsResponse(rsp *http.Response) (*ListMemberSessionsRes
 	switch {
 	case rsp.StatusCode == 401:
 		var headers ListMemberSessionsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListMemberTokensResponse parses an HTTP response from a ListMemberTokensWithResponse call
+func ParseListMemberTokensResponse(rsp *http.Response) (*ListMemberTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMemberTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiTokenList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMemberTokensResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeMemberTokenResponse parses an HTTP response from a RevokeMemberTokenWithResponse call
+func ParseRevokeMemberTokenResponse(rsp *http.Response) (*RevokeMemberTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeMemberTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RevokeMemberTokenResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -12114,6 +13364,15 @@ type ServerInterface interface {
 	// RevokeMySession Sign out one device
 	// (DELETE /me/sessions/{session})
 	RevokeMySession(w http.ResponseWriter, r *http.Request, session SessionID)
+	// ListMyTokens The caller's personal access tokens
+	// (GET /me/tokens)
+	ListMyTokens(w http.ResponseWriter, r *http.Request)
+	// CreateMyToken Create a personal access token
+	// (POST /me/tokens)
+	CreateMyToken(w http.ResponseWriter, r *http.Request)
+	// RevokeMyToken Revoke a personal access token
+	// (DELETE /me/tokens/{token})
+	RevokeMyToken(w http.ResponseWriter, r *http.Request, token TokenID)
 	// ListMembers The instance's members
 	// (GET /members)
 	ListMembers(w http.ResponseWriter, r *http.Request, params ListMembersParams)
@@ -12141,6 +13400,12 @@ type ServerInterface interface {
 	// ListMemberSessions A member's sessions
 	// (GET /members/{member}/sessions)
 	ListMemberSessions(w http.ResponseWriter, r *http.Request, member MemberID)
+	// ListMemberTokens A member's personal access tokens
+	// (GET /members/{member}/tokens)
+	ListMemberTokens(w http.ResponseWriter, r *http.Request, member MemberID)
+	// RevokeMemberToken Revoke a member's personal access token
+	// (DELETE /members/{member}/tokens/{token})
+	RevokeMemberToken(w http.ResponseWriter, r *http.Request, member MemberID, token TokenID)
 	// ListProjects The projects the caller works in
 	// (GET /projects)
 	ListProjects(w http.ResponseWriter, r *http.Request)
@@ -12606,6 +13871,60 @@ func (siw *ServerInterfaceWrapper) RevokeMySession(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListMyTokens operation middleware
+func (siw *ServerInterfaceWrapper) ListMyTokens(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyTokens(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMyToken operation middleware
+func (siw *ServerInterfaceWrapper) CreateMyToken(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMyToken(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeMyToken operation middleware
+func (siw *ServerInterfaceWrapper) RevokeMyToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "token" -------------
+	var token TokenID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeMyToken(w, r, token)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMembers operation middleware
 func (siw *ServerInterfaceWrapper) ListMembers(w http.ResponseWriter, r *http.Request) {
 
@@ -12839,6 +14158,67 @@ func (siw *ServerInterfaceWrapper) ListMemberSessions(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListMemberSessions(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMemberTokens operation middleware
+func (siw *ServerInterfaceWrapper) ListMemberTokens(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMemberTokens(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeMemberToken operation middleware
+func (siw *ServerInterfaceWrapper) RevokeMemberToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "token" -------------
+	var token TokenID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeMemberToken(w, r, member, token)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13775,6 +15155,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions", wrapper.RevokeMySessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sessions", wrapper.ListMySessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions/{session}", wrapper.RevokeMySession)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/tokens", wrapper.ListMyTokens)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/tokens", wrapper.CreateMyToken)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/tokens/{token}", wrapper.RevokeMyToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/roles", wrapper.ListRoles)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects", wrapper.ListProjects)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects", wrapper.CreateProject)
@@ -13807,6 +15190,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/invitation", wrapper.ReissueInvitation)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/sessions", wrapper.RevokeMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/sessions", wrapper.ListMemberSessions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/tokens", wrapper.ListMemberTokens)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/tokens/{token}", wrapper.RevokeMemberToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-settings", wrapper.GetAuthSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-settings", wrapper.UpdateAuthSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit", wrapper.ListAuditEntries)
@@ -14791,6 +16176,202 @@ func (response RevokeMySession404ApplicationProblemPlusJSONResponse) VisitRevoke
 	return err
 }
 
+type ListMyTokensRequestObject struct {
+}
+
+type ListMyTokensResponseObject interface {
+	VisitListMyTokensResponse(w http.ResponseWriter) error
+}
+
+type ListMyTokens200JSONResponse ApiTokenList
+
+func (response ListMyTokens200JSONResponse) VisitListMyTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyTokens401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMyTokens401ApplicationProblemPlusJSONResponse) VisitListMyTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyTokens403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMyTokens403ApplicationProblemPlusJSONResponse) VisitListMyTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMyTokenRequestObject struct {
+	Body *CreateMyTokenJSONRequestBody
+}
+
+type CreateMyTokenResponseObject interface {
+	VisitCreateMyTokenResponse(w http.ResponseWriter) error
+}
+
+type CreateMyToken201JSONResponse CreatedApiToken
+
+func (response CreateMyToken201JSONResponse) VisitCreateMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMyToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateMyToken401ApplicationProblemPlusJSONResponse) VisitCreateMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMyToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateMyToken403ApplicationProblemPlusJSONResponse) VisitCreateMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMyToken422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateMyToken422ApplicationProblemPlusJSONResponse) VisitCreateMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMyTokenRequestObject struct {
+	Token TokenID `json:"token"`
+}
+
+type RevokeMyTokenResponseObject interface {
+	VisitRevokeMyTokenResponse(w http.ResponseWriter) error
+}
+
+type RevokeMyToken204Response struct {
+}
+
+func (response RevokeMyToken204Response) VisitRevokeMyTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeMyToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMyToken401ApplicationProblemPlusJSONResponse) VisitRevokeMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMyToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMyToken403ApplicationProblemPlusJSONResponse) VisitRevokeMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMyToken404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMyToken404ApplicationProblemPlusJSONResponse) VisitRevokeMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListMembersRequestObject struct {
 	Params ListMembersParams
 }
@@ -15528,6 +17109,147 @@ type ListMemberSessions404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ListMemberSessions404ApplicationProblemPlusJSONResponse) VisitListMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberTokensRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type ListMemberTokensResponseObject interface {
+	VisitListMemberTokensResponse(w http.ResponseWriter) error
+}
+
+type ListMemberTokens200JSONResponse ApiTokenList
+
+func (response ListMemberTokens200JSONResponse) VisitListMemberTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberTokens401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberTokens401ApplicationProblemPlusJSONResponse) VisitListMemberTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberTokens403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberTokens403ApplicationProblemPlusJSONResponse) VisitListMemberTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberTokens404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberTokens404ApplicationProblemPlusJSONResponse) VisitListMemberTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberTokenRequestObject struct {
+	Member MemberID `json:"member"`
+	Token  TokenID  `json:"token"`
+}
+
+type RevokeMemberTokenResponseObject interface {
+	VisitRevokeMemberTokenResponse(w http.ResponseWriter) error
+}
+
+type RevokeMemberToken204Response struct {
+}
+
+func (response RevokeMemberToken204Response) VisitRevokeMemberTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeMemberToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMemberToken401ApplicationProblemPlusJSONResponse) VisitRevokeMemberTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMemberToken403ApplicationProblemPlusJSONResponse) VisitRevokeMemberTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberToken404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMemberToken404ApplicationProblemPlusJSONResponse) VisitRevokeMemberTokenResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -17446,6 +19168,15 @@ type StrictServerInterface interface {
 	// RevokeMySession Sign out one device
 	// (DELETE /me/sessions/{session})
 	RevokeMySession(ctx context.Context, request RevokeMySessionRequestObject) (RevokeMySessionResponseObject, error)
+	// ListMyTokens The caller's personal access tokens
+	// (GET /me/tokens)
+	ListMyTokens(ctx context.Context, request ListMyTokensRequestObject) (ListMyTokensResponseObject, error)
+	// CreateMyToken Create a personal access token
+	// (POST /me/tokens)
+	CreateMyToken(ctx context.Context, request CreateMyTokenRequestObject) (CreateMyTokenResponseObject, error)
+	// RevokeMyToken Revoke a personal access token
+	// (DELETE /me/tokens/{token})
+	RevokeMyToken(ctx context.Context, request RevokeMyTokenRequestObject) (RevokeMyTokenResponseObject, error)
 	// ListMembers The instance's members
 	// (GET /members)
 	ListMembers(ctx context.Context, request ListMembersRequestObject) (ListMembersResponseObject, error)
@@ -17473,6 +19204,12 @@ type StrictServerInterface interface {
 	// ListMemberSessions A member's sessions
 	// (GET /members/{member}/sessions)
 	ListMemberSessions(ctx context.Context, request ListMemberSessionsRequestObject) (ListMemberSessionsResponseObject, error)
+	// ListMemberTokens A member's personal access tokens
+	// (GET /members/{member}/tokens)
+	ListMemberTokens(ctx context.Context, request ListMemberTokensRequestObject) (ListMemberTokensResponseObject, error)
+	// RevokeMemberToken Revoke a member's personal access token
+	// (DELETE /members/{member}/tokens/{token})
+	RevokeMemberToken(ctx context.Context, request RevokeMemberTokenRequestObject) (RevokeMemberTokenResponseObject, error)
 	// ListProjects The projects the caller works in
 	// (GET /projects)
 	ListProjects(ctx context.Context, request ListProjectsRequestObject) (ListProjectsResponseObject, error)
@@ -17902,6 +19639,87 @@ func (sh *strictHandler) RevokeMySession(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// ListMyTokens operation middleware
+func (sh *strictHandler) ListMyTokens(w http.ResponseWriter, r *http.Request) {
+	var request ListMyTokensRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyTokens(ctx, request.(ListMyTokensRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyTokens")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyTokensResponseObject); ok {
+		if err := validResponse.VisitListMyTokensResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateMyToken operation middleware
+func (sh *strictHandler) CreateMyToken(w http.ResponseWriter, r *http.Request) {
+	var request CreateMyTokenRequestObject
+
+	var body CreateMyTokenJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateMyToken(ctx, request.(CreateMyTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateMyToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateMyTokenResponseObject); ok {
+		if err := validResponse.VisitCreateMyTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeMyToken operation middleware
+func (sh *strictHandler) RevokeMyToken(w http.ResponseWriter, r *http.Request, token TokenID) {
+	var request RevokeMyTokenRequestObject
+
+	request.Token = token
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeMyToken(ctx, request.(RevokeMyTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeMyToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeMyTokenResponseObject); ok {
+		if err := validResponse.VisitRevokeMyTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListMembers operation middleware
 func (sh *strictHandler) ListMembers(w http.ResponseWriter, r *http.Request, params ListMembersParams) {
 	var request ListMembersRequestObject
@@ -18141,6 +19959,59 @@ func (sh *strictHandler) ListMemberSessions(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListMemberSessionsResponseObject); ok {
 		if err := validResponse.VisitListMemberSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMemberTokens operation middleware
+func (sh *strictHandler) ListMemberTokens(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request ListMemberTokensRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMemberTokens(ctx, request.(ListMemberTokensRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMemberTokens")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMemberTokensResponseObject); ok {
+		if err := validResponse.VisitListMemberTokensResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeMemberToken operation middleware
+func (sh *strictHandler) RevokeMemberToken(w http.ResponseWriter, r *http.Request, member MemberID, token TokenID) {
+	var request RevokeMemberTokenRequestObject
+
+	request.Member = member
+	request.Token = token
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeMemberToken(ctx, request.(RevokeMemberTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeMemberToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeMemberTokenResponseObject); ok {
+		if err := validResponse.VisitRevokeMemberTokenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

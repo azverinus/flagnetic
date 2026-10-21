@@ -302,6 +302,85 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /me/tokens:
+    get:
+      operationId: listMyTokens
+      summary: The caller's personal access tokens
+      description: |
+        Every personal access token of the caller, the newest first, revoked
+        and expired ones included, by their hint: a token's value is shown
+        only when it is created.
+      x-permission: member
+      tags: [me]
+      responses:
+        "200":
+          description: The tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiTokenList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createMyToken
+      summary: Create a personal access token
+      description: |
+        Creates a personal access token acting for the caller and answers its
+        value, shown this once and never again. It carries `read` alone
+        unless asked for more, and `read` beside every write scope; a scope
+        the caller does not hold, `instance:admin` for a member who is no
+        instance admin, is refused `scope_not_allowed`. Its expiry lies in
+        the future and at most the instance's maximum token lifetime ahead,
+        and is required when the instance requires one; without one the
+        token never expires. Only a session creates a token, so a leaked
+        token can never multiply itself or outlive its revocation.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiTokenCreate"
+      responses:
+        "201":
+          description: The token, with its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedApiToken"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /me/tokens/{token}:
+    parameters:
+      - $ref: "#/components/parameters/TokenID"
+    delete:
+      operationId: revokeMyToken
+      summary: Revoke a personal access token
+      description: |
+        Revokes one of the caller's tokens, which is refused `token_revoked`
+        from then on. A token of another member, one already revoked or an
+        identifier that names none is not found. Only a session may do this,
+        so a leaked token cannot hide its siblings.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /roles:
     get:
       operationId: listRoles
@@ -1093,6 +1172,47 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /members/{member}/tokens:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    get:
+      operationId: listMemberTokens
+      summary: A member's personal access tokens
+      description: Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiTokenList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /members/{member}/tokens/{token}:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+      - $ref: "#/components/parameters/TokenID"
+    delete:
+      operationId: revokeMemberToken
+      summary: Revoke a member's personal access token
+      description: Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /instance/auth-settings:
     get:
       operationId: getAuthSettings
@@ -1293,6 +1413,13 @@ components:
       in: path
       required: true
       description: The member's identifier.
+      schema:
+        type: string
+    TokenID:
+      name: token
+      in: path
+      required: true
+      description: The API token's identifier.
       schema:
         type: string
     ProjectKey:
@@ -1767,6 +1894,85 @@ components:
         password_min_length:
           type: integer
           description: The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
+    Scope:
+      type: string
+      enum: [read, "flags:write", "experiments:write", "project:admin", "instance:admin"]
+      description: What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
+    ApiToken:
+      type: object
+      description: A personal access token, by its hint; its value is shown only when it is created.
+      required: [id, name, hint, scopes, expires_at, created_at, last_used_at, last_used_ip, revoked_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        hint:
+          type: string
+          description: The value's prefix and its first four characters, such as `fn_pat_Ab3d`.
+        scopes:
+          type: array
+          description: The scopes the token carries, `read` first.
+          items:
+            $ref: "#/components/schemas/Scope"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; null for a token that never expires.
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token was last presented, recorded at most once a minute; null until it is used.
+        last_used_ip:
+          type: string
+          nullable: true
+          description: The address the token was last presented from.
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+    ApiTokenList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiToken"
+    ApiTokenCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: 1 to 200 characters, not blank, to tell the token apart.
+        scopes:
+          type: array
+          description: The scopes the token carries; `read` alone when absent, and `read` is added to any write scope.
+          items:
+            $ref: "#/components/schemas/Scope"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; absent or null for a token that never expires, unless the instance requires an expiry.
+    CreatedApiToken:
+      type: object
+      description: A personal access token just created, with its value.
+      required: [token, value]
+      properties:
+        token:
+          $ref: "#/components/schemas/ApiToken"
+        value:
+          type: string
+          format: password
+          description: The token's value, `fn_pat_` and 40 characters, shown this once.
     Grant:
       type: object
       description: One role held by one member in one project.

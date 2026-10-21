@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"errors"
+	"net/netip"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -19,22 +20,24 @@ type TokenStore interface {
 }
 
 // AuthenticateToken resolves the value of an API token presented as Bearer
-// into the caller
-// presenting it.
+// into the caller presenting it.
 type AuthenticateToken struct {
 	store TokenStore
+	uses  *TokenUses
 	clock clock.Clock
 }
 
-// NewAuthenticateToken returns the handler.
-func NewAuthenticateToken(store TokenStore, c clock.Clock) *AuthenticateToken {
-	return &AuthenticateToken{store: store, clock: c}
+// NewAuthenticateToken returns the handler, which notes each token's use
+// in uses.
+func NewAuthenticateToken(store TokenStore, uses *TokenUses, c clock.Clock) *AuthenticateToken {
+	return &AuthenticateToken{store: store, uses: uses, clock: c}
 }
 
-// Handle returns the caller presenting value, or the refusal a script tells
-// apart: invalid_token for a value that is malformed or unknown alike,
-// token_revoked, token_expired.
-func (h *AuthenticateToken) Handle(ctx context.Context, value string) (access.Caller, error) {
+// Handle returns the caller presenting value from the address ip, or the
+// refusal a script tells apart: invalid_token for a value that is malformed
+// or unknown alike, token_revoked, token_expired. A token accepted has its
+// use noted.
+func (h *AuthenticateToken) Handle(ctx context.Context, value string, ip netip.Addr) (access.Caller, error) {
 	hash, err := access.ParseTokenValue(value)
 	if err != nil {
 		return access.Caller{}, err
@@ -46,8 +49,10 @@ func (h *AuthenticateToken) Handle(ctx context.Context, value string) (access.Ca
 	if err != nil {
 		return access.Caller{}, err
 	}
-	if err := token.Refusal(h.clock.Now(), holder); err != nil {
+	now := h.clock.Now()
+	if err := token.Refusal(now, holder); err != nil {
 		return access.Caller{}, err
 	}
+	h.uses.Note(token, now, ip)
 	return access.TokenCaller(token, holder), nil
 }

@@ -211,17 +211,24 @@ func memberCreated(m access.Member) governance.Record {
 
 // tokenCreated records a token by its hint, never its value.
 func tokenCreated(t access.APIToken, holder access.Member) governance.Record {
+	return governance.Record{Action: "api_token.created", Entity: tokenEntity(t), After: tokenDetail(t, holder)}
+}
+
+// tokenEntity is t as the entity of an audit entry, keyed by its name.
+func tokenEntity(t access.APIToken) governance.Entity {
+	return governance.Entity{Kind: "api_token", ID: t.ID.String(), Key: t.Name}
+}
+
+// tokenDetail is what the audit log keeps of a personal access token of
+// holder: its hint, never its value.
+func tokenDetail(t access.APIToken, holder access.Member) map[string]any {
 	var expiresAt *string
 	if t.ExpiresAt != nil {
 		s := t.ExpiresAt.UTC().Format(time.RFC3339)
 		expiresAt = &s
 	}
-	return governance.Record{
-		Action: "api_token.created",
-		Entity: governance.Entity{Kind: "api_token", ID: t.ID.String(), Key: t.Name},
-		After: map[string]any{
-			"kind": t.Kind, "name": t.Name, "hint": t.Hint, "member": holder.ID.String(),
-			"scopes": t.Scopes, "expires_at": expiresAt,
-		},
+	return map[string]any{
+		"kind": t.Kind, "name": t.Name, "hint": t.Hint, "member": holder.ID.String(),
+		"scopes": t.Scopes, "expires_at": expiresAt,
 	}
 }

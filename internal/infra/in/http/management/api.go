@@ -46,6 +46,9 @@ type Handlers struct {
 	ReissueInvitation   *appaccess.ReissueInvitation
 	GetInvitation       *appaccess.GetInvitation
 	AcceptInvitation    *appaccess.AcceptInvitation
+	ListPersonalTokens  *appaccess.ListPersonalTokens
+	CreatePersonalToken *appaccess.CreatePersonalToken
+	RevokePersonalToken *appaccess.RevokePersonalToken
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
 
@@ -282,7 +285,7 @@ func (a *api) authenticate(r *http.Request, op access.Operation) (access.Caller,
 		if !strings.EqualFold(scheme, "Bearer") || value == "" {
 			return access.Caller{}, access.ErrInvalidToken
 		}
-		return a.h.AuthenticateToken.Handle(r.Context(), value)
+		return a.h.AuthenticateToken.Handle(r.Context(), value, flaghttp.ClientOf(r.Context()).IP)
 	}
 	cookie, err := r.Cookie(SessionCookie)
 	if err != nil || op.Requirement == access.RequirePublic {

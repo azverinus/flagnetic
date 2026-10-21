@@ -170,3 +170,95 @@ func TestATokenNeedsANameAndKnownScopes(t *testing.T) {
 		}
 	}
 }
+
+// violationOf returns the code of a refusal and of its one violation.
+func violationOf(err error) (code, pointer, violation string) {
+	e, ok := apperrors.From(err)
+	if !ok {
+		return "", "", ""
+	}
+	if len(e.Violations) != 1 {
+		return e.Code, "", ""
+	}
+	return e.Code, e.Violations[0].Pointer, e.Violations[0].Code
+}
+
+func TestATokensExpiryLiesInTheFutureWithinTheMaximumLifetime(t *testing.T) {
+	settings := access.DefaultAuthSettings
+	required := settings
+	required.TokenExpiryRequired = true
+	at := func(d time.Duration) *time.Time { e := now.Add(d); return &e }
+	for name, tc := range map[string]struct {
+		expiresAt *time.Time
+		settings  access.AuthSettings
+		want      string
+	}{
+		"none":                            {nil, settings, ""},
+		"an hour ahead":                   {at(time.Hour), settings, ""},
+		"exactly the maximum lifetime":    {at(settings.TokenMaxLifetime), settings, ""},
+		"a second beyond it":              {at(settings.TokenMaxLifetime + time.Second), settings, "beyond_max_lifetime"},
+		"now":                             {at(0), settings, "in_past"},
+		"an hour ago":                     {at(-time.Hour), settings, "in_past"},
+		"none when the setting wants one": {nil, required, "required"},
+		"one when the setting wants one":  {at(time.Hour), required, ""},
+	} {
+		code, pointer, violation := violationOf(access.CheckTokenExpiry(tc.expiresAt, now, tc.settings))
+		if tc.want == "" {
+			if code != "" {
+				t.Errorf("%s: refused %s %s", name, code, violation)
+			}
+			continue
+		}
+		if code != "invalid_token_request" || pointer != "/expires_at" || violation != tc.want {
+			t.Errorf("%s: refusal = %s %s %s, want invalid_token_request /expires_at %s", name, code, pointer, violation, tc.want)
+		}
+	}
+}
+
+func TestAMaximumLifetimeViolationNamesTheMaximum(t *testing.T) {
+	far := now.Add(access.DefaultAuthSettings.TokenMaxLifetime + time.Hour)
+	e, _ := apperrors.From(access.CheckTokenExpiry(&far, now, access.DefaultAuthSettings))
+	if e == nil || len(e.Violations) != 1 || e.Violations[0].Params["max_lifetime_seconds"] != int64(365*24*3600) {
+		t.Errorf("refusal = %+v, want the maximum lifetime in seconds", e)
+	}
+}
+
+func TestACredentialHandsOutNoScopeItDoesNotHold(t *testing.T) {
+	admin := access.Member{Status: access.MemberActive, InstanceAdmin: true}
+	member := access.Member{Status: access.MemberActive}
+	all := access.AllScopes()
+	readOnly := personalToken(t, nil)
+	for name, tc := range map[string]struct {
+		caller access.Caller
+		asked  []access.Scope
+		want   bool
+	}{
+		"a member's session, every scope but instance:admin": {access.SessionCaller(access.Session{}, member), all[:4], true},
+		"a member's session, instance:admin":                 {access.SessionCaller(access.Session{}, member), all, false},
+		"an instance admin's session, every scope":           {access.SessionCaller(access.Session{}, admin), all, true},
+		"a read-only token, read":                            {access.TokenCaller(readOnly, &admin), all[:1], true},
+		"a read-only token, a write scope":                   {access.TokenCaller(readOnly, &admin), all[:2], false},
+	} {
+		err := access.CheckScopesHeld(tc.caller, tc.asked)
+		if got := err == nil; got != tc.want {
+			t.Errorf("%s: allowed = %v (%v), want %v", name, got, err, tc.want)
+			continue
+		}
+		if code, pointer, _ := violationOf(err); !tc.want && (code != "scope_not_allowed" || !strings.HasPrefix(pointer, "/scopes/")) {
+			t.Errorf("%s: refusal = %s at %q, want scope_not_allowed at a scope", name, code, pointer)
+		}
+	}
+}
+
+func TestATokensUseIsRecordedAtMostOnceAMinute(t *testing.T) {
+	tok := personalToken(t, nil)
+	if !tok.UseToRecord(now) {
+		t.Error("a token never used has no use to record")
+	}
+	tok.LastUsedAt = &now
+	for d, want := range map[time.Duration]bool{0: false, 59 * time.Second: false, time.Minute: true, time.Hour: true} {
+		if got := tok.UseToRecord(now.Add(d)); got != want {
+			t.Errorf("%v after its last use: recorded = %v, want %v", d, got, want)
+		}
+	}
+}

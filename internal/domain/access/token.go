@@ -3,6 +3,7 @@ package access
 import (
 	"crypto/sha256"
 	"io"
+	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
@@ -126,6 +127,10 @@ type APIToken struct {
 	ExpiresAt *time.Time
 	RevokedAt *time.Time
 	CreatedAt time.Time
+	// LastUsedAt and LastUsedIP are when and from where the token was last
+	// presented, as last recorded; nil and the zero address until then.
+	LastUsedAt *time.Time
+	LastUsedIP netip.Addr
 }
 
 // NewPersonalTokenInput is what a personal access token is made of.
@@ -193,4 +198,65 @@ func (t APIToken) Refusal(now time.Time, holder *Member) error {
 		return apperrors.Unauthenticated("token_expired", "the API token has expired")
 	}
 	return nil
+}
+
+// errInvalidTokenRequest refuses a token asked for with a field that breaks
+// a rule, naming it.
+func errInvalidTokenRequest(v apperrors.Violation) error {
+	return apperrors.Invalid("invalid_token_request", "the token is not valid", v)
+}
+
+// CheckTokenExpiry refuses the expiry of a token created at now unless it
+// lies in the future and at most the settings' maximum lifetime ahead, or
+// its absence when the settings require one, so no token outlives what the
+// instance allows. A token without an expiry never expires.
+func CheckTokenExpiry(expiresAt *time.Time, now time.Time, s AuthSettings) error {
+	switch {
+	case expiresAt == nil && s.TokenExpiryRequired:
+		return errInvalidTokenRequest(apperrors.Violation{
+			Pointer: "/expires_at", Code: "required", Detail: "the instance requires every token to expire",
+		})
+	case expiresAt == nil:
+		return nil
+	case !expiresAt.After(now):
+		return errInvalidTokenRequest(apperrors.Violation{
+			Pointer: "/expires_at", Code: "in_past", Detail: "a token's expiry lies in the future",
+		})
+	case expiresAt.After(now.Add(s.TokenMaxLifetime)):
+		seconds := int64(s.TokenMaxLifetime / time.Second)
+		return errInvalidTokenRequest(apperrors.Violation{
+			Pointer: "/expires_at", Code: "beyond_max_lifetime",
+			Detail: "a token expires at most " + strconv.FormatInt(seconds, 10) + " seconds after it is created",
+			Params: map[string]any{"max_lifetime_seconds": seconds},
+		})
+	}
+	return nil
+}
+
+// CheckScopesHeld refuses scopes c does not hold itself, scope_not_allowed
+// naming the first, so a credential never hands out more than it holds: a
+// session holds every scope, but instance:admin only for an instance admin;
+// a token holds its own scopes.
+func CheckScopesHeld(c Caller, scopes []Scope) error {
+	for i, s := range scopes {
+		held := c.hasScope(s) && (s != ScopeInstanceAdmin || (c.Member != nil && c.Member.InstanceAdmin))
+		if !held {
+			return apperrors.Invalid("scope_not_allowed", "the scope "+string(s)+" is not one the caller holds", apperrors.Violation{
+				Pointer: "/scopes/" + strconv.Itoa(i), Code: "scope_not_allowed",
+				Detail: "a token carries only scopes its creator holds; instance:admin is an instance admin's",
+			})
+		}
+	}
+	return nil
+}
+
+// useInterval is how often a token's use is recorded at most: often enough
+// for a member to tell a token in use from one forgotten, rarely enough that
+// a busy script does not write on every request.
+const useInterval = time.Minute
+
+// UseToRecord reports whether presenting the token at now is a use worth
+// recording: its first, or a minute or more after the last one recorded.
+func (t APIToken) UseToRecord(now time.Time) bool {
+	return t.LastUsedAt == nil || now.Sub(*t.LastUsedAt) >= useInterval
 }

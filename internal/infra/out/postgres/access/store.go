@@ -14,7 +14,6 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	"github.com/azverinus/flagnetic/internal/domain/access"
-	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -90,44 +89,28 @@ func (s *Store) CreateToken(ctx context.Context, t access.APIToken) error {
 // TokenByHash returns the token whose value hashes to hash and, for a
 // personal access token, its member.
 func (s *Store) TokenByHash(ctx context.Context, hash access.TokenHash) (access.APIToken, *access.Member, error) {
+	tokenDest, token := scanToken()
 	var (
-		t               access.APIToken
-		tokenID         [16]byte
-		kind            string
-		scopes          []string
 		memberID        *[16]byte
 		email, name     *string
 		status, locale  *string
 		instanceAdmin   *bool
 		memberCreatedAt *time.Time
-		tokenHash       []byte
-		projectID       *[16]byte
-		role            *string
 	)
 	err := s.db(ctx).QueryRow(ctx, `
-		SELECT t.id, t.kind, t.project_id, t.role, t.name, t.hint, t.token_hash, t.scopes, t.expires_at, t.revoked_at, t.created_at,
+		SELECT `+tokenColumns+`,
 		       m.id, m.email, m.display_name, m.status, m.instance_admin, m.locale, m.created_at
 		FROM api_tokens t
 		LEFT JOIN members m ON m.id = t.member_id
-		WHERE t.token_hash = $1`, hash[:]).Scan(
-		&tokenID, &kind, &projectID, &role, &t.Name, &t.Hint, &tokenHash, &scopes, &t.ExpiresAt, &t.RevokedAt, &t.CreatedAt,
-		&memberID, &email, &name, &status, &instanceAdmin, &locale, &memberCreatedAt)
+		WHERE t.token_hash = $1`, hash[:]).Scan(append(tokenDest,
+		&memberID, &email, &name, &status, &instanceAdmin, &locale, &memberCreatedAt)...)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return access.APIToken{}, nil, appaccess.ErrNotFound
 	}
 	if err != nil {
 		return access.APIToken{}, nil, fmt.Errorf("reading an API token: %w", err)
 	}
-	t.ID, t.Kind, t.Hash = id.FromBytes[access.APIToken](tokenID), access.TokenKind(kind), access.TokenHash(tokenHash)
-	for _, sc := range scopes {
-		t.Scopes = append(t.Scopes, access.Scope(sc))
-	}
-	if projectID != nil {
-		t.Project = id.FromBytes[workspace.Project](*projectID)
-	}
-	if role != nil {
-		t.Role = access.RoleName(*role)
-	}
+	t := token()
 	if memberID == nil {
 		return t, nil, nil
 	}
@@ -138,7 +121,6 @@ func (s *Store) TokenByHash(ctx context.Context, hash access.TokenHash) (access.
 	if locale != nil {
 		m.Locale = *locale
 	}
-	t.Member = m.ID
 	return t, m, nil
 }
 

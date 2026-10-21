@@ -82,8 +82,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// replica's.
 	hasher := password.NewBoundedHasher(password.DefaultParams,
 		semaphore.NewWeighted(int64(o.PasswordHashConcurrency)), password.SlotWait)
+	// Token uses are gathered per replica and written in rounds, so no
+	// request waits on recording one.
+	tokenUses := appaccess.NewTokenUses(accessStore)
 	management.Mount(edge, management.Handlers{
-		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, d.Clock),
+		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
 		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
@@ -106,8 +109,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
 		}),
-		ProjectPermissions: appaccess.NewProjectPermissions(),
-		WorkingProjects:    appaccess.NewWorkingProjects(),
+		ListPersonalTokens:  appaccess.NewListPersonalTokens(accessStore),
+		CreatePersonalToken: appaccess.NewCreatePersonalToken(tx, accessStore, settings, auditLog, d.Clock, d.IDs, rand.Reader),
+		RevokePersonalToken: appaccess.NewRevokePersonalToken(tx, accessStore, auditLog, d.Clock, d.IDs),
+		ProjectPermissions:  appaccess.NewProjectPermissions(),
+		WorkingProjects:     appaccess.NewWorkingProjects(),
 
 		FindProject:   appworkspace.NewFindProject(ws),
 		ListProjects:  appworkspace.NewListProjects(ws),
@@ -136,7 +142,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
 	}, reg, o.Options)
 	return Background{
-		Workers:   []worker.Worker{worker.AuthRetention(appaccess.NewPurgeAuthRecords(tx, accessStore, settings, d.Clock), reg)},
+		Workers: []worker.Worker{
+			worker.AuthRetention(appaccess.NewPurgeAuthRecords(tx, accessStore, settings, d.Clock), reg),
+			worker.TokenLastUse(tokenUses),
+		},
 		Listeners: []Listener{{Channel: pgaccess.AuthSettingsChannel, Handler: settings}},
 	}
 }
