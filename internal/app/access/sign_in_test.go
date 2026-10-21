@@ -138,3 +138,30 @@ func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {
 		t.Errorf("the right password once slots are free: %s, want signed in", code)
 	}
 }
+
+// busyRehash verifies passwords as its hasher does but finds every stored
+// hash outdated, and finds no slot to rehash one.
+type busyRehash struct{ *password.Hasher }
+
+func (b busyRehash) Verify(ctx context.Context, p secret.String, encoded string) (bool, bool, error) {
+	ok, _, err := b.Hasher.Verify(ctx, p, encoded)
+	return ok, true, err
+}
+
+func (busyRehash) Hash(context.Context, secret.String) (string, error) { return "", password.ErrBusy }
+
+func TestARightPasswordNeverCountsAsAFailure(t *testing.T) {
+	m := testkit.NewMember(t, testkit.Pool(t))
+	from := anAddress()
+	busy := newSignIn(t, busyRehash{password.NewHasher(password.DefaultParams)})
+	for i := range access.LockoutThreshold + 1 {
+		_, err := busy.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(m.Password), ClientIP: from})
+		if codeOf(err) != "busy" {
+			t.Fatalf("attempt %d with the right password and no slot to rehash: %v, want busy", i+1, err)
+		}
+	}
+	h := newSignIn(t, password.NewHasher(password.DefaultParams))
+	if _, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(m.Password), ClientIP: from}); err != nil {
+		t.Errorf("the right password once a rehash can run: %v, want signed in: the right password counted no failure", err)
+	}
+}

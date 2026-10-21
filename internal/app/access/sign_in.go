@@ -151,7 +151,26 @@ func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, e
 		return SignInResult{}, h.fail(ctx, cmd, member, reserved, string(member.Status))
 	}
 
-	var rehash string
+	res, err := h.succeed(ctx, cmd, member, outdated, func(ctx context.Context) error {
+		return h.store.ClearAttempt(ctx, key, source, reserved.WindowStart)
+	})
+	if err != nil {
+		// The password proved right, so whatever failed after was no wrong
+		// guess: a member who knows their password is never locked by it.
+		return SignInResult{}, errors.Join(err, h.store.ReleaseAttempt(context.WithoutCancel(ctx), key, source, reserved.WindowStart))
+	}
+	return res, nil
+}
+
+// succeed opens a session for member, whose password proved right, rehashing
+// it when outdated, and clears the attempt in the same unit of work.
+func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.Member, outdated bool,
+	clear func(context.Context) error,
+) (SignInResult, error) {
+	var (
+		rehash string
+		err    error
+	)
 	if outdated {
 		if rehash, err = h.hasher.Hash(ctx, cmd.Password); err != nil {
 			return SignInResult{}, err
@@ -169,7 +188,7 @@ func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, e
 		return SignInResult{}, err
 	}
 	if err := h.tx.Within(ctx, func(ctx context.Context) error {
-		if err := h.store.ClearAttempt(ctx, key, source, reserved.WindowStart); err != nil {
+		if err := clear(ctx); err != nil {
 			return err
 		}
 		return h.open(ctx, session, rehash, entry)
