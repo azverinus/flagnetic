@@ -289,7 +289,7 @@ func addConstruct(list []Construct, c *Construct) []Construct {
 }
 
 func buildIndex(rs *Ruleset) *index {
-	types := make(map[string]AttributeType, len(rs.Attributes)+len(rs.UnitTypes))
+	types := make(map[string]AttributeType, len(rs.Attributes))
 	for _, a := range rs.Attributes {
 		types[a.Key] = a.Type
 	}
