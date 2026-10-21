@@ -47,8 +47,11 @@ const (
 // Config is the configuration of one replica.
 type Config struct {
 	DatabaseURL secret.String
-	ConfigFile  string
-	ListenAddr  string
+	// SecretKey is the instance's secret key, zero when not set; serve
+	// requires it.
+	SecretKey  secret.String
+	ConfigFile string
+	ListenAddr string
 	// MetricsListenAddr is "" when metrics are switched off.
 	MetricsListenAddr string
 	AutoMigrate       bool
@@ -85,6 +88,9 @@ type Setting struct {
 	Example string
 	// Required settings have no default and must be set.
 	Required bool
+	// RequiredBy names the command that requires the setting, when only
+	// that command does; the command checks it, so the others run without.
+	RequiredBy string
 	// Secret settings are never repeated in a message, not even a refusal.
 	Secret bool
 
@@ -113,6 +119,20 @@ func Settings() []Setting {
 					return errors.New("not a PostgreSQL connection string")
 				}
 				cfg.DatabaseURL = secret.New(v)
+				return nil
+			},
+		},
+		{
+			Name:       "FLAGNETIC_SECRET_KEY",
+			Key:        "secret_key",
+			RequiredBy: "serve",
+			Secret:     true,
+			Description: "The instance's secret key: stored secrets are sealed under it, sessions are signed with it. " +
+				"Keep it for the life of the instance: on its first start the instance stores a canary sealed under the key, " +
+				"and `serve` refuses to start under a key that does not open it. Use a long random value, such as the output of `openssl rand -base64 32`.",
+			Example: "q3S0k1p2Rk7Jt0E5m9xV8bYcN4wZ6hL2aU1dG7fH0eI=",
+			apply: func(cfg *Config, v string) error {
+				cfg.SecretKey = secret.New(v)
 				return nil
 			},
 		},

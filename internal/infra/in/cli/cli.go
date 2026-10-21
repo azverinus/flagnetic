@@ -54,6 +54,9 @@ type options struct {
 	serverVersionNum func(context.Context, *pgxpool.Pool) (int, error)
 	routes           []route
 	workers          []worker.Worker
+	// canary is whether serve checks the secret key against the canary,
+	// which the server's own migrations make a table for.
+	canary bool
 }
 
 type route struct {
@@ -61,8 +64,10 @@ type route struct {
 	handler http.Handler
 }
 
+// withMigrations replaces the server's migrations. The schema they make has
+// no canary table, so serve skips the canary.
 func withMigrations(migrations fs.FS) Option {
-	return func(o *options) { o.migrations = migrations }
+	return func(o *options) { o.migrations, o.canary = migrations, false }
 }
 
 func withServerVersionNum(f func(context.Context, *pgxpool.Pool) (int, error)) Option {
@@ -84,6 +89,7 @@ func Main(args []string, lookupEnv func(string) (string, bool), stdout, stderr i
 	o := options{
 		migrations:       postgres.Migrations(),
 		serverVersionNum: postgres.ServerVersionNum,
+		canary:           true,
 	}
 	for _, opt := range opts {
 		opt(&o)

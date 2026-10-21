@@ -53,10 +53,17 @@ func (r result) logRecord(t *testing.T, msg string) map[string]any {
 	return nil
 }
 
+// secretKey is the secret key every command runs with unless a test sets
+// FLAGNETIC_SECRET_KEY itself, to the empty string for none.
+const secretKey = "0123456789abcdef0123456789abcdef"
+
 func run(env map[string]string, opts []cli.Option, args ...string) result {
 	var stdout, stderr bytes.Buffer
 	lookup := func(k string) (string, bool) {
 		v, ok := env[k]
+		if !ok && k == "FLAGNETIC_SECRET_KEY" {
+			return secretKey, true
+		}
 		return v, ok
 	}
 	code := cli.Main(args, lookup, &stdout, &stderr, make(chan os.Signal), opts...)

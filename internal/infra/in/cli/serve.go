@@ -20,6 +20,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
+	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
 // workerStopBound is how long the stop waits for worker rounds, and for
@@ -38,6 +39,12 @@ const poolCloseBound = 5 * time.Second
 // whatever of the drain and the grace is left.
 func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o options) int {
 	log.InfoContext(ctx, "starting", "version", buildinfo.Version())
+	if cfg.SecretKey.IsZero() {
+		// Sessions would be signed with an empty key, and stored secrets
+		// sealed under one: a replica without its key never starts.
+		return fail(log, "start failed", configError(errors.New(
+			"FLAGNETIC_SECRET_KEY is required by serve; for example the output of `openssl rand -base64 32`, kept for the life of the instance")))
+	}
 	pool, err := openDatabase(ctx, cfg, log, o)
 	if err != nil {
 		return failStart(ctx, log, err)
@@ -50,6 +57,11 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	}
 	if err != nil {
 		return failStart(ctx, log, err)
+	}
+	if o.canary {
+		if err = checkCanary(ctx, pool, secret.NewKeyring(cfg.SecretKey)); err != nil {
+			return failStart(ctx, log, err)
+		}
 	}
 
 	// The registry every part of the replica registers its metrics on.
@@ -180,6 +192,21 @@ func checkSchema(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, o op
 		log.WarnContext(ctx, "database schema is ahead of this binary", "database_version", database, "binary_version", binary)
 	}
 	return nil
+}
+
+// checkCanary stores the instance's canary on its first start and proves on
+// every start that the secret key opens it, so a mistyped key stops the
+// replica rather than silently failing to read what the instance stored.
+func checkCanary(ctx context.Context, pool *pgxpool.Pool, keyring *secret.Keyring) error {
+	fresh, err := keyring.NewCanary()
+	if err != nil {
+		return err
+	}
+	stored, err := postgres.Canary(ctx, pool, fresh, clock.System{}.Now())
+	if err != nil {
+		return fmt.Errorf("reading the secret key canary: %w", err)
+	}
+	return keyring.CheckCanary(stored)
 }
 
 // failStart reports a start that did not complete. A start cut short by the

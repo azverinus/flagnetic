@@ -1,6 +1,10 @@
 // Package secret holds values that must never reach a log: passwords, keys,
 // tokens. Every way of printing one (fmt, slog, JSON) writes [redacted]; only
 // an explicit Reveal gives the value, at the one place that needs it.
+//
+// A Keyring seals values under the instance's secret key for storage, so only
+// an instance holding the key reads them back, and derives the keys of other
+// uses from it.
 package secret
 
 import "log/slog"

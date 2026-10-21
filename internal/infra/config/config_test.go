@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -255,5 +256,34 @@ func TestTheDatabaseURLIsLoggedWithoutItsPassword(t *testing.T) {
 	cfg, _ = config.Load(env(map[string]string{"DATABASE_URL": "host=db user=flagnetic password=s3cret"}))
 	if strings.Contains(cfg.DatabaseURLForLog(), "s3cret") {
 		t.Errorf("DatabaseURLForLog = %q", cfg.DatabaseURLForLog())
+	}
+}
+
+func TestTheSecretKeyIsReadAndNeverPrinted(t *testing.T) {
+	const key = "a secret key nobody may read"
+	cfg, err := config.Load(func(k string) (string, bool) {
+		v, ok := map[string]string{"DATABASE_URL": "postgres://localhost/flagnetic", "FLAGNETIC_SECRET_KEY": key}[k]
+		return v, ok
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.SecretKey.Reveal() != key {
+		t.Errorf("secret key = %q, want it read", cfg.SecretKey.Reveal())
+	}
+	if s := fmt.Sprintf("%v %+v", cfg, cfg); strings.Contains(s, key) {
+		t.Errorf("the configuration printed shows the secret key: %s", s)
+	}
+}
+
+func TestTheSecretKeyIsOptionalForCommandsOtherThanServe(t *testing.T) {
+	cfg, err := config.Load(func(k string) (string, bool) {
+		if k == "DATABASE_URL" {
+			return "postgres://localhost/flagnetic", true
+		}
+		return "", false
+	})
+	if err != nil || !cfg.SecretKey.IsZero() {
+		t.Errorf("Load without a secret key = %v, %v; want no error and no key", cfg.SecretKey, err)
 	}
 }
