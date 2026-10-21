@@ -148,7 +148,7 @@ func (s *Server) writeProblem(w http.ResponseWriter, r *http.Request, p problem)
 	members["title"] = p.title
 	members["status"] = p.status
 	members["code"] = p.code
-	members["request_id"] = requestIDOf(r.Context())
+	members["request_id"] = RequestIDOf(r.Context())
 	if p.detail != "" {
 		members["detail"] = p.detail
 	}

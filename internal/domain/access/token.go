@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -119,9 +120,13 @@ type APIToken struct {
 	Kind TokenKind
 	// Member holds a personal access token; zero for a project token.
 	Member MemberID
-	Name   string
-	Hint   string
-	Hash   TokenHash
+	// Project is the one project a project token reaches, and Role the one
+	// role it holds there; zero for a personal access token.
+	Project workspace.ProjectID
+	Role    RoleName
+	Name    string
+	Hint    string
+	Hash    TokenHash
 	// Scopes always hold read beside any write scope.
 	Scopes []Scope
 	// ExpiresAt is nil for a token that does not expire.

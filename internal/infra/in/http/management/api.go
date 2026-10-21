@@ -13,7 +13,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management/operations"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
@@ -26,6 +29,11 @@ const BaseURL = "/api/v1"
 // Handlers are the use cases the management API serves.
 type Handlers struct {
 	AuthenticateToken *appaccess.AuthenticateToken
+
+	FindProject   *appworkspace.FindProject
+	ListProjects  *appworkspace.ListProjects
+	CreateProject *appworkspace.CreateProject
+	UpdateProject *appworkspace.UpdateProject
 }
 
 // api serves every operation of the document.
@@ -83,13 +91,36 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 
 func (rt router) ServeHTTP(w http.ResponseWriter, r *http.Request) { rt.a.edge.ServeHTTP(w, r) }
 
-type callerKey struct{}
+type (
+	callerKey  struct{}
+	projectKey struct{}
+)
 
 // callerOf returns the caller the seam authenticated for the request ctx
 // belongs to.
 func callerOf(ctx context.Context) access.Caller {
 	c, _ := ctx.Value(callerKey{}).(access.Caller)
 	return c
+}
+
+// addressed is the project an operation addresses, as the seam found it,
+// with what the caller holds there.
+type addressed struct {
+	project     workspace.Project
+	permissions []access.Permission
+}
+
+// projectOf returns the project the request ctx belongs to addresses, which
+// the seam found before judging it.
+func projectOf(ctx context.Context) addressed {
+	p, _ := ctx.Value(projectKey{}).(addressed)
+	return p
+}
+
+// requestOf returns who makes the change a request ctx belongs to asks for,
+// for its audit entries.
+func requestOf(ctx context.Context) governance.Request {
+	return governance.Request{Actor: appaccess.ActorOf(callerOf(ctx)), ID: flaghttp.RequestIDOf(ctx)}
 }
 
 // seam judges a request to op before its handler runs: it authenticates the
@@ -99,10 +130,17 @@ func callerOf(ctx context.Context) access.Caller {
 // as everywhere; only the absence of any credential is how anyone calls it.
 func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		caller, err := a.authenticate(r)
+		var in *addressed
 		switch {
+		case err == nil && op.InProject():
+			in, err = a.address(ctx, caller, r.PathValue("project"))
+			if err == nil {
+				err = access.Authorize(caller, op, &access.ProjectAccess{Project: in.project.ID, Permissions: in.permissions})
+			}
 		case err == nil:
-			err = access.Authorize(caller, op)
+			err = access.Authorize(caller, op, nil)
 		case errors.Is(err, errUnauthenticated) && op.Requirement == access.RequirePublic:
 			err = nil
 		}
@@ -110,8 +148,27 @@ func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
 			a.refuse(w, r, op, err)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), callerKey{}, caller)))
+		ctx = context.WithValue(ctx, callerKey{}, caller)
+		if in != nil {
+			ctx = context.WithValue(ctx, projectKey{}, *in)
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// address finds the project with key and what caller holds there; an
+// unknown project is the zero one, holding nothing.
+func (a *api) address(ctx context.Context, caller access.Caller, key string) (*addressed, error) {
+	p, err := a.h.FindProject.Handle(ctx, key)
+	if errors.Is(err, appworkspace.ErrNotFound) {
+		return &addressed{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	// Grants are not stored yet, so a member who is not an instance admin
+	// holds no role in any project.
+	return &addressed{project: p, permissions: access.EffectivePermissions(caller, p.ID, nil)}, nil
 }
 
 // errUnauthenticated answers a request that presents no credential.
@@ -138,7 +195,8 @@ func (a *api) authenticate(r *http.Request) (access.Caller, error) {
 // operation and its code. A refused credential is named in WWW-Authenticate,
 // so tooling tells an expired token from a revoked one without the body.
 func (a *api) refuse(w http.ResponseWriter, r *http.Request, op access.Operation, err error) {
-	if e, ok := apperrors.From(err); ok && (e.Kind == apperrors.KindUnauthenticated || e.Kind == apperrors.KindForbidden) {
+	if e, ok := apperrors.From(err); ok && (e.Kind == apperrors.KindUnauthenticated || e.Kind == apperrors.KindForbidden ||
+		e.Kind == apperrors.KindNotFound) {
 		if e.Kind == apperrors.KindUnauthenticated {
 			challenge := "Bearer"
 			if e.Code != errUnauthenticated.Code {

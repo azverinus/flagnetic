@@ -38,13 +38,179 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /roles:
+    get:
+      operationId: listRoles
+      summary: The roles and their permissions
+      description: Every role a grant or a project token may hold, with the permissions it allows, so a client can explain which roles hold a permission a caller lacks.
+      x-permission: member
+      tags: [access]
+      responses:
+        "200":
+          description: The roles, the most powerful first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /projects:
+    get:
+      operationId: listProjects
+      summary: The projects the caller works in
+      description: The projects where the caller holds a grant; every project for an instance admin. A project token is refused.
+      x-permission: member
+      tags: [projects]
+      responses:
+        "200":
+          description: The projects, ordered by key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createProject
+      summary: Create a project
+      description: |
+        Creates a project with the development, staging and production
+        environments, the `user` and `anonymous` unit types and the standard
+        attributes. The creator receives no grant: an instance admin holds
+        every permission in every project already.
+      x-permission: instance_admin
+      tags: [projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreate"
+      responses:
+        "201":
+          description: The project created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: getProject
+      summary: A project
+      x-permission: project.read
+      tags: [projects]
+      responses:
+        "200":
+          description: The project.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateProject
+      summary: Rename a project or change its description
+      description: The key never changes; sending one is refused with `key_immutable`.
+      x-permission: project.update
+      tags: [projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectPatch"
+      responses:
+        "200":
+          description: The project as changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/me:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: getProjectMe
+      summary: What the caller holds in a project
+      description: |
+        The caller's grants in the project and their effective permissions
+        there: the union of the grants' roles (every permission for an
+        instance admin), narrowed by the scopes of the credential in use.
+      x-permission: project.read
+      tags: [projects]
+      responses:
+        "200":
+          description: The caller's grants and permissions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMe"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
+  parameters:
+    ProjectKey:
+      name: project
+      in: path
+      required: true
+      description: The project's key.
+      schema:
+        type: string
   securitySchemes:
     bearer:
       type: http
       scheme: bearer
       description: An API token, `fn_pat_…` for a personal access token or `fn_prj_…` for a project token, in the `Authorization` header. A token in the query string is never read.
   responses:
+    NotFound:
+      description: "`not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Conflict:
+      description: "The change conflicts with what exists, such as `already_exists` for a key already in use."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Invalid:
+      description: The request is well formed but breaks a rule; `errors` names each field to fix.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
     Unauthenticated:
       description: |
         No credential, or one that is not accepted: `unauthenticated` without
@@ -158,3 +324,117 @@ components:
           description: The API token in use, for the token method.
         token_name:
           type: string
+    Key:
+      type: string
+      pattern: "^[a-z][a-z0-9_-]{0,63}$"
+      description: Names the entity in URLs, SDK calls and rules, and never changes.
+    Name:
+      type: string
+      minLength: 1
+      maxLength: 200
+    Description:
+      type: string
+      maxLength: 2000
+    Project:
+      type: object
+      required: [id, key, name, description]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+    ProjectList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+    ProjectCreate:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+    ProjectPatch:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Refused with `key_immutable` whatever its value.
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+    Permission:
+      type: string
+      description: A permission of the catalog, named entity.verb, such as `environment.manage`.
+    RoleName:
+      type: string
+      enum: [owner, maintainer, developer, viewer]
+    Role:
+      type: object
+      required: [name, permissions]
+      properties:
+        name:
+          $ref: "#/components/schemas/RoleName"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+    RoleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+    Grant:
+      type: object
+      description: One role held by one member in one project.
+      required: [id, member, role, source, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        member:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/RoleName"
+        source:
+          type: string
+          enum: [manual]
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member who made the grant.
+        created_at:
+          type: string
+          format: date-time
+    ProjectMe:
+      type: object
+      required: [grants, permissions]
+      properties:
+        grants:
+          type: array
+          description: The grants the caller's member holds in the project; none for a project token or an instance admin acting without one.
+          items:
+            $ref: "#/components/schemas/Grant"
+        permissions:
+          type: array
+          description: The caller's effective permissions in the project, narrowed by the scopes of the credential in use, in catalog order.
+          items:
+            $ref: "#/components/schemas/Permission"

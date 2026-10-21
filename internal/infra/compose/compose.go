@@ -11,12 +11,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
+	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -36,9 +38,15 @@ func NewDeps(pool *pgxpool.Pool, c clock.Clock) Deps {
 
 // Management mounts the management API on edge, its metrics on reg.
 func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer) {
-	store := pgaccess.NewStore(d.Pool)
+	tx, audit := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
+	accessStore, workspaceStore := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
 	management.Mount(edge, management.Handlers{
-		AuthenticateToken: appaccess.NewAuthenticateToken(store, d.Clock),
+		AuthenticateToken: appaccess.NewAuthenticateToken(accessStore, d.Clock),
+
+		FindProject:   appworkspace.NewFindProject(workspaceStore),
+		ListProjects:  appworkspace.NewListProjects(workspaceStore),
+		CreateProject: appworkspace.NewCreateProject(tx, workspaceStore, audit, d.Clock, d.IDs),
+		UpdateProject: appworkspace.NewUpdateProject(tx, workspaceStore, audit, d.Clock, d.IDs),
 	}, reg)
 }
 
