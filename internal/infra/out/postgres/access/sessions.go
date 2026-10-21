@@ -42,17 +42,19 @@ func scanSession() ([]any, func() access.Session) {
 		ip                *netip.Addr
 		secret            []byte
 	)
-	return []any{
-			&sessionID, &secret, &member, &method, &ip, &sess.UserAgent, &sess.CreatedAt, &sess.LastSeenAt, &sess.ExpiresAt, &sess.RevokedAt,
-		}, func() access.Session {
-			sess.ID, sess.Hash, sess.Method = id.FromBytes[access.Session](sessionID), access.SessionHash(secret), access.SignInMethod(method)
-			sess.Member = id.FromBytes[access.Member](member)
-			sess.ClientIP = netip.Addr{}
-			if ip != nil {
-				sess.ClientIP = *ip
-			}
-			return sess
+	dest := []any{
+		&sessionID, &secret, &member, &method, &ip, &sess.UserAgent, &sess.CreatedAt, &sess.LastSeenAt, &sess.ExpiresAt, &sess.RevokedAt,
+	}
+	fill := func() access.Session {
+		sess.ID, sess.Hash, sess.Method = id.FromBytes[access.Session](sessionID), access.SessionHash(secret), access.SignInMethod(method)
+		sess.Member = id.FromBytes[access.Member](member)
+		sess.ClientIP = netip.Addr{}
+		if ip != nil {
+			sess.ClientIP = *ip
 		}
+		return sess
+	}
+	return dest, fill
 }
 
 // SessionByHash returns the session stored under hash with its member;
