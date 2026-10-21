@@ -30,12 +30,13 @@ func variations(kv ...string) *[]management.VariationInput {
 	return &out
 }
 
-// createFlag creates a flag as c, failing unless it is created.
+// createFlag creates a flag as c, failing unless it is created at version
+// 1 with that version as its ETag.
 func createFlag(t *testing.T, c *management.ClientWithResponses, project string, body management.FlagCreate) management.Flag {
 	t.Helper()
 	res := do(c.CreateFlagWithResponse(t.Context(), project, body))
-	if res.JSON201 == nil {
-		t.Fatalf("POST flags %s = %d: %s", body.Key, res.StatusCode(), res.Body)
+	if res.JSON201 == nil || res.HTTPResponse.Header.Get("ETag") != `"1"` {
+		t.Fatalf("POST flags %s = %d, ETag %q: %s", body.Key, res.StatusCode(), res.HTTPResponse.Header.Get("ETag"), res.Body)
 	}
 	return *res.JSON201
 }

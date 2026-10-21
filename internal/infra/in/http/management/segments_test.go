@@ -31,11 +31,13 @@ func conditions(cs ...management.Condition) *[]management.Condition {
 	return &cs
 }
 
+// createSegment creates a segment as c, failing unless it is created at
+// version 1 with that version as its ETag.
 func createSegment(t *testing.T, c *management.ClientWithResponses, project string, body management.SegmentCreate) management.Segment {
 	t.Helper()
 	res := do(c.CreateSegmentWithResponse(t.Context(), project, body))
-	if res.JSON201 == nil {
-		t.Fatalf("POST segments %s = %d: %s", body.Key, res.StatusCode(), res.Body)
+	if res.JSON201 == nil || res.HTTPResponse.Header.Get("ETag") != `"1"` {
+		t.Fatalf("POST segments %s = %d, ETag %q: %s", body.Key, res.StatusCode(), res.HTTPResponse.Header.Get("ETag"), res.Body)
 	}
 	return *res.JSON201
 }
@@ -314,6 +316,10 @@ func TestSegmentWritesBumpEveryEnvironmentAndRecordAnAuditEntry(t *testing.T) {
 			res := do(admin.DeleteSegmentWithResponse(t.Context(), p.Key, "apple", nil))
 			return res.StatusCode(), res.Body
 		}, http.StatusPreconditionRequired, false},
+		{"delete at a stale version", func() (int, []byte) {
+			res := deleteSegment(t, admin, p.Key, "apple", 3)
+			return res.StatusCode(), res.Body
+		}, http.StatusPreconditionFailed, false},
 		{"delete", func() (int, []byte) {
 			res := deleteSegment(t, admin, p.Key, "apple", 4)
 			return res.StatusCode(), res.Body
