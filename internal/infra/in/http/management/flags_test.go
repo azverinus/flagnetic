@@ -112,10 +112,10 @@ func TestCreatingAFlagConfiguresItOffInEveryEnvironment(t *testing.T) {
 	before := rulesetVersions(t, p)
 
 	f := createFlag(t, admin, p.Key, management.FlagCreate{
-		Key: "new_matching", Type: management.FlagTypeBoolean, Name: "New matching", Description: ptr("Matches better"),
-		Tags: &[]string{"matching", "mobile"},
+		Key: "new_checkout", Type: management.FlagTypeBoolean, Name: "New checkout", Description: ptr("Pays in one step"),
+		Tags: &[]string{"checkout", "mobile"},
 	})
-	res := do(admin.GetFlagWithResponse(t.Context(), p.Key, "new_matching"))
+	res := do(admin.GetFlagWithResponse(t.Context(), p.Key, "new_checkout"))
 	if res.JSON200 == nil || res.HTTPResponse.Header.Get("ETag") != `"1"` {
 		t.Fatalf("GET = %d %s, ETag %q, want the flag at version 1", res.StatusCode(), res.Body, res.HTTPResponse.Header.Get("ETag"))
 	}
@@ -162,11 +162,11 @@ func TestCreatingAFlagConfiguresItOffInEveryEnvironment(t *testing.T) {
 		}
 	}
 	created := auditOf(t, srv, "flag.created", f.Id.String())
-	if len(created) != 1 || created[0].Before != nil || created[0].Entity.Kind != "flag" || created[0].Entity.Key != "new_matching" {
+	if len(created) != 1 || created[0].Before != nil || created[0].Entity.Kind != "flag" || created[0].Entity.Key != "new_checkout" {
 		t.Fatalf("audit = %+v, want one flag.created entry", created)
 	}
 	after, _ := json.Marshal(created[0].After)
-	for _, want := range []string{`"key":"new_matching"`, `"version":1`, `"environment":"production"`, `"off_variation":"false"`} {
+	for _, want := range []string{`"key":"new_checkout"`, `"version":1`, `"environment":"production"`, `"off_variation":"false"`} {
 		if !strings.Contains(string(after), want) {
 			t.Errorf("after = %s, want it to hold %s", after, want)
 		}
@@ -219,7 +219,7 @@ func TestFlagKeysAndTypesAreValidatedAndImmutable(t *testing.T) {
 			t.Errorf("key %q: violations = %v", key, got)
 		}
 	}
-	for _, key := range []string{"a", "Checkout.V2", "new-matching_3", strings.Repeat("a", 128), "A"} {
+	for _, key := range []string{"a", "Checkout.V2", "new-checkout_3", strings.Repeat("a", 128), "A"} {
 		createFlag(t, admin, p.Key, boolean(key))
 	}
 	yaml := do(admin.CreateFlagWithResponse(t.Context(), p.Key, management.FlagCreate{Key: "y", Type: "yaml", Name: " "}))

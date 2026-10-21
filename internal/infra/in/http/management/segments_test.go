@@ -112,7 +112,7 @@ func TestSegmentKeysAreValidatedUniqueAndImmutable(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
-	for _, key := range []string{"", "Employees", "1st", "with space", strings.Repeat("a", 65)} {
+	for _, key := range []string{"", "Beta", "1st", "with space", strings.Repeat("a", 65)} {
 		res := do(admin.CreateSegmentWithResponse(t.Context(), p.Key, management.SegmentCreate{Key: key, Name: "S"}))
 		if got := violationsOf(t, "key "+key, res.StatusCode(), res.Body, "invalid_segment"); !slices.Equal(got, []string{"/key invalid_key"}) {
 			t.Errorf("key %q: violations = %v", key, got)
@@ -120,12 +120,12 @@ func TestSegmentKeysAreValidatedUniqueAndImmutable(t *testing.T) {
 	}
 	blank := do(admin.CreateSegmentWithResponse(t.Context(), p.Key, management.SegmentCreate{Key: "s", Name: " "}))
 	violationsOf(t, "a blank name", blank.StatusCode(), blank.Body, "invalid_segment")
-	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "employees", Name: "Employees"})
-	dup := do(admin.CreateSegmentWithResponse(t.Context(), p.Key, management.SegmentCreate{Key: "employees", Name: "Again"}))
+	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "beta_testers", Name: "Beta testers"})
+	dup := do(admin.CreateSegmentWithResponse(t.Context(), p.Key, management.SegmentCreate{Key: "beta_testers", Name: "Again"}))
 	assertProblem(t, "a key in use", dup.StatusCode(), dup.Body, http.StatusConflict, "already_exists")
-	createSegment(t, admin, createProject(t, admin, projectKey()).Key, management.SegmentCreate{Key: "employees", Name: "Elsewhere"})
+	createSegment(t, admin, createProject(t, admin, projectKey()).Key, management.SegmentCreate{Key: "beta_testers", Name: "Elsewhere"})
 	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "user", Name: "Named like a unit type"})
-	rekey := updateSegment(t, admin, p.Key, "employees", 1, management.SegmentPatch{Key: ptr("staff")})
+	rekey := updateSegment(t, admin, p.Key, "beta_testers", 1, management.SegmentPatch{Key: ptr("staff")})
 	if got := violationsOf(t, "a new key", rekey.StatusCode(), rekey.Body, "invalid_segment"); !slices.Equal(got, []string{"/key immutable"}) {
 		t.Errorf("violations = %v", got)
 	}
@@ -135,10 +135,10 @@ func TestSegmentsAcceptOnlyAttributeConditions(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
-	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "employees", Name: "Employees"})
+	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "beta_testers", Name: "Beta testers"})
 	for name, c := range map[string]management.Condition{
-		"in_segment":     {Kind: "in_segment", Segment: ptr("employees")},
-		"not_in_segment": {Kind: "not_in_segment", Segment: ptr("employees")},
+		"in_segment":     {Kind: "in_segment", Segment: ptr("beta_testers")},
+		"not_in_segment": {Kind: "not_in_segment", Segment: ptr("beta_testers")},
 		"prerequisite":   {Kind: "prerequisite", Flag: ptr("f"), Variation: ptr("true")},
 		"expression":     {Kind: "expression"},
 	} {
@@ -147,14 +147,14 @@ func TestSegmentsAcceptOnlyAttributeConditions(t *testing.T) {
 		if got := violationsOf(t, "create with "+name, created.StatusCode(), created.Body, "invalid_segment"); !slices.Equal(got, []string{"/conditions/1/kind invalid_value"}) {
 			t.Errorf("%s: violations = %v", name, got)
 		}
-		patched := updateSegment(t, admin, p.Key, "employees", 1, management.SegmentPatch{Conditions: cs})
+		patched := updateSegment(t, admin, p.Key, "beta_testers", 1, management.SegmentPatch{Conditions: cs})
 		violationsOf(t, "patch with "+name, patched.StatusCode(), patched.Body, "invalid_segment")
 	}
 	if res := do(admin.GetSegmentWithResponse(t.Context(), p.Key, "nested")); res.StatusCode() != http.StatusNotFound {
 		t.Errorf("the refused segment = %d, want none", res.StatusCode())
 	}
-	if res := do(admin.GetSegmentWithResponse(t.Context(), p.Key, "employees")); res.JSON200 == nil || res.JSON200.Version != 1 || len(res.JSON200.Conditions) != 0 {
-		t.Errorf("employees after refused changes = %d %s", res.StatusCode(), res.Body)
+	if res := do(admin.GetSegmentWithResponse(t.Context(), p.Key, "beta_testers")); res.JSON200 == nil || res.JSON200.Version != 1 || len(res.JSON200.Conditions) != 0 {
+		t.Errorf("beta_testers after refused changes = %d %s", res.StatusCode(), res.Body)
 	}
 }
 
@@ -237,16 +237,16 @@ func TestAUnitTypeWorksAsAStringAttributeInASegment(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
-	if res := do(admin.CreateUnitTypeWithResponse(t.Context(), p.Key, management.UnitTypeCreate{Key: "therapist", Name: "Therapist"})); res.JSON201 == nil {
-		t.Fatalf("declaring therapist = %d %s", res.StatusCode(), res.Body)
+	if res := do(admin.CreateUnitTypeWithResponse(t.Context(), p.Key, management.UnitTypeCreate{Key: "organization", Name: "Organization"})); res.JSON201 == nil {
+		t.Fatalf("declaring organization = %d %s", res.StatusCode(), res.Body)
 	}
-	employees := createSegment(t, admin, p.Key, management.SegmentCreate{Key: "employees", Name: "Employees", Private: ptr(true),
-		Conditions: conditions(attr("user", "in", `["u-emp-1","u-emp-2"]`))})
-	if !employees.Private {
-		t.Errorf("employees = %s, want private", raw(employees))
+	beta_testers := createSegment(t, admin, p.Key, management.SegmentCreate{Key: "beta_testers", Name: "Beta testers", Private: ptr(true),
+		Conditions: conditions(attr("user", "in", `["u-beta-1","u-beta-2"]`))})
+	if !beta_testers.Private {
+		t.Errorf("beta_testers = %s, want private", raw(beta_testers))
 	}
-	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "b2b_special_therapists", Name: "B2B therapists",
-		Conditions: conditions(attr("therapist", "starts_with", `"b2b-"`), attr("anonymous", "not_exists", ""))})
+	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "beta_customers", Name: "Beta customers",
+		Conditions: conditions(attr("organization", "starts_with", `"org-"`), attr("anonymous", "not_exists", ""))})
 	for name, tc := range map[string]struct {
 		c    management.Condition
 		want string

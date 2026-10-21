@@ -67,7 +67,7 @@ func TestASegmentConditionNamesADeclarationWithAnOperatorAndValueOfItsType(t *te
 		cond("signed_up", "before", `"2026-01-01T00:00:00Z"`), cond("signed_up", "after", `"2025-06-30T12:00:00.5+03:00"`),
 		cond("roles", "contains", `"admin"`), cond("roles", "contains_any", `["a","b"]`), cond("roles", "contains_all", `["a"]`),
 		cond("roles", "is_empty", ""),
-		cond("user", "in", `["u-1","u-2"]`), cond("anonymous", "not_exists", ""), cond("user", "starts_with", `"b2b-"`),
+		cond("user", "in", `["u-1","u-2"]`), cond("anonymous", "not_exists", ""), cond("user", "starts_with", `"org-"`),
 	} {
 		if _, err := flags.NewSegment(segment("s", c)); err != nil {
 			t.Errorf("%s %s %v: %v", c.Attribute, c.Op, c.Value, err)
@@ -123,7 +123,7 @@ func TestASegmentConditionNamesADeclarationWithAnOperatorAndValueOfItsType(t *te
 }
 
 func TestASegmentHasAKeyANameAndAtMostTwentyConditions(t *testing.T) {
-	for _, key := range []string{"", "Employees", "1st", "with space", strings.Repeat("a", 65)} {
+	for _, key := range []string{"", "Beta", "1st", "with space", strings.Repeat("a", 65)} {
 		_, err := flags.NewSegment(segment(key))
 		if got := segmentViolations(t, err); !slices.Equal(got, []string{"/key invalid_key"}) {
 			t.Errorf("key %q: violations = %v", key, got)

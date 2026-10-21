@@ -60,7 +60,7 @@ func violations(t *testing.T, err error) []string {
 }
 
 func TestABooleanFlagHasExactlyTrueAndFalseAndServesFalseWhenOff(t *testing.T) {
-	f, err := flags.NewFlag(input("new_matching", flags.TypeBoolean))
+	f, err := flags.NewFlag(input("new_checkout", flags.TypeBoolean))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestVariationsAreTypedByTheFlagType(t *testing.T) {
 }
 
 func TestFlagKeysTypesNamesAndTagsAreValidated(t *testing.T) {
-	for _, key := range []string{"a", "Checkout.V2", "new-matching_3", strings.Repeat("a", 128)} {
+	for _, key := range []string{"a", "Checkout.V2", "new-checkout_3", strings.Repeat("a", 128)} {
 		if _, err := flags.NewFlag(input(key, flags.TypeBoolean)); err != nil {
 			t.Errorf("key %q: %v", key, err)
 		}
