@@ -60,6 +60,16 @@ export const zMemberPatch = z.object({
   instance_admin: z.boolean().optional(),
 });
 
+export const zMePatch = z.object({
+  display_name: z.string().optional(),
+  locale: z.string().nullish(),
+});
+
+export const zPasswordChange = z.object({
+  current_password: z.string(),
+  new_password: z.string(),
+});
+
 export const zMemberInvite = z.object({
   email: z.string(),
   display_name: z.string(),
@@ -155,6 +165,16 @@ export const zMe = z.object({
   member: zMeMember.optional(),
   credential: zCredential,
   client_ip: z.string(),
+  max_token_lifetime_seconds: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    })
+    .nullable(),
+  require_token_expiry: z.boolean(),
 });
 
 export const zRole = z.object({
@@ -591,6 +611,20 @@ export const zAcceptInvitationResponse = zMe;
  * The caller.
  */
 export const zGetMeResponse = zMe;
+
+export const zUpdateMeBody = zMePatch;
+
+/**
+ * The caller as changed, as `GET /me` answers it.
+ */
+export const zUpdateMeResponse = zMe;
+
+export const zChangeMyPasswordBody = zPasswordChange;
+
+/**
+ * Changed; every other session is revoked.
+ */
+export const zChangeMyPasswordResponse = z.void();
 
 export const zRevokeMySessionsQuery = z.object({
   include_current: z.boolean().optional().default(false),

@@ -54,8 +54,8 @@ type MemberChanger interface {
 	// OtherActiveInstanceAdmins counts the active instance admins other
 	// than member.
 	OtherActiveInstanceAdmins(ctx context.Context, member access.MemberID) (int, error)
-	// SaveMember stores m's email, display name, status and instance
-	// admin switch; an email another member holds is refused
+	// SaveMember stores m's email, display name, status, instance admin
+	// switch and locale; an email another member holds is refused
 	// already_exists.
 	SaveMember(ctx context.Context, m access.Member, at time.Time) error
 }

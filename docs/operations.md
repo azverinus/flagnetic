@@ -105,7 +105,7 @@ Every replica also runs the `token_last_use` worker once a minute. A replica gat
 
 The binary serves the web console at every path the APIs and probes do not own, so `https://flags.example.com/projects/checkout` loads the console, which then renders that page. Its files are built into the binary: there is nothing to deploy beside it. Files under `/assets/` carry a hash of their content in their name and are cached for a year; the page itself is never cached, so a new release reaches every browser on its next page load. Every answer of the console carries a content security policy that lets it load scripts, styles, fonts and images from its own origin only (images also as `data:` URIs) and call no other origin; inline styles are allowed, inline scripts are not.
 
-The console is in English and Russian. It shows the language chosen in it, else the first of the browser's languages it offers, else `FLAGNETIC_DEFAULT_LOCALE`.
+The console is in English and Russian. It shows the language the member chose in their personal settings, which is kept with the member, so it follows them to every browser, and remembered in the browser for the sign-in page. A member who chose none sees the first of the browser's languages the console offers, else `FLAGNETIC_DEFAULT_LOCALE`.
 
 ## Probes
 

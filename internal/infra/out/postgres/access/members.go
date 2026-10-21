@@ -184,12 +184,17 @@ func (s *Store) OtherActiveInstanceAdmins(ctx context.Context, member access.Mem
 	return n, err
 }
 
-// SaveMember stores m's email, display name, status and instance admin
-// switch.
+// SaveMember stores m's email, display name, status, instance admin switch
+// and locale, NULL when the member follows the browser.
 func (s *Store) SaveMember(ctx context.Context, m access.Member, at time.Time) error {
+	var locale *string
+	if m.Locale != "" {
+		locale = &m.Locale
+	}
 	_, err := s.db(ctx).Exec(ctx, `
-		UPDATE members SET email = $2, display_name = $3, status = $4, instance_admin = $5, updated_at = $6 WHERE id = $1`,
-		m.ID.Bytes(), m.Email, m.DisplayName, string(m.Status), m.InstanceAdmin, at)
+		UPDATE members SET email = $2, display_name = $3, status = $4, instance_admin = $5, locale = $6, updated_at = $7
+		WHERE id = $1`,
+		m.ID.Bytes(), m.Email, m.DisplayName, string(m.Status), m.InstanceAdmin, locale, at)
 	return emailTaken(err)
 }
 
