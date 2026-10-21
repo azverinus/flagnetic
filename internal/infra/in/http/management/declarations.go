@@ -71,7 +71,7 @@ func (a *api) ListUnitTypes(ctx context.Context, _ ListUnitTypesRequestObject) (
 	if err != nil {
 		return nil, err
 	}
-	return ListUnitTypes200JSONResponse{Items: each(units, unitTypeOut)}, nil
+	return ListUnitTypes200JSONResponse{Items: each(units, unitTypeListItemOut)}, nil
 }
 
 // CreateUnitType declares a unit type.
@@ -124,7 +124,7 @@ func (a *api) ListAttributes(ctx context.Context, _ ListAttributesRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	return ListAttributes200JSONResponse{Items: each(attrs, attributeOut)}, nil
+	return ListAttributes200JSONResponse{Items: each(attrs, attributeListItemOut)}, nil
 }
 
 // CreateAttribute declares an attribute.
@@ -196,6 +196,19 @@ func environmentOut(e workspace.Environment) Environment {
 
 func unitTypeOut(u workspace.UnitType) UnitType {
 	return UnitType{Id: openapi_types.UUID(u.ID.Bytes()), Key: u.Key, Name: u.Name, Description: u.Description}
+}
+
+func unitTypeListItemOut(u appworkspace.Used[workspace.UnitType]) UnitTypeListItem {
+	d := unitTypeOut(u.Declaration)
+	return UnitTypeListItem{Id: d.Id, Key: d.Key, Name: d.Name, Description: d.Description, UsageCount: u.UsageCount}
+}
+
+func attributeListItemOut(a appworkspace.Used[workspace.Attribute]) AttributeListItem {
+	d := attributeOut(a.Declaration)
+	return AttributeListItem{
+		Id: d.Id, Key: d.Key, Type: d.Type, Name: d.Name, Description: d.Description, Standard: d.Standard,
+		UsageCount: a.UsageCount,
+	}
 }
 
 func attributeOut(a workspace.Attribute) Attribute {

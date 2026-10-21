@@ -3,8 +3,10 @@ package management
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
-	"unicode/utf8"
+	"slices"
+	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
@@ -22,32 +24,121 @@ const (
 	maxFlagLimit     = 200
 )
 
-// ListFlags answers a page of the project's flags by key.
+// ListFlags answers a page of the project's flags, filtered and sorted
+// as the request asks.
 func (a *api) ListFlags(ctx context.Context, req ListFlagsRequestObject) (ListFlagsResponseObject, error) {
-	page := appflags.FlagPage{Limit: defaultFlagLimit, Archived: valueOr(req.Params.Archived, false)}
-	if l := req.Params.Limit; l != nil {
-		if *l < 1 || *l > maxFlagLimit {
-			return nil, flaghttp.InvalidRequest(fmt.Sprintf("limit must be between 1 and %d", maxFlagLimit))
-		}
-		page.Limit = *l
-	}
-	if c := req.Params.Cursor; c != nil {
-		after, err := base64.RawURLEncoding.DecodeString(*c)
-		if err != nil || len(after) == 0 || !utf8.Valid(after) {
-			return nil, flaghttp.InvalidRequest("cursor is not a next_cursor this API returned")
-		}
-		page.After = string(after)
-	}
-	fs, more, err := a.h.ListFlags.Handle(ctx, projectID(ctx), page)
+	page, err := flagPageOf(req.Params)
 	if err != nil {
 		return nil, err
 	}
-	out := ListFlags200JSONResponse{Items: each(fs, flagDefinitionOut)}
-	if more {
-		// The cursor is opaque, so the order a page follows can change
-		// without breaking a client that only passes it back.
-		cursor := base64.RawURLEncoding.EncodeToString([]byte(fs[len(fs)-1].Key))
+	fs, next, err := a.h.ListFlags.Handle(ctx, projectID(ctx), page)
+	if err != nil {
+		return nil, err
+	}
+	out := ListFlags200JSONResponse{Items: each(fs, flagListItemOut)}
+	if next != nil {
+		cursor := encodeFlagCursor(page.Sort, *next)
 		out.NextCursor = &cursor
+	}
+	return out, nil
+}
+
+// flagPageOf reads the page params ask for, refusing a request whose
+// filters or cursor do not make one.
+func flagPageOf(params ListFlagsParams) (appflags.FlagPage, error) {
+	page := appflags.FlagPage{
+		Limit: defaultFlagLimit, Sort: appflags.SortByKey, Text: valueOf(params.Q), Tag: valueOf(params.Tag),
+		Archived: valueOr(params.Archived, false), Environment: valueOf(params.Environment),
+	}
+	if l := params.Limit; l != nil {
+		if *l < 1 || *l > maxFlagLimit {
+			return page, flaghttp.InvalidRequest(fmt.Sprintf("limit must be between 1 and %d", maxFlagLimit))
+		}
+		page.Limit = *l
+	}
+	if t := params.Type; t != nil {
+		if !slices.Contains(flags.Types(), flags.Type(*t)) {
+			return page, flaghttp.InvalidRequest("type must be one of boolean, string, number and json")
+		}
+		page.Type = flags.Type(*t)
+	}
+	if o := params.Owner; o != nil {
+		m := id.FromBytes[access.Member](*o)
+		page.Owner = &m
+	}
+	if st := params.State; st != nil {
+		page.State = appflags.StateFilter(*st)
+		if !slices.Contains([]appflags.StateFilter{appflags.StateOn, appflags.StateOff, appflags.StateRules, appflags.StateRollout}, page.State) {
+			return page, flaghttp.InvalidRequest("state must be one of on, off, rules and rollout")
+		}
+		if page.Environment == "" {
+			return page, flaghttp.InvalidRequest("state is judged in the environment named by environment")
+		}
+	}
+	if d := params.DiffersBetween; d != nil {
+		if len(*d) != 2 || (*d)[0] == (*d)[1] {
+			return page, flaghttp.InvalidRequest("differs_between names two different environments")
+		}
+		page.DiffersBetween = &[2]string{(*d)[0], (*d)[1]}
+	}
+	if so := params.Sort; so != nil {
+		page.Sort = appflags.FlagSort(*so)
+		if !slices.Contains([]appflags.FlagSort{appflags.SortByKey, appflags.SortByName, appflags.SortByUpdated}, page.Sort) {
+			return page, flaghttp.InvalidRequest("sort must be one of key, name and updated")
+		}
+	}
+	if c := params.Cursor; c != nil {
+		after, err := decodeFlagCursor(page.Sort, *c)
+		if err != nil {
+			return page, err
+		}
+		page.After = &after
+	}
+	return page, nil
+}
+
+// flagCursor is a page's cursor as a client holds it: the sort it pages
+// and the values of the last flag of the page that sort compares. It is
+// opaque, so the order a page follows can change without breaking a
+// client that only passes it back.
+type flagCursor struct {
+	Sort      appflags.FlagSort `json:"s"`
+	Key       string            `json:"k"`
+	Name      string            `json:"n,omitempty"`
+	UpdatedAt *time.Time        `json:"u,omitempty"`
+}
+
+func encodeFlagCursor(sort appflags.FlagSort, c appflags.FlagCursor) string {
+	fc := flagCursor{Sort: sort, Key: c.Key}
+	switch sort {
+	case appflags.SortByName:
+		fc.Name = c.Name
+	case appflags.SortByUpdated:
+		fc.UpdatedAt = &c.UpdatedAt
+	}
+	b, err := json.Marshal(fc)
+	if err != nil {
+		// A struct of strings and a time always encodes.
+		panic(err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// decodeFlagCursor reads cursor, refusing one this API did not return for
+// sort.
+func decodeFlagCursor(sort appflags.FlagSort, cursor string) (appflags.FlagCursor, error) {
+	refused := flaghttp.InvalidRequest("cursor is not a next_cursor this API returned for this sort")
+	b, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return appflags.FlagCursor{}, refused
+	}
+	var fc flagCursor
+	if json.Unmarshal(b, &fc) != nil || fc.Sort != sort || fc.Key == "" || (sort == appflags.SortByUpdated) != (fc.UpdatedAt != nil) {
+		return appflags.FlagCursor{}, refused
+	}
+	out := appflags.FlagCursor{Key: fc.Key, Name: fc.Name}
+	if fc.UpdatedAt != nil {
+		out.UpdatedAt = *fc.UpdatedAt
 	}
 	return out, nil
 }
@@ -160,6 +251,19 @@ func variationsIn(in *[]VariationInput) *[]flags.VariationInput {
 		out[i] = flags.VariationInput{Key: v.Key, Value: v.Value, Name: v.Name, Description: v.Description}
 	}
 	return &out
+}
+
+func flagListItemOut(l appflags.ListedFlag) FlagListItem {
+	d := flagDefinitionOut(l.Flag)
+	return FlagListItem{
+		Id: d.Id, Key: d.Key, Type: d.Type, Name: d.Name, Description: d.Description, Owner: d.Owner, Tags: d.Tags,
+		Lifetime: d.Lifetime, ExpectedRemovalAt: d.ExpectedRemovalAt, AutomaticExposure: d.AutomaticExposure,
+		Variations: d.Variations, ArchivedAt: d.ArchivedAt, CreatedBy: d.CreatedBy, CreatedAt: d.CreatedAt,
+		UpdatedAt: d.UpdatedAt, Version: d.Version,
+		States: each(l.States, func(s appflags.FlagState) FlagState {
+			return FlagState{Environment: s.Environment, On: s.On, HasRules: s.HasRules, HasRollout: s.HasRollout}
+		}),
+	}
 }
 
 func flagDefinitionOut(f flags.Flag) FlagDefinition {

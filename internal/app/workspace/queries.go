@@ -56,6 +56,46 @@ func (h *List[T]) Handle(ctx context.Context, project workspace.ProjectID) ([]T,
 	return h.list(ctx, project)
 }
 
+// Used is a unit type or attribute with how many flags and segments name
+// it.
+type Used[T any] struct {
+	Declaration T
+	UsageCount  int
+}
+
+// ListUsed lists a project's unit types or attributes with how many flags
+// and segments name each.
+type ListUsed[T any] struct {
+	snapshots Snapshotter
+	list      func(ctx context.Context, project workspace.ProjectID) ([]T, error)
+	key       func(T) string
+	usages    DeclarationUsages
+}
+
+// Handle returns project's declarations of the kind by key, each with its
+// usage count. The declarations and the counts are read in one snapshot, so
+// a count is never that of a declaration deleted and created again in
+// between, and the counts of the whole list cost one query.
+func (h *ListUsed[T]) Handle(ctx context.Context, project workspace.ProjectID) ([]Used[T], error) {
+	var out []Used[T]
+	err := h.snapshots.Snapshot(ctx, func(ctx context.Context) error {
+		ds, err := h.list(ctx, project)
+		if err != nil {
+			return err
+		}
+		counts, err := h.usages.DeclarationUsageCounts(ctx, project)
+		if err != nil {
+			return err
+		}
+		out = make([]Used[T], len(ds))
+		for i, d := range ds {
+			out[i] = Used[T]{Declaration: d, UsageCount: counts[h.key(d)]}
+		}
+		return nil
+	})
+	return out, err
+}
+
 // Get finds one thing a project holds by its key, such as an environment.
 type Get[T any] struct {
 	get  func(ctx context.Context, project workspace.ProjectID, key string, lock bool) (T, error)
@@ -92,9 +132,12 @@ type UnitTypeReader interface {
 	UnitTypeByKey(ctx context.Context, project workspace.ProjectID, key string, lock bool) (workspace.UnitType, error)
 }
 
-// NewListUnitTypes returns the query listing a project's unit types.
-func NewListUnitTypes(store UnitTypeReader) *List[workspace.UnitType] {
-	return &List[workspace.UnitType]{list: store.UnitTypes}
+// NewListUnitTypes returns the query listing a project's unit types, each
+// with how many flags and segments usages counts naming it.
+func NewListUnitTypes(snapshots Snapshotter, store UnitTypeReader, usages DeclarationUsages) *ListUsed[workspace.UnitType] {
+	return &ListUsed[workspace.UnitType]{
+		snapshots: snapshots, list: store.UnitTypes, key: func(u workspace.UnitType) string { return u.Key }, usages: usages,
+	}
 }
 
 // NewGetUnitType returns the query finding a unit type by key.
@@ -109,9 +152,12 @@ type AttributeReader interface {
 	AttributeByKey(ctx context.Context, project workspace.ProjectID, key string, lock bool) (workspace.Attribute, error)
 }
 
-// NewListAttributes returns the query listing a project's attributes.
-func NewListAttributes(store AttributeReader) *List[workspace.Attribute] {
-	return &List[workspace.Attribute]{list: store.Attributes}
+// NewListAttributes returns the query listing a project's attributes, each
+// with how many flags and segments usages counts naming it.
+func NewListAttributes(snapshots Snapshotter, store AttributeReader, usages DeclarationUsages) *ListUsed[workspace.Attribute] {
+	return &ListUsed[workspace.Attribute]{
+		snapshots: snapshots, list: store.Attributes, key: func(a workspace.Attribute) string { return a.Key }, usages: usages,
+	}
 }
 
 // NewGetAttribute returns the query finding an attribute by key.

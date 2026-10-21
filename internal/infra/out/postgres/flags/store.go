@@ -113,7 +113,9 @@ func optionalMember(m *access.MemberID) any {
 const flagColumns = `id, project_id, key, type, name, description, owner_id, tags, lifetime, expected_removal_at,
 	automatic_exposure, variations, archived_at, created_by, created_at, updated_at, version`
 
-func scanFlag(row pgx.Row) (flags.Flag, error) {
+// scanFlag reads a flag from row's leading columns, flagColumns, and the
+// columns after them into extra.
+func scanFlag(row pgx.Row, extra ...any) (flags.Flag, error) {
 	var (
 		f                   flags.Flag
 		fk, pk, owner       [16]byte
@@ -122,8 +124,9 @@ func scanFlag(row pgx.Row) (flags.Flag, error) {
 		variations          []byte
 		removal, archivedAt *time.Time
 	)
-	if err := row.Scan(&fk, &pk, &f.Key, &typ, &f.Name, &f.Description, &owner, &f.Tags, &lifetime, &removal,
-		&f.AutomaticExposure, &variations, &archivedAt, &createdBy, &f.CreatedAt, &f.UpdatedAt, &f.Version); err != nil {
+	dest := []any{&fk, &pk, &f.Key, &typ, &f.Name, &f.Description, &owner, &f.Tags, &lifetime, &removal,
+		&f.AutomaticExposure, &variations, &archivedAt, &createdBy, &f.CreatedAt, &f.UpdatedAt, &f.Version}
+	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return flags.Flag{}, err
 	}
 	var docs []variationDoc
@@ -166,14 +169,6 @@ func (s *Store) FlagByKey(ctx context.Context, project workspace.ProjectID, key 
 		return f, fmt.Errorf("reading a flag: %w", err)
 	}
 	return f, nil
-}
-
-// Flags returns at most limit of project's flags, archived or not as
-// archived says, with a key after after, by key in byte order.
-func (s *Store) Flags(ctx context.Context, project workspace.ProjectID, archived bool, after string, limit int) ([]flags.Flag, error) {
-	return s.flags(ctx, `SELECT `+flagColumns+` FROM flags
-		WHERE project_id = $1 AND (archived_at IS NOT NULL) = $2 AND key COLLATE "C" > $3
-		ORDER BY key COLLATE "C" LIMIT $4`, project.Bytes(), archived, after, limit)
 }
 
 // DeleteFlag deletes the flag with its configurations.

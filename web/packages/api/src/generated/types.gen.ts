@@ -573,8 +573,21 @@ export type UnitType = {
 };
 
 export type UnitTypeList = {
-  items: Array<UnitType>;
+  items: Array<UnitTypeListItem>;
 };
+
+export type UnitTypeListItem = UnitType & {
+  usage_count: DeclarationUsageCount;
+};
+
+/**
+ * How many flags (archived ones included, each counted once whatever
+ * its environments) and segments name it, in a rule's condition, a
+ * rollout, an override or a segment's condition. Deleting it is
+ * refused while this is above zero.
+ *
+ */
+export type DeclarationUsageCount = number;
 
 export type UnitTypeCreate = {
   key: Key;
@@ -609,7 +622,11 @@ export type Attribute = {
 };
 
 export type AttributeList = {
-  items: Array<Attribute>;
+  items: Array<AttributeListItem>;
+};
+
+export type AttributeListItem = Attribute & {
+  usage_count: DeclarationUsageCount;
 };
 
 export type AttributeCreate = {
@@ -949,11 +966,34 @@ export type KillResult = {
 };
 
 export type FlagList = {
-  items: Array<FlagDefinition>;
+  items: Array<FlagListItem>;
   /**
    * Pass as `cursor` for the next page; null on the last.
    */
   next_cursor: string | null;
+};
+
+/**
+ * A flag's definition with its flag state in every environment, by the environments' order.
+ */
+export type FlagListItem = FlagDefinition & {
+  states: Array<FlagState>;
+};
+
+/**
+ * What a flag's configuration in one environment serves at a glance.
+ */
+export type FlagState = {
+  environment: Key;
+  on: boolean;
+  /**
+   * The configuration has at least one rule, whether the flag is on or off.
+   */
+  has_rules: boolean;
+  /**
+   * A rule of the configuration serves a rollout.
+   */
+  has_rollout: boolean;
 };
 
 export type FlagCreate = {
@@ -1053,7 +1093,17 @@ export type Segment = {
 };
 
 export type SegmentList = {
-  items: Array<Segment>;
+  items: Array<SegmentListItem>;
+};
+
+export type SegmentListItem = Segment & {
+  /**
+   * How many flags' rules name the segment, archived flags
+   * included, each flag counted once whatever its environments.
+   * Deleting it is refused while this is above zero.
+   *
+   */
+  usage_count: number;
 };
 
 export type SegmentCreate = {
@@ -2425,7 +2475,7 @@ export type ListUnitTypesError = ListUnitTypesErrors[keyof ListUnitTypesErrors];
 
 export type ListUnitTypesResponses = {
   /**
-   * The unit types, by key.
+   * The unit types, by key, each with how many flags and segments name it.
    */
   200: UnitTypeList;
 };
@@ -2527,6 +2577,10 @@ export type DeleteUnitTypeErrors = {
    * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
    */
   404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
 };
 
 export type DeleteUnitTypeError = DeleteUnitTypeErrors[keyof DeleteUnitTypeErrors];
@@ -2689,7 +2743,7 @@ export type ListAttributesError = ListAttributesErrors[keyof ListAttributesError
 
 export type ListAttributesResponses = {
   /**
-   * The attributes, by key.
+   * The attributes, by key, each with how many flags and segments name it.
    */
   200: AttributeList;
 };
@@ -2926,9 +2980,53 @@ export type ListFlagsData = {
   };
   query?: {
     /**
+     * Text the flag's key or name contains, ignoring case; `%`, `_`
+     * and `\` stand for themselves.
+     *
+     */
+    q?: string;
+    type?: FlagType;
+    /**
+     * A tag the flag carries, matched exactly.
+     */
+    tag?: string;
+    /**
+     * The member owning the flag.
+     */
+    owner?: string;
+    /**
      * Lists the archived flags instead of the others.
      */
     archived?: boolean;
+    /**
+     * The environment `state` is judged in; alone, it filters nothing.
+     */
+    environment?: Key;
+    /**
+     * Lists the flags whose configuration in `environment` is on, is
+     * off, has rules, or has a rule serving a rollout; rules count
+     * whether the flag is on or off.
+     *
+     */
+    state?: "on" | "off" | "rules" | "rollout";
+    /**
+     * Two environment keys, comma separated: lists the flags whose
+     * configurations differ between them in what their rulesets carry
+     * (on or off, the off and fallthrough variations, prerequisites,
+     * overrides by unit type, ID and variation, and rules with their
+     * identifiers, conditions and serves, salts included, in order),
+     * never in rule descriptions, override notes or authors, or
+     * versions.
+     *
+     */
+    differs_between?: [Key, Key];
+    /**
+     * `key` and `name` in byte order (capitals before lower case),
+     * `updated` by the last change to the flag's definition, the most
+     * recent first; ties by key.
+     *
+     */
+    sort?: "key" | "name" | "updated";
     /**
      * The `next_cursor` of the previous page.
      */
@@ -3882,7 +3980,7 @@ export type ListSegmentsError = ListSegmentsErrors[keyof ListSegmentsErrors];
 
 export type ListSegmentsResponses = {
   /**
-   * The segments, by key.
+   * The segments, by key, each with how many flags' rules name it.
    */
   200: SegmentList;
 };

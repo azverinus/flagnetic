@@ -9,20 +9,24 @@ import (
 
 // UnitTypeDeleter deletes a unit type.
 type UnitTypeDeleter interface {
+	ProjectLocker
 	UnitTypeByKey(ctx context.Context, project workspace.ProjectID, key string, lock bool) (workspace.UnitType, error)
 	DeleteUnitType(ctx context.Context, unitType workspace.UnitTypeID) error
 }
 
 // DeleteUnitType deletes a unit type.
 type DeleteUnitType struct {
-	tx    Transactor
-	store UnitTypeDeleter
-	rec   Recorder
+	tx       Transactor
+	store    UnitTypeDeleter
+	guard    DeclarationGuard
+	rulesets Rulesets
+	rec      Recorder
 }
 
-// NewDeleteUnitType returns the handler.
-func NewDeleteUnitType(tx Transactor, store UnitTypeDeleter, rec Recorder) *DeleteUnitType {
-	return &DeleteUnitType{tx: tx, store: store, rec: rec}
+// NewDeleteUnitType returns the handler, which has guard refuse a unit
+// type something still names.
+func NewDeleteUnitType(tx Transactor, store UnitTypeDeleter, guard DeclarationGuard, rulesets Rulesets, rec Recorder) *DeleteUnitType {
+	return &DeleteUnitType{tx: tx, store: store, guard: guard, rulesets: rulesets, rec: rec}
 }
 
 // DeleteUnitTypeCommand names the unit type to delete.
@@ -32,16 +36,28 @@ type DeleteUnitTypeCommand struct {
 	Request governance.Request
 }
 
-// Handle deletes the unit type. Nothing refers to a unit type yet, so the
-// deletion is unconditional.
+// Handle deletes the unit type unless a rule, rollout, override or segment
+// still names it, which every environment's ruleset then no longer
+// declares. It holds the project's lock, which every write naming a unit
+// type takes too, so no write starts naming it between the check and the
+// deletion.
 func (h *DeleteUnitType) Handle(ctx context.Context, cmd DeleteUnitTypeCommand) error {
 	now := h.rec.clock.Now()
 	return h.tx.Within(ctx, func(ctx context.Context) error {
-		u, err := h.store.UnitTypeByKey(ctx, cmd.Project, cmd.Key, true)
+		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
+			return err
+		}
+		u, err := h.store.UnitTypeByKey(ctx, cmd.Project, cmd.Key, false)
 		if err != nil {
 			return notFound(err, "unit type")
 		}
+		if err := h.guard.RefuseReferenced(ctx, cmd.Project, u.Key); err != nil {
+			return err
+		}
 		if err := h.store.DeleteUnitType(ctx, u.ID); err != nil {
+			return err
+		}
+		if err := h.rulesets.Project(ctx, cmd.Project); err != nil {
 			return err
 		}
 		return h.rec.record(ctx, now, cmd.Request, governance.Record{

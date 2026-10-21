@@ -21,10 +21,8 @@ func segmentNotFound(err error) error {
 	return err
 }
 
-// SegmentReader reads a project's segments.
+// SegmentReader reads one segment of a project and where it is used.
 type SegmentReader interface {
-	// Segments returns the project's segments by key.
-	Segments(ctx context.Context, project workspace.ProjectID) ([]flags.Segment, error)
 	SegmentByKey(ctx context.Context, project workspace.ProjectID, key string) (flags.Segment, error)
 	// SegmentUsages returns one reference per flag and environment whose
 	// rules name the segment key, archived flags included, by flag key and
@@ -32,15 +30,54 @@ type SegmentReader interface {
 	SegmentUsages(ctx context.Context, project workspace.ProjectID, key string) ([]flags.Reference, error)
 }
 
+// SegmentLister lists a project's segments with how much they are used.
+type SegmentLister interface {
+	// Segments returns the project's segments by key.
+	Segments(ctx context.Context, project workspace.ProjectID) ([]flags.Segment, error)
+	// SegmentUsageCounts returns, by segment key, how many flags' rules
+	// name it, archived flags included; a key no rule names is absent.
+	SegmentUsageCounts(ctx context.Context, project workspace.ProjectID) (map[string]int, error)
+}
+
+// ListedSegment is a segment with how many flags' rules name it.
+type ListedSegment struct {
+	Segment    flags.Segment
+	UsageCount int
+}
+
 // ListSegments lists a project's segments.
-type ListSegments struct{ store SegmentReader }
+type ListSegments struct {
+	snapshots Snapshotter
+	store     SegmentLister
+}
 
 // NewListSegments returns the handler.
-func NewListSegments(store SegmentReader) *ListSegments { return &ListSegments{store: store} }
+func NewListSegments(snapshots Snapshotter, store SegmentLister) *ListSegments {
+	return &ListSegments{snapshots: snapshots, store: store}
+}
 
-// Handle returns project's segments by key.
-func (h *ListSegments) Handle(ctx context.Context, project workspace.ProjectID) ([]flags.Segment, error) {
-	return h.store.Segments(ctx, project)
+// Handle returns project's segments by key, each with how many flags'
+// rules name it. The segments and the counts are read in one snapshot, so
+// a count is never that of a segment deleted and created again in between,
+// and the counts of the whole list cost one query.
+func (h *ListSegments) Handle(ctx context.Context, project workspace.ProjectID) ([]ListedSegment, error) {
+	var out []ListedSegment
+	err := h.snapshots.Snapshot(ctx, func(ctx context.Context) error {
+		ss, err := h.store.Segments(ctx, project)
+		if err != nil {
+			return err
+		}
+		counts, err := h.store.SegmentUsageCounts(ctx, project)
+		if err != nil {
+			return err
+		}
+		out = make([]ListedSegment, len(ss))
+		for i, s := range ss {
+			out[i] = ListedSegment{Segment: s, UsageCount: counts[s.Key]}
+		}
+		return nil
+	})
+	return out, err
 }
 
 // GetSegment reads one segment.

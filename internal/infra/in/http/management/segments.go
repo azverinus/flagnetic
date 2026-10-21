@@ -15,7 +15,7 @@ func (a *api) ListSegments(ctx context.Context, _ ListSegmentsRequestObject) (Li
 	if err != nil {
 		return nil, err
 	}
-	return ListSegments200JSONResponse{Items: each(ss, segmentOut)}, nil
+	return ListSegments200JSONResponse{Items: each(ss, segmentListItemOut)}, nil
 }
 
 // CreateSegment creates a segment.
@@ -121,6 +121,14 @@ func segmentOut(s flags.Segment) Segment {
 	return Segment{
 		Id: openapi_types.UUID(s.ID.Bytes()), Key: s.Key, Name: s.Name, Description: s.Description, Private: s.Private,
 		Conditions: each(s.Conditions, conditionOut), CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt, Version: s.Version,
+	}
+}
+
+func segmentListItemOut(l appflags.ListedSegment) SegmentListItem {
+	s := segmentOut(l.Segment)
+	return SegmentListItem{
+		Id: s.Id, Key: s.Key, Name: s.Name, Description: s.Description, Private: s.Private, Conditions: s.Conditions,
+		CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt, Version: s.Version, UsageCount: l.UsageCount,
 	}
 }
 

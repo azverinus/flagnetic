@@ -41,6 +41,22 @@ type ProjectLocker interface {
 	LockProject(ctx context.Context, project workspace.ProjectID) (workspace.Project, error)
 }
 
+// Rulesets marks the rulesets a write changed, in the write's unit of work.
+type Rulesets interface {
+	// Project marks the ruleset of every environment of project changed.
+	Project(ctx context.Context, project workspace.ProjectID) error
+}
+
+// DeclarationGuard refuses to delete a unit type or attribute that rules,
+// rollouts, overrides or segments still name, which the flags context
+// knows.
+type DeclarationGuard interface {
+	// RefuseReferenced answers in_use, listing what names the declaration
+	// keyed key in project, or nil when nothing does, under the project's
+	// lock the caller holds.
+	RefuseReferenced(ctx context.Context, project workspace.ProjectID, key string) error
+}
+
 // ids mints the identifiers of a new project's defaults from one source.
 type ids struct{ src *id.Source }
 
@@ -81,4 +97,19 @@ func notFound(err error, what string) error {
 		return apperrors.NotFound("not_found", "the project has no "+what+" with this key")
 	}
 	return err
+}
+
+// Snapshotter runs a query of several statements on one consistent view, so
+// what it answers never mixes the states before and after a write committed
+// between its statements.
+type Snapshotter interface {
+	Snapshot(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+// DeclarationUsages counts what names a project's unit types and
+// attributes, which the flags context knows.
+type DeclarationUsages interface {
+	// DeclarationUsageCounts returns, by declaration key, how many flags
+	// and segments of project name it; a key nothing names is absent.
+	DeclarationUsageCounts(ctx context.Context, project workspace.ProjectID) (map[string]int, error)
 }

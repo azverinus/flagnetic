@@ -379,8 +379,23 @@ export const zUnitType = z.object({
   description: zDescription,
 });
 
+/**
+ * How many flags (archived ones included, each counted once whatever
+ * its environments) and segments name it, in a rule's condition, a
+ * rollout, an override or a segment's condition. Deleting it is
+ * refused while this is above zero.
+ *
+ */
+export const zDeclarationUsageCount = z.int().gte(0);
+
+export const zUnitTypeListItem = zUnitType.and(
+  z.object({
+    usage_count: zDeclarationUsageCount,
+  }),
+);
+
 export const zUnitTypeList = z.object({
-  items: z.array(zUnitType),
+  items: z.array(zUnitTypeListItem),
 });
 
 export const zUnitTypeCreate = z.object({
@@ -409,8 +424,14 @@ export const zAttribute = z.object({
   standard: z.boolean(),
 });
 
+export const zAttributeListItem = zAttribute.and(
+  z.object({
+    usage_count: zDeclarationUsageCount,
+  }),
+);
+
 export const zAttributeList = z.object({
-  items: z.array(zAttribute),
+  items: z.array(zAttributeListItem),
 });
 
 export const zAttributeCreate = z.object({
@@ -602,8 +623,27 @@ export const zKill = z.object({
   reason: z.string().nullish(),
 });
 
+/**
+ * What a flag's configuration in one environment serves at a glance.
+ */
+export const zFlagState = z.object({
+  environment: zKey,
+  on: z.boolean(),
+  has_rules: z.boolean(),
+  has_rollout: z.boolean(),
+});
+
+/**
+ * A flag's definition with its flag state in every environment, by the environments' order.
+ */
+export const zFlagListItem = zFlagDefinition.and(
+  z.object({
+    states: z.array(zFlagState),
+  }),
+);
+
 export const zFlagList = z.object({
-  items: z.array(zFlagDefinition),
+  items: z.array(zFlagListItem),
   next_cursor: z.string().nullable(),
 });
 
@@ -720,8 +760,14 @@ export const zSegment = z.object({
   version: zVersion,
 });
 
+export const zSegmentListItem = zSegment.and(
+  z.object({
+    usage_count: z.int().gte(0),
+  }),
+);
+
 export const zSegmentList = z.object({
-  items: z.array(zSegment),
+  items: z.array(zSegmentListItem),
 });
 
 export const zSegmentCreate = z.object({
@@ -1060,7 +1106,7 @@ export const zListUnitTypesPath = z.object({
 });
 
 /**
- * The unit types, by key.
+ * The unit types, by key, each with how many flags and segments name it.
  */
 export const zListUnitTypesResponse = zUnitTypeList;
 
@@ -1112,7 +1158,7 @@ export const zListAttributesPath = z.object({
 });
 
 /**
- * The attributes, by key.
+ * The attributes, by key, each with how many flags and segments name it.
  */
 export const zListAttributesResponse = zAttributeList;
 
@@ -1164,7 +1210,15 @@ export const zListFlagsPath = z.object({
 });
 
 export const zListFlagsQuery = z.object({
+  q: z.string().optional(),
+  type: zFlagType.optional(),
+  tag: z.string().optional(),
+  owner: z.uuid().optional(),
   archived: z.boolean().optional().default(false),
+  environment: zKey.optional(),
+  state: z.enum(["on", "off", "rules", "rollout"]).optional(),
+  differs_between: z.tuple([zKey, zKey]).optional(),
+  sort: z.enum(["key", "name", "updated"]).optional().default("key"),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });
@@ -1343,7 +1397,7 @@ export const zListSegmentsPath = z.object({
 });
 
 /**
- * The segments, by key.
+ * The segments, by key, each with how many flags' rules name it.
  */
 export const zListSegmentsResponse = zSegmentList;
 

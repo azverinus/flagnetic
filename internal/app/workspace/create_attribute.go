@@ -16,14 +16,15 @@ type AttributeCreator interface {
 
 // CreateAttribute declares an attribute in a project.
 type CreateAttribute struct {
-	tx    Transactor
-	store AttributeCreator
-	rec   Recorder
+	tx       Transactor
+	store    AttributeCreator
+	rulesets Rulesets
+	rec      Recorder
 }
 
 // NewCreateAttribute returns the handler.
-func NewCreateAttribute(tx Transactor, store AttributeCreator, rec Recorder) *CreateAttribute {
-	return &CreateAttribute{tx: tx, store: store, rec: rec}
+func NewCreateAttribute(tx Transactor, store AttributeCreator, rulesets Rulesets, rec Recorder) *CreateAttribute {
+	return &CreateAttribute{tx: tx, store: store, rulesets: rulesets, rec: rec}
 }
 
 // CreateAttributeCommand names the attribute to declare.
@@ -55,6 +56,11 @@ func (h *CreateAttribute) create(ctx context.Context, attr workspace.Attribute, 
 		return err
 	}
 	if err := h.store.CreateAttribute(ctx, attr); err != nil {
+		return err
+	}
+	// Every environment's ruleset declares the project's unit types and
+	// attributes, so a new one changes them all.
+	if err := h.rulesets.Project(ctx, attr.Project); err != nil {
 		return err
 	}
 	return h.rec.record(ctx, attr.CreatedAt, req, governance.Record{

@@ -40,14 +40,15 @@ type UnitTypeCreator interface {
 
 // CreateUnitType declares a unit type in a project.
 type CreateUnitType struct {
-	tx    Transactor
-	store UnitTypeCreator
-	rec   Recorder
+	tx       Transactor
+	store    UnitTypeCreator
+	rulesets Rulesets
+	rec      Recorder
 }
 
 // NewCreateUnitType returns the handler.
-func NewCreateUnitType(tx Transactor, store UnitTypeCreator, rec Recorder) *CreateUnitType {
-	return &CreateUnitType{tx: tx, store: store, rec: rec}
+func NewCreateUnitType(tx Transactor, store UnitTypeCreator, rulesets Rulesets, rec Recorder) *CreateUnitType {
+	return &CreateUnitType{tx: tx, store: store, rulesets: rulesets, rec: rec}
 }
 
 // CreateUnitTypeCommand names the unit type to declare.
@@ -78,6 +79,11 @@ func (h *CreateUnitType) create(ctx context.Context, u workspace.UnitType, req g
 		return err
 	}
 	if err := h.store.CreateUnitType(ctx, u); err != nil {
+		return err
+	}
+	// Every environment's ruleset declares the project's unit types and
+	// attributes, so a new one changes them all.
+	if err := h.rulesets.Project(ctx, u.Project); err != nil {
 		return err
 	}
 	return h.rec.record(ctx, u.CreatedAt, req, governance.Record{

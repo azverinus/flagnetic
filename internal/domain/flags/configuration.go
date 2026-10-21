@@ -224,13 +224,18 @@ func (c Configuration) changedTo(out Configuration, w Write) (Configuration, Cha
 	out.UpdatedAt, out.UpdatedBy, out.Version = w.Now, w.By, c.Version+1
 	switched := c
 	switched.On = out.On
-	return out, Changed{Any: true, Ruleset: !out.sameRuleset(c), Switched: out.On != c.On && out.sameRuleset(switched)}
+	return out, Changed{Any: true, Ruleset: !out.SameRuleset(c), Switched: out.On != c.On && out.SameRuleset(switched)}
 }
 
-// sameRuleset reports whether c and d carry the same ruleset: everything
-// but rule descriptions and override notes and authors, which stay on the
-// server.
-func (c Configuration) sameRuleset(d Configuration) bool {
+// SameRuleset reports whether c and d carry the same ruleset: on or off,
+// the off and fallthrough variations, the prerequisites, the overrides by
+// unit type, unit ID and variation, and the rules with their identifiers,
+// conditions and serves, salts included, each in order. Rule descriptions
+// and override notes and authors stay on the server, and the version and
+// who made it describe the write rather than what SDKs receive, so none of
+// them counts. Whether a write changed what an environment's SDKs receive,
+// and whether two environments differ for a flag, are judged by it alike.
+func (c Configuration) SameRuleset(d Configuration) bool {
 	return c.On == d.On && c.OffVariation == d.OffVariation && c.Fallthrough == d.Fallthrough &&
 		slices.Equal(c.Prerequisites, d.Prerequisites) &&
 		slices.EqualFunc(c.Overrides, d.Overrides, func(a, b Override) bool {
@@ -244,7 +249,7 @@ func (c Configuration) sameRuleset(d Configuration) bool {
 // sameDocument reports whether c and d are the same document, what stays
 // on the server included.
 func (c Configuration) sameDocument(d Configuration) bool {
-	return c.sameRuleset(d) &&
+	return c.SameRuleset(d) &&
 		slices.EqualFunc(c.Overrides, d.Overrides, func(a, b Override) bool {
 			return a.Note == b.Note && sameMember(a.AddedBy, b.AddedBy)
 		}) &&
