@@ -215,8 +215,8 @@ func (h *ListFlags) findEnvironments(ctx context.Context, project workspace.Proj
 		return workspace.EnvironmentID{}, errEnvironmentNotFound
 	}
 	if p.Environment != "" {
-		in, err := find(p.Environment)
-		if err != nil {
+		var in workspace.EnvironmentID
+		if in, err = find(p.Environment); err != nil {
 			return err
 		}
 		if p.State != "" {
