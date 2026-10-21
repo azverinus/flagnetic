@@ -6,4 +6,14 @@ use (
 	.
 	./eval
 	./sdks/go
+	./sdks/go-openfeature
+)
+
+// A published module requires another module of this repository at the
+// version it was released with, or at v0.0.0 before its first release. The
+// workspace does not resolve v0.0.0 to its own directory on its own, so
+// these replacements do; go.work is never part of a published module.
+replace (
+	github.com/azverinus/flagnetic/eval v0.0.0 => ./eval
+	github.com/azverinus/flagnetic/sdks/go v0.0.0 => ./sdks/go
 )

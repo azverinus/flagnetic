@@ -1,0 +1,17 @@
+{
+  "name": "openfeature/reasons",
+  "metadata_key": "flagnetic_reason",
+  "reasons": {
+    "rule": "TARGETING_MATCH",
+    "prerequisite_failed": "TARGETING_MATCH",
+    "targeting_match": "TARGETING_MATCH",
+    "override": "TARGETING_MATCH",
+    "rollout": "SPLIT",
+    "experiment": "SPLIT",
+    "fallthrough": "DEFAULT",
+    "off": "DISABLED",
+    "error": "ERROR",
+    "fallback": "ERROR",
+    "local_override": "STATIC"
+  }
+}

@@ -8,6 +8,8 @@
 go get github.com/azverinus/flagnetic/sdks/go
 ```
 
+On OpenFeature? Install the [OpenFeature provider](../go-openfeature/README.md) instead, `github.com/azverinus/flagnetic/sdks/go-openfeature`, a module of its own over this SDK.
+
 ## Quick start
 
 An offline client reads a ruleset document, exactly as the ruleset endpoint of a Flagnetic instance serves it, from a file, a byte slice or a function of yours, and never touches the network:
@@ -69,12 +71,34 @@ d := c.Detail(ctx, fc, "new_checkout", false)
 ```
 
 - Getters are **total**: they never panic and never return an error. A missing flag, a flag of another type (logged once per flag as `type_mismatch`), an evaluator error or a client holding no ruleset serves the built-in default with reason `fallback` and an error code.
+- An evaluation stays **under 1 ms at the 99th percentile** on a 1000-flag ruleset with attribute conditions of every type, segments, prerequisites, rollouts and experiments; CI measures it on every push and fails above it, so a getter belongs in a hot path. `go test -bench . ./...` profiles one evaluation and every flag at once.
 - `Int` serves a number flag only when its value is whole and fits in an `int64`; otherwise it serves the default with `type_mismatch` rather than a truncated value.
 - `Detail` tells why a value was served: the value, the evaluation reason, the variation, the rule, the error code, the ruleset version and when it was received, the stage of the fallback chain, whether a platform override decided it, and the experiment block when an experiment assigned it. The Go type of the default names the flag type asked for: `bool`, `string`, any Go number, or anything else for JSON.
 - `OnChange` registers a listener called with the keys of the flags whose value may have changed, through their own configuration, a segment, a declared attribute or unit type, or a prerequisite they reach; `OnStage` one called on every stage transition. Both return a function that removes the listener, and a panicking listener is logged as `listener_failed`.
 - Local overrides need `flagnetic.WithLocalOverrides()`: `c.LocalOverrides().Set/Remove/Clear/List` substitute a value inside this process for a developer's machine, read with reason `local_override`. A ruleset whose environment is protected refuses them.
 - An offline client counts every evaluation in `c.Recorder()`, by flag, variation and reason.
 - `flagnetic.WithLogger` receives every event with structured fields, or `flagnetic.SlogLogger` sends them to a `log/slog` logger; the default logs warnings and above through `log/slog`.
+
+## Testing your code with `flagnetictest`
+
+`github.com/azverinus/flagnetic/sdks/go/flagnetictest` builds offline clients for your unit tests, so they need no server:
+
+```go
+func TestCheckout(t *testing.T) {
+	c := flagnetictest.FromValues(t, map[string]any{"new_checkout": true}) // each value served as the fallthrough
+	handler := NewHandler(c.Client)
+	// ... the new checkout
+
+	c.Set("new_checkout", false) // one variation for everyone; a JSON flag stays JSON
+	// ... the old checkout
+
+	c.Reload() // back to what the client was built from
+}
+```
+
+- `flagnetictest.New(t, document)` takes a ruleset document as the ruleset endpoint serves it, `FromFile(t, path)` reads one, and `FromValues(t, values)` builds one flag per value, its type from the value's Go type.
+- Options pass through to the client, so `flagnetic.WithLocalOverrides()` makes local overrides available as in your service.
+- `c.AssertExposure("checkout_v2")` fails the test unless exactly one exposure of that flag was recorded and returns it; `c.Recorder()` holds every count, exposure and alias.
 
 ## Logger events
 

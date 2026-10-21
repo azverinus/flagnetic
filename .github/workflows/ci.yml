@@ -179,6 +179,13 @@ jobs:
           for dir in $(jq -r '.[]' <<< "$DIRS"); do
             go work use "$GITHUB_WORKSPACE/$dir"
           done
+          # As in the committed go.work: v0.0.0, the version required before
+          # a first release, resolves to the module's directory.
+          go work edit -json "$GITHUB_WORKSPACE/go.work" |
+            jq -r '.Replace[]? | select(.Old.Version == "v0.0.0") | "\(.Old.Path) \(.New.Path)"' |
+            while read -r path target; do
+              go work edit -replace="$path@v0.0.0=$GITHUB_WORKSPACE/${target#./}"
+            done
           cat "$GOWORK"
       - name: go.mod is tidy
         run: '"$GITHUB_WORKSPACE/.github/scripts/check-tidy.sh" .'
@@ -211,15 +218,49 @@ jobs:
             tee /dev/stderr | grep -o 'kill_switch_propagation_ms=[0-9]*' |
             sed "s/kill_switch_propagation_ms=/Kill-switch propagation (go $GO): /; s/\$/ ms (target 2000 ms)/" \
             >> "$GITHUB_STEP_SUMMARY"
+      - name: Evaluation p99
+        # The race detector distorts timing, so the guarantee that an
+        # evaluation stays under 1 ms at p99 is measured without it; the
+        # test writes the numbers to the job summary.
+        if: matrix.dir == 'sdks/go'
+        run: go test -count=1 -run 'TestEvaluationStaysUnderAMillisecondAtP99$' .
       - name: Scan reachable code
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+  # What go get gives a consumer: each published module built and tested
+  # outside the workspace against the versions its go.mod requires. Skipped
+  # while it requires a module of this repository at v0.0.0, and failing
+  # when that skip would hide a broken release.
+  released:
+    name: released requirements ${{ matrix.dir }}
+    needs: modules
+    if: needs.modules.outputs.dirs != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.modules.outputs.dirs) }}
+    env:
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version: oldstable
+          cache-dependency-path: ${{ matrix.dir }}/go.mod
+      - name: Build and test against the released requirements
+        run: .github/scripts/check-released-requirements.sh "$DIR"
+        env:
+          DIR: ${{ matrix.dir }}
 
   # The one check branch protection requires. A job above may be skipped (a
   # module matrix with nothing to run, a job behind a condition), which is
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, tidy, workflows, docker, modules, module]
+    needs: [lint, test, vuln, tidy, workflows, docker, modules, module, released]
     if: always()
     runs-on: ubuntu-latest
     steps:

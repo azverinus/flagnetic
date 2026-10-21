@@ -10,7 +10,9 @@
 # with the originals. Any other module is checked in place.
 set -euo pipefail
 
-dir="${1:?usage: check-tidy.sh <module directory>}"
+dir="${1:?usage: check-tidy.sh <module directory> [-w]}"
+# -w writes the tidied go.mod and go.sum instead of failing on a difference.
+write="${2:-}"
 module="$(cd "$dir" && pwd)"
 # The workspace in effect for the module: the committed go.work, or the
 # one CI builds of the published modules alone.
@@ -42,7 +44,11 @@ go mod edit -json "$module/go.mod" |
   done > "$scratch/unreleased"
 
 if [[ ! -s "$scratch/unreleased" ]]; then
-  (cd "$module" && GOWORK=off go mod tidy -diff)
+  if [[ "$write" == "-w" ]]; then
+    (cd "$module" && GOWORK=off go mod tidy)
+  else
+    (cd "$module" && GOWORK=off go mod tidy -diff)
+  fi
   exit
 fi
 
@@ -57,12 +63,18 @@ while read -r path _; do
   (cd "$copy" && go mod edit -dropreplace="$path")
 done < "$scratch/unreleased"
 
+if [[ "$write" == "-w" ]]; then
+  cp "$copy/go.mod" "$module/go.mod"
+  if [[ -f "$copy/go.sum" ]]; then cp "$copy/go.sum" "$module/go.sum"; fi
+  exit
+fi
+
 status=0
 diff -u "$module/go.mod" "$copy/go.mod" || status=1
 if [[ -f "$module/go.sum" || -f "$copy/go.sum" ]]; then
   diff -u "$module/go.sum" "$copy/go.sum" || status=1
 fi
 if [[ $status -ne 0 ]]; then
-  echo "$dir is not tidy: run go mod tidy there with a replace of each v0.0.0 requirement" >&2
+  echo "$dir is not tidy: run .github/scripts/check-tidy.sh $dir -w" >&2
 fi
 exit $status

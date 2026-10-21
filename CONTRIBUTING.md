@@ -38,7 +38,7 @@ A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: i
 
 ## Commits
 
-- **Conventional Commits.** `type(scope): summary` in the imperative, under 72 characters. Types: `feat`, `fix`, `perf`, `deps`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`. Scopes are the contexts (`flags`, `segments`, `experiments`, `delivery`, `events`, `governance`, `access`, `workspace`, `integrations`), the SDKs (`sdk-go`, `sdk-js`, `sdk-dart`, `sdk-ruby`, `sdk-python`), and `api`, `eval`, `conformance`, `console`, `platform`, `release`, `ci`, `docs`.
+- **Conventional Commits.** `type(scope): summary` in the imperative, under 72 characters. Types: `feat`, `fix`, `perf`, `deps`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`. Scopes are the contexts (`flags`, `segments`, `experiments`, `delivery`, `events`, `governance`, `access`, `workspace`, `integrations`), the SDKs (`sdk-go`, `sdk-go-openfeature`, `sdk-js`, `sdk-dart`, `sdk-ruby`, `sdk-python`), and `api`, `eval`, `conformance`, `console`, `platform`, `release`, `ci`, `docs`.
 - **Sign-off (DCO).** Every commit carries a `Signed-off-by:` line matching its author: `git commit -s`. By signing off you certify the [Developer Certificate of Origin](https://developercertificate.org/): that you wrote the change or otherwise have the right to submit it under the project's license. CI rejects commits without it.
 - Explain *why* in the body when the subject cannot. Keep commits self-contained; each one should build and pass tests.
 
@@ -52,7 +52,21 @@ A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: i
 
 ## Releases
 
-[release-please](https://github.com/googleapis/release-please) keeps a release pull request open, with the next version and changelog of every package computed from the commits on `main`. Merging it tags the release and publishes it: the server image to `ghcr.io/azverinus/flagnetic`, each SDK to its registry. Until 1.0.0 a new feature or a breaking change bumps the minor version, a fix the patch version.
+[release-please](https://github.com/googleapis/release-please) keeps one release pull request open per package, with its next version and changelog computed from the commits on `main` that touch it. Merging one tags the release and publishes it: the server image to `ghcr.io/azverinus/flagnetic`, each SDK to its registry. Until 1.0.0 a new feature or a breaking change bumps the minor version, a fix the patch version. A change to `conformance/` alone releases nothing: the release note goes with the evaluator or SDK change the fixture demands.
+
+### Go modules
+
+The evaluator (`eval`), the Go SDK (`sdks/go`, with `flagnetictest` inside it) and the OpenFeature provider (`sdks/go-openfeature`) are separate Go modules with their own versions and changelogs. A Go module is published by its tag alone, so merging a release pull request is the release: the tags are `eval/vX.Y.Z`, `sdks/go/vX.Y.Z` and `sdks/go-openfeature/vX.Y.Z`. Use the scopes `eval`, `sdk-go`, `sdk-go-openfeature` and `conformance` for commits to them.
+
+Each module requires the released version of what it imports, because that is what `go get` gives a consumer; the committed `go.work` only makes a change across modules build in one checkout. So an SDK change that needs a new evaluator lands with it, but releases in order:
+
+1. The evaluator's release pull request is merged and `eval` is tagged.
+2. Dependabot proposes the bump of the SDK's requirement to that tag; merging it is a commit to the SDK, which updates the SDK's release pull request.
+3. The SDK's release pull request is merged; Dependabot then bumps the provider's requirement, and the provider releases the same way.
+
+Before a module's first release its dependents require it at `v0.0.0`, which only the workspace resolves (`go.work` replaces it with the module's directory). CI's `released requirements` job builds each module outside the workspace against what it requires; it is skipped while a direct requirement is `v0.0.0`, and fails when that would hide a broken release: when the module is released while it still requires `v0.0.0`, or when a requirement's module is tagged but not yet bumped, so merge the bump promptly after a tag.
+
+The first release of all three follows the order above, with one difference: Dependabot cannot resolve a `v0.0.0` requirement outside the workspace, so the first bump of each dependent is made by hand, in its directory, with `go get github.com/azverinus/flagnetic/eval@v0.1.0` (and the SDK's tag for the provider) and `.github/scripts/check-tidy.sh <dir> -w`. Every later bump is Dependabot's.
 
 ## Licensing
 

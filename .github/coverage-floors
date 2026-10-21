@@ -5,3 +5,5 @@
 # coverage, so coverage never erodes unnoticed; raise a floor, never lower it.
 eval eval 90
 sdks/go sdks/go 85
+sdks/go sdks/go/flagnetictest 80
+sdks/go-openfeature sdks/go-openfeature 80

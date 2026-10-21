@@ -9,6 +9,28 @@ updates:
     groups:
       go:
         patterns: ["*"]
+  # The published Go modules. After the evaluator is tagged, the SDK's
+  # requirement on it is bumped here, and the provider's on the SDK; the
+  # bump is what lets the dependent module release next. Daily, so a
+  # release does not wait a week for its dependent.
+  - package-ecosystem: gomod
+    directory: /eval
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: "deps(eval)"
+  - package-ecosystem: gomod
+    directory: /sdks/go
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: "deps(sdk-go)"
+  - package-ecosystem: gomod
+    directory: /sdks/go-openfeature
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: "deps(sdk-go-openfeature)"
   - package-ecosystem: github-actions
     directory: /
     schedule:
