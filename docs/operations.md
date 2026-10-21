@@ -99,6 +99,12 @@ An instance admin invites someone by email (`POST /members`) and is shown a one-
 
 Every replica runs the auth retention worker once an hour. It deletes ended sessions (revoked, or past the idle or absolute timeout in force), an email's failed sign-ins a day after the last one once no lock holds it, a source's failures once its fifteen-minute window is over, and invitations used, replaced or expired more than 30 days ago, except each member's latest, a thousand rows per transaction until nothing is left. Each batch runs under an advisory lock, so one replica purges at a time; a replica that finds another purging leaves the rest of its round to it.
 
+## The console
+
+The binary serves the web console at every path the APIs and probes do not own, so `https://flags.example.com/projects/checkout` loads the console, which then renders that page. Its files are built into the binary: there is nothing to deploy beside it. Files under `/assets/` carry a hash of their content in their name and are cached for a year; the page itself is never cached, so a new release reaches every browser on its next page load. Every answer of the console carries a content security policy that lets it load scripts, styles, fonts and images from its own origin only (images also as `data:` URIs) and call no other origin; inline styles are allowed, inline scripts are not.
+
+The console is in English and Russian. It shows the language chosen in it, else the first of the browser's languages it offers, else `FLAGNETIC_DEFAULT_LOCALE`.
+
 ## Probes
 
 | Path | Answers | Use it for |

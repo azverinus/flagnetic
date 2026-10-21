@@ -49,6 +49,10 @@ func TestEverySettingIsDocumentedAndHasAValidExample(t *testing.T) {
 		if s.Name == "FLAGNETIC_CONFIG_FILE" {
 			continue // its example names a file that does not exist here
 		}
+		if s.Name == "FLAGNETIC_TEST_CLOCK_FILE" {
+			// Accepted only where the end-to-end harness runs.
+			vars["FLAGNETIC_TEST_HARNESS"], vars["FLAGNETIC_LISTEN_ADDR"] = config.TestHarness, "127.0.0.1:0"
+		}
 		if _, err := config.Load(env(vars)); err != nil {
 			t.Errorf("%s=%s, its own example, is refused: %v", s.Name, s.Example, err)
 		}

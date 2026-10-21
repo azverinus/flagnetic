@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +45,9 @@ const (
 	LogText LogFormat = "text"
 )
 
+// ConsoleLocales are the languages the console is translated into.
+var ConsoleLocales = []string{"en", "ru"}
+
 // Config is the configuration of one replica.
 type Config struct {
 	DatabaseURL secret.String
@@ -58,8 +62,14 @@ type Config struct {
 	// PasswordHashConcurrency bounds the password hashes a replica runs at
 	// once.
 	PasswordHashConcurrency int
-	ConfigFile              string
-	ListenAddr              string
+	// DefaultLocale is the console's language when neither the member nor
+	// the browser names one it offers.
+	DefaultLocale string
+	// TestClockFile names the offset file of the test clock, "" outside the
+	// end-to-end harness.
+	TestClockFile string
+	ConfigFile    string
+	ListenAddr    string
 	// MetricsListenAddr is "" when metrics are switched off.
 	MetricsListenAddr string
 	AutoMigrate       bool
@@ -190,6 +200,31 @@ func Settings() []Setting {
 					return errors.New("not a whole number of at least 1")
 				}
 				cfg.PasswordHashConcurrency = n
+				return nil
+			},
+		},
+		{
+			Name:    "FLAGNETIC_DEFAULT_LOCALE",
+			Key:     "default_locale",
+			Default: "en",
+			Description: "The console's language when the member has not chosen one and the browser asks for none the console offers: " +
+				"`en` (English) or `ru` (Russian).",
+			Example: "ru",
+			apply: func(cfg *Config, v string) error {
+				if !slices.Contains(ConsoleLocales, v) {
+					return errors.New("not a language the console offers")
+				}
+				cfg.DefaultLocale = v
+				return nil
+			},
+		},
+		{
+			Name: "FLAGNETIC_TEST_CLOCK_FILE",
+			Description: "Test only: a file holding a duration, such as `25h`, that moves the server's clock ahead, read again on every use. " +
+				"Accepted only by the end-to-end test harness, listening on loopback; refused anywhere else. Environment only.",
+			Example: "/tmp/flagnetic-clock-offset",
+			apply: func(cfg *Config, v string) error {
+				cfg.TestClockFile = v
 				return nil
 			},
 		},
@@ -486,7 +521,35 @@ func Load(lookupEnv func(string) (string, bool)) (Config, error) {
 			return Config{}, fmt.Errorf("%s: %s is %w; for example %s", s.Name, shown, err, s.Example)
 		}
 	}
+	if cfg.TestClockFile != "" {
+		if err := requireTestHarness(lookupEnv, cfg.ListenAddr); err != nil {
+			return Config{}, fmt.Errorf("FLAGNETIC_TEST_CLOCK_FILE: %w", err)
+		}
+	}
 	return cfg, nil
+}
+
+// TestHarness is the value of FLAGNETIC_TEST_HARNESS the end-to-end harness
+// sets, the one marker under which test-only settings are accepted.
+const TestHarness = "playwright"
+
+// requireTestHarness refuses a test-only setting outside the end-to-end
+// harness: without its FLAGNETIC_TEST_HARNESS marker, or listening beyond
+// loopback, where a deployment would be. The marker is read from the
+// environment alone and is no setting of its own, so no configuration file
+// can turn it on.
+func requireTestHarness(lookupEnv func(string) (string, bool), listenAddr string) error {
+	if v, _ := lookupEnv("FLAGNETIC_TEST_HARNESS"); v != TestHarness {
+		return fmt.Errorf("a test-only setting, accepted only with FLAGNETIC_TEST_HARNESS=%s", TestHarness)
+	}
+	host, _, err := net.SplitHostPort(listenAddr)
+	if err != nil {
+		return fmt.Errorf("a test-only setting: FLAGNETIC_LISTEN_ADDR %q: %w", listenAddr, err)
+	}
+	if addr, err := netip.ParseAddr(host); host != "localhost" && (err != nil || !addr.IsLoopback()) {
+		return fmt.Errorf("a test-only setting, accepted only while listening on loopback, not %q", listenAddr)
+	}
+	return nil
 }
 
 // readFile reads a configuration file: a YAML mapping from file keys to

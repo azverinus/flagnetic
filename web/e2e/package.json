@@ -1,0 +1,20 @@
+{
+  "name": "@flagnetic/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:local": "./scripts/with-postgres.sh playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@flagnetic/api": "workspace:*"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "~1.63.0",
+    "@types/node": "^22.10.5",
+    "typescript": "^5.9.3"
+  }
+}

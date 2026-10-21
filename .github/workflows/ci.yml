@@ -95,6 +95,118 @@ jobs:
           go generate ./...
           git diff --exit-code
 
+  # The console: the client generated from the management API is current,
+  # the code typechecks, lints and tests, every string is translated and
+  # the catalogs are what extraction gives, and it builds.
+  console:
+    name: console
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generated client is up to date
+        run: |
+          pnpm generate
+          git diff --exit-code -- packages/api/src
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Format
+        run: pnpm format
+      - name: Test
+        run: pnpm test
+      - name: Catalogs are extracted and complete
+        run: pnpm i18n:check
+      - name: Build
+        run: pnpm build
+
+  # Whether a pull request touches what the end-to-end suite exercises: the
+  # console or the server it runs against.
+  changes:
+    name: what changed
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    outputs:
+      e2e: ${{ steps.diff.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --name-only "$BASE...HEAD" | grep -qE '^(web/|internal/|cmd/|api/|eval/|go\.(mod|sum)$)'; then
+            echo "e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "e2e=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The console end to end, once per pull request that touches it or the
+  # server: Playwright builds the binary with the console embedded, runs it
+  # against PostgreSQL under the test clock, and drives it in Chromium.
+  e2e:
+    name: console end to end
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: flagnetic
+          POSTGRES_USER: flagnetic
+          POSTGRES_PASSWORD: flagnetic
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flagnetic -d flagnetic"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      DATABASE_URL: postgres://flagnetic:flagnetic@localhost:5432/flagnetic?sslmode=disable
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm e2e:install
+      - name: Run the suite
+        run: pnpm e2e
+      - name: Keep the report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: web/e2e/playwright-report
+          retention-days: 7
+
   workflows:
     name: actionlint
     runs-on: ubuntu-latest
@@ -260,7 +372,7 @@ jobs:
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, tidy, workflows, docker, modules, module, released]
+    needs: [lint, test, vuln, tidy, console, changes, e2e, workflows, docker, modules, module, released]
     if: always()
     runs-on: ubuntu-latest
     steps:

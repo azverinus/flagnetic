@@ -1,0 +1,391 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-10-21 14:19+0300\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: pseudo\n"
+
+#: src/lib/problem-messages.ts
+msgid "At most {max} characters."
+msgstr ""
+
+#: src/components/breadcrumb.tsx
+msgid "Breadcrumb"
+msgstr ""
+
+#: src/components/ui/confirm-dialog.tsx
+#: src/components/ui/form-page.tsx
+msgid "Cancel"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Choose a stronger password."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered scopes."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered types."
+msgstr ""
+
+#: src/components/ui/dialog.tsx
+#: src/components/ui/reveal-secret.tsx
+#: src/components/ui/sheet.tsx
+msgid "Close"
+msgstr ""
+
+#: src/components/app-shell.tsx
+msgid "Collapse the sidebar"
+msgstr ""
+
+#: src/components/ui/reveal-secret.tsx
+msgid "Copied to the clipboard."
+msgstr ""
+
+#: src/components/ui/reveal-secret.tsx
+msgid "Copy"
+msgstr ""
+
+#: src/components/personal-menu.tsx
+msgid "Dark"
+msgstr ""
+
+#: src/components/ui/unsaved-changes-bar.tsx
+msgid "Discard"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "edit the project"
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "Email"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Enter a name."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Enter a valid email address."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Enter a value from {min} to {max}."
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "Enter your email."
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "Enter your password."
+msgstr ""
+
+#: src/components/app-shell.tsx
+msgid "Expand the sidebar"
+msgstr ""
+
+#: src/components/not-found.tsx
+msgid "Go to the start page"
+msgstr ""
+
+#: src/components/app-shell.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "Home"
+msgstr ""
+
+#: src/components/ui/reveal-secret.tsx
+msgid "I have stored it somewhere safe"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "It does not exist, or it was deleted."
+msgstr ""
+
+#: src/components/ui/unsaved-changes-bar.tsx
+msgid "Leave"
+msgstr ""
+
+#: src/components/ui/unsaved-changes-bar.tsx
+msgid "Leave without saving?"
+msgstr ""
+
+#: src/components/personal-menu.tsx
+msgid "Light"
+msgstr ""
+
+#: src/components/ui/table.tsx
+msgid "Loading…"
+msgstr ""
+
+#: src/components/app-shell.tsx
+msgid "Main"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "manage environments"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "manage project tokens"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "manage unit types and attributes"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "manage who has access"
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "No way to sign in is enabled on this instance. Ask its operator."
+msgstr ""
+
+#: src/routes/_signed-in/$.tsx
+msgid "Not found"
+msgstr ""
+
+#: src/components/ui/table.tsx
+msgid "Nothing here yet."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "One with this key already exists."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Only a signed-in session can do this, not an API token."
+msgstr ""
+
+#: src/components/not-found.tsx
+msgid "Page not found"
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "Password"
+msgstr ""
+
+#: src/components/query-error.tsx
+#: src/lib/toast.ts
+msgid "Request ID: {requestId}"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Required."
+msgstr ""
+
+#: src/components/ui/unsaved-changes-bar.tsx
+msgid "Save"
+msgstr ""
+
+#: src/components/app-shell.tsx
+msgid "Sidebar"
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+#: src/routes/sign-in.tsx
+msgid "Sign in"
+msgstr ""
+
+#: src/components/personal-menu.tsx
+msgid "Sign out"
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "Signing in…"
+msgstr ""
+
+#: src/components/app-shell.tsx
+msgid "Skip to content"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Some fields need correcting."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Something went wrong on the server."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
+msgstr ""
+
+#: src/components/personal-menu.tsx
+msgid "System"
+msgstr ""
+
+#: src/components/ui/reveal-secret.tsx
+msgid "The browser refused the clipboard. Select the value and copy it by hand."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The email or the password is not right."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The idle timeout cannot be longer than the absolute timeout."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The password is too short or too long."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The password must not contain your email address."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The request came from another site and was refused."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The request is too large."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The request was not sent as JSON."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The request was refused."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The server could not be reached. Check your connection and try again."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The server could not read the request."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The server is busy checking other passwords. Try again in a moment."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The server is unavailable. Try again in {retry}."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The server is unavailable. Try again in a moment."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The token in use does not carry the scope this needs."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The value is out of range."
+msgstr ""
+
+#: src/components/personal-menu.tsx
+msgid "Theme"
+msgstr ""
+
+#: src/components/not-found.tsx
+msgid "There is nothing at this address. The link may be old or mistyped."
+msgstr ""
+
+#: src/components/ui/reveal-secret.tsx
+msgid "This is the only time it is shown. It is kept encrypted and never shown again, so if it is lost, rotate it."
+msgstr ""
+
+#: src/components/ui/reveal-secret.tsx
+msgid "This is the only time it is shown. Only a hash of it is kept, so if it is lost, replace it."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This key is reserved."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This password is too common. Choose another."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Too long."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Too many failed attempts for this email. Try again in {retry}."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Too many failed attempts for this email. Try again later."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Too many requests. Try again in {retry}."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Too many requests. Try again later."
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "Too many sign-in attempts from your network. Try again in {retry}."
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+msgid "Too many sign-in attempts from your network. Try again later."
+msgstr ""
+
+#: src/components/query-error.tsx
+msgid "Try again"
+msgstr ""
+
+#: src/components/ui/confirm-dialog.tsx
+msgid "Type {typeToConfirm} to confirm"
+msgstr ""
+
+#: src/components/ui/unsaved-changes-bar.tsx
+msgid "Unsaved changes"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Use {min} to {max} characters."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "view the project"
+msgstr ""
+
+#: src/routes/_signed-in/index.tsx
+msgid "Welcome, {name}"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "You are not signed in."
+msgstr ""
+
+#: src/routes/_signed-in/index.tsx
+msgid "You are signed in to Flagnetic."
+msgstr ""
+
+#: src/components/ui/unsaved-changes-bar.tsx
+msgid "You have unsaved changes."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "You may not do this."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "You need the permission to {name}."
+msgstr ""
+
+#: src/components/ui/unsaved-changes-bar.tsx
+msgid "Your changes on this page will be lost."
+msgstr ""
+
+#: src/components/sign-in-form.tsx
+#: src/lib/problem-messages.ts
+msgid "Your session has ended. Sign in again to continue."
+msgstr ""

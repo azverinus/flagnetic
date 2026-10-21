@@ -32,7 +32,13 @@ tasks:
   # --- Build ---
 
   build:
-    desc: Build the binary into bin/flagnetic
+    desc: Build the console, then the binary embedding it, into bin/flagnetic
+    deps: [web:build]
+    cmds:
+      - task: build:go
+
+  build:go:
+    desc: Build the binary alone, embedding whatever console build is present
     cmds:
       - go build -trimpath -o {{.BIN}} ./cmd/flagnetic
 
@@ -48,16 +54,71 @@ tasks:
       - docker build -f deploy/Dockerfile --build-arg VERSION=dev -t flagnetic:dev .
 
   generate:
-    desc: Regenerate generated code and docs (API code, the configuration reference)
+    desc: Regenerate generated code and docs (API code and client, the configuration reference)
+    deps: [web:install]
     cmds:
       - go generate ./...
+      - pnpm --dir web generate
+
+  # --- Console (web/, needs Node and pnpm) ---
+
+  web:install:
+    desc: Install the console's dependencies
+    sources:
+      - web/pnpm-lock.yaml
+      - web/package.json
+      - web/*/*/package.json
+      - web/e2e/package.json
+    cmds:
+      - pnpm --dir web install --frozen-lockfile
+
+  web:build:
+    desc: Build the console into the directory the binary embeds
+    deps: [web:install]
+    sources:
+      - web/apps/console/**/*
+      - web/packages/api/src/**/*
+      - exclude: web/**/node_modules/**
+    generates:
+      - internal/infra/in/http/console/dist/index.html
+    cmds:
+      - pnpm --dir web build
+
+  web:dev:
+    desc: Serve the console with live reload, proxying the API to a running binary (FLAGNETIC_URL)
+    deps: [web:install]
+    cmds:
+      - pnpm --dir web dev
+
+  web:check:
+    desc: Typecheck, lint, format-check and test the console; check its catalogs
+    deps: [web:install]
+    cmds:
+      - pnpm --dir web typecheck
+      - pnpm --dir web lint
+      - pnpm --dir web format
+      - pnpm --dir web test
+      - pnpm --dir web i18n:check
+
+  web:e2e:
+    desc: Run the console end to end against the real binary and a throwaway PostgreSQL
+    deps: [web:install]
+    cmds:
+      - env -u DATABASE_URL pnpm --dir web/e2e test:local
+
+  web:extract:
+    desc: Extract the console's messages into its catalogs
+    deps: [web:install]
+    cmds:
+      - pnpm --dir web i18n:extract
 
   # --- Checks (what CI runs) ---
 
   check:
-    desc: Run every CI check locally (lint, tests, vulnerabilities, tidy)
+    desc: Run every CI check locally (lint, tests, vulnerabilities, tidy, the console)
     cmds:
       - task: lint
+      - task: web:check
       - task: test
       - task: cover
       - task: vuln
@@ -147,3 +208,4 @@ tasks:
     desc: Remove build output
     cmds:
       - rm -rf bin coverage.out
+      - find internal/infra/in/http/console/dist -mindepth 1 ! -name .gitkeep -delete

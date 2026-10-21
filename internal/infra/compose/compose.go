@@ -15,6 +15,7 @@ import (
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/console"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
@@ -169,4 +170,17 @@ func PromoteMember(d Deps) *appaccess.PromoteMember {
 // instance admin.
 func InstanceAdminExists(d Deps) *appaccess.InstanceAdminExists {
 	return appaccess.NewInstanceAdminExists(pgaccess.NewStore(d.Pool))
+}
+
+// Console mounts the embedded console on edge, its entry document naming
+// defaultLocale, and reports whether the binary holds a build of the console
+// rather than the placeholder page.
+func Console(edge *flaghttp.Server, defaultLocale string) (bool, error) {
+	fsys, built := console.FS()
+	h, err := console.Handler(fsys, defaultLocale)
+	if err != nil {
+		return false, err
+	}
+	edge.Console(h)
+	return built, nil
 }

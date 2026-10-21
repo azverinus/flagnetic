@@ -1,0 +1,33 @@
+{
+  "name": "@flagnetic/web",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "generate": "pnpm --filter @flagnetic/api generate",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "test": "pnpm --filter @flagnetic/console test",
+    "i18n:extract": "pnpm --filter @flagnetic/console i18n:extract",
+    "i18n:check": "pnpm --filter @flagnetic/console i18n:check",
+    "build": "pnpm --filter @flagnetic/console build",
+    "dev": "pnpm --filter @flagnetic/console dev",
+    "e2e": "pnpm --filter @flagnetic/e2e test",
+    "e2e:install": "pnpm --filter @flagnetic/e2e exec playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "eslint-plugin-lingui": "^0.16.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.12.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.0"
+  }
+}

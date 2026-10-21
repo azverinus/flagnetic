@@ -18,6 +18,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	"github.com/azverinus/flagnetic/internal/infra/out/testclock"
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -43,13 +44,20 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	if cfg.SecretKey.IsZero() {
 		// Sessions would be signed with an empty key, and stored secrets
 		// sealed under one: a replica without its key never starts.
-		return fail(log, "start failed", configError(errors.New(
+		return failStart(ctx, log, configError(errors.New(
 			"FLAGNETIC_SECRET_KEY is required by serve; for example the output of `openssl rand -base64 32`, kept for the life of the instance")))
 	}
 	if n := len(cfg.SecretKey.Reveal()); n < secret.MinKeyLength {
-		return fail(log, "start failed", configError(fmt.Errorf(
+		return failStart(ctx, log, configError(fmt.Errorf(
 			"FLAGNETIC_SECRET_KEY is %d bytes long and must be at least %d bytes; for example the output of `openssl rand -base64 32`",
 			n, secret.MinKeyLength)))
+	}
+	var now clock.Clock = clock.System{}
+	if cfg.TestClockFile != "" {
+		offset := testclock.New(cfg.TestClockFile)
+		now = offset
+		log.WarnContext(ctx, "the clock is moved by a test-only offset file",
+			"file", cfg.TestClockFile, "offset", offset.Offset().String())
 	}
 	pool, err := openDatabase(ctx, cfg, log, o)
 	if err != nil {
@@ -65,7 +73,7 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		return failStart(ctx, log, err)
 	}
 	if o.canary {
-		if err = checkCanary(ctx, pool, secret.NewKeyring(cfg.SecretKey)); err != nil {
+		if err = checkCanary(ctx, pool, secret.NewKeyring(cfg.SecretKey), now); err != nil {
 			return failStart(ctx, log, err)
 		}
 	}
@@ -77,21 +85,29 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	runner := worker.NewRunner(log, reg)
 	for _, w := range o.workers {
 		if err = runner.Register(w); err != nil {
-			return fail(log, "start failed", err)
+			return failStart(ctx, log, err)
 		}
 	}
 
 	edgeOpts := flaghttp.OptionsFrom(cfg)
 	edgeOpts.Logger, edgeOpts.DB, edgeOpts.Metrics = log, pool, flaghttp.NewMetrics(reg)
 	edge := flaghttp.New(edgeOpts)
-	background := compose.Management(edge, compose.NewDeps(pool, clock.System{}), reg, compose.Options{
+	background := compose.Management(edge, compose.NewDeps(pool, now), reg, compose.Options{
 		Keyring: secret.NewKeyring(cfg.SecretKey), PasswordHashConcurrency: cfg.PasswordHashConcurrency,
 		Options: management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
 	})
 	for _, w := range background.Workers {
 		if err = runner.Register(w); err != nil {
-			return fail(log, "start failed", err)
+			return failStart(ctx, log, err)
 		}
+	}
+	built, err := compose.Console(edge, cfg.DefaultLocale)
+	if err != nil {
+		return failStart(ctx, log, fmt.Errorf("console: %w", err))
+	}
+	if !built {
+		log.WarnContext(ctx, "this binary was built without the console; a placeholder page is served instead",
+			"build", "task build")
 	}
 	for _, r := range o.routes {
 		edge.Handle(r.pattern, r.handler)
@@ -99,13 +115,13 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	var lc net.ListenConfig
 	ln, err := lc.Listen(ctx, "tcp", cfg.ListenAddr)
 	if err != nil {
-		return fail(log, "start failed", err)
+		return failStart(ctx, log, err)
 	}
 	var metricsLn *metrics.Listener
 	if cfg.MetricsListenAddr != "" {
 		if metricsLn, err = metrics.Listen(ctx, cfg.MetricsListenAddr, reg); err != nil {
 			_ = ln.Close()
-			return fail(log, "start failed", fmt.Errorf("metrics listener: %w", err))
+			return failStart(ctx, log, fmt.Errorf("metrics listener: %w", err))
 		}
 		// Stopped on every way out, after the public listener and before the
 		// pool closes.
@@ -213,12 +229,12 @@ func checkSchema(ctx context.Context, pool *pgxpool.Pool, log *slog.Logger, o op
 // checkCanary stores the instance's canary on its first start and proves on
 // every start that the secret key opens it, so a mistyped key stops the
 // replica rather than silently failing to read what the instance stored.
-func checkCanary(ctx context.Context, pool *pgxpool.Pool, keyring *secret.Keyring) error {
+func checkCanary(ctx context.Context, pool *pgxpool.Pool, keyring *secret.Keyring, now clock.Clock) error {
 	fresh, err := keyring.NewCanary()
 	if err != nil {
 		return err
 	}
-	stored, err := postgres.Canary(ctx, pool, fresh, clock.System{}.Now())
+	stored, err := postgres.Canary(ctx, pool, fresh, now.Now())
 	if err != nil {
 		return fmt.Errorf("reading the secret key canary: %w", err)
 	}
