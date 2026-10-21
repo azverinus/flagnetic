@@ -174,7 +174,7 @@ func requestOf(ctx context.Context) governance.Request {
 }
 
 // seam judges a request to op before its handler runs: it authenticates the
-// caller, refuses a write signed in by the session cookie that comes from
+// caller, refuses a request signed in by the session cookie that comes from
 // another origin, and authorizes the caller for op, and refuses the request
 // otherwise. The caller then travels in the request's context. A bearer
 // credential is authenticated even for a public operation, so a bad one is
@@ -190,7 +190,7 @@ func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
 		caller, err := a.authenticate(r, op)
 		var in *addressed
 		switch {
-		case err == nil && caller.Method == access.MethodSession && a.origins.Check(r) != nil:
+		case err == nil && caller.Method == access.MethodSession && a.crossOrigin(r):
 			err = errCrossOrigin
 		case err == nil && op.InProject():
 			in, err = a.address(ctx, caller, r.PathValue("project"))
@@ -215,6 +215,18 @@ func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// crossOrigin reports whether the browser says r comes from an origin other
+// than the console's. The standard check lets safe methods through, since a
+// read changes nothing; a session is only ever used by the console on its
+// own origin, though, so a read from another origin is refused too: what it
+// answers is no other page's business. The check is therefore made as if r
+// were a write.
+func (a *api) crossOrigin(r *http.Request) bool {
+	asWrite := r.WithContext(r.Context())
+	asWrite.Method = http.MethodPost
+	return a.origins.Check(asWrite) != nil
 }
 
 // address finds the project with key and what caller holds there; an

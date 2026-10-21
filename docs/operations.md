@@ -68,7 +68,7 @@ Both are recorded in the audit log with the CLI as their actor.
 Members sign in with their email and password. A sign-in opens a session held by the server and referred to by the cookie `flagnetic_session` (`HttpOnly; SameSite=Lax`), signed under the secret key. A session ends at sign-out, after 24 hours without a request, or 30 days after it opened.
 
 - The cookie is `Secure` whenever the console is reached over HTTPS, and also over plain HTTP unless the host is `localhost` (or a loopback address), where browsers accept it without TLS. To try Flagnetic over plain HTTP on another host, set `FLAGNETIC_INSECURE_COOKIES=true`; never do so on a network you do not trust.
-- A write signed in by the cookie is refused (`403 cross_origin`) when the browser says it comes from another site, so a page elsewhere cannot act as a signed-in member. Requests with an API token are not checked: a browser never sends one by itself.
+- A request signed in by the cookie, a read as much as a write, is refused (`403 cross_origin`) when the browser says it comes from another site, so a page elsewhere can neither act as a signed-in member nor read what the console shows them. Requests with an API token are not checked: a browser never sends one by itself.
 
 Guessing passwords is slow, and cannot exhaust a replica:
 
@@ -91,7 +91,7 @@ Both are served on the public listener (`FLAGNETIC_LISTEN_ADDR`). A notification
 
 By default the client of a request is its TCP peer, and `X-Forwarded-For` and `X-Forwarded-Proto` are ignored, so a client cannot choose the address rate limits, sessions and audit entries see. Behind a load balancer or a reverse proxy, list the proxies in `FLAGNETIC_TRUSTED_PROXIES` (CIDR prefixes or single addresses, comma-separated). For a request from a listed proxy, `X-Forwarded-For` is read from the right, where each proxy appended the address it received the request from, and the first address that is not a listed proxy is the client; an entry that is not an address (some proxies write `unknown`) is skipped. The scheme is taken from the rightmost `X-Forwarded-Proto` entry when it is `http` or `https`. List only proxies you control: a listed address is believed about whoever it says the client is.
 
-Set `FLAGNETIC_BASE_URL` to the URL members open the console at, such as `https://flags.example.com`. Its scheme decides whether the session cookie is `Secure`, whatever the proxy forwards, and its origin is trusted for the console's writes even when the proxy rewrites `Host`. Without it, each request's own scheme (from `X-Forwarded-Proto` of a trusted proxy) and host are used.
+Set `FLAGNETIC_BASE_URL` to the URL members open the console at, such as `https://flags.example.com`. Its scheme decides whether the session cookie is `Secure`, whatever the proxy forwards, and its origin is trusted for the console's requests even when the proxy rewrites `Host`. Without it, each request's own scheme (from `X-Forwarded-Proto` of a trusted proxy) and host are used.
 
 ## HTTP limits
 

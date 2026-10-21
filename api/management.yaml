@@ -16,9 +16,9 @@ info:
 
     A script authenticates with an API token as a bearer; the console with
     the session cookie `POST /auth/sign-in` sets. When a request carries both,
-    the token is judged and the cookie ignored. A write authenticated by the
-    cookie is refused `cross_origin` when the browser says it comes from
-    another origin.
+    the token is judged and the cookie ignored. A request authenticated by
+    the cookie, a read included, is refused `cross_origin` when the browser
+    says it comes from another origin.
 
     Errors are problem documents (RFC 9457) with a stable `code`.
 servers:
@@ -863,8 +863,8 @@ components:
       description: |
         The caller may not perform the operation: `forbidden` (with the
         missing `permission`), `session_required`, `insufficient_scope`, or
-        `cross_origin` for a write signed in by the session cookie that the
-        browser says comes from another origin.
+        `cross_origin` for a request signed in by the session cookie, a read
+        included, that the browser says comes from another origin.
       content:
         application/problem+json:
           schema:

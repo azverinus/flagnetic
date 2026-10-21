@@ -400,9 +400,20 @@ func TestCrossOriginProtectionGuardsCookieRequests(t *testing.T) {
 		}
 	}
 	b.Header = http.Header{"Sec-Fetch-Site": {"cross-site"}}
-	if res, _ := b.GetMeWithResponse(t.Context()); res.StatusCode() != http.StatusOK {
-		t.Errorf("cross-site read = %d, want 200: a read changes nothing", res.StatusCode())
+	// A session is only ever used by the console on its own origin, so a
+	// read from another is refused too: what it answers is no other page's
+	// business.
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		if res, body := b.Do(t, method, "/api/v1/me", "", ""); res.StatusCode != http.StatusForbidden ||
+			(method == http.MethodGet && !strings.Contains(body, `"cross_origin"`)) {
+			t.Errorf("cross-site %s = %d %s, want 403 cross_origin", method, res.StatusCode, body)
+		}
 	}
+	b.Header = http.Header{"Sec-Fetch-Site": {"same-origin"}}
+	if res, _ := b.GetMeWithResponse(t.Context()); res.StatusCode() != http.StatusOK {
+		t.Errorf("same-origin read = %d, want 200", res.StatusCode())
+	}
+	b.Header = http.Header{"Sec-Fetch-Site": {"cross-site"}}
 	if res, _ := b.SignOutWithResponse(t.Context()); res.StatusCode() != http.StatusForbidden {
 		t.Errorf("cross-site sign-out = %d, want 403", res.StatusCode())
 	}

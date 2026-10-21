@@ -28,9 +28,8 @@ type Options struct {
 	InsecureCookies bool
 }
 
-// errCrossOrigin refuses a write signed in by the session cookie that a
-// browser says comes from another origin, and a sign-in that is not JSON,
-// which is what a form on another site would send.
+// errCrossOrigin refuses a request signed in by the session cookie that a
+// browser says comes from another origin.
 var errCrossOrigin = apperrors.Forbidden("cross_origin", "a request signed in by the session cookie must come from the console's own origin")
 
 // opensSession are the operations that open a session: public, so no cookie
