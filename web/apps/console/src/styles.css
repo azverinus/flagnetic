@@ -110,3 +110,17 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Toast text in the light theme, darker than the toast library's own:
+ * its greens, blues, oranges and reds read at under 4.5:1 on their pale
+ * backgrounds, below what WCAG AA asks of text this size. The dark
+ * theme's already pass. Two attributes and :root outrank the library's
+ * rule wherever its stylesheet lands in the page.
+ */
+:root [data-sonner-toaster][data-sonner-theme="light"] {
+  --success-text: hsl(140, 100%, 22%);
+  --info-text: hsl(210, 92%, 38%);
+  --warning-text: hsl(31, 92%, 30%);
+  --error-text: hsl(360, 100%, 40%);
+}
