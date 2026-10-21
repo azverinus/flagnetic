@@ -7,6 +7,7 @@ import { readStored, writeStored } from "./storage";
  */
 const keys = {
   sidebarCollapsed: "flagnetic.sidebar-collapsed",
+  lastProject: "flagnetic.last-project",
 } as const;
 
 export function sidebarCollapsed(): boolean {
@@ -15,4 +16,13 @@ export function sidebarCollapsed(): boolean {
 
 export function rememberSidebarCollapsed(collapsed: boolean): void {
   writeStored(keys.sidebarCollapsed, collapsed ? "true" : "false");
+}
+
+/** The key of the project this browser showed last, which the start page reopens. */
+export function lastProject(): string | null {
+  return readStored(keys.lastProject);
+}
+
+export function rememberLastProject(project: string): void {
+  writeStored(keys.lastProject, project);
 }

@@ -70,7 +70,9 @@ describe("a confirmation", () => {
       </ConfirmDialog>,
     );
 
-    expect(screen.getByRole("alert")).toHaveTextContent("The last one stays.");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This is the project's last environment. A project always keeps one to serve from.",
+    );
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

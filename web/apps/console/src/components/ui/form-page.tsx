@@ -34,8 +34,6 @@ export function FormPage({
   className,
   children,
 }: FormPageProps) {
-  const { i18n } = useLingui();
-  const error = refusal instanceof ApiError ? refusal : undefined;
   return (
     <form
       noValidate
@@ -43,25 +41,45 @@ export function FormPage({
       className={cn("flex w-full max-w-2xl flex-col gap-6", className)}
     >
       <div className="flex flex-col gap-5">{children}</div>
-      {error ? (
-        <p
-          role="alert"
-          className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
-        >
-          <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
-          {problemMessage(i18n, error)}
-        </p>
-      ) : null}
-      <div className="flex flex-wrap justify-end gap-2">
-        {onCancel ? (
-          <Button type="button" variant="outline" onClick={onCancel}>
-            <Trans>Cancel</Trans>
-          </Button>
-        ) : null}
-        <Button type="submit" disabled={pending}>
-          {submitLabel}
-        </Button>
-      </div>
+      <FormRefusal refusal={refusal} />
+      <FormActions submitLabel={submitLabel} onCancel={onCancel} pending={pending} />
     </form>
+  );
+}
+
+/**
+ * The refusal of a form's last submission, explained above its actions;
+ * nothing for no refusal. A refusal shown under a field instead is left
+ * out by the caller.
+ */
+export function FormRefusal({ refusal }: { refusal: unknown }) {
+  const { i18n } = useLingui();
+  if (!(refusal instanceof ApiError)) return null;
+  return (
+    <p
+      role="alert"
+      className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm"
+    >
+      <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+      {problemMessage(i18n, refusal)}
+    </p>
+  );
+}
+
+export type FormActionsProps = Pick<FormPageProps, "submitLabel" | "onCancel" | "pending">;
+
+/** A form's action row: right-aligned, the primary action rightmost and cancel before it. */
+export function FormActions({ submitLabel, onCancel, pending = false }: FormActionsProps) {
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      {onCancel ? (
+        <Button type="button" variant="outline" onClick={onCancel}>
+          <Trans>Cancel</Trans>
+        </Button>
+      ) : null}
+      <Button type="submit" disabled={pending}>
+        {submitLabel}
+      </Button>
+    </div>
   );
 }

@@ -10,8 +10,8 @@ async function signIn(page: Page, password = admin.password) {
 }
 
 const signInHeading = (page: Page) => page.getByRole("heading", { name: "Sign in" });
-const shellHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: `Welcome, ${admin.name}` });
+/** The start page a member lands on with no project to reopen: the projects. */
+const shellHeading = (page: Page) => page.getByRole("heading", { level: 1, name: "Projects" });
 const personalMenu = (page: Page) => page.getByRole("button", { name: admin.name });
 
 test.describe("signing in and the shell", () => {
@@ -44,7 +44,7 @@ test.describe("signing in and the shell", () => {
     await signIn(page);
 
     await expect(shellHeading(page)).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveText("Home");
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveText("Projects");
     await expect(personalMenu(page)).toBeVisible();
     await expect(page).toHaveURL(/\/$/);
   });

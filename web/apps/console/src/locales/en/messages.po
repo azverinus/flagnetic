@@ -8,8 +8,43 @@ msgstr ""
 "Language: en\n"
 
 #: src/lib/problem-messages.ts
+msgid "A key never changes once it is set."
+msgstr "A key never changes once it is set."
+
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
+msgstr "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
+
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "A project owner or an instance admin can grant you a role in it."
+msgstr "A project owner or an instance admin can grant you a role in it."
+
+#: src/components/row-dialogs.tsx
+msgid "Actions"
+msgstr "Actions"
+
+#: src/components/project-switcher.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "All projects"
+msgstr "All projects"
+
+#: src/lib/problem-messages.ts
+msgid "An attribute's type is fixed once it is declared."
+msgstr "An attribute's type is fixed once it is declared."
+
+#: src/lib/problem-messages.ts
 msgid "At most {max} characters."
 msgstr "At most {max} characters."
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Attributes"
+msgstr "Attributes"
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Boolean"
+msgstr "Boolean"
 
 #: src/components/breadcrumb.tsx
 msgid "Breadcrumb"
@@ -23,6 +58,14 @@ msgstr "Cancel"
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
 msgstr "Choose a stronger password."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Choose a type"
+msgstr "Choose a type"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Choose a type."
+msgstr "Choose a type."
 
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered scopes."
@@ -50,15 +93,79 @@ msgstr "Copied to the clipboard."
 msgid "Copy"
 msgstr "Copy"
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Create attribute"
+msgstr "Create attribute"
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Create environment"
+msgstr "Create environment"
+
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "Create project"
+msgstr "Create project"
+
+#: src/routes/_signed-in/index.tsx
+msgid "Create the first project to start declaring what it serves."
+msgstr "Create the first project to start declaring what it serves."
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Create unit type"
+msgstr "Create unit type"
+
 #: src/components/personal-menu.tsx
 msgid "Dark"
 msgstr "Dark"
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Date"
+msgstr "Date"
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Declare the kinds of unit its flags are served to."
+msgstr "Declare the kinds of unit its flags are served to."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Delete {key}"
+msgstr "Delete {key}"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Delete attribute"
+msgstr "Delete attribute"
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Delete environment"
+msgstr "Delete environment"
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Delete unit type"
+msgstr "Delete unit type"
+
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Description"
+msgstr "Description"
+
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Developer"
+msgstr "Developer"
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Discard"
 msgstr "Discard"
 
-#: src/lib/problem-messages.ts
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Edit {key}"
+msgstr "Edit {key}"
+
+#: src/lib/access-names.ts
 msgid "edit the project"
 msgstr "edit the project"
 
@@ -66,6 +173,7 @@ msgstr "edit the project"
 msgid "Email"
 msgstr "Email"
 
+#: src/lib/forms.ts
 #: src/lib/problem-messages.ts
 msgid "Enter a name."
 msgstr "Enter a name."
@@ -86,26 +194,61 @@ msgstr "Enter your email."
 msgid "Enter your password."
 msgstr "Enter your password."
 
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/index.tsx
+msgid "Environments"
+msgstr "Environments"
+
 #: src/components/app-shell.tsx
 msgid "Expand the sidebar"
 msgstr "Expand the sidebar"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Fixed once declared."
+msgstr "Fixed once declared."
+
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "Fixed once the project is created, since SDKs and scripts use it."
+msgstr "Fixed once the project is created, since SDKs and scripts use it."
 
 #: src/components/not-found.tsx
 msgid "Go to the start page"
 msgstr "Go to the start page"
 
-#: src/components/app-shell.tsx
-#: src/routes/_signed-in/index.tsx
-msgid "Home"
-msgstr "Home"
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
+msgstr "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
 
 #: src/components/ui/reveal-secret.tsx
 msgid "I have stored it somewhere safe"
 msgstr "I have stored it somewhere safe"
 
+#: src/components/navigation.tsx
+msgid "Instance"
+msgstr "Instance"
+
+#: src/routes/_signed-in/admin/route.tsx
+msgid "Instance administration"
+msgstr "Instance administration"
+
 #: src/lib/problem-messages.ts
 msgid "It does not exist, or it was deleted."
 msgstr "It does not exist, or it was deleted."
+
+#: src/components/projects-table.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Key"
+msgstr "Key"
+
+#: src/routes/_signed-in/projects/$project/index.tsx
+msgid "Key <0>{key}</0>"
+msgstr "Key <0>{key}</0>"
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Leave"
@@ -119,33 +262,101 @@ msgstr "Leave without saving?"
 msgid "Light"
 msgstr "Light"
 
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "List"
+msgstr "List"
+
 #: src/components/ui/table.tsx
 msgid "Loading…"
 msgstr "Loading…"
 
-#: src/components/app-shell.tsx
-msgid "Main"
-msgstr "Main"
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Lowercase letters, digits, - and _. It never changes."
+msgstr "Lowercase letters, digits, - and _. It never changes."
 
-#: src/lib/problem-messages.ts
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Maintainer"
+msgstr "Maintainer"
+
+#: src/lib/access-names.ts
 msgid "manage environments"
 msgstr "manage environments"
 
-#: src/lib/problem-messages.ts
+#: src/lib/access-names.ts
 msgid "manage project tokens"
 msgstr "manage project tokens"
 
-#: src/lib/problem-messages.ts
+#: src/lib/access-names.ts
 msgid "manage unit types and attributes"
 msgstr "manage unit types and attributes"
 
-#: src/lib/problem-messages.ts
+#: src/lib/access-names.ts
 msgid "manage who has access"
 msgstr "manage who has access"
+
+#: src/components/projects-table.tsx
+msgid "Members"
+msgstr "Members"
+
+#: src/components/projects-table.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Name"
+msgstr "Name"
+
+#: src/lib/access.tsx
+msgid "Needs the permission to {name}, held by {list}."
+msgstr "Needs the permission to {name}, held by {list}."
+
+#: src/lib/access.tsx
+msgid "Needs the permission to {name}."
+msgstr "Needs the permission to {name}."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "New attribute"
+msgstr "New attribute"
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "New environment"
+msgstr "New environment"
+
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "New project"
+msgstr "New project"
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "New unit type"
+msgstr "New unit type"
+
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "No project has this key. It may be mistyped, or the link may point to another instance."
+msgstr "No project has this key. It may be mistyped, or the link may point to another instance."
+
+#: src/components/project-switcher.tsx
+msgid "No project matches that."
+msgstr "No project matches that."
+
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "No projects yet"
+msgstr "No projects yet"
 
 #: src/components/sign-in-form.tsx
 msgid "No way to sign in is enabled on this instance. Ask its operator."
 msgstr "No way to sign in is enabled on this instance. Ask its operator."
+
+#. The project switcher, when no project is open.
+#: src/components/project-switcher.tsx
+msgid "none chosen"
+msgstr "none chosen"
 
 #: src/routes/_signed-in/$.tsx
 msgid "Not found"
@@ -155,6 +366,11 @@ msgstr "Not found"
 msgid "Nothing here yet."
 msgstr "Nothing here yet."
 
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Number"
+msgstr "Number"
+
 #: src/lib/problem-messages.ts
 msgid "One with this key already exists."
 msgstr "One with this key already exists."
@@ -163,6 +379,19 @@ msgstr "One with this key already exists."
 msgid "Only a signed-in session can do this, not an API token."
 msgstr "Only a signed-in session can do this, not an API token."
 
+#: src/routes/_signed-in/admin/route.tsx
+msgid "Only an instance admin can open it."
+msgstr "Only an instance admin can open it."
+
+#: src/components/navigation.tsx
+msgid "Overview"
+msgstr "Overview"
+
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Owner"
+msgstr "Owner"
+
 #: src/components/not-found.tsx
 msgid "Page not found"
 msgstr "Page not found"
@@ -170,6 +399,29 @@ msgstr "Page not found"
 #: src/components/sign-in-form.tsx
 msgid "Password"
 msgstr "Password"
+
+#: src/components/navigation.tsx
+msgid "Project"
+msgstr "Project"
+
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "Project not found"
+msgstr "Project not found"
+
+#: src/components/project-switcher.tsx
+msgid "Project: {label}"
+msgstr "Project: {label}"
+
+#: src/components/navigation.tsx
+#: src/components/project-switcher.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "Projects"
+msgstr "Projects"
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Rename {key}"
+msgstr "Rename {key}"
 
 #: src/components/query-error.tsx
 #: src/lib/toast.ts
@@ -181,8 +433,26 @@ msgid "Required."
 msgstr "Required."
 
 #: src/components/ui/unsaved-changes-bar.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Save"
 msgstr "Save"
+
+#: src/components/project-switcher.tsx
+msgid "Search projects"
+msgstr "Search projects"
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Semantic version"
+msgstr "Semantic version"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "Settings"
+msgstr "Settings"
 
 #: src/components/app-shell.tsx
 msgid "Sidebar"
@@ -213,13 +483,30 @@ msgstr "Some fields need correcting."
 msgid "Something went wrong on the server."
 msgstr "Something went wrong on the server."
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Standard"
+msgstr "Standard"
+
+#: src/lib/problem-messages.ts
+msgid "Standard attributes are part of every project, so they cannot be deleted."
+msgstr "Standard attributes are part of every project, so they cannot be deleted."
+
 #: src/lib/problem-messages.ts
 msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
 msgstr "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
 
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "String"
+msgstr "String"
+
 #: src/components/personal-menu.tsx
 msgid "System"
 msgstr "System"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "The attribute {key} is no longer declared, and its key can be declared again."
+msgstr "The attribute {key} is no longer declared, and its key can be declared again."
 
 #: src/components/ui/reveal-secret.tsx
 msgid "The browser refused the clipboard. Select the value and copy it by hand."
@@ -229,9 +516,17 @@ msgstr "The browser refused the clipboard. Select the value and copy it by hand.
 msgid "The email or the password is not right."
 msgstr "The email or the password is not right."
 
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "The environment {key} is deleted. This cannot be undone."
+msgstr "The environment {key} is deleted. This cannot be undone."
+
 #: src/lib/problem-messages.ts
 msgid "The idle timeout cannot be longer than the absolute timeout."
 msgstr "The idle timeout cannot be longer than the absolute timeout."
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
+msgstr "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 
 #: src/lib/problem-messages.ts
 msgid "The password is too short or too long."
@@ -240,6 +535,10 @@ msgstr "The password is too short or too long."
 #: src/lib/problem-messages.ts
 msgid "The password must not contain your email address."
 msgstr "The password must not contain your email address."
+
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "The project is saved."
+msgstr "The project is saved."
 
 #: src/lib/problem-messages.ts
 msgid "The request came from another site and was refused."
@@ -281,6 +580,10 @@ msgstr "The server is unavailable. Try again in a moment."
 msgid "The token in use does not carry the scope this needs."
 msgstr "The token in use does not carry the scope this needs."
 
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "The unit type {key} is no longer declared, and its key can be declared again."
+msgstr "The unit type {key} is no longer declared, and its key can be declared again."
+
 #: src/lib/problem-messages.ts
 msgid "The value is out of range."
 msgstr "The value is out of range."
@@ -293,6 +596,10 @@ msgstr "Theme"
 msgid "There is nothing at this address. The link may be old or mistyped."
 msgstr "There is nothing at this address. The link may be old or mistyped."
 
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "This instance already has a project with that key."
+msgstr "This instance already has a project with that key."
+
 #: src/components/ui/reveal-secret.tsx
 msgid "This is the only time it is shown. It is kept encrypted and never shown again, so if it is lost, rotate it."
 msgstr "This is the only time it is shown. It is kept encrypted and never shown again, so if it is lost, rotate it."
@@ -302,12 +609,33 @@ msgid "This is the only time it is shown. Only a hash of it is kept, so if it is
 msgstr "This is the only time it is shown. Only a hash of it is kept, so if it is lost, replace it."
 
 #: src/lib/problem-messages.ts
+msgid "This is the project's last environment. A project always keeps one to serve from."
+msgstr "This is the project's last environment. A project always keeps one to serve from."
+
+#: src/lib/problem-messages.ts
 msgid "This key is reserved."
 msgstr "This key is reserved."
 
 #: src/lib/problem-messages.ts
 msgid "This password is too common. Choose another."
 msgstr "This password is too common. Choose another."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "This project already has a unit type or an attribute with that key."
+msgstr "This project already has a unit type or an attribute with that key."
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "This project already has an environment with that key."
+msgstr "This project already has an environment with that key."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "This project has no attribute yet."
+msgstr "This project has no attribute yet."
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "This project has no unit type yet."
+msgstr "This project has no unit type yet."
 
 #: src/lib/problem-messages.ts
 msgid "Too long."
@@ -337,13 +665,23 @@ msgstr "Too many sign-in attempts from your network. Try again in {retry}."
 msgid "Too many sign-in attempts from your network. Try again later."
 msgstr "Too many sign-in attempts from your network. Try again later."
 
+#: src/components/navigation.tsx
 #: src/components/query-error.tsx
 msgid "Try again"
 msgstr "Try again"
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Type"
+msgstr "Type"
+
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Type {typeToConfirm} to confirm"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Unit types"
+msgstr "Unit types"
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Unsaved changes"
@@ -353,25 +691,54 @@ msgstr "Unsaved changes"
 msgid "Use {min} to {max} characters."
 msgstr "Use {min} to {max} characters."
 
-#: src/lib/problem-messages.ts
+#: src/routes/_signed-in/projects/$project/index.tsx
+msgid "View all environments"
+msgstr "View all environments"
+
+#: src/lib/access-names.ts
 msgid "view the project"
 msgstr "view the project"
 
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Viewer"
+msgstr "Viewer"
+
 #: src/routes/_signed-in/index.tsx
-msgid "Welcome, {name}"
-msgstr "Welcome, {name}"
+msgid "Welcome, {name}. Choose a project to work in."
+msgstr "Welcome, {name}. Choose a project to work in."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
+msgstr "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
+
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "What the project is called and what it is for."
+msgstr "What the project is called and what it is for."
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Where the project serves from. A key is fixed once created; the name can change."
+msgstr "Where the project serves from. A key is fixed once created; the name can change."
 
 #: src/lib/problem-messages.ts
 msgid "You are not signed in."
 msgstr "You are not signed in."
 
-#: src/routes/_signed-in/index.tsx
-msgid "You are signed in to Flagnetic."
-msgstr "You are signed in to Flagnetic."
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "You cannot open this project"
+msgstr "You cannot open this project"
+
+#: src/components/can.tsx
+msgid "You cannot open this screen"
+msgstr "You cannot open this screen"
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "You have unsaved changes."
 msgstr "You have unsaved changes."
+
+#: src/routes/_signed-in/index.tsx
+msgid "You hold no grant in any project yet. Ask a project owner or an instance admin."
+msgstr "You hold no grant in any project yet. Ask a project owner or an instance admin."
 
 #: src/lib/problem-messages.ts
 msgid "You may not do this."

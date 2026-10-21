@@ -33,6 +33,18 @@ describe("a refusal in the member's language", () => {
     );
   });
 
+  it("explains the refusals of deleting or changing an environment or a declaration", () => {
+    expect(problemMessage(i18n, refusal(409, { code: "last_environment" }))).toBe(
+      "This is the project's last environment. A project always keeps one to serve from.",
+    );
+    expect(problemMessage(i18n, refusal(409, { code: "standard_attribute" }))).toBe(
+      "Standard attributes are part of every project, so they cannot be deleted.",
+    );
+    expect(problemMessage(i18n, refusal(422, { code: "type_immutable" }))).toBe(
+      "An attribute's type is fixed once it is declared.",
+    );
+  });
+
   it("names the missing permission by its display name", () => {
     expect(
       problemMessage(i18n, refusal(403, { code: "forbidden", permission: "environment.manage" })),

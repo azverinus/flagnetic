@@ -2,12 +2,17 @@ import type { MessageDescriptor } from "@lingui/core";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 
+import type { projectNameCrumb } from "@/components/breadcrumb";
 import { Toaster } from "@/components/toaster";
 
 declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
-    /** What the breadcrumb calls the route, in the member's language. */
-    crumb?: MessageDescriptor;
+    /**
+     * What the breadcrumb calls the route, in the member's language, or
+     * `projectNameCrumb` for the route of one project, which the
+     * breadcrumb calls by the project's name.
+     */
+    crumb?: MessageDescriptor | typeof projectNameCrumb;
   }
 }
 
