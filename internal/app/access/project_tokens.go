@@ -69,9 +69,10 @@ func NewCreateProjectToken(tx Transactor, store ProjectTokenStore, settings Auth
 
 // Handle creates the token and records api_token.created in its project,
 // with its hint. Only a session creates one, so no token can mint another;
-// its role is one the caller may hand out in the project and its scopes
-// ones the caller holds, never instance:admin; its expiry is within what
-// the auth settings allow. It acts for no member and survives its creator.
+// a session holds every scope a project token may carry, which never
+// includes instance:admin, so only its role is capped, by what the caller
+// may hand out in the project; its expiry is within what the auth settings
+// allow. It acts for no member and survives its creator.
 func (h *CreateProjectToken) Handle(ctx context.Context, cmd CreateProjectTokenCommand) (CreatedToken, error) {
 	if cmd.Caller.Session == nil || cmd.Caller.Member == nil {
 		return CreatedToken{}, access.ErrSessionRequired
@@ -86,9 +87,6 @@ func (h *CreateProjectToken) Handle(ctx context.Context, cmd CreateProjectTokenC
 	}
 	role, _ := access.RoleNamed(token.Role)
 	if err = access.CheckGrantorCap(cmd.Project.Held, role); err != nil {
-		return CreatedToken{}, err
-	}
-	if err = access.CheckScopesHeld(cmd.Caller, token.Scopes); err != nil {
 		return CreatedToken{}, err
 	}
 	settings, err := h.settings.AuthSettings(ctx)
