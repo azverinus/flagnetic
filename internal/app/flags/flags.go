@@ -49,8 +49,6 @@ type Environments interface {
 
 // Rulesets marks the rulesets a write changed, in the write's unit of work.
 type Rulesets interface {
-	// Environment marks one environment's ruleset changed.
-	Environment(ctx context.Context, environment workspace.EnvironmentID) error
 	// Project marks the ruleset of every environment of project changed.
 	Project(ctx context.Context, project workspace.ProjectID) error
 }
