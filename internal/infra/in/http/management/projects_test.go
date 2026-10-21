@@ -3,6 +3,7 @@ package management_test
 import (
 	"crypto/rand"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -12,7 +13,6 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
-	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -78,54 +78,45 @@ func TestCreatingAProjectCreatesItsDefaults(t *testing.T) {
 		t.Errorf("project = %+v, want %s named Mobile", p, key)
 	}
 
-	store := pgworkspace.NewStore(testkit.Pool(t))
-	envs, err := store.Environments(t.Context(), projectIDOf(p))
-	if err != nil {
-		t.Fatal(err)
+	envs := do(admin.ListEnvironmentsWithResponse(t.Context(), key)).JSON200
+	if envs == nil {
+		t.Fatal("no environments listed")
 	}
-	var envKeys []string
-	for i, e := range envs {
-		envKeys = append(envKeys, e.Key)
-		if e.SortOrder != i+1 {
-			t.Errorf("%s sort order = %d, want %d", e.Key, e.SortOrder, i+1)
-		}
+	want := []management.Environment{{Key: "development", Name: "Development", SortOrder: 1},
+		{Key: "staging", Name: "Staging", SortOrder: 2}, {Key: "production", Name: "Production", SortOrder: 3}}
+	if !slices.EqualFunc(envs.Items, want, func(a, b management.Environment) bool {
+		return a.Key == b.Key && a.Name == b.Name && a.SortOrder == b.SortOrder && a.Id != [16]byte{}
+	}) {
+		t.Errorf("environments = %+v, want %+v", envs.Items, want)
 	}
-	if want := []string{"development", "staging", "production"}; !slices.Equal(envKeys, want) {
-		t.Errorf("environments = %v, want %v", envKeys, want)
-	}
-	unitTypes, err := store.UnitTypes(t.Context(), projectIDOf(p))
-	if err != nil {
-		t.Fatal(err)
+	units := do(admin.ListUnitTypesWithResponse(t.Context(), key)).JSON200
+	if units == nil {
+		t.Fatal("no unit types listed")
 	}
 	var unitKeys []string
-	for _, u := range unitTypes {
+	for _, u := range units.Items {
 		unitKeys = append(unitKeys, u.Key)
 	}
 	if want := []string{"anonymous", "user"}; !slices.Equal(unitKeys, want) {
 		t.Errorf("unit types = %v, want %v", unitKeys, want)
 	}
-	attrs, err := store.Attributes(t.Context(), projectIDOf(p))
-	if err != nil {
-		t.Fatal(err)
+	attrs := do(admin.ListAttributesWithResponse(t.Context(), key)).JSON200
+	if attrs == nil {
+		t.Fatal("no attributes listed")
 	}
-	got := map[string]workspace.AttributeType{}
-	for _, a := range attrs {
+	got := map[string]management.AttributeType{}
+	for _, a := range attrs.Items {
 		if !a.Standard {
 			t.Errorf("attribute %s is not standard", a.Key)
 		}
 		got[a.Key] = a.Type
 	}
-	want := map[string]workspace.AttributeType{
+	wantAttrs := map[string]management.AttributeType{
 		"platform": "string", "os": "string", "app_id": "string", "sdk": "string", "locale": "string", "country": "string",
 		"os_version": "semver", "app_version": "semver", "sdk_version": "semver", "build_number": "number",
 	}
-	if len(got) != len(want) {
-		t.Errorf("attributes = %v, want %v", got, want)
-	}
-	for k, typ := range want {
-		if got[k] != typ {
-			t.Errorf("attribute %s = %q, want %q", k, got[k], typ)
-		}
+	if !maps.Equal(got, wantAttrs) {
+		t.Errorf("attributes = %v, want %v", got, wantAttrs)
 	}
 
 	list, err := admin.ListProjectsWithResponse(t.Context())

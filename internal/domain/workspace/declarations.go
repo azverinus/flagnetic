@@ -1,8 +1,10 @@
 package workspace
 
 import (
+	"slices"
 	"time"
 
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
@@ -34,6 +36,50 @@ func NewEnvironment(environmentID EnvironmentID, project ProjectID, key, name st
 	}, nil
 }
 
+// EnvironmentChange is a change to an environment; a nil field is left as
+// it is.
+type EnvironmentChange struct {
+	// Key is refused whatever its value, since a key never changes.
+	Key  *string
+	Name *string
+}
+
+// Change returns the environment with c applied at now, and whether anything
+// changed.
+func (e Environment) Change(c EnvironmentChange, now time.Time) (Environment, bool, error) {
+	if c.Key != nil {
+		return e, false, errKeyImmutable
+	}
+	if c.Name == nil {
+		return e, false, nil
+	}
+	f := check("invalid_environment", "the environment is not valid").nameOf(*c.Name)
+	if err := f.err(); err != nil {
+		return e, false, err
+	}
+	if f.name == e.Name {
+		return e, false, nil
+	}
+	out := e
+	out.Name, out.UpdatedAt = f.name, now
+	return out, true, nil
+}
+
+// CanDeleteEnvironment refuses to delete one of a project's count
+// environments when it is the last: a project always has somewhere to serve
+// its flags from.
+func CanDeleteEnvironment(count int) error {
+	if count <= 1 {
+		return apperrors.Conflict("last_environment", "the last environment of a project cannot be deleted")
+	}
+	return nil
+}
+
+// ErrDeclarationKeyTaken refuses a unit type or attribute whose key the
+// project's unit types or attributes already use: a rule names either by its
+// key alone, so one key must mean one thing.
+var ErrDeclarationKeyTaken = apperrors.Conflict("already_exists", "a unit type or attribute of the project already has this key")
+
 // UnitType is one declared kind of unit in a project, such as user.
 type UnitType struct {
 	ID          UnitTypeID
@@ -57,6 +103,40 @@ func NewUnitType(unitTypeID UnitTypeID, project ProjectID, key, name, descriptio
 	return UnitType{
 		ID: unitTypeID, Project: project, Key: key, Name: f.name, Description: f.description, CreatedAt: now, UpdatedAt: now,
 	}, nil
+}
+
+// UnitTypeChange is a change to a unit type; a nil field is left as it is.
+type UnitTypeChange struct {
+	// Key is refused whatever its value, since a key never changes.
+	Key         *string
+	Name        *string
+	Description *string
+}
+
+// Change returns the unit type with c applied at now, and whether anything
+// changed.
+func (u UnitType) Change(c UnitTypeChange, now time.Time) (UnitType, bool, error) {
+	if c.Key != nil {
+		return u, false, errKeyImmutable
+	}
+	f := check("invalid_unit_type", "the unit type is not valid").
+		nameOf(valueOr(c.Name, u.Name)).descriptionOf(valueOr(c.Description, u.Description))
+	if err := f.err(); err != nil {
+		return u, false, err
+	}
+	if f.name == u.Name && f.description == u.Description {
+		return u, false, nil
+	}
+	out := u
+	out.Name, out.Description, out.UpdatedAt = f.name, f.description, now
+	return out, true, nil
+}
+
+func valueOr(v *string, otherwise string) string {
+	if v == nil {
+		return otherwise
+	}
+	return *v
 }
 
 // AttributeType is the type of an attribute's values.
@@ -95,6 +175,91 @@ type Attribute struct {
 
 // AttributeID identifies an attribute.
 type AttributeID = id.Of[Attribute]
+
+// reservedAttributeKey is the key no attribute may have: the management API
+// serves the attributes SDKs report without a declaration under it.
+const reservedAttributeKey = "discovered"
+
+// NewAttribute returns an attribute of project, declared rather than
+// standard.
+func NewAttribute(attributeID AttributeID, project ProjectID, key, name, description string, typ AttributeType, now time.Time) (Attribute, error) {
+	f := check("invalid_attribute", "the attribute is not valid")
+	if key == reservedAttributeKey {
+		f.violations = append(f.violations, apperrors.Violation{
+			Pointer: "/key", Code: "reserved_key", Detail: "the key discovered is reserved",
+			Params: map[string]any{"key": reservedAttributeKey},
+		})
+	} else {
+		f.key(key)
+	}
+	f.nameOf(name).descriptionOf(description)
+	if !slices.Contains(AttributeTypes(), typ) {
+		types := make([]string, 0, len(AttributeTypes()))
+		for _, t := range AttributeTypes() {
+			types = append(types, string(t))
+		}
+		f.violations = append(f.violations, apperrors.Violation{
+			Pointer: "/type", Code: "invalid_type", Detail: "the type is not one an attribute can have",
+			Params: map[string]any{"types": types},
+		})
+	}
+	if err := f.err(); err != nil {
+		return Attribute{}, err
+	}
+	return Attribute{
+		ID: attributeID, Project: project, Key: key, Name: f.name, Description: f.description, Type: typ,
+		CreatedAt: now, UpdatedAt: now,
+	}, nil
+}
+
+// AttributeChange is a change to an attribute; a nil field is left as it
+// is.
+type AttributeChange struct {
+	// Key and Type are refused whatever their value: rules written against
+	// the attribute rely on both.
+	Key         *string
+	Type        *AttributeType
+	Name        *string
+	Description *string
+}
+
+// errTypeImmutable refuses a change to an attribute's type, which would
+// change the meaning of every rule written against it.
+var errTypeImmutable = apperrors.Invalid("type_immutable", "an attribute's type never changes", apperrors.Violation{
+	Pointer: "/type", Code: "type_immutable", Detail: "an attribute's type never changes; declare a new attribute instead",
+})
+
+// Change returns the attribute with c applied at now, and whether anything
+// changed. A standard attribute is renamed like any other and stays
+// standard.
+func (a Attribute) Change(c AttributeChange, now time.Time) (Attribute, bool, error) {
+	if c.Key != nil {
+		return a, false, errKeyImmutable
+	}
+	if c.Type != nil {
+		return a, false, errTypeImmutable
+	}
+	f := check("invalid_attribute", "the attribute is not valid").
+		nameOf(valueOr(c.Name, a.Name)).descriptionOf(valueOr(c.Description, a.Description))
+	if err := f.err(); err != nil {
+		return a, false, err
+	}
+	if f.name == a.Name && f.description == a.Description {
+		return a, false, nil
+	}
+	out := a
+	out.Name, out.Description, out.UpdatedAt = f.name, f.description, now
+	return out, true, nil
+}
+
+// CanDelete refuses to delete a standard attribute, which SDKs rely on
+// finding in every project.
+func (a Attribute) CanDelete() error {
+	if a.Standard {
+		return apperrors.Conflict("standard_attribute", "a standard attribute cannot be deleted")
+	}
+	return nil
+}
 
 // Draft is what a project is created with besides itself: the key and name
 // of a default environment, unit type or standard attribute, and its

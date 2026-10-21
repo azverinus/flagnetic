@@ -34,6 +34,24 @@ type Handlers struct {
 	ListProjects  *appworkspace.ListProjects
 	CreateProject *appworkspace.CreateProject
 	UpdateProject *appworkspace.UpdateProject
+
+	ListEnvironments  *appworkspace.List[workspace.Environment]
+	GetEnvironment    *appworkspace.Get[workspace.Environment]
+	CreateEnvironment *appworkspace.CreateEnvironment
+	UpdateEnvironment *appworkspace.UpdateEnvironment
+	DeleteEnvironment *appworkspace.DeleteEnvironment
+
+	ListUnitTypes  *appworkspace.List[workspace.UnitType]
+	GetUnitType    *appworkspace.Get[workspace.UnitType]
+	CreateUnitType *appworkspace.CreateUnitType
+	UpdateUnitType *appworkspace.UpdateUnitType
+	DeleteUnitType *appworkspace.DeleteUnitType
+
+	ListAttributes  *appworkspace.List[workspace.Attribute]
+	GetAttribute    *appworkspace.Get[workspace.Attribute]
+	CreateAttribute *appworkspace.CreateAttribute
+	UpdateAttribute *appworkspace.UpdateAttribute
+	DeleteAttribute *appworkspace.DeleteAttribute
 }
 
 // api serves every operation of the document.

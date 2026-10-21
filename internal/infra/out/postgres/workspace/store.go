@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -85,14 +84,7 @@ func (s *Store) LockProject(ctx context.Context, projectID workspace.ProjectID) 
 }
 
 func (s *Store) oneProject(ctx context.Context, sql string, arg any) (workspace.Project, error) {
-	p, err := scanProject(s.db(ctx).QueryRow(ctx, sql, arg))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return workspace.Project{}, appworkspace.ErrNotFound
-	}
-	if err != nil {
-		return workspace.Project{}, fmt.Errorf("reading a project: %w", err)
-	}
-	return p, nil
+	return one(s.db(ctx).QueryRow(ctx, sql, arg), scanProject, "a project")
 }
 
 // Projects returns every project when all is set, else those of ids,

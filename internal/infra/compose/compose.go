@@ -38,15 +38,34 @@ func NewDeps(pool *pgxpool.Pool, c clock.Clock) Deps {
 
 // Management mounts the management API on edge, its metrics on reg.
 func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer) {
-	tx, audit := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
-	accessStore, workspaceStore := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
+	tx := postgres.NewTransactor(d.Pool)
+	rec := appworkspace.NewRecorder(pggovernance.NewAuditLog(d.Pool), d.Clock, d.IDs)
+	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
 	management.Mount(edge, management.Handlers{
 		AuthenticateToken: appaccess.NewAuthenticateToken(accessStore, d.Clock),
 
-		FindProject:   appworkspace.NewFindProject(workspaceStore),
-		ListProjects:  appworkspace.NewListProjects(workspaceStore),
-		CreateProject: appworkspace.NewCreateProject(tx, workspaceStore, audit, d.Clock, d.IDs),
-		UpdateProject: appworkspace.NewUpdateProject(tx, workspaceStore, audit, d.Clock, d.IDs),
+		FindProject:   appworkspace.NewFindProject(ws),
+		ListProjects:  appworkspace.NewListProjects(ws),
+		CreateProject: appworkspace.NewCreateProject(tx, ws, rec),
+		UpdateProject: appworkspace.NewUpdateProject(tx, ws, rec),
+
+		ListEnvironments:  appworkspace.NewListEnvironments(ws),
+		GetEnvironment:    appworkspace.NewGetEnvironment(ws),
+		CreateEnvironment: appworkspace.NewCreateEnvironment(tx, ws, rec),
+		UpdateEnvironment: appworkspace.NewUpdateEnvironment(tx, ws, rec),
+		DeleteEnvironment: appworkspace.NewDeleteEnvironment(tx, ws, rec),
+
+		ListUnitTypes:  appworkspace.NewListUnitTypes(ws),
+		GetUnitType:    appworkspace.NewGetUnitType(ws),
+		CreateUnitType: appworkspace.NewCreateUnitType(tx, ws, rec),
+		UpdateUnitType: appworkspace.NewUpdateUnitType(tx, ws, rec),
+		DeleteUnitType: appworkspace.NewDeleteUnitType(tx, ws, rec),
+
+		ListAttributes:  appworkspace.NewListAttributes(ws),
+		GetAttribute:    appworkspace.NewGetAttribute(ws),
+		CreateAttribute: appworkspace.NewCreateAttribute(tx, ws, rec),
+		UpdateAttribute: appworkspace.NewUpdateAttribute(tx, ws, rec),
+		DeleteAttribute: appworkspace.NewDeleteAttribute(tx, ws, rec),
 	}, reg)
 }
 

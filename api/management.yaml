@@ -178,8 +178,366 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/environments:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listEnvironments
+      summary: The project's environments
+      x-permission: project.read
+      tags: [environments]
+      responses:
+        "200":
+          description: The environments, by sort order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createEnvironment
+      summary: Create an environment
+      description: Appends an environment after the project's others.
+      x-permission: environment.manage
+      tags: [environments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentCreate"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Environment"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/environments/{environment}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+    get:
+      operationId: getEnvironment
+      x-permission: project.read
+      tags: [environments]
+      responses:
+        "200":
+          description: Found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Environment"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateEnvironment
+      description: Renames the environment; the key never changes (`key_immutable`).
+      x-permission: environment.manage
+      tags: [environments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentPatch"
+      responses:
+        "200":
+          description: As changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Environment"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+    delete:
+      operationId: deleteEnvironment
+      description: Deletes the environment; the last one of a project is refused with `last_environment`.
+      x-permission: environment.manage
+      tags: [environments]
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /projects/{project}/unit-types:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listUnitTypes
+      summary: The project's unit types
+      x-permission: project.read
+      tags: [unit types]
+      responses:
+        "200":
+          description: The unit types, by key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitTypeList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createUnitType
+      summary: Create a unit type
+      description: A key is unique across the unit types and attributes of the project (`already_exists`).
+      x-permission: declaration.manage
+      tags: [unit types]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitTypeCreate"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitType"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/unit-types/{unit_type}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/UnitTypeKey"
+    get:
+      operationId: getUnitType
+      x-permission: project.read
+      tags: [unit types]
+      responses:
+        "200":
+          description: Found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitType"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateUnitType
+      description: Renames the unit type or changes its description; the key never changes (`key_immutable`).
+      x-permission: declaration.manage
+      tags: [unit types]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnitTypePatch"
+      responses:
+        "200":
+          description: As changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnitType"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+    delete:
+      operationId: deleteUnitType
+      description: Deletes the unit type.
+      x-permission: declaration.manage
+      tags: [unit types]
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/attributes:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listAttributes
+      summary: The project's attributes
+      x-permission: project.read
+      tags: [attributes]
+      responses:
+        "200":
+          description: The attributes, by key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createAttribute
+      summary: Declare an attribute
+      description: Declares an attribute. A key is unique across the unit types and attributes of the project (`already_exists`); `discovered` is reserved.
+      x-permission: declaration.manage
+      tags: [attributes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttributeCreate"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attribute"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/attributes/{attribute}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/AttributeKey"
+    get:
+      operationId: getAttribute
+      x-permission: project.read
+      tags: [attributes]
+      responses:
+        "200":
+          description: Found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attribute"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateAttribute
+      description: Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
+      x-permission: declaration.manage
+      tags: [attributes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttributePatch"
+      responses:
+        "200":
+          description: As changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attribute"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+    delete:
+      operationId: deleteAttribute
+      description: Deletes a declared attribute; a standard attribute is refused with `standard_attribute`.
+      x-permission: declaration.manage
+      tags: [attributes]
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 components:
   parameters:
+    EnvironmentKey:
+      name: environment
+      in: path
+      required: true
+      description: The environment's key.
+      schema:
+        type: string
+    UnitTypeKey:
+      name: unit_type
+      in: path
+      required: true
+      description: The unit type's key.
+      schema:
+        type: string
+    AttributeKey:
+      name: attribute
+      in: path
+      required: true
+      description: The attribute's key.
+      schema:
+        type: string
     ProjectKey:
       name: project
       in: path
@@ -438,3 +796,137 @@ components:
           description: The caller's effective permissions in the project, narrowed by the scopes of the credential in use, in catalog order.
           items:
             $ref: "#/components/schemas/Permission"
+    Environment:
+      type: object
+      required: [id, key, name, sort_order]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+        sort_order:
+          type: integer
+          description: Where the environment is listed among its project's, the first created first.
+    EnvironmentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Environment"
+    EnvironmentCreate:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+    EnvironmentPatch:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Refused with `key_immutable` whatever its value.
+        name:
+          $ref: "#/components/schemas/Name"
+    UnitType:
+      type: object
+      required: [id, key, name, description]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+    UnitTypeList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnitType"
+    UnitTypeCreate:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+    UnitTypePatch:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Refused with `key_immutable` whatever its value.
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+    AttributeType:
+      type: string
+      enum: [string, number, boolean, semver, date, list]
+      description: The type of an attribute's values; `semver` is a semantic version, `list` a list of strings.
+    Attribute:
+      type: object
+      required: [id, key, type, name, description, standard]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          $ref: "#/components/schemas/Key"
+        type:
+          $ref: "#/components/schemas/AttributeType"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        standard:
+          type: boolean
+          description: Predeclared in every project; renamable, never deleted or retyped.
+    AttributeList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attribute"
+    AttributeCreate:
+      type: object
+      required: [key, type, name]
+      properties:
+        key:
+          $ref: "#/components/schemas/Key"
+        type:
+          $ref: "#/components/schemas/AttributeType"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+    AttributePatch:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Refused with `key_immutable` whatever its value.
+        type:
+          type: string
+          description: Refused with `type_immutable` whatever its value.
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
