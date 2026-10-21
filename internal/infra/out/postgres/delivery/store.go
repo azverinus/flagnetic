@@ -22,13 +22,6 @@ func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
 func (s *Store) db(ctx context.Context) pgxtx.DB { return pgxtx.Querier(ctx, s.pool) }
 
-// BumpEnvironment increments the ruleset version of environment.
-func (s *Store) BumpEnvironment(ctx context.Context, environment workspace.EnvironmentID) error {
-	_, err := s.db(ctx).Exec(ctx, `UPDATE environments SET ruleset_version = ruleset_version + 1 WHERE id = $1`,
-		environment.Bytes())
-	return err
-}
-
 // BumpProject increments the ruleset version of every environment of
 // project.
 func (s *Store) BumpProject(ctx context.Context, project workspace.ProjectID) error {
