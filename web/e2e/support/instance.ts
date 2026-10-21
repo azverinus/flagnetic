@@ -24,6 +24,16 @@ export const admin = {
   password: "harness-tangerine-violin-1987",
 };
 
+/**
+ * A member who holds viewer in the first seeded project and no role in
+ * the second, invited and accepted through the management API.
+ */
+export const viewer = {
+  email: "vera@flagnetic.test",
+  name: "Vera Viewer",
+  password: "harness-cobalt-lantern-2031",
+};
+
 /** The projects the harness seeds through the management API. */
 export const seededProject = { key: "checkout", name: "Checkout" };
 export const secondProject = { key: "billing", name: "Billing" };

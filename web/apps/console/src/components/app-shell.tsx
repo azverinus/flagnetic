@@ -1,10 +1,12 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Link } from "@tanstack/react-router";
-import { HouseIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
+import { useParams } from "@tanstack/react-router";
+import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { Breadcrumb } from "@/components/breadcrumb";
+import { InstanceNavigation, ProjectNavigation } from "@/components/navigation";
 import { PersonalMenu } from "@/components/personal-menu";
+import { ProjectSwitcher } from "@/components/project-switcher";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { rememberSidebarCollapsed, sidebarCollapsed } from "@/lib/preferences";
@@ -18,6 +20,7 @@ import { rememberSidebarCollapsed, sidebarCollapsed } from "@/lib/preferences";
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useLingui();
   const [collapsed, setCollapsed] = useState(sidebarCollapsed);
+  const { project } = useParams({ strict: false });
   const toggle = () => {
     rememberSidebarCollapsed(!collapsed);
     setCollapsed(!collapsed);
@@ -47,18 +50,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             Flagnetic
           </span>
         </div>
-        <nav aria-label={t`Main`} className="flex flex-1 flex-col gap-1 p-2">
-          <Link
-            to="/"
-            activeOptions={{ exact: true }}
-            className="flex h-9 items-center gap-2 rounded-md px-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[status=active]:bg-accent data-[status=active]:font-medium data-[status=active]:text-foreground"
-          >
-            <HouseIcon aria-hidden className="size-4 shrink-0" />
-            <span className={cn("truncate", collapsed ? "sr-only" : "sr-only md:not-sr-only")}>
-              <Trans>Home</Trans>
-            </span>
-          </Link>
-        </nav>
+        <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-2">
+          <ProjectSwitcher collapsed={collapsed} />
+          {project ? <ProjectNavigation project={project} collapsed={collapsed} /> : null}
+          <InstanceNavigation collapsed={collapsed} />
+        </div>
         <div className="hidden border-t p-2 md:block">
           <Button
             variant="ghost"

@@ -8,8 +8,131 @@ msgstr ""
 "Language: ru\n"
 
 #: src/lib/problem-messages.ts
+msgid "A key never changes once it is set."
+msgstr "Ключ, однажды заданный, больше не меняется."
+
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
+msgstr "Новый проект создаётся с окружениями development, staging и production, типами единиц user и anonymous и стандартными атрибутами."
+
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "A project owner or an instance admin can grant you a role in it."
+msgstr "Выдать вам роль в нём может владелец проекта или администратор экземпляра."
+
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Action"
+msgstr "Действие"
+
+#: src/components/row-dialogs.tsx
+msgid "Actions"
+msgstr "Действия"
+
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Actor"
+msgstr "Автор"
+
+#: src/components/audit-log.tsx
+msgid "Actor kind"
+msgstr "Вид автора"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "After"
+msgstr "После"
+
+#: src/components/project-switcher.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "All projects"
+msgstr "Все проекты"
+
+#: src/lib/problem-messages.ts
+msgid "An attribute's type is fixed once it is declared."
+msgstr "Тип атрибута после объявления не меняется."
+
+#: src/components/audit-log.tsx
+msgid "Any"
+msgstr "Любое"
+
+#. A kind of actor in the audit log.
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "API token"
+msgstr "API-токен"
+
+#: src/lib/audit.ts
+msgid "API token created"
+msgstr "API-токен создан"
+
+#: src/lib/audit.ts
+msgid "API token revoked"
+msgstr "API-токен отозван"
+
+#: src/components/audit-log.tsx
+msgid "Apply filters"
+msgstr "Применить фильтры"
+
+#: src/lib/problem-messages.ts
 msgid "At most {max} characters."
 msgstr "Не более {max} символов."
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Attribute"
+msgstr "Атрибут"
+
+#: src/lib/audit.ts
+msgid "Attribute declared"
+msgstr "Атрибут объявлен"
+
+#: src/lib/audit.ts
+msgid "Attribute deleted"
+msgstr "Атрибут удалён"
+
+#: src/lib/audit.ts
+msgid "Attribute updated"
+msgstr "Атрибут изменён"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Attributes"
+msgstr "Атрибуты"
+
+#: src/components/audit-log.tsx
+msgid "Audit entries, newest first"
+msgstr "Записи журнала аудита, сначала новые"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Audit entry"
+msgstr "Запись журнала аудита"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/audit.tsx
+#: src/routes/_signed-in/projects/$project/audit.tsx
+msgid "Audit log"
+msgstr "Журнал аудита"
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Authentication settings"
+msgstr "Настройки аутентификации"
+
+#: src/lib/audit.ts
+msgid "Authentication settings updated"
+msgstr "Настройки аутентификации изменены"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Before"
+msgstr "До"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Before and after"
+msgstr "До и после"
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Boolean"
+msgstr "Логический"
 
 #: src/components/breadcrumb.tsx
 msgid "Breadcrumb"
@@ -20,9 +143,21 @@ msgstr "Навигационная цепочка"
 msgid "Cancel"
 msgstr "Отмена"
 
+#: src/components/audit-entry-sheet.tsx
+msgid "changed"
+msgstr "изменено"
+
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
 msgstr "Выберите более надёжный пароль."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Choose a type"
+msgstr "Выберите тип"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Choose a type."
+msgstr "Выберите тип."
 
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered scopes."
@@ -31,6 +166,10 @@ msgstr "Выберите одну из предложенных областей
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered types."
 msgstr "Выберите один из предложенных типов."
+
+#: src/components/audit-log.tsx
+msgid "Clear filters"
+msgstr "Сбросить фильтры"
 
 #: src/components/ui/dialog.tsx
 #: src/components/ui/reveal-secret.tsx
@@ -42,6 +181,11 @@ msgstr "Закрыть"
 msgid "Collapse the sidebar"
 msgstr "Свернуть боковую панель"
 
+#. A kind of actor in the audit log.
+#: src/lib/audit.ts
+msgid "Command line"
+msgstr "Командная строка"
+
 #: src/components/ui/reveal-secret.tsx
 msgid "Copied to the clipboard."
 msgstr "Скопировано в буфер обмена."
@@ -50,15 +194,79 @@ msgstr "Скопировано в буфер обмена."
 msgid "Copy"
 msgstr "Копировать"
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Create attribute"
+msgstr "Создать атрибут"
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Create environment"
+msgstr "Создать окружение"
+
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "Create project"
+msgstr "Создать проект"
+
+#: src/routes/_signed-in/index.tsx
+msgid "Create the first project to start declaring what it serves."
+msgstr "Создайте первый проект, чтобы начать объявлять, что он отдаёт."
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Create unit type"
+msgstr "Создать тип единицы"
+
 #: src/components/personal-menu.tsx
 msgid "Dark"
 msgstr "Тёмная"
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Date"
+msgstr "Дата"
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Declare the kinds of unit its flags are served to."
+msgstr "Объявите виды единиц, которым отдаются его флаги."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Delete {key}"
+msgstr "Удалить {key}"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Delete attribute"
+msgstr "Удалить атрибут"
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Delete environment"
+msgstr "Удалить окружение"
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Delete unit type"
+msgstr "Удалить тип единицы"
+
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Description"
+msgstr "Описание"
+
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Developer"
+msgstr "Разработчик"
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Discard"
 msgstr "Отменить изменения"
 
-#: src/lib/problem-messages.ts
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Edit {key}"
+msgstr "Изменить {key}"
+
+#: src/lib/access-names.ts
 msgid "edit the project"
 msgstr "изменять проект"
 
@@ -66,6 +274,7 @@ msgstr "изменять проект"
 msgid "Email"
 msgstr "Электронная почта"
 
+#: src/lib/forms.ts
 #: src/lib/problem-messages.ts
 msgid "Enter a name."
 msgstr "Введите название."
@@ -86,26 +295,130 @@ msgstr "Введите адрес электронной почты."
 msgid "Enter your password."
 msgstr "Введите пароль."
 
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Entity"
+msgstr "Объект"
+
+#. A kind of entity in the audit log.
+#: src/components/project-audit.tsx
+#: src/lib/audit.ts
+#: src/routes/_signed-in/projects/$project/audit.$entry.tsx
+msgid "Environment"
+msgstr "Окружение"
+
+#: src/lib/audit.ts
+msgid "Environment created"
+msgstr "Окружение создано"
+
+#: src/lib/audit.ts
+msgid "Environment deleted"
+msgstr "Окружение удалено"
+
+#: src/lib/audit.ts
+msgid "Environment updated"
+msgstr "Окружение изменено"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/index.tsx
+msgid "Environments"
+msgstr "Окружения"
+
+#: src/routes/_signed-in/projects/$project/audit.tsx
+msgid "Every change made in this project, newest first, with its values before and after."
+msgstr "Все изменения в этом проекте, сначала новые, со значениями до и после."
+
+#: src/routes/_signed-in/admin/audit.tsx
+msgid "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
+msgstr "Все изменения в этом экземпляре: во всех проектах и вне их, например участники, входы и настройки."
+
 #: src/components/app-shell.tsx
 msgid "Expand the sidebar"
 msgstr "Развернуть боковую панель"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Field"
+msgstr "Поле"
+
+#: src/components/audit-log.tsx
+msgid "Filter the audit log"
+msgstr "Фильтры журнала аудита"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Fixed once declared."
+msgstr "Не меняется после объявления."
+
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "Fixed once the project is created, since SDKs and scripts use it."
+msgstr "Не меняется после создания проекта: по нему проект находят SDK и скрипты."
+
+#: src/components/audit-log.tsx
+msgid "From"
+msgstr "С"
 
 #: src/components/not-found.tsx
 msgid "Go to the start page"
 msgstr "На стартовую страницу"
 
-#: src/components/app-shell.tsx
-#: src/routes/_signed-in/index.tsx
-msgid "Home"
-msgstr "Главная"
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Grant"
+msgstr "Роль участника"
+
+#: src/lib/audit.ts
+msgid "Grant removed"
+msgstr "Роль отозвана"
+
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
+msgstr "Имя проекта для SDK и скриптов: строчные буквы, цифры, - и _. Никогда не меняется."
 
 #: src/components/ui/reveal-secret.tsx
 msgid "I have stored it somewhere safe"
 msgstr "Я сохранил это в надёжном месте"
 
+#: src/components/audit-log.tsx
+msgid "In the action, the entity's key and the actor's name."
+msgstr "В действии, ключе объекта и имени автора."
+
+#. An audit entry that belongs to no project.
+#. An audit entry that belongs to no project.
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/audit.$entry.tsx
+#: src/routes/_signed-in/admin/audit.tsx
+msgid "Instance"
+msgstr "Экземпляр"
+
+#: src/routes/_signed-in/admin/route.tsx
+msgid "Instance administration"
+msgstr "Администрирование экземпляра"
+
+#: src/lib/audit.ts
+msgid "Invitation accepted"
+msgstr "Приглашение принято"
+
+#: src/lib/audit.ts
+msgid "Invitation issued again"
+msgstr "Приглашение выдано повторно"
+
 #: src/lib/problem-messages.ts
 msgid "It does not exist, or it was deleted."
 msgstr "Этого не существует, или это было удалено."
+
+#: src/components/projects-table.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Key"
+msgstr "Ключ"
+
+#: src/routes/_signed-in/projects/$project/index.tsx
+msgid "Key <0>{key}</0>"
+msgstr "Ключ <0>{key}</0>"
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Leave"
@@ -119,41 +432,178 @@ msgstr "Уйти без сохранения?"
 msgid "Light"
 msgstr "Светлая"
 
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "List"
+msgstr "Список"
+
 #: src/components/ui/table.tsx
 msgid "Loading…"
 msgstr "Загрузка…"
 
-#: src/components/app-shell.tsx
-msgid "Main"
-msgstr "Основное меню"
+#: src/lib/audit.ts
+msgid "Locked out after failed sign-ins"
+msgstr "Вход заблокирован после неудачных попыток"
 
-#: src/lib/problem-messages.ts
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Lowercase letters, digits, - and _. It never changes."
+msgstr "Строчные буквы, цифры, - и _. Никогда не меняется."
+
+#: src/lib/audit.ts
+msgid "Made an instance admin"
+msgstr "Назначен администратором экземпляра"
+
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Maintainer"
+msgstr "Сопровождающий"
+
+#: src/lib/access-names.ts
 msgid "manage environments"
 msgstr "управлять окружениями"
 
-#: src/lib/problem-messages.ts
+#: src/lib/access-names.ts
 msgid "manage project tokens"
 msgstr "управлять токенами проекта"
 
-#: src/lib/problem-messages.ts
+#: src/lib/access-names.ts
 msgid "manage unit types and attributes"
 msgstr "управлять типами единиц и атрибутами"
 
-#: src/lib/problem-messages.ts
+#: src/lib/access-names.ts
 msgid "manage who has access"
 msgstr "управлять доступом"
+
+#. A kind of actor in the audit log.
+#. A kind of entity in the audit log.
+#: src/components/audit-log.tsx
+#: src/lib/audit.ts
+msgid "Member"
+msgstr "Участник"
+
+#: src/lib/audit.ts
+msgid "Member created"
+msgstr "Участник создан"
+
+#: src/lib/audit.ts
+msgid "Member deactivated"
+msgstr "Участник деактивирован"
+
+#: src/lib/audit.ts
+msgid "Member invited"
+msgstr "Участник приглашён"
+
+#: src/lib/audit.ts
+msgid "Member reactivated"
+msgstr "Участник активирован снова"
+
+#: src/lib/audit.ts
+msgid "Member updated"
+msgstr "Участник изменён"
+
+#: src/components/projects-table.tsx
+msgid "Members"
+msgstr "Участники"
+
+#: src/components/projects-table.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Name"
+msgstr "Название"
+
+#: src/lib/access.ts
+msgid "Needs the permission to {name}, held by {list}."
+msgstr "Нужно право {name}, оно есть у ролей {list}."
+
+#: src/lib/access.ts
+msgid "Needs the permission to {name}."
+msgstr "Нужно право {name}."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "New attribute"
+msgstr "Новый атрибут"
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "New environment"
+msgstr "Новое окружение"
+
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "New project"
+msgstr "Новый проект"
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "New unit type"
+msgstr "Новый тип единицы"
+
+#: src/components/audit-log.tsx
+msgid "Newest entries"
+msgstr "Самые новые записи"
+
+#: src/components/audit-log.tsx
+msgid "No entry matches these filters."
+msgstr "Нет записей, подходящих под эти фильтры."
+
+#: src/lib/audit.ts
+msgid "No longer an instance admin"
+msgstr "Больше не администратор экземпляра"
+
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "No project has this key. It may be mistyped, or the link may point to another instance."
+msgstr "Проекта с таким ключом нет. Возможно, в ключе опечатка или ссылка ведёт на другой экземпляр."
+
+#: src/components/project-switcher.tsx
+msgid "No project matches that."
+msgstr "Подходящих проектов нет."
+
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "No projects yet"
+msgstr "Проектов пока нет"
 
 #: src/components/sign-in-form.tsx
 msgid "No way to sign in is enabled on this instance. Ask its operator."
 msgstr "На этом экземпляре не включён ни один способ входа. Обратитесь к его администратору."
 
+#. An audit entry's value before a creation or after a deletion.
+#: src/components/audit-entry-sheet.tsx
+msgid "none"
+msgstr "нет"
+
+#. The project switcher, when no project is open.
+#: src/components/project-switcher.tsx
+msgid "none chosen"
+msgstr "не выбран"
+
 #: src/routes/_signed-in/$.tsx
 msgid "Not found"
 msgstr "Не найдено"
 
+#: src/components/audit-log.tsx
+msgid "Nothing has been recorded yet."
+msgstr "Пока ничего не записано."
+
+#: src/components/project-audit.tsx
+msgid "Nothing has changed in this project yet."
+msgstr "В этом проекте пока ничего не менялось."
+
 #: src/components/ui/table.tsx
 msgid "Nothing here yet."
 msgstr "Здесь пока ничего нет."
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Number"
+msgstr "Число"
+
+#: src/components/audit-log.tsx
+msgid "Older entries"
+msgstr "Более старые записи"
 
 #: src/lib/problem-messages.ts
 msgid "One with this key already exists."
@@ -163,13 +613,77 @@ msgstr "Объект с таким ключом уже существует."
 msgid "Only a signed-in session can do this, not an API token."
 msgstr "Это можно сделать только в сеансе входа, а не с API-токеном."
 
+#: src/routes/_signed-in/admin/route.tsx
+msgid "Only an instance admin can open it."
+msgstr "Его может открыть только администратор экземпляра."
+
+#: src/components/navigation.tsx
+msgid "Overview"
+msgstr "Обзор"
+
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Owner"
+msgstr "Владелец"
+
 #: src/components/not-found.tsx
 msgid "Page not found"
 msgstr "Страница не найдена"
 
+#: src/components/audit-log.tsx
+msgid "Pages of entries"
+msgstr "Страницы записей"
+
 #: src/components/sign-in-form.tsx
 msgid "Password"
 msgstr "Пароль"
+
+#: src/lib/audit.ts
+msgid "Password changed"
+msgstr "Пароль изменён"
+
+#. A kind of entity in the audit log.
+#: src/components/navigation.tsx
+#: src/lib/audit.ts
+#: src/routes/_signed-in/admin/audit.$entry.tsx
+#: src/routes/_signed-in/admin/audit.tsx
+msgid "Project"
+msgstr "Проект"
+
+#: src/lib/audit.ts
+msgid "Project created"
+msgstr "Проект создан"
+
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "Project not found"
+msgstr "Проект не найден"
+
+#: src/lib/audit.ts
+msgid "Project updated"
+msgstr "Проект изменён"
+
+#: src/components/project-switcher.tsx
+msgid "Project: {label}"
+msgstr "Проект: {label}"
+
+#: src/components/navigation.tsx
+#: src/components/project-switcher.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "Projects"
+msgstr "Проекты"
+
+#: src/components/project-audit.tsx
+msgid "Recent activity"
+msgstr "Последние изменения"
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Rename {key}"
+msgstr "Переименовать {key}"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Request ID"
+msgstr "ID запроса"
 
 #: src/components/query-error.tsx
 #: src/lib/toast.ts
@@ -180,9 +694,44 @@ msgstr "ID запроса: {requestId}"
 msgid "Required."
 msgstr "Обязательное поле."
 
+#: src/lib/audit.ts
+msgid "Role granted"
+msgstr "Роль выдана"
+
 #: src/components/ui/unsaved-changes-bar.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Save"
 msgstr "Сохранить"
+
+#: src/components/audit-log.tsx
+msgid "Search"
+msgstr "Поиск"
+
+#: src/components/project-switcher.tsx
+msgid "Search projects"
+msgstr "Поиск проектов"
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Semantic version"
+msgstr "Семантическая версия"
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Session"
+msgstr "Сеанс"
+
+#: src/lib/audit.ts
+msgid "Session ended"
+msgstr "Сеанс завершён"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "Settings"
+msgstr "Настройки"
 
 #: src/components/app-shell.tsx
 msgid "Sidebar"
@@ -196,6 +745,18 @@ msgstr "Войти"
 #: src/components/personal-menu.tsx
 msgid "Sign out"
 msgstr "Выйти"
+
+#: src/lib/audit.ts
+msgid "Sign-in failed"
+msgstr "Неудачный вход"
+
+#: src/lib/audit.ts
+msgid "Signed in"
+msgstr "Вход выполнен"
+
+#: src/lib/audit.ts
+msgid "Signed out"
+msgstr "Выход выполнен"
 
 #: src/components/sign-in-form.tsx
 msgid "Signing in…"
@@ -213,13 +774,32 @@ msgstr "Исправьте некоторые поля."
 msgid "Something went wrong on the server."
 msgstr "На сервере что-то пошло не так."
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Standard"
+msgstr "Стандартный"
+
+#: src/lib/problem-messages.ts
+msgid "Standard attributes are part of every project, so they cannot be deleted."
+msgstr "Стандартные атрибуты есть в каждом проекте, поэтому их нельзя удалить."
+
 #: src/lib/problem-messages.ts
 msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
 msgstr "Начните со строчной латинской буквы; далее строчные буквы, цифры, - и _, всего не более 64."
 
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "String"
+msgstr "Строка"
+
+#. A kind of actor in the audit log.
 #: src/components/personal-menu.tsx
+#: src/lib/audit.ts
 msgid "System"
 msgstr "Как в системе"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "The attribute {key} is no longer declared, and its key can be declared again."
+msgstr "Атрибут {key} больше не объявлен, и его ключ можно объявить снова."
 
 #: src/components/ui/reveal-secret.tsx
 msgid "The browser refused the clipboard. Select the value and copy it by hand."
@@ -229,9 +809,29 @@ msgstr "Браузер не дал доступ к буферу обмена. В
 msgid "The email or the password is not right."
 msgstr "Неверный адрес электронной почты или пароль."
 
+#: src/components/audit-entry-sheet.tsx
+msgid "The entry records no values."
+msgstr "Запись не содержит значений."
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "The environment {key} is deleted. This cannot be undone."
+msgstr "Окружение {key} будет удалено. Отменить это нельзя."
+
 #: src/lib/problem-messages.ts
 msgid "The idle timeout cannot be longer than the absolute timeout."
 msgstr "Тайм-аут бездействия не может быть больше абсолютного тайм-аута."
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
+msgstr "Виды единиц, которым отдаётся флаг, например пользователь или устройство. Ключ не должен совпадать с ключами атрибутов и никогда не меняется."
+
+#: src/lib/audit.ts
+msgid "The member whose API token is {token}"
+msgstr "Участник, чей API-токен — {token}"
+
+#: src/components/project-audit.tsx
+msgid "The most recent changes in this project"
+msgstr "Самые недавние изменения в этом проекте"
 
 #: src/lib/problem-messages.ts
 msgid "The password is too short or too long."
@@ -240,6 +840,14 @@ msgstr "Пароль слишком короткий или слишком дл�
 #: src/lib/problem-messages.ts
 msgid "The password must not contain your email address."
 msgstr "Пароль не должен содержать ваш адрес электронной почты."
+
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "The project is saved."
+msgstr "Проект сохранён."
+
+#: src/components/navigation.tsx
+msgid "The project's screens could not be read."
+msgstr "Не удалось загрузить разделы проекта."
 
 #: src/lib/problem-messages.ts
 msgid "The request came from another site and was refused."
@@ -281,6 +889,10 @@ msgstr "Сервер недоступен. Попробуйте ещё раз ч
 msgid "The token in use does not carry the scope this needs."
 msgstr "У используемого токена нет нужной для этого области доступа."
 
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "The unit type {key} is no longer declared, and its key can be declared again."
+msgstr "Тип единицы {key} больше не объявлен, и его ключ можно объявить снова."
+
 #: src/lib/problem-messages.ts
 msgid "The value is out of range."
 msgstr "Значение вне допустимого диапазона."
@@ -293,6 +905,10 @@ msgstr "Тема"
 msgid "There is nothing at this address. The link may be old or mistyped."
 msgstr "По этому адресу ничего нет. Возможно, ссылка устарела или в ней опечатка."
 
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "This instance already has a project with that key."
+msgstr "В этом экземпляре уже есть проект с таким ключом."
+
 #: src/components/ui/reveal-secret.tsx
 msgid "This is the only time it is shown. It is kept encrypted and never shown again, so if it is lost, rotate it."
 msgstr "Это значение показывается только один раз. Оно хранится зашифрованным и больше не показывается, поэтому если оно потеряно, смените его."
@@ -302,12 +918,42 @@ msgid "This is the only time it is shown. Only a hash of it is kept, so if it is
 msgstr "Это значение показывается только один раз. Хранится лишь его хеш, поэтому если оно потеряно, замените его."
 
 #: src/lib/problem-messages.ts
+msgid "This is the project's last environment. A project always keeps one to serve from."
+msgstr "Это последнее окружение проекта. У проекта всегда остаётся хотя бы одно окружение."
+
+#: src/lib/problem-messages.ts
 msgid "This key is reserved."
 msgstr "Этот ключ зарезервирован."
 
 #: src/lib/problem-messages.ts
 msgid "This password is too common. Choose another."
 msgstr "Этот пароль слишком распространён. Выберите другой."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "This project already has a unit type or an attribute with that key."
+msgstr "В этом проекте уже есть тип единицы или атрибут с таким ключом."
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "This project already has an environment with that key."
+msgstr "В этом проекте уже есть окружение с таким ключом."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "This project has no attribute yet."
+msgstr "В этом проекте пока нет атрибутов."
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "This project has no unit type yet."
+msgstr "В этом проекте пока нет типов единиц."
+
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Time"
+msgstr "Время"
+
+#: src/components/audit-log.tsx
+msgid "To"
+msgstr "По"
 
 #: src/lib/problem-messages.ts
 msgid "Too long."
@@ -337,13 +983,40 @@ msgstr "Слишком много попыток входа из вашей се
 msgid "Too many sign-in attempts from your network. Try again later."
 msgstr "Слишком много попыток входа из вашей сети. Попробуйте позже."
 
+#: src/components/navigation.tsx
 #: src/components/query-error.tsx
 msgid "Try again"
 msgstr "Попробовать ещё раз"
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Type"
+msgstr "Тип"
+
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Введите {typeToConfirm} для подтверждения"
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Unit type"
+msgstr "Тип единицы"
+
+#: src/lib/audit.ts
+msgid "Unit type declared"
+msgstr "Тип единицы объявлен"
+
+#: src/lib/audit.ts
+msgid "Unit type deleted"
+msgstr "Тип единицы удалён"
+
+#: src/lib/audit.ts
+msgid "Unit type updated"
+msgstr "Тип единицы изменён"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Unit types"
+msgstr "Типы единиц"
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Unsaved changes"
@@ -353,25 +1026,62 @@ msgstr "Несохранённые изменения"
 msgid "Use {min} to {max} characters."
 msgstr "Используйте от {min} до {max} символов."
 
-#: src/lib/problem-messages.ts
+#: src/components/audit-entry-sheet.tsx
+msgid "Values before and after the change"
+msgstr "Значения до и после изменения"
+
+#: src/routes/_signed-in/projects/$project/index.tsx
+msgid "View all environments"
+msgstr "Все окружения"
+
+#: src/components/project-audit.tsx
+msgid "View the audit log"
+msgstr "Открыть журнал аудита"
+
+#: src/lib/access-names.ts
 msgid "view the project"
 msgstr "просматривать проект"
 
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Viewer"
+msgstr "Наблюдатель"
+
 #: src/routes/_signed-in/index.tsx
-msgid "Welcome, {name}"
-msgstr "Добро пожаловать, {name}"
+msgid "Welcome, {name}. Choose a project to work in."
+msgstr "Здравствуйте, {name}. Выберите проект для работы."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
+msgstr "То, что таргетинг знает о единице. Стандартные атрибуты есть в каждом проекте: их можно переименовать, но не удалить. Тип после объявления не меняется."
+
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "What the project is called and what it is for."
+msgstr "Как называется проект и для чего он."
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Where the project serves from. A key is fixed once created; the name can change."
+msgstr "Откуда проект отдаёт значения. Ключ после создания не меняется, название можно изменить."
 
 #: src/lib/problem-messages.ts
 msgid "You are not signed in."
 msgstr "Вы не вошли в систему."
 
-#: src/routes/_signed-in/index.tsx
-msgid "You are signed in to Flagnetic."
-msgstr "Вы вошли в Flagnetic."
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "You cannot open this project"
+msgstr "Этот проект вам недоступен"
+
+#: src/components/can.tsx
+msgid "You cannot open this screen"
+msgstr "Этот экран вам недоступен"
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "You have unsaved changes."
 msgstr "У вас есть несохранённые изменения."
+
+#: src/routes/_signed-in/index.tsx
+msgid "You hold no grant in any project yet. Ask a project owner or an instance admin."
+msgstr "У вас пока нет роли ни в одном проекте. Обратитесь к владельцу проекта или администратору экземпляра."
 
 #: src/lib/problem-messages.ts
 msgid "You may not do this."

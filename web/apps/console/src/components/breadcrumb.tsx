@@ -2,15 +2,27 @@ import { useLingui } from "@lingui/react/macro";
 import { Link, useMatches } from "@tanstack/react-router";
 import { ChevronRightIcon } from "lucide-react";
 
+import { useProjectInAddress } from "@/lib/use-project-in-address";
+
+/**
+ * The crumb of the route of one project, which the breadcrumb calls by the
+ * project's name rather than by a fixed label.
+ */
+export const projectNameCrumb: unique symbol = Symbol();
+
 /**
  * Where the member is, from the crumb each matched route declares in its
  * static data; the last crumb is the page itself.
  */
 export function Breadcrumb() {
   const { i18n, t } = useLingui();
-  const crumbs = useMatches()
-    .filter((match) => match.staticData.crumb !== undefined)
-    .map((match) => ({ id: match.id, to: match.pathname, label: i18n._(match.staticData.crumb!) }));
+  const { key, project } = useProjectInAddress();
+  const crumbs = useMatches().flatMap((match) => {
+    const crumb = match.staticData.crumb;
+    if (crumb === undefined) return [];
+    const label = crumb === projectNameCrumb ? (project?.name ?? key ?? "") : i18n._(crumb);
+    return [{ id: match.id, to: match.pathname, label }];
+  });
   if (crumbs.length === 0) return null;
   return (
     <nav aria-label={t`Breadcrumb`} className="min-w-0">

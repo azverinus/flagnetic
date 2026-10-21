@@ -8,7 +8,130 @@ msgstr ""
 "Language: pseudo\n"
 
 #: src/lib/problem-messages.ts
+msgid "A key never changes once it is set."
+msgstr ""
+
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "A project owner or an instance admin can grant you a role in it."
+msgstr ""
+
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Action"
+msgstr ""
+
+#: src/components/row-dialogs.tsx
+msgid "Actions"
+msgstr ""
+
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Actor"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Actor kind"
+msgstr ""
+
+#: src/components/audit-entry-sheet.tsx
+msgid "After"
+msgstr ""
+
+#: src/components/project-switcher.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "All projects"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "An attribute's type is fixed once it is declared."
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Any"
+msgstr ""
+
+#. A kind of actor in the audit log.
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "API token"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "API token created"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "API token revoked"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Apply filters"
+msgstr ""
+
+#: src/lib/problem-messages.ts
 msgid "At most {max} characters."
+msgstr ""
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Attribute"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Attribute declared"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Attribute deleted"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Attribute updated"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Attributes"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Audit entries, newest first"
+msgstr ""
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Audit entry"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/audit.tsx
+#: src/routes/_signed-in/projects/$project/audit.tsx
+msgid "Audit log"
+msgstr ""
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Authentication settings"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Authentication settings updated"
+msgstr ""
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Before"
+msgstr ""
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Before and after"
+msgstr ""
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Boolean"
 msgstr ""
 
 #: src/components/breadcrumb.tsx
@@ -20,8 +143,20 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
+#: src/components/audit-entry-sheet.tsx
+msgid "changed"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Choose a type"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Choose a type."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -30,6 +165,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered types."
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Clear filters"
 msgstr ""
 
 #: src/components/ui/dialog.tsx
@@ -42,6 +181,11 @@ msgstr ""
 msgid "Collapse the sidebar"
 msgstr ""
 
+#. A kind of actor in the audit log.
+#: src/lib/audit.ts
+msgid "Command line"
+msgstr ""
+
 #: src/components/ui/reveal-secret.tsx
 msgid "Copied to the clipboard."
 msgstr ""
@@ -50,15 +194,79 @@ msgstr ""
 msgid "Copy"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Create attribute"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Create environment"
+msgstr ""
+
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "Create project"
+msgstr ""
+
+#: src/routes/_signed-in/index.tsx
+msgid "Create the first project to start declaring what it serves."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Create unit type"
+msgstr ""
+
 #: src/components/personal-menu.tsx
 msgid "Dark"
+msgstr ""
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Date"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Declare the kinds of unit its flags are served to."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Delete {key}"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Delete attribute"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Delete environment"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Delete unit type"
+msgstr ""
+
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Description"
+msgstr ""
+
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Developer"
 msgstr ""
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Discard"
 msgstr ""
 
-#: src/lib/problem-messages.ts
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Edit {key}"
+msgstr ""
+
+#: src/lib/access-names.ts
 msgid "edit the project"
 msgstr ""
 
@@ -66,6 +274,7 @@ msgstr ""
 msgid "Email"
 msgstr ""
 
+#: src/lib/forms.ts
 #: src/lib/problem-messages.ts
 msgid "Enter a name."
 msgstr ""
@@ -86,25 +295,129 @@ msgstr ""
 msgid "Enter your password."
 msgstr ""
 
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Entity"
+msgstr ""
+
+#. A kind of entity in the audit log.
+#: src/components/project-audit.tsx
+#: src/lib/audit.ts
+#: src/routes/_signed-in/projects/$project/audit.$entry.tsx
+msgid "Environment"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Environment created"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Environment deleted"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Environment updated"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/index.tsx
+msgid "Environments"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/audit.tsx
+msgid "Every change made in this project, newest first, with its values before and after."
+msgstr ""
+
+#: src/routes/_signed-in/admin/audit.tsx
+msgid "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
+msgstr ""
+
 #: src/components/app-shell.tsx
 msgid "Expand the sidebar"
+msgstr ""
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Field"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Filter the audit log"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Fixed once declared."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "Fixed once the project is created, since SDKs and scripts use it."
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "From"
 msgstr ""
 
 #: src/components/not-found.tsx
 msgid "Go to the start page"
 msgstr ""
 
-#: src/components/app-shell.tsx
-#: src/routes/_signed-in/index.tsx
-msgid "Home"
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Grant"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Grant removed"
+msgstr ""
+
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
 msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
 msgid "I have stored it somewhere safe"
 msgstr ""
 
+#: src/components/audit-log.tsx
+msgid "In the action, the entity's key and the actor's name."
+msgstr ""
+
+#. An audit entry that belongs to no project.
+#. An audit entry that belongs to no project.
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/audit.$entry.tsx
+#: src/routes/_signed-in/admin/audit.tsx
+msgid "Instance"
+msgstr ""
+
+#: src/routes/_signed-in/admin/route.tsx
+msgid "Instance administration"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Invitation accepted"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Invitation issued again"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "It does not exist, or it was deleted."
+msgstr ""
+
+#: src/components/projects-table.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Key"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/index.tsx
+msgid "Key <0>{key}</0>"
 msgstr ""
 
 #: src/components/ui/unsaved-changes-bar.tsx
@@ -119,40 +432,177 @@ msgstr ""
 msgid "Light"
 msgstr ""
 
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "List"
+msgstr ""
+
 #: src/components/ui/table.tsx
 msgid "Loading…"
 msgstr ""
 
-#: src/components/app-shell.tsx
-msgid "Main"
+#: src/lib/audit.ts
+msgid "Locked out after failed sign-ins"
 msgstr ""
 
-#: src/lib/problem-messages.ts
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Lowercase letters, digits, - and _. It never changes."
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Made an instance admin"
+msgstr ""
+
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Maintainer"
+msgstr ""
+
+#: src/lib/access-names.ts
 msgid "manage environments"
 msgstr ""
 
-#: src/lib/problem-messages.ts
+#: src/lib/access-names.ts
 msgid "manage project tokens"
 msgstr ""
 
-#: src/lib/problem-messages.ts
+#: src/lib/access-names.ts
 msgid "manage unit types and attributes"
 msgstr ""
 
-#: src/lib/problem-messages.ts
+#: src/lib/access-names.ts
 msgid "manage who has access"
+msgstr ""
+
+#. A kind of actor in the audit log.
+#. A kind of entity in the audit log.
+#: src/components/audit-log.tsx
+#: src/lib/audit.ts
+msgid "Member"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Member created"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Member deactivated"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Member invited"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Member reactivated"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Member updated"
+msgstr ""
+
+#: src/components/projects-table.tsx
+msgid "Members"
+msgstr ""
+
+#: src/components/projects-table.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Name"
+msgstr ""
+
+#: src/lib/access.ts
+msgid "Needs the permission to {name}, held by {list}."
+msgstr ""
+
+#: src/lib/access.ts
+msgid "Needs the permission to {name}."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "New attribute"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "New environment"
+msgstr ""
+
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "New project"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "New unit type"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Newest entries"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "No entry matches these filters."
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "No longer an instance admin"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "No project has this key. It may be mistyped, or the link may point to another instance."
+msgstr ""
+
+#: src/components/project-switcher.tsx
+msgid "No project matches that."
+msgstr ""
+
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "No projects yet"
 msgstr ""
 
 #: src/components/sign-in-form.tsx
 msgid "No way to sign in is enabled on this instance. Ask its operator."
 msgstr ""
 
+#. An audit entry's value before a creation or after a deletion.
+#: src/components/audit-entry-sheet.tsx
+msgid "none"
+msgstr ""
+
+#. The project switcher, when no project is open.
+#: src/components/project-switcher.tsx
+msgid "none chosen"
+msgstr ""
+
 #: src/routes/_signed-in/$.tsx
 msgid "Not found"
 msgstr ""
 
+#: src/components/audit-log.tsx
+msgid "Nothing has been recorded yet."
+msgstr ""
+
+#: src/components/project-audit.tsx
+msgid "Nothing has changed in this project yet."
+msgstr ""
+
 #: src/components/ui/table.tsx
 msgid "Nothing here yet."
+msgstr ""
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Number"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Older entries"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -163,12 +613,76 @@ msgstr ""
 msgid "Only a signed-in session can do this, not an API token."
 msgstr ""
 
+#: src/routes/_signed-in/admin/route.tsx
+msgid "Only an instance admin can open it."
+msgstr ""
+
+#: src/components/navigation.tsx
+msgid "Overview"
+msgstr ""
+
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Owner"
+msgstr ""
+
 #: src/components/not-found.tsx
 msgid "Page not found"
 msgstr ""
 
+#: src/components/audit-log.tsx
+msgid "Pages of entries"
+msgstr ""
+
 #: src/components/sign-in-form.tsx
 msgid "Password"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Password changed"
+msgstr ""
+
+#. A kind of entity in the audit log.
+#: src/components/navigation.tsx
+#: src/lib/audit.ts
+#: src/routes/_signed-in/admin/audit.$entry.tsx
+#: src/routes/_signed-in/admin/audit.tsx
+msgid "Project"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Project created"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "Project not found"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Project updated"
+msgstr ""
+
+#: src/components/project-switcher.tsx
+msgid "Project: {label}"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/components/project-switcher.tsx
+#: src/routes/_signed-in/admin/projects.tsx
+#: src/routes/_signed-in/index.tsx
+msgid "Projects"
+msgstr ""
+
+#: src/components/project-audit.tsx
+msgid "Recent activity"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Rename {key}"
+msgstr ""
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Request ID"
 msgstr ""
 
 #: src/components/query-error.tsx
@@ -180,8 +694,43 @@ msgstr ""
 msgid "Required."
 msgstr ""
 
+#: src/lib/audit.ts
+msgid "Role granted"
+msgstr ""
+
 #: src/components/ui/unsaved-changes-bar.tsx
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Save"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "Search"
+msgstr ""
+
+#: src/components/project-switcher.tsx
+msgid "Search projects"
+msgstr ""
+
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Semantic version"
+msgstr ""
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Session"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Session ended"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "Settings"
 msgstr ""
 
 #: src/components/app-shell.tsx
@@ -195,6 +744,18 @@ msgstr ""
 
 #: src/components/personal-menu.tsx
 msgid "Sign out"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Sign-in failed"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Signed in"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Signed out"
 msgstr ""
 
 #: src/components/sign-in-form.tsx
@@ -213,12 +774,31 @@ msgstr ""
 msgid "Something went wrong on the server."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Standard"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Standard attributes are part of every project, so they cannot be deleted."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
 msgstr ""
 
+#. An attribute type.
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "String"
+msgstr ""
+
+#. A kind of actor in the audit log.
 #: src/components/personal-menu.tsx
+#: src/lib/audit.ts
 msgid "System"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "The attribute {key} is no longer declared, and its key can be declared again."
 msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
@@ -229,8 +809,28 @@ msgstr ""
 msgid "The email or the password is not right."
 msgstr ""
 
+#: src/components/audit-entry-sheet.tsx
+msgid "The entry records no values."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "The environment {key} is deleted. This cannot be undone."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The idle timeout cannot be longer than the absolute timeout."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "The member whose API token is {token}"
+msgstr ""
+
+#: src/components/project-audit.tsx
+msgid "The most recent changes in this project"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -239,6 +839,14 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "The password must not contain your email address."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "The project is saved."
+msgstr ""
+
+#: src/components/navigation.tsx
+msgid "The project's screens could not be read."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -281,6 +889,10 @@ msgstr ""
 msgid "The token in use does not carry the scope this needs."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "The unit type {key} is no longer declared, and its key can be declared again."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The value is out of range."
 msgstr ""
@@ -293,6 +905,10 @@ msgstr ""
 msgid "There is nothing at this address. The link may be old or mistyped."
 msgstr ""
 
+#: src/routes/_signed-in/admin/projects.tsx
+msgid "This instance already has a project with that key."
+msgstr ""
+
 #: src/components/ui/reveal-secret.tsx
 msgid "This is the only time it is shown. It is kept encrypted and never shown again, so if it is lost, rotate it."
 msgstr ""
@@ -302,11 +918,41 @@ msgid "This is the only time it is shown. Only a hash of it is kept, so if it is
 msgstr ""
 
 #: src/lib/problem-messages.ts
+msgid "This is the project's last environment. A project always keeps one to serve from."
+msgstr ""
+
+#: src/lib/problem-messages.ts
 msgid "This key is reserved."
 msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "This password is too common. Choose another."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "This project already has a unit type or an attribute with that key."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "This project already has an environment with that key."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "This project has no attribute yet."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "This project has no unit type yet."
+msgstr ""
+
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Time"
+msgstr ""
+
+#: src/components/audit-log.tsx
+msgid "To"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -337,12 +983,39 @@ msgstr ""
 msgid "Too many sign-in attempts from your network. Try again later."
 msgstr ""
 
+#: src/components/navigation.tsx
 #: src/components/query-error.tsx
 msgid "Try again"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Type"
+msgstr ""
+
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
+msgstr ""
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Unit type"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Unit type declared"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Unit type deleted"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Unit type updated"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Unit types"
 msgstr ""
 
 #: src/components/ui/unsaved-changes-bar.tsx
@@ -353,24 +1026,61 @@ msgstr ""
 msgid "Use {min} to {max} characters."
 msgstr ""
 
-#: src/lib/problem-messages.ts
+#: src/components/audit-entry-sheet.tsx
+msgid "Values before and after the change"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/index.tsx
+msgid "View all environments"
+msgstr ""
+
+#: src/components/project-audit.tsx
+msgid "View the audit log"
+msgstr ""
+
+#: src/lib/access-names.ts
 msgid "view the project"
 msgstr ""
 
+#. The name of a built-in role.
+#: src/lib/access-names.ts
+msgid "Viewer"
+msgstr ""
+
 #: src/routes/_signed-in/index.tsx
-msgid "Welcome, {name}"
+msgid "Welcome, {name}. Choose a project to work in."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/settings.tsx
+msgid "What the project is called and what it is for."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/environments.tsx
+msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "You are not signed in."
 msgstr ""
 
-#: src/routes/_signed-in/index.tsx
-msgid "You are signed in to Flagnetic."
+#: src/routes/_signed-in/projects/$project/route.tsx
+msgid "You cannot open this project"
+msgstr ""
+
+#: src/components/can.tsx
+msgid "You cannot open this screen"
 msgstr ""
 
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "You have unsaved changes."
+msgstr ""
+
+#: src/routes/_signed-in/index.tsx
+msgid "You hold no grant in any project yet. Ask a project owner or an instance admin."
 msgstr ""
 
 #: src/lib/problem-messages.ts

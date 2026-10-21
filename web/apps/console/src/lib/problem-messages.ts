@@ -1,9 +1,10 @@
 import type { Violation } from "@flagnetic/api";
-import type { I18n, MessageDescriptor } from "@lingui/core";
+import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
 import { formatNumber, formatWait } from "@/i18n/format";
 
+import { permissionName } from "./access-names";
 import type { ApiError } from "./errors";
 
 /**
@@ -12,22 +13,6 @@ import type { ApiError } from "./errors";
  * problem document; the console writes the sentence. The server's English
  * `detail` is shown only for a code this table does not know yet.
  */
-
-/** What a member reads for each permission of the catalog. */
-const permissionNames: Record<string, MessageDescriptor> = {
-  "project.read": msg`view the project`,
-  "project.update": msg`edit the project`,
-  "environment.manage": msg`manage environments`,
-  "declaration.manage": msg`manage unit types and attributes`,
-  "grant.manage": msg`manage who has access`,
-  "project_token.manage": msg`manage project tokens`,
-};
-
-/** The permission's display name, or its catalog name for one this build does not know. */
-export function permissionName(i18n: I18n, permission: string): string {
-  const name = permissionNames[permission];
-  return name ? i18n._(name) : permission;
-}
 
 /** How long the refusal asks to wait, in the member's language, if it says. */
 export function retryWait(i18n: I18n, error: ApiError): string | undefined {
@@ -86,6 +71,16 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`Something went wrong on the server.`);
     case "already_exists":
       return i18n._(msg`One with this key already exists.`);
+    case "last_environment":
+      return i18n._(
+        msg`This is the project's last environment. A project always keeps one to serve from.`,
+      );
+    case "standard_attribute":
+      return i18n._(msg`Standard attributes are part of every project, so they cannot be deleted.`);
+    case "type_immutable":
+      return i18n._(msg`An attribute's type is fixed once it is declared.`);
+    case "key_immutable":
+      return i18n._(msg`A key never changes once it is set.`);
     default:
       if (error.code.startsWith("invalid_") && error.violations.length > 0) {
         return i18n._(msg`Some fields need correcting.`);
