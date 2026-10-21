@@ -11,6 +11,14 @@ export function formatDateTime(i18n: I18n, value: Date | string): string {
   );
 }
 
+/** An instant to the second, as an audit entry needs it. */
+export function formatInstant(i18n: I18n, value: Date | string): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat(i18n.locale, { dateStyle: "medium", timeStyle: "medium" }).format(
+    date,
+  );
+}
+
 export function formatNumber(i18n: I18n, value: number): string {
   return new Intl.NumberFormat(i18n.locale).format(value);
 }

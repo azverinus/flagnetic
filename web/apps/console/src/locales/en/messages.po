@@ -19,9 +19,27 @@ msgstr "A new project starts with the environments development, staging and prod
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr "A project owner or an instance admin can grant you a role in it."
 
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Action"
+msgstr "Action"
+
 #: src/components/row-dialogs.tsx
 msgid "Actions"
 msgstr "Actions"
+
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Actor"
+msgstr "Actor"
+
+#: src/components/audit-log.tsx
+msgid "Actor kind"
+msgstr "Actor kind"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "After"
+msgstr "After"
 
 #: src/components/project-switcher.tsx
 #: src/routes/_signed-in/admin/projects.tsx
@@ -32,14 +50,84 @@ msgstr "All projects"
 msgid "An attribute's type is fixed once it is declared."
 msgstr "An attribute's type is fixed once it is declared."
 
+#: src/components/audit-log.tsx
+msgid "Any"
+msgstr "Any"
+
+#. A kind of actor in the audit log.
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "API token"
+msgstr "API token"
+
+#: src/lib/audit.ts
+msgid "API token created"
+msgstr "API token created"
+
+#: src/lib/audit.ts
+msgid "API token revoked"
+msgstr "API token revoked"
+
+#: src/components/audit-log.tsx
+msgid "Apply filters"
+msgstr "Apply filters"
+
 #: src/lib/problem-messages.ts
 msgid "At most {max} characters."
 msgstr "At most {max} characters."
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Attribute"
+msgstr "Attribute"
+
+#: src/lib/audit.ts
+msgid "Attribute declared"
+msgstr "Attribute declared"
+
+#: src/lib/audit.ts
+msgid "Attribute deleted"
+msgstr "Attribute deleted"
+
+#: src/lib/audit.ts
+msgid "Attribute updated"
+msgstr "Attribute updated"
 
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Attributes"
 msgstr "Attributes"
+
+#: src/components/audit-log.tsx
+msgid "Audit entries, newest first"
+msgstr "Audit entries, newest first"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Audit entry"
+msgstr "Audit entry"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/audit.tsx
+#: src/routes/_signed-in/projects/$project/audit.tsx
+msgid "Audit log"
+msgstr "Audit log"
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Authentication settings"
+msgstr "Authentication settings"
+
+#: src/lib/audit.ts
+msgid "Authentication settings updated"
+msgstr "Authentication settings updated"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Before"
+msgstr "Before"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Before and after"
+msgstr "Before and after"
 
 #. An attribute type.
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -54,6 +142,10 @@ msgstr "Breadcrumb"
 #: src/components/ui/form-page.tsx
 msgid "Cancel"
 msgstr "Cancel"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "changed"
+msgstr "changed"
 
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
@@ -75,6 +167,10 @@ msgstr "Choose one of the offered scopes."
 msgid "Choose one of the offered types."
 msgstr "Choose one of the offered types."
 
+#: src/components/audit-log.tsx
+msgid "Clear filters"
+msgstr "Clear filters"
+
 #: src/components/ui/dialog.tsx
 #: src/components/ui/reveal-secret.tsx
 #: src/components/ui/sheet.tsx
@@ -84,6 +180,11 @@ msgstr "Close"
 #: src/components/app-shell.tsx
 msgid "Collapse the sidebar"
 msgstr "Collapse the sidebar"
+
+#. A kind of actor in the audit log.
+#: src/lib/audit.ts
+msgid "Command line"
+msgstr "Command line"
 
 #: src/components/ui/reveal-secret.tsx
 msgid "Copied to the clipboard."
@@ -194,15 +295,55 @@ msgstr "Enter your email."
 msgid "Enter your password."
 msgstr "Enter your password."
 
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Entity"
+msgstr "Entity"
+
+#. A kind of entity in the audit log.
+#: src/components/project-audit.tsx
+#: src/lib/audit.ts
+#: src/routes/_signed-in/projects/$project/audit.$entry.tsx
+msgid "Environment"
+msgstr "Environment"
+
+#: src/lib/audit.ts
+msgid "Environment created"
+msgstr "Environment created"
+
+#: src/lib/audit.ts
+msgid "Environment deleted"
+msgstr "Environment deleted"
+
+#: src/lib/audit.ts
+msgid "Environment updated"
+msgstr "Environment updated"
+
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "Environments"
 msgstr "Environments"
 
+#: src/routes/_signed-in/projects/$project/audit.tsx
+msgid "Every change made in this project, newest first, with its values before and after."
+msgstr "Every change made in this project, newest first, with its values before and after."
+
+#: src/routes/_signed-in/admin/audit.tsx
+msgid "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
+msgstr "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
+
 #: src/components/app-shell.tsx
 msgid "Expand the sidebar"
 msgstr "Expand the sidebar"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Field"
+msgstr "Field"
+
+#: src/components/audit-log.tsx
+msgid "Filter the audit log"
+msgstr "Filter the audit log"
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
@@ -213,9 +354,22 @@ msgstr "Fixed once declared."
 msgid "Fixed once the project is created, since SDKs and scripts use it."
 msgstr "Fixed once the project is created, since SDKs and scripts use it."
 
+#: src/components/audit-log.tsx
+msgid "From"
+msgstr "From"
+
 #: src/components/not-found.tsx
 msgid "Go to the start page"
 msgstr "Go to the start page"
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Grant"
+msgstr "Grant"
+
+#: src/lib/audit.ts
+msgid "Grant removed"
+msgstr "Grant removed"
 
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
@@ -225,13 +379,29 @@ msgstr "How SDKs and scripts name the project: lowercase letters, digits, - and 
 msgid "I have stored it somewhere safe"
 msgstr "I have stored it somewhere safe"
 
+#: src/components/audit-log.tsx
+msgid "In the action, the entity's key and the actor's name."
+msgstr "In the action, the entity's key and the actor's name."
+
+#. An audit entry that belongs to no project.
+#. An audit entry that belongs to no project.
 #: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/audit.$entry.tsx
+#: src/routes/_signed-in/admin/audit.tsx
 msgid "Instance"
 msgstr "Instance"
 
 #: src/routes/_signed-in/admin/route.tsx
 msgid "Instance administration"
 msgstr "Instance administration"
+
+#: src/lib/audit.ts
+msgid "Invitation accepted"
+msgstr "Invitation accepted"
+
+#: src/lib/audit.ts
+msgid "Invitation issued again"
+msgstr "Invitation issued again"
 
 #: src/lib/problem-messages.ts
 msgid "It does not exist, or it was deleted."
@@ -271,11 +441,19 @@ msgstr "List"
 msgid "Loading…"
 msgstr "Loading…"
 
+#: src/lib/audit.ts
+msgid "Locked out after failed sign-ins"
+msgstr "Locked out after failed sign-ins"
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Lowercase letters, digits, - and _. It never changes."
 msgstr "Lowercase letters, digits, - and _. It never changes."
+
+#: src/lib/audit.ts
+msgid "Made an instance admin"
+msgstr "Made an instance admin"
 
 #. The name of a built-in role.
 #: src/lib/access-names.ts
@@ -298,6 +476,33 @@ msgstr "manage unit types and attributes"
 msgid "manage who has access"
 msgstr "manage who has access"
 
+#. A kind of actor in the audit log.
+#. A kind of entity in the audit log.
+#: src/components/audit-log.tsx
+#: src/lib/audit.ts
+msgid "Member"
+msgstr "Member"
+
+#: src/lib/audit.ts
+msgid "Member created"
+msgstr "Member created"
+
+#: src/lib/audit.ts
+msgid "Member deactivated"
+msgstr "Member deactivated"
+
+#: src/lib/audit.ts
+msgid "Member invited"
+msgstr "Member invited"
+
+#: src/lib/audit.ts
+msgid "Member reactivated"
+msgstr "Member reactivated"
+
+#: src/lib/audit.ts
+msgid "Member updated"
+msgstr "Member updated"
+
 #: src/components/projects-table.tsx
 msgid "Members"
 msgstr "Members"
@@ -311,11 +516,11 @@ msgstr "Members"
 msgid "Name"
 msgstr "Name"
 
-#: src/lib/access.tsx
+#: src/lib/access.ts
 msgid "Needs the permission to {name}, held by {list}."
 msgstr "Needs the permission to {name}, held by {list}."
 
-#: src/lib/access.tsx
+#: src/lib/access.ts
 msgid "Needs the permission to {name}."
 msgstr "Needs the permission to {name}."
 
@@ -336,6 +541,18 @@ msgstr "New project"
 msgid "New unit type"
 msgstr "New unit type"
 
+#: src/components/audit-log.tsx
+msgid "Newest entries"
+msgstr "Newest entries"
+
+#: src/components/audit-log.tsx
+msgid "No entry matches these filters."
+msgstr "No entry matches these filters."
+
+#: src/lib/audit.ts
+msgid "No longer an instance admin"
+msgstr "No longer an instance admin"
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "No project has this key. It may be mistyped, or the link may point to another instance."
 msgstr "No project has this key. It may be mistyped, or the link may point to another instance."
@@ -353,6 +570,11 @@ msgstr "No projects yet"
 msgid "No way to sign in is enabled on this instance. Ask its operator."
 msgstr "No way to sign in is enabled on this instance. Ask its operator."
 
+#. An audit entry's value before a creation or after a deletion.
+#: src/components/audit-entry-sheet.tsx
+msgid "none"
+msgstr "none"
+
 #. The project switcher, when no project is open.
 #: src/components/project-switcher.tsx
 msgid "none chosen"
@@ -362,6 +584,14 @@ msgstr "none chosen"
 msgid "Not found"
 msgstr "Not found"
 
+#: src/components/audit-log.tsx
+msgid "Nothing has been recorded yet."
+msgstr "Nothing has been recorded yet."
+
+#: src/components/project-audit.tsx
+msgid "Nothing has changed in this project yet."
+msgstr "Nothing has changed in this project yet."
+
 #: src/components/ui/table.tsx
 msgid "Nothing here yet."
 msgstr "Nothing here yet."
@@ -370,6 +600,10 @@ msgstr "Nothing here yet."
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Number"
 msgstr "Number"
+
+#: src/components/audit-log.tsx
+msgid "Older entries"
+msgstr "Older entries"
 
 #: src/lib/problem-messages.ts
 msgid "One with this key already exists."
@@ -396,17 +630,37 @@ msgstr "Owner"
 msgid "Page not found"
 msgstr "Page not found"
 
+#: src/components/audit-log.tsx
+msgid "Pages of entries"
+msgstr "Pages of entries"
+
 #: src/components/sign-in-form.tsx
 msgid "Password"
 msgstr "Password"
 
+#: src/lib/audit.ts
+msgid "Password changed"
+msgstr "Password changed"
+
+#. A kind of entity in the audit log.
 #: src/components/navigation.tsx
+#: src/lib/audit.ts
+#: src/routes/_signed-in/admin/audit.$entry.tsx
+#: src/routes/_signed-in/admin/audit.tsx
 msgid "Project"
 msgstr "Project"
+
+#: src/lib/audit.ts
+msgid "Project created"
+msgstr "Project created"
 
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "Project not found"
 msgstr "Project not found"
+
+#: src/lib/audit.ts
+msgid "Project updated"
+msgstr "Project updated"
 
 #: src/components/project-switcher.tsx
 msgid "Project: {label}"
@@ -419,9 +673,17 @@ msgstr "Project: {label}"
 msgid "Projects"
 msgstr "Projects"
 
+#: src/components/project-audit.tsx
+msgid "Recent activity"
+msgstr "Recent activity"
+
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "Rename {key}"
 msgstr "Rename {key}"
+
+#: src/components/audit-entry-sheet.tsx
+msgid "Request ID"
+msgstr "Request ID"
 
 #: src/components/query-error.tsx
 #: src/lib/toast.ts
@@ -432,6 +694,10 @@ msgstr "Request ID: {requestId}"
 msgid "Required."
 msgstr "Required."
 
+#: src/lib/audit.ts
+msgid "Role granted"
+msgstr "Role granted"
+
 #: src/components/ui/unsaved-changes-bar.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
@@ -439,6 +705,10 @@ msgstr "Required."
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Save"
 msgstr "Save"
+
+#: src/components/audit-log.tsx
+msgid "Search"
+msgstr "Search"
 
 #: src/components/project-switcher.tsx
 msgid "Search projects"
@@ -448,6 +718,15 @@ msgstr "Search projects"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Semantic version"
 msgstr "Semantic version"
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Session"
+msgstr "Session"
+
+#: src/lib/audit.ts
+msgid "Session ended"
+msgstr "Session ended"
 
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
@@ -466,6 +745,18 @@ msgstr "Sign in"
 #: src/components/personal-menu.tsx
 msgid "Sign out"
 msgstr "Sign out"
+
+#: src/lib/audit.ts
+msgid "Sign-in failed"
+msgstr "Sign-in failed"
+
+#: src/lib/audit.ts
+msgid "Signed in"
+msgstr "Signed in"
+
+#: src/lib/audit.ts
+msgid "Signed out"
+msgstr "Signed out"
 
 #: src/components/sign-in-form.tsx
 msgid "Signing in…"
@@ -500,7 +791,9 @@ msgstr "Start with a lowercase letter; then lowercase letters, digits, - and _, 
 msgid "String"
 msgstr "String"
 
+#. A kind of actor in the audit log.
 #: src/components/personal-menu.tsx
+#: src/lib/audit.ts
 msgid "System"
 msgstr "System"
 
@@ -516,6 +809,10 @@ msgstr "The browser refused the clipboard. Select the value and copy it by hand.
 msgid "The email or the password is not right."
 msgstr "The email or the password is not right."
 
+#: src/components/audit-entry-sheet.tsx
+msgid "The entry records no values."
+msgstr "The entry records no values."
+
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "The environment {key} is deleted. This cannot be undone."
 msgstr "The environment {key} is deleted. This cannot be undone."
@@ -528,6 +825,14 @@ msgstr "The idle timeout cannot be longer than the absolute timeout."
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 msgstr "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 
+#: src/lib/audit.ts
+msgid "The member whose API token is {token}"
+msgstr "The member whose API token is {token}"
+
+#: src/components/project-audit.tsx
+msgid "The most recent changes in this project"
+msgstr "The most recent changes in this project"
+
 #: src/lib/problem-messages.ts
 msgid "The password is too short or too long."
 msgstr "The password is too short or too long."
@@ -539,6 +844,10 @@ msgstr "The password must not contain your email address."
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "The project is saved."
 msgstr "The project is saved."
+
+#: src/components/navigation.tsx
+msgid "The project's screens could not be read."
+msgstr "The project's screens could not be read."
 
 #: src/lib/problem-messages.ts
 msgid "The request came from another site and was refused."
@@ -637,6 +946,15 @@ msgstr "This project has no attribute yet."
 msgid "This project has no unit type yet."
 msgstr "This project has no unit type yet."
 
+#: src/components/audit-entry-sheet.tsx
+#: src/components/audit-log.tsx
+msgid "Time"
+msgstr "Time"
+
+#: src/components/audit-log.tsx
+msgid "To"
+msgstr "To"
+
 #: src/lib/problem-messages.ts
 msgid "Too long."
 msgstr "Too long."
@@ -678,6 +996,23 @@ msgstr "Type"
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Type {typeToConfirm} to confirm"
 
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Unit type"
+msgstr "Unit type"
+
+#: src/lib/audit.ts
+msgid "Unit type declared"
+msgstr "Unit type declared"
+
+#: src/lib/audit.ts
+msgid "Unit type deleted"
+msgstr "Unit type deleted"
+
+#: src/lib/audit.ts
+msgid "Unit type updated"
+msgstr "Unit type updated"
+
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Unit types"
@@ -691,9 +1026,17 @@ msgstr "Unsaved changes"
 msgid "Use {min} to {max} characters."
 msgstr "Use {min} to {max} characters."
 
+#: src/components/audit-entry-sheet.tsx
+msgid "Values before and after the change"
+msgstr "Values before and after the change"
+
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "View all environments"
 msgstr "View all environments"
+
+#: src/components/project-audit.tsx
+msgid "View the audit log"
+msgstr "View the audit log"
 
 #: src/lib/access-names.ts
 msgid "view the project"

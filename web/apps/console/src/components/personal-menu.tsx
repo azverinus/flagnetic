@@ -36,6 +36,7 @@ export function PersonalMenu() {
   const navigate = useNavigate();
   const signingOut = useMutation({
     mutationFn: () => unwrap(signOut()),
+    meta: { readsAuditAgain: false },
     onSuccess: () => {
       queryClient.clear();
       void navigate({ to: "/sign-in" });

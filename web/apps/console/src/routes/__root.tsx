@@ -21,6 +21,11 @@ declare module "@tanstack/react-query" {
     mutationMeta: {
       /** False for a mutation that explains its own refusal on the page. */
       toast?: boolean;
+      /**
+       * False for signing in and out: they change the session, not what a
+       * log shows, and once signed out every read of a log is answered 401.
+       */
+      readsAuditAgain?: boolean;
     };
   }
 }

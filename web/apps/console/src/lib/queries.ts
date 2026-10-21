@@ -1,5 +1,14 @@
 import {
   getAuthMethods,
+  getProjectAuditEntry,
+  listAuditEntries,
+  listMembers,
+  listProjectAuditEntries,
+  listProjectMembers,
+  type AuditEntry,
+  type AuditEntryList,
+  type Member,
+  type ProjectMember,
   getMe,
   getProject,
   getProjectMe,
@@ -17,9 +26,9 @@ import {
   type Role,
   type UnitType,
 } from "@flagnetic/api";
-import { queryOptions, useQuery } from "@tanstack/react-query";
-import { useParams } from "@tanstack/react-router";
+import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
+import { type AuditSearch, auditQueryOf } from "./audit";
 import { unwrap } from "./errors";
 
 /** The caller: who is signed in, and with which credential. */
@@ -63,17 +72,6 @@ export function projectQuery(project: string) {
   });
 }
 
-/**
- * The project the address names, for what renders outside the project's
- * own routes, such as the breadcrumb and the switcher: its key, and the
- * project once read. Nothing is read where the address names none.
- */
-export function useProjectInAddress(): { key: string | undefined; project: Project | undefined } {
-  const { project: key } = useParams({ strict: false });
-  const { data } = useQuery({ ...projectQuery(key ?? ""), enabled: key !== undefined });
-  return { key, project: data };
-}
-
 /** The caller's grants and effective permissions in one project. */
 export function projectMeQuery(project: string) {
   return queryOptions<ProjectMe>({
@@ -104,5 +102,57 @@ export function attributesQuery(project: string) {
   return queryOptions<Attribute[]>({
     queryKey: ["projects", project, "attributes"],
     queryFn: async () => (await unwrap(listAttributes({ path: { project } }))).items,
+  });
+}
+
+/** The members holding a grant in a project, with their grants. */
+export function projectMembersQuery(project: string) {
+  return queryOptions<ProjectMember[]>({
+    queryKey: ["projects", project, "members"],
+    queryFn: async () => (await unwrap(listProjectMembers({ path: { project } }))).items,
+  });
+}
+
+/** Every member of the instance, for an instance admin. */
+export const membersQuery = queryOptions<Member[]>({
+  queryKey: ["members"],
+  queryFn: async () => (await unwrap(listMembers())).items,
+});
+
+/** What every read of an audit log is cached under. */
+export const auditQueryKey = ["audit"] as const;
+
+/** Whose audit log: one project's, by its key, or the instance's. */
+export type AuditScope = { project: string } | "instance";
+
+/**
+ * One page of an audit log for a search, of the server's size or of
+ * `limit` entries. The page shown stays while the next one loads, so
+ * paging and filtering do not blank the table.
+ */
+export function auditEntriesQuery(scope: AuditScope, search: AuditSearch, limit?: number) {
+  return queryOptions<AuditEntryList>({
+    queryKey: [...auditQueryKey, scope, search, limit],
+    queryFn: () => {
+      if (scope === "instance") {
+        return unwrap(listAuditEntries({ query: { ...auditQueryOf(search), limit } }));
+      }
+      const { project: _instanceOnly, ...rest } = search;
+      return unwrap(
+        listProjectAuditEntries({
+          path: { project: scope.project },
+          query: { ...auditQueryOf(rest), limit },
+        }),
+      );
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function projectAuditEntryQuery(project: string, entry: string) {
+  return queryOptions<AuditEntry>({
+    queryKey: [...auditQueryKey, { project }, "entry", entry],
+    queryFn: () => unwrap(getProjectAuditEntry({ path: { project, entry } })),
+    retry: false,
   });
 }

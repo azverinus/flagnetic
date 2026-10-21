@@ -2,7 +2,7 @@ import { useLingui } from "@lingui/react/macro";
 import { Link, useMatches } from "@tanstack/react-router";
 import { ChevronRightIcon } from "lucide-react";
 
-import { useProjectInAddress } from "@/lib/queries";
+import { useProjectInAddress } from "@/lib/use-project-in-address";
 
 /**
  * The crumb of the route of one project, which the breadcrumb calls by the

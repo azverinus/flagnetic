@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
-import { projectsQuery, useProjectInAddress } from "@/lib/queries";
+import { projectsQuery } from "@/lib/queries";
+import { useProjectInAddress } from "@/lib/use-project-in-address";
 
 /**
  * The project the member is in, and the way to another: a search over the

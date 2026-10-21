@@ -52,7 +52,7 @@ export function SignInForm({ ended, onSignedIn }: SignInFormProps) {
   });
   const submit = useMutation({
     mutationFn: (body: z.infer<typeof schema>) => unwrap(signIn({ body })),
-    meta: { toast: false },
+    meta: { toast: false, readsAuditAgain: false },
     onSuccess: onSignedIn,
   });
 

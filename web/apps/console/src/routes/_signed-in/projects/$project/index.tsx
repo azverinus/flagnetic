@@ -3,6 +3,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useId } from "react";
 
+import { RecentActivity } from "@/components/project-audit";
 import { QueryError } from "@/components/query-error";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +13,10 @@ export const Route = createFileRoute("/_signed-in/projects/$project/")({
   component: Overview,
 });
 
-/** The project at a glance: what it is called and where it serves from. */
+/**
+ * The project at a glance: what it is called, where it serves from and
+ * what changed in it last.
+ */
 function Overview() {
   const { t } = useLingui();
   const environmentsHeading = useId();
@@ -63,6 +67,7 @@ function Overview() {
           </ul>
         )}
       </section>
+      <RecentActivity project={key} />
     </div>
   );
 }

@@ -2,9 +2,10 @@ import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, type LinkProps } from "@tanstack/react-router";
 import {
   BoxesIcon,
+  HistoryIcon,
   LayersIcon,
   LayoutDashboardIcon,
   type LucideIcon,
@@ -20,7 +21,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Permission } from "@/lib/access-names";
 import { cn } from "@/lib/cn";
 import { ApiError } from "@/lib/errors";
-import { problemMessage } from "@/lib/problem-messages";
 import { meQuery, projectMeQuery } from "@/lib/queries";
 
 type Screen = {
@@ -29,19 +29,21 @@ type Screen = {
   exact?: boolean;
 };
 
+/** The routes of one project whose only parameter is the project's key. */
+type ProjectScreenRoute = Exclude<
+  Extract<NonNullable<LinkProps["to"]>, `/projects/$project${string}`>,
+  `/projects/$project${string}$${string}`
+>;
+
 type ProjectScreen = Screen & {
-  to:
-    | "/projects/$project"
-    | "/projects/$project/environments"
-    | "/projects/$project/unit-types"
-    | "/projects/$project/attributes"
-    | "/projects/$project/settings";
+  /** A screen of the project, opened with the project's key alone. */
+  to: ProjectScreenRoute;
   /** The permission the screen needs; the screen is listed only to a caller holding it. */
   permission: Permission;
 };
 
 /** The screens of one project, in the order the sidebar lists them. */
-const projectScreens: ProjectScreen[] = [
+const projectScreens = [
   {
     to: "/projects/$project",
     label: msg`Overview`,
@@ -68,18 +70,25 @@ const projectScreens: ProjectScreen[] = [
     permission: "project.read",
   },
   {
+    to: "/projects/$project/audit",
+    label: msg`Audit log`,
+    icon: HistoryIcon,
+    permission: "project.read",
+  },
+  {
     to: "/projects/$project/settings",
     label: msg`Settings`,
     icon: SettingsIcon,
     permission: "project.update",
   },
-];
+] satisfies ProjectScreen[];
 
-type InstanceScreen = Screen & { to: "/admin/projects" };
+type InstanceScreen = Screen & { to: "/admin/projects" | "/admin/audit" };
 
 /** The screens of the instance, listed to instance admins. */
 const instanceScreens: InstanceScreen[] = [
   { to: "/admin/projects", label: msg`Projects`, icon: LayersIcon },
+  { to: "/admin/audit", label: msg`Audit log`, icon: HistoryIcon },
 ];
 
 const linkClassName =
@@ -104,9 +113,42 @@ function ScreenLabel({ screen, collapsed }: { screen: Screen; collapsed: boolean
  * by the permissions the server answers for them there.
  */
 export function ProjectNavigation({ project, collapsed }: { project: string; collapsed: boolean }) {
-  const { i18n, t } = useLingui();
+  const { t } = useLingui();
   const me = useQuery(projectMeQuery(project));
-  if (me.isPending) {
+  if (me.data === undefined) {
+    // A first read that failed is announced by the page, with its own way
+    // to ask again; the navigation says in place that its screens are
+    // missing and offers to read them again, without a second alert. An
+    // unknown project and one the caller holds no grant in have no screens
+    // to list.
+    if (me.isError) {
+      const refused =
+        me.error instanceof ApiError && (me.error.status === 403 || me.error.status === 404);
+      if (refused) return null;
+      return (
+        <nav aria-label={t`Project`} className="flex flex-col gap-1">
+          <p
+            className={cn(
+              "px-2.5 text-xs text-muted-foreground",
+              collapsed ? "sr-only" : "sr-only md:not-sr-only",
+            )}
+          >
+            {t`The project's screens could not be read.`}
+          </p>
+          <Button
+            variant="ghost"
+            className="h-9 justify-start gap-2 px-2.5"
+            title={t`Try again`}
+            onClick={() => void me.refetch()}
+          >
+            <RotateCwIcon aria-hidden className="size-4 shrink-0" />
+            <span
+              className={cn("truncate", collapsed ? "sr-only" : "sr-only md:not-sr-only")}
+            >{t`Try again`}</span>
+          </Button>
+        </nav>
+      );
+    }
     return (
       <div className="flex flex-col gap-1" aria-busy>
         <Skeleton className="h-9 w-full" />
@@ -114,35 +156,7 @@ export function ProjectNavigation({ project, collapsed }: { project: string; col
       </div>
     );
   }
-  if (me.isError) {
-    // An unknown project and one the caller holds no grant in have no
-    // screens to list; the page says which it is.
-    if (me.error instanceof ApiError && (me.error.status === 403 || me.error.status === 404)) {
-      return null;
-    }
-    return (
-      <div role="alert" className="flex flex-col items-start gap-1 px-1">
-        <p
-          className={cn(
-            "text-xs text-muted-foreground",
-            collapsed ? "sr-only" : "sr-only md:not-sr-only",
-          )}
-        >
-          {problemMessage(i18n, me.error instanceof ApiError ? me.error : new ApiError(0, {}))}
-        </p>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t`Try again`}
-          title={t`Try again`}
-          onClick={() => void me.refetch()}
-        >
-          <RotateCwIcon aria-hidden />
-        </Button>
-      </div>
-    );
-  }
-  const held = new Set(me.data.permissions);
+  const held = new Set<string>(me.data.permissions);
   return (
     <nav aria-label={t`Project`} className="flex flex-col gap-1">
       {projectScreens

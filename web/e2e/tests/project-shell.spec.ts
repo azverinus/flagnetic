@@ -260,9 +260,105 @@ test.describe("what a role may do", () => {
   });
 });
 
+test.describe("the overview", () => {
+  const recentActivity = (page: Page) =>
+    page.getByRole("table", { name: "The most recent changes in this project" });
+
+  test("lists what has changed in the project", async ({ page }) => {
+    await openProject(page, seededProject);
+
+    await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
+    await expect(recentActivity(page)).toContainText("project.created");
+    // The harness seeded the project through the bootstrap token.
+    await expect(recentActivity(page)).toContainText("bootstrap");
+
+    await recentActivity(page)
+      .getByRole("link", { name: /project\.created/ })
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${seededProject.key}/audit/[0-9a-f-]{36}`));
+    await expect(page.getByRole("dialog", { name: "Audit entry" })).toContainText(
+      "Project created",
+    );
+
+    // Closing it goes back to where it was opened.
+    await page.getByRole("button", { name: "Close" }).click();
+    await expect(page).toHaveURL(new RegExp(`/projects/${seededProject.key}$`));
+    await expect(recentActivity(page)).toContainText("project.created");
+  });
+
+  test("renders a failed query where it belongs, with a way to ask again", async ({ page }) => {
+    let refuse = true;
+    await page.route(`**/api/v1/projects/${seededProject.key}/audit*`, async (route) => {
+      if (!refuse) return route.continue();
+      return route.fulfill({
+        status: 500,
+        contentType: "application/problem+json",
+        body: JSON.stringify({
+          type: "about:blank",
+          title: "Internal Server Error",
+          status: 500,
+          code: "internal",
+          request_id: "req-e2e-1",
+        }),
+      });
+    });
+    await openProject(page, seededProject);
+
+    // Only the failed part of the screen says so; the rest is still there.
+    const failure = page.getByRole("alert").filter({ hasText: "req-e2e-1" });
+    await expect(failure).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Recent activity" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Environments" })).toBeVisible();
+    await expect(recentActivity(page)).toHaveCount(0);
+
+    refuse = false;
+    await failure.getByRole("button", { name: "Try again" }).click();
+
+    await expect(recentActivity(page)).toContainText("project.created");
+    await expect(failure).toHaveCount(0);
+  });
+});
+
+test.describe("the project navigation", () => {
+  test("says a failed read of the caller's permissions once, and reads its screens again", async ({
+    page,
+  }) => {
+    let refuse = true;
+    await page.route(`**/api/v1/projects/${seededProject.key}/me`, async (route) => {
+      if (!refuse) return route.continue();
+      return route.fulfill({
+        status: 500,
+        contentType: "application/problem+json",
+        body: JSON.stringify({
+          type: "about:blank",
+          title: "Internal Server Error",
+          status: 500,
+          code: "internal",
+          request_id: "req-e2e-2",
+        }),
+      });
+    });
+    await signIn(page);
+    await page.goto(`/projects/${seededProject.key}`);
+
+    await expect(page.getByRole("alert")).toHaveCount(1);
+    await expect(page.getByRole("alert")).toContainText("req-e2e-2");
+    const navigation = projectNavigation(page);
+    await expect(navigation).toContainText("The project's screens could not be read.");
+    await expect(navigation.getByRole("link")).toHaveCount(0);
+
+    refuse = false;
+    await navigation.getByRole("button", { name: "Try again" }).click();
+
+    await expect(projectNavigation(page).getByRole("link", { name: "Environments" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: seededProject.name, level: 1 })).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+  });
+});
+
 test.describe("accessibility", () => {
   for (const theme of ["light", "dark"] as const) {
-    test(`every screen of the route map has no serious violation in the ${theme} theme`, async ({
+    test(`every screen in the project navigation has no serious violation in the ${theme} theme`, async ({
       page,
     }) => {
       await useTheme(page, theme);
