@@ -20,8 +20,8 @@ type stateDoc struct {
 	HasRollout  bool   `json:"has_rollout"`
 }
 
-// rolloutRule is the containment a configuration whose rules serve a
-// rollout matches, through the configurations' GIN index.
+// rolloutRule is the containment a configuration matches when one of its
+// rules serves a rollout.
 const rolloutRule = `'{"rules": [{"serve": {"kind": "rollout"}}]}'`
 
 // stateConditions are what a configuration c in the state's environment
@@ -35,8 +35,9 @@ var stateConditions = map[appflags.StateFilter]string{
 
 // flagOrders are the ORDER BY of each sort, and the keyset condition of a
 // page after cursor c, its values passed through arg. A key or name
-// compares in byte order, as the console shows them; the key breaks ties,
-// as it is unique in the project.
+// compares in byte order, so the order is the one the API documents
+// whatever the database's collation; the key breaks ties, as it is unique
+// in the project.
 var flagOrders = map[appflags.FlagSort]struct {
 	order string
 	after func(c appflags.FlagCursor, arg func(any) string) string
