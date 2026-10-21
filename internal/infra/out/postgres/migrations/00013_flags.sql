@@ -34,9 +34,6 @@ CREATE TABLE flags (
     UNIQUE (project_id, key)
 );
 
--- The flags list filters by tag.
-CREATE INDEX flags_tags ON flags USING gin (tags);
-
 -- Flag configurations: what one flag serves in one environment, one row for
 -- every flag in every environment of its project, dropped with either. The
 -- document is written and read whole; the GIN index answers which

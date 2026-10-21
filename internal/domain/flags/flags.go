@@ -1,9 +1,9 @@
 // Package flags is the domain of what a project serves: flags with their
 // definition and variations, their configuration in each environment, and
-// the segments their rules target. Every rule spanning several of them (a
-// variation is not removed while a configuration serves it, a segment is not
-// deleted while a rule names it) is a pure function over what the handler
-// loaded under its project's row lock, so it holds for as long as that lock.
+// the segments their rules target. Every rule spanning several of them, such
+// as a variation not being removed while a configuration serves it, is a pure
+// function over what the handler loaded under its project's row lock, so it
+// holds for as long as that lock.
 package flags
 
 import (
