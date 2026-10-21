@@ -63,8 +63,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	management.Mount(edge, management.Handlers{
 		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, d.Clock),
 		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, d.Clock, sessionKey),
-		SignIn: appaccess.NewSignIn(tx, accessStore, hasher, auditLog, d.Clock, d.IDs,
-			rand.Reader, sessionKey),
+		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{
+			Tx: tx, Store: accessStore, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
+			Random: rand.Reader, Key: sessionKey,
+		}),
 		SignOut:            appaccess.NewSignOut(tx, accessStore, auditLog, d.Clock, d.IDs),
 		ProjectPermissions: appaccess.NewProjectPermissions(),
 		WorkingProjects:    appaccess.NewWorkingProjects(),

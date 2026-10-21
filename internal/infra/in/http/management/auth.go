@@ -61,7 +61,11 @@ func browserOf(ctx context.Context) browser {
 // HTTP too unless the console is on localhost, where browsers keep a Secure
 // cookie off plain HTTP, or insecure cookies were allowed for a trial. The
 // base URL, when configured, is what the browser sees in front of any proxy,
-// so it decides instead of the request.
+// so it decides instead of the request. Without it the request's own host
+// is the best witness of what the browser opened: a browser sets Host from
+// the URL and lets no page change it, so only a client that is no browser
+// can claim localhost, and that spares only its own cookie the Secure flag.
+// The listen address would say less, as it usually names no host at all.
 func (o Options) secureCookies(scheme, host string) bool {
 	if o.BaseURL != nil {
 		scheme, host = o.BaseURL.Scheme, o.BaseURL.Host

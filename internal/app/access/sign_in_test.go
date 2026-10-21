@@ -46,8 +46,10 @@ func newSignIn(t *testing.T, hasher appaccess.PasswordVerifier) *appaccess.SignI
 func newSignInAt(t *testing.T, c clock.Clock, hasher appaccess.PasswordVerifier) *appaccess.SignIn {
 	t.Helper()
 	pool := testkit.Pool(t)
-	return appaccess.NewSignIn(postgres.NewTransactor(pool), pgaccess.NewStore(pool), hasher, pggovernance.NewAuditLog(pool),
-		c, id.NewSource(c), rand.Reader, bytes.Repeat([]byte{1}, 32))
+	return appaccess.NewSignIn(appaccess.SignInDeps{
+		Tx: postgres.NewTransactor(pool), Store: pgaccess.NewStore(pool), Hasher: hasher, Audit: pggovernance.NewAuditLog(pool),
+		Clock: c, IDs: id.NewSource(c), Random: rand.Reader, Key: bytes.Repeat([]byte{1}, 32),
+	})
 }
 
 // anAddress returns an address no other test of the run signs in from.
