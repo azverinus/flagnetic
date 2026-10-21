@@ -45,6 +45,11 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		return fail(log, "start failed", configError(errors.New(
 			"FLAGNETIC_SECRET_KEY is required by serve; for example the output of `openssl rand -base64 32`, kept for the life of the instance")))
 	}
+	if n := len(cfg.SecretKey.Reveal()); n < secret.MinKeyLength {
+		return fail(log, "start failed", configError(fmt.Errorf(
+			"FLAGNETIC_SECRET_KEY is %d bytes long and must be at least %d bytes; for example the output of `openssl rand -base64 32`",
+			n, secret.MinKeyLength)))
+	}
 	pool, err := openDatabase(ctx, cfg, log, o)
 	if err != nil {
 		return failStart(ctx, log, err)

@@ -6,7 +6,7 @@ How to run Flagnetic in production: what it needs, how it starts and stops, and 
 
 - **PostgreSQL 16 or newer.** `serve` and `migrate` read the server version at start and refuse an older one with a message naming it. Flagnetic is tested on the oldest and the newest supported versions.
 - **Synchronized clocks.** Every replica judges time by its own wall clock (expiry, leases, scheduled changes), so run NTP or your platform's time sync on every host. Coordination between replicas tolerates seconds of skew, not minutes.
-- **A secret key.** `serve` refuses to start without `FLAGNETIC_SECRET_KEY` (exit code 2); see [The secret key](#the-secret-key).
+- **A secret key.** `serve` refuses to start without `FLAGNETIC_SECRET_KEY`, or with one shorter than 32 bytes (exit code 2); see [The secret key](#the-secret-key).
 
 Any number of replicas can run against one database; every replica serves every API and runs every background worker, and they coordinate only through PostgreSQL.
 
@@ -36,7 +36,7 @@ With `FLAGNETIC_AUTO_MIGRATE=false`, `serve` compares the database's schema with
 
 ## The secret key
 
-`FLAGNETIC_SECRET_KEY` is the instance's secret key: secrets the instance stores are sealed (encrypted) under it, and sessions are signed with it. Generate a long random value once, for example with `openssl rand -base64 32`, give every replica the same one, and keep it in your secret store.
+`FLAGNETIC_SECRET_KEY` is the instance's secret key: secrets the instance stores are sealed (encrypted) under it, and sessions are signed with it. It must be at least 32 bytes long; `serve` refuses a shorter one (exit code 2), since the keys it derives are no stronger than the key itself. Generate a long random value once, for example with `openssl rand -base64 32`, give every replica the same one, and keep it in your secret store.
 
 **Keep the key for the life of the instance.** On its first start the instance stores a canary, a random value sealed under the key, and every replica opens it on every start. A replica given another key cannot open it and refuses to start, exit code 1, with a message naming `FLAGNETIC_SECRET_KEY`: a mistyped or rotated key stops the deploy instead of silently losing what the instance sealed. Start it again with the original key.
 

@@ -129,7 +129,7 @@ func Settings() []Setting {
 			Secret:     true,
 			Description: "The instance's secret key: stored secrets are sealed under it, sessions are signed with it. " +
 				"Keep it for the life of the instance: on its first start the instance stores a canary sealed under the key, " +
-				"and `serve` refuses to start under a key that does not open it. Use a long random value, such as the output of `openssl rand -base64 32`.",
+				"and `serve` refuses to start under a key that does not open it. At least 32 bytes: use a long random value, such as the output of `openssl rand -base64 32`.",
 			Example: "q3S0k1p2Rk7Jt0E5m9xV8bYcN4wZ6hL2aU1dG7fH0eI=",
 			apply: func(cfg *Config, v string) error {
 				cfg.SecretKey = secret.New(v)

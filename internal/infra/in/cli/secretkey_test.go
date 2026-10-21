@@ -17,6 +17,16 @@ func TestServeRequiresASecretKey(t *testing.T) {
 	}
 }
 
+func TestServeRefusesASecretKeyShorterThan32Bytes(t *testing.T) {
+	r := run(map[string]string{"DATABASE_URL": testkit.EmptyDatabase(t), "FLAGNETIC_SECRET_KEY": "0123456789abcdef0123456789abcde"}, nil, "serve")
+	if r.code != 2 {
+		t.Fatalf("exit code = %d, want 2; stderr:\n%s", r.code, r.stderr)
+	}
+	if !strings.Contains(r.stderr, "FLAGNETIC_SECRET_KEY") || !strings.Contains(r.stderr, "32 bytes") {
+		t.Errorf("stderr does not name FLAGNETIC_SECRET_KEY and its minimum:\n%s", r.stderr)
+	}
+}
+
 func TestServeWritesTheCanaryAndThenRefusesAChangedSecretKey(t *testing.T) {
 	url := testkit.EmptyDatabase(t)
 	first := serve(t, map[string]string{"DATABASE_URL": url})

@@ -43,6 +43,12 @@ var ErrSecretKeyChanged = errors.New("FLAGNETIC_SECRET_KEY does not open this in
 	"it is not the key the instance was set up with, and what the instance sealed cannot be read without that key; " +
 	"start with the original key")
 
+// MinKeyLength is the fewest bytes a secret key may have. Every key the
+// keyring uses is derived from the secret key, and derivation adds no
+// strength: a short key would make sealed secrets and session signatures
+// guessable.
+const MinKeyLength = 32
+
 // Keyring seals and opens values, and derives keys, under the instance's
 // secret key.
 type Keyring struct {
