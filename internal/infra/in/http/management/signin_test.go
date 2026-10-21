@@ -418,16 +418,27 @@ func TestCrossOriginProtectionGuardsCookieRequests(t *testing.T) {
 		t.Errorf("cross-site sign-out = %d, want 403", res.StatusCode())
 	}
 
-	signIn := `{"email":"` + admin.Email + `","password":"` + admin.Password + `"}`
-	other := testkit.NewBrowser(t, srv.URL)
-	for _, contentType := range []string{"text/plain", "application/x-www-form-urlencoded", ""} {
-		res, body := other.Do(t, http.MethodPost, "/api/v1/auth/sign-in", contentType, signIn)
-		if res.StatusCode != http.StatusForbidden || !strings.Contains(body, `"cross_origin"`) || len(res.Cookies()) != 0 {
-			t.Errorf("sign-in as %q: %d %s, want 403 cross_origin and no cookie", contentType, res.StatusCode, body)
+}
+
+func TestASignInThatIsNotJSONIsRefusedAsUnsupported(t *testing.T) {
+	srv := testkit.StartServer(t)
+	m := testkit.NewMember(t, testkit.Pool(t))
+	signIn := `{"email":"` + m.Email + `","password":"` + m.Password + `"}`
+	b := testkit.NewBrowser(t, srv.URL)
+	// A form on another site can send these without asking the browser
+	// first; JSON it cannot.
+	for _, contentType := range []string{"text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x", ""} {
+		res, err := b.SignInWithBodyWithResponse(t.Context(), contentType, strings.NewReader(signIn))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p := res.ApplicationproblemJSON415; p == nil || p.Code != "unsupported_media_type" || len(res.HTTPResponse.Cookies()) != 0 {
+			t.Errorf("sign-in as %q: %d %s, want 415 unsupported_media_type and no cookie", contentType, res.StatusCode(), res.Body)
 		}
 	}
-	if res, body := other.Do(t, http.MethodPost, "/api/v1/auth/sign-in", "application/json; charset=utf-8", signIn); res.StatusCode != http.StatusOK {
-		t.Errorf("sign-in as JSON: %d %s, want 200", res.StatusCode, body)
+	res, err := b.SignInWithBodyWithResponse(t.Context(), "application/json; charset=utf-8", strings.NewReader(signIn))
+	if err != nil || res.JSON200 == nil {
+		t.Errorf("sign-in as JSON: %d %s, want 200", res.StatusCode(), res.Body)
 	}
 }
 

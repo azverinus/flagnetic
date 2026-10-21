@@ -55,6 +55,12 @@ func InvalidRequest(detail string) error {
 	return &adapterProblem{problem{status: http.StatusBadRequest, code: "invalid_request", title: "Invalid request", detail: detail}}
 }
 
+// UnsupportedMediaType is answered 415 unsupported_media_type: a body sent
+// as a media type the operation does not accept.
+func UnsupportedMediaType(detail string) error {
+	return &adapterProblem{problem{status: http.StatusUnsupportedMediaType, code: "unsupported_media_type", title: "Unsupported media type", detail: detail}}
+}
+
 // PreconditionRequired is answered 428 precondition_required: a write that
 // must name the version it read and does not.
 func PreconditionRequired(detail string) error {

@@ -2,7 +2,6 @@ package management_test
 
 import (
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -49,8 +48,8 @@ func signInAs(t *testing.T, b *testkit.Browser, email, password string) (status 
 	switch {
 	case res.ApplicationproblemJSON401 != nil:
 		p = res.ApplicationproblemJSON401
-	case res.StatusCode() == http.StatusTooManyRequests:
-		p = problemOf(t, res.Body)
+	case res.ApplicationproblemJSON429 != nil:
+		p = res.ApplicationproblemJSON429
 		if p.RetryAfter != nil {
 			retryAfter = *p.RetryAfter
 		}
@@ -58,7 +57,7 @@ func signInAs(t *testing.T, b *testkit.Browser, email, password string) (status 
 			t.Errorf("Retry-After = %q, want %d as in the body", header, retryAfter)
 		}
 	case res.StatusCode() != http.StatusOK:
-		p = problemOf(t, res.Body)
+		t.Fatalf("sign-in = %d %s, an answer the contract does not declare", res.StatusCode(), res.Body)
 	}
 	if p != nil {
 		code = p.Code
@@ -246,18 +245,11 @@ func TestAnInvitedMemberCannotSignInAndIsAuditedAsInvited(t *testing.T) {
 func TestAuthBodiesOver8KiBAreRefusedBeforeAnything(t *testing.T) {
 	srv := testkit.StartServer(t)
 	body := `{"email":"a@example.com","password":"` + strings.Repeat("x", 8<<10) + `"}`
-	res, got := testkit.NewBrowser(t, srv.URL).Do(t, http.MethodPost, "/api/v1/auth/sign-in", "application/json", body)
-	if res.StatusCode != http.StatusRequestEntityTooLarge || !strings.Contains(got, `"request_too_large"`) {
-		t.Errorf("a 8 KiB password: %d %s, want 413 request_too_large", res.StatusCode, got)
+	res, err := testkit.NewBrowser(t, srv.URL).SignInWithBodyWithResponse(t.Context(), "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-// problemOf decodes a problem document the generated client does not.
-func problemOf(t *testing.T, body []byte) *management.Problem {
-	t.Helper()
-	var p management.Problem
-	if err := json.Unmarshal(body, &p); err != nil {
-		t.Fatalf("not a problem document: %s", body)
+	if p := res.ApplicationproblemJSON413; p == nil || p.Code != "request_too_large" {
+		t.Errorf("a 8 KiB password: %d %s, want 413 request_too_large", res.StatusCode(), res.Body)
 	}
-	return &p
 }

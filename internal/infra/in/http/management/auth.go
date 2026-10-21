@@ -32,10 +32,9 @@ type Options struct {
 // browser says comes from another origin.
 var errCrossOrigin = apperrors.Forbidden("cross_origin", "a request signed in by the session cookie must come from the console's own origin")
 
-// opensSession are the operations that open a session: public, so no cookie
-// guards them, and so they accept only a JSON body, which a cross-site form
-// cannot send without a preflight.
-var opensSession = map[string]bool{"signIn": true}
+// errNotJSON refuses a body that is not JSON to an operation that opens a
+// session, which is what a form on another site would send.
+var errNotJSON = flaghttp.UnsupportedMediaType("the body must be sent as application/json")
 
 // isJSON reports whether r's body is declared application/json.
 func isJSON(r *http.Request) bool {

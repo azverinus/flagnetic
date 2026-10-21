@@ -12,7 +12,11 @@ info:
     acting for a member) and `instance_admin`. An API token is further
     narrowed by its scopes: each permission falls under one scope, and a token
     exercises it only when it carries that scope. Operations marked
-    `x-session-required` refuse every API token.
+    `x-session-required` refuse every API token. Operations marked
+    `x-opens-session` accept a body sent as `application/json` only
+    (`415 unsupported_media_type` otherwise); operations marked
+    `x-checks-password` accept a body of 8 KiB at most
+    (`413 request_too_large` otherwise).
 
     A script authenticates with an API token as a bearer; the console with
     the session cookie `POST /auth/sign-in` sets. When a request carries both,
@@ -36,8 +40,16 @@ paths:
         password and a member who may not sign in all get the same
         `invalid_credentials`, in comparable time. The body must be sent as
         `application/json`, which a form on another site cannot send;
-        anything else is refused `cross_origin`.
+        anything else is refused `unsupported_media_type`.
+
+        Each attempt counts as a failure of its email and of its address
+        before the password is checked, and is taken back when the password
+        was right or could not be checked. Five consecutive failures lock the
+        email, a hundred from one address in fifteen minutes throttle the
+        address; either is refused before the password is checked.
       x-permission: public
+      x-opens-session: true
+      x-checks-password: true
       security: []
       tags: [auth]
       requestBody:
@@ -62,8 +74,14 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
-        "403":
-          $ref: "#/components/responses/Forbidden"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/TooManyAttempts"
+        "503":
+          $ref: "#/components/responses/Busy"
   /auth/sign-out:
     post:
       operationId: signOut
@@ -855,6 +873,47 @@ components:
         WWW-Authenticate:
           schema:
             type: string
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    RequestTooLarge:
+      description: "`request_too_large`: the body is larger than the operation accepts; one that checks a password accepts 8 KiB."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    UnsupportedMediaType:
+      description: "`unsupported_media_type`: the body is not sent as `application/json`, which the operations opening a session require so a form on another site cannot call them."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    TooManyAttempts:
+      description: |
+        Refused before the password is checked: `locked` while the email is
+        locked by consecutive failures, `rate_limited` while the address is
+        throttled. `retry_after` and the `Retry-After` header give the
+        seconds until the attempt can be made again.
+      headers:
+        Retry-After:
+          description: Seconds to wait before trying again.
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Busy:
+      description: |
+        `busy`: the replica is checking as many passwords as it may at once
+        and no turn freed within two seconds. The attempt was not counted as
+        a failure; retry after `Retry-After` seconds.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
       content:
         application/problem+json:
           schema:

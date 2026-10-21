@@ -128,16 +128,11 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 		panic("management: no operation table entry for " + pattern + "; run task generate")
 	}
 	var opts []flaghttp.RouteOption
-	if strings.HasPrefix(path, BaseURL+"/auth/") {
-		opts = append(opts, flaghttp.MaxBodyBytes(authBodyLimit))
+	if op.ChecksPassword {
+		opts = append(opts, flaghttp.MaxBodyBytes(operations.PasswordBodyLimit))
 	}
 	rt.a.edge.Handle(pattern, rt.a.seam(op, http.HandlerFunc(h)), opts...)
 }
-
-// authBodyLimit caps the bodies of the operations that check a password,
-// which hold an email and a password at most 128 characters long, so a huge
-// body costs nothing before it is refused.
-const authBodyLimit = 8 << 10
 
 func (rt router) ServeHTTP(w http.ResponseWriter, r *http.Request) { rt.a.edge.ServeHTTP(w, r) }
 
@@ -180,14 +175,14 @@ func requestOf(ctx context.Context) governance.Request {
 // credential is authenticated even for a public operation, so a bad one is
 // refused there as everywhere; only the absence of any credential is how
 // anyone calls it.
-func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
+func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), browserKey{}, browser{
 			secureCookies: a.opts.secureCookies(flaghttp.ClientOf(r.Context()).Scheme, r.Host),
 			userAgent:     r.UserAgent(),
 		})
 		r = r.WithContext(ctx)
-		caller, err := a.authenticate(r, op)
+		caller, err := a.authenticate(r, op.Operation)
 		var in *addressed
 		switch {
 		case err == nil && caller.Method == access.MethodSession && a.crossOrigin(r):
@@ -195,18 +190,18 @@ func (a *api) seam(op access.Operation, next http.Handler) http.Handler {
 		case err == nil && op.InProject():
 			in, err = a.address(ctx, caller, r.PathValue("project"))
 			if err == nil {
-				err = access.Authorize(caller, op, &access.ProjectAccess{Project: in.project.ID, Permissions: in.permissions})
+				err = access.Authorize(caller, op.Operation, &access.ProjectAccess{Project: in.project.ID, Permissions: in.permissions})
 			}
 		case err == nil:
-			err = access.Authorize(caller, op, nil)
+			err = access.Authorize(caller, op.Operation, nil)
 		case errors.Is(err, errUnauthenticated) && op.Requirement == access.RequirePublic:
 			err = nil
 		}
-		if err == nil && opensSession[op.Name] && !isJSON(r) {
-			err = errCrossOrigin
+		if err == nil && op.OpensSession && !isJSON(r) {
+			err = errNotJSON
 		}
 		if err != nil {
-			a.refuse(w, r, op, err)
+			a.refuse(w, r, op.Operation, err)
 			return
 		}
 		ctx = context.WithValue(ctx, callerKey{}, caller)

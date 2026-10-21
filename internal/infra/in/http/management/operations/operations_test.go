@@ -111,3 +111,20 @@ func TestOnlyReadingWhoTheCallerIsIsOpenToProjectTokens(t *testing.T) {
 		}
 	}
 }
+
+func TestTheOperationsOpeningASessionAndCheckingAPasswordAreRead(t *testing.T) {
+	doc := "paths:\n  /auth/sign-in:\n    post:\n      operationId: signIn\n      x-permission: public\n      x-opens-session: true\n      x-checks-password: true\n" +
+		"  /me/password:\n    post:\n      operationId: changeMyPassword\n      x-permission: member\n      x-checks-password: true\n" +
+		"  /auth/sign-out:\n    post:\n      operationId: signOut\n      x-permission: member\n"
+	ops, err := Read([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for pattern, want := range map[string][2]bool{
+		"POST /auth/sign-in": {true, true}, "POST /me/password": {false, true}, "POST /auth/sign-out": {false, false},
+	} {
+		if got := ops[pattern]; got.OpensSession != want[0] || got.ChecksPassword != want[1] {
+			t.Errorf("%s: opens a session %v, checks a password %v; want %v", pattern, got.OpensSession, got.ChecksPassword, want)
+		}
+	}
+}

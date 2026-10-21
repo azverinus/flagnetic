@@ -538,6 +538,9 @@ type UnitTypeKey = string
 // BadRequest A problem document (RFC 9457). Code-specific values are further members.
 type BadRequest = Problem
 
+// Busy A problem document (RFC 9457). Code-specific values are further members.
+type Busy = Problem
+
 // Conflict A problem document (RFC 9457). Code-specific values are further members.
 type Conflict = Problem
 
@@ -550,8 +553,17 @@ type Invalid = Problem
 // NotFound A problem document (RFC 9457). Code-specific values are further members.
 type NotFound = Problem
 
+// RequestTooLarge A problem document (RFC 9457). Code-specific values are further members.
+type RequestTooLarge = Problem
+
+// TooManyAttempts A problem document (RFC 9457). Code-specific values are further members.
+type TooManyAttempts = Problem
+
 // Unauthenticated A problem document (RFC 9457). Code-specific values are further members.
 type Unauthenticated = Problem
+
+// UnsupportedMediaType A problem document (RFC 9457). Code-specific values are further members.
+type UnsupportedMediaType = Problem
 
 // ListAuditEntriesParams defines parameters for ListAuditEntries.
 type ListAuditEntriesParams struct {
@@ -747,7 +759,13 @@ type ClientInterface interface {
 	// password and a member who may not sign in all get the same
 	// `invalid_credentials`, in comparable time. The body must be sent as
 	// `application/json`, which a form on another site cannot send;
-	// anything else is refused `cross_origin`.
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its email and of its address
+	// before the password is checked, and is taken back when the password
+	// was right or could not be checked. Five consecutive failures lock the
+	// email, a hundred from one address in fifteen minutes throttle the
+	// address; either is refused before the password is checked.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -760,7 +778,13 @@ type ClientInterface interface {
 	// password and a member who may not sign in all get the same
 	// `invalid_credentials`, in comparable time. The body must be sent as
 	// `application/json`, which a form on another site cannot send;
-	// anything else is refused `cross_origin`.
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its email and of its address
+	// before the password is checked, and is taken back when the password
+	// was right or could not be checked. Five consecutive failures lock the
+	// email, a hundred from one address in fifteen minutes throttle the
+	// address; either is refused before the password is checked.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1039,7 +1063,13 @@ func (c *Client) GetAuthMethods(ctx context.Context, reqEditors ...RequestEditor
 // password and a member who may not sign in all get the same
 // `invalid_credentials`, in comparable time. The body must be sent as
 // `application/json`, which a form on another site cannot send;
-// anything else is refused `cross_origin`.
+// anything else is refused `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its email and of its address
+// before the password is checked, and is taken back when the password
+// was right or could not be checked. Five consecutive failures lock the
+// email, a hundred from one address in fifteen minutes throttle the
+// address; either is refused before the password is checked.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1062,7 +1092,13 @@ func (c *Client) SignInWithBody(ctx context.Context, contentType string, body io
 // password and a member who may not sign in all get the same
 // `invalid_credentials`, in comparable time. The body must be sent as
 // `application/json`, which a form on another site cannot send;
-// anything else is refused `cross_origin`.
+// anything else is refused `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its email and of its address
+// before the password is checked, and is taken back when the password
+// was right or could not be checked. Five consecutive failures lock the
+// email, a hundred from one address in fifteen minutes throttle the
+// address; either is refused before the password is checked.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3097,7 +3133,13 @@ type ClientWithResponsesInterface interface {
 	// password and a member who may not sign in all get the same
 	// `invalid_credentials`, in comparable time. The body must be sent as
 	// `application/json`, which a form on another site cannot send;
-	// anything else is refused `cross_origin`.
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its email and of its address
+	// before the password is checked, and is taken back when the password
+	// was right or could not be checked. Five consecutive failures lock the
+	// email, a hundred from one address in fifteen minutes throttle the
+	// address; either is refused before the password is checked.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -3110,7 +3152,13 @@ type ClientWithResponsesInterface interface {
 	// password and a member who may not sign in all get the same
 	// `invalid_credentials`, in comparable time. The body must be sent as
 	// `application/json`, which a form on another site cannot send;
-	// anything else is refused `cross_origin`.
+	// anything else is refused `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its email and of its address
+	// before the password is checked, and is taken back when the password
+	// was right or could not be checked. Five consecutive failures lock the
+	// email, a hundred from one address in fifteen minutes throttle the
+	// address; either is refused before the password is checked.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -3528,6 +3576,16 @@ type SignInResponse401Headers struct {
 	WWWAuthenticate *string
 }
 
+// SignInResponse429Headers the declared response headers of an HTTP 429 response for SignIn
+type SignInResponse429Headers struct {
+	RetryAfter *int
+}
+
+// SignInResponse503Headers the declared response headers of an HTTP 503 response for SignIn
+type SignInResponse503Headers struct {
+	RetryAfter *int
+}
+
 type SignInResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3537,12 +3595,22 @@ type SignInResponse struct {
 	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
-	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
-	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *RequestTooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *UnsupportedMediaType
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyAttempts
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *Busy
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *SignInResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *SignInResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *SignInResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *SignInResponse503Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -3560,9 +3628,24 @@ func (r SignInResponse) GetApplicationproblemJSON401() *Unauthenticated {
 	return r.ApplicationproblemJSON401
 }
 
-// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
-func (r SignInResponse) GetApplicationproblemJSON403() *Forbidden {
-	return r.ApplicationproblemJSON403
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON413() *RequestTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON415() *UnsupportedMediaType {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON429() *TooManyAttempts {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON503() *Busy {
+	return r.ApplicationproblemJSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -5406,7 +5489,13 @@ func (c *ClientWithResponses) GetAuthMethodsWithResponse(ctx context.Context, re
 // password and a member who may not sign in all get the same
 // `invalid_credentials`, in comparable time. The body must be sent as
 // `application/json`, which a form on another site cannot send;
-// anything else is refused `cross_origin`.
+// anything else is refused `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its email and of its address
+// before the password is checked, and is taken back when the password
+// was right or could not be checked. Five consecutive failures lock the
+// email, a hundred from one address in fifteen minutes throttle the
+// address; either is refused before the password is checked.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -5425,7 +5514,13 @@ func (c *ClientWithResponses) SignInWithBodyWithResponse(ctx context.Context, co
 // password and a member who may not sign in all get the same
 // `invalid_credentials`, in comparable time. The body must be sent as
 // `application/json`, which a form on another site cannot send;
-// anything else is refused `cross_origin`.
+// anything else is refused `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its email and of its address
+// before the password is checked, and is taken back when the password
+// was right or could not be checked. Five consecutive failures lock the
+// email, a hundred from one address in fifteen minutes throttle the
+// address; either is refused before the password is checked.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -6053,12 +6148,33 @@ func ParseSignInResponse(rsp *http.Response) (*SignInResponse, error) {
 		}
 		response.ApplicationproblemJSON401 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Forbidden
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest RequestTooLarge
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.ApplicationproblemJSON403 = &dest
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest UnsupportedMediaType
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyAttempts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Busy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
 
 	}
 
@@ -6083,6 +6199,26 @@ func ParseSignInResponse(rsp *http.Response) (*SignInResponse, error) {
 			headers.WWWAuthenticate = &value
 		}
 		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers SignInResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers SignInResponse503Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -8933,6 +9069,15 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 type BadRequestApplicationProblemPlusJSONResponse Problem
 
+type BusyResponseHeaders struct {
+	RetryAfter *int
+}
+type BusyApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers BusyResponseHeaders
+}
+
 type ConflictApplicationProblemPlusJSONResponse Problem
 
 type ForbiddenApplicationProblemPlusJSONResponse Problem
@@ -8940,6 +9085,17 @@ type ForbiddenApplicationProblemPlusJSONResponse Problem
 type InvalidApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
+
+type RequestTooLargeApplicationProblemPlusJSONResponse Problem
+
+type TooManyAttemptsResponseHeaders struct {
+	RetryAfter *int
+}
+type TooManyAttemptsApplicationProblemPlusJSONResponse struct {
+	Body Problem
+
+	Headers TooManyAttemptsResponseHeaders
+}
 
 type UnauthenticatedResponseHeaders struct {
 	WWWAuthenticate *string
@@ -8949,6 +9105,8 @@ type UnauthenticatedApplicationProblemPlusJSONResponse struct {
 
 	Headers UnauthenticatedResponseHeaders
 }
+
+type UnsupportedMediaTypeApplicationProblemPlusJSONResponse Problem
 
 type ListAuditEntriesRequestObject struct {
 	Params ListAuditEntriesParams
@@ -9146,18 +9304,72 @@ func (response SignIn401ApplicationProblemPlusJSONResponse) VisitSignInResponse(
 	return err
 }
 
-type SignIn403ApplicationProblemPlusJSONResponse struct {
-	ForbiddenApplicationProblemPlusJSONResponse
+type SignIn413ApplicationProblemPlusJSONResponse struct {
+	RequestTooLargeApplicationProblemPlusJSONResponse
 }
 
-func (response SignIn403ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+func (response SignIn413ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
-	w.WriteHeader(403)
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn415ApplicationProblemPlusJSONResponse struct {
+	UnsupportedMediaTypeApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn415ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn429ApplicationProblemPlusJSONResponse struct {
+	TooManyAttemptsApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn429ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignIn503ApplicationProblemPlusJSONResponse struct {
+	BusyApplicationProblemPlusJSONResponse
+}
+
+func (response SignIn503ApplicationProblemPlusJSONResponse) VisitSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
