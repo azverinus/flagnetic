@@ -173,6 +173,7 @@ func TestEvaluateAgreesWithTheEvaluatorOnConformanceRulesets(t *testing.T) {
 	if want := slices.Sorted(slices.Values(refusedByTheAPI)); !slices.Equal(refused, want) {
 		t.Errorf("refused by the API:\n%s\nwant:\n%s", strings.Join(refused, "\n"), strings.Join(refusedByTheAPI, "\n"))
 	}
+	t.Logf("ran %d cases", ran)
 	if ran < 300 {
 		t.Errorf("ran %d cases, want the fixtures' cases the API can express", ran)
 	}

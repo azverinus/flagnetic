@@ -137,6 +137,11 @@ func TestARevertIsRefusedForWhatItCannotRestore(t *testing.T) {
 		t.Fatalf("POST environments = %d %s", created.StatusCode(), created.Body)
 	}
 	mustPut(t, admin, p.Key, "banner", "qa", 1, management.FlagConfigurationPut{On: true, OffVariation: "a", Fallthrough: "b"})
+	// The configuration qa's creation gave the flag is recorded by no entry
+	// of its own, but whole in the before of the write after it.
+	if first := revert(t, admin, p.Key, "banner", "qa", ifMatch(2), 1); first.JSON200 == nil || first.JSON200.On || first.JSON200.Version != 3 {
+		t.Errorf("reverting qa to version 1 = %d %s, want it switched off again", first.StatusCode(), first.Body)
+	}
 	if deleted := do(admin.DeleteEnvironmentWithResponse(t.Context(), p.Key, "qa")); deleted.StatusCode() != http.StatusNoContent {
 		t.Fatalf("DELETE qa = %d %s", deleted.StatusCode(), deleted.Body)
 	}

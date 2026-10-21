@@ -3,6 +3,7 @@ package delivery
 import (
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/azverinus/flagnetic/eval"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
@@ -23,7 +24,7 @@ func CheckContext(ctx eval.Context) error {
 	for _, unitType := range types {
 		if len(ctx.Units[unitType]) > flags.MaxUnitIDBytes {
 			violations = append(violations, apperrors.Violation{
-				Pointer: "/units/" + escapePointer(unitType), Code: "too_long",
+				Pointer: "/units/" + pointerToken.Replace(unitType), Code: "too_long",
 				Detail: "a unit ID has at most " + strconv.Itoa(flags.MaxUnitIDBytes) + " bytes",
 				Params: map[string]any{"max": flags.MaxUnitIDBytes},
 			})
@@ -35,21 +36,8 @@ func CheckContext(ctx eval.Context) error {
 	return nil
 }
 
-// escapePointer escapes a key as a JSON Pointer reference token.
-func escapePointer(key string) string {
-	out := make([]byte, 0, len(key))
-	for i := range len(key) {
-		switch key[i] {
-		case '~':
-			out = append(out, "~0"...)
-		case '/':
-			out = append(out, "~1"...)
-		default:
-			out = append(out, key[i])
-		}
-	}
-	return string(out)
-}
+// pointerToken escapes a key as a reference token of a JSON Pointer.
+var pointerToken = strings.NewReplacer("~", "~0", "/", "~1")
 
 // Result is what evaluating one flag served a context, with the full
 // reason the reference evaluator gives, and for a rollout the salt its
