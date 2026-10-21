@@ -99,15 +99,15 @@ func TestDeletingAReferencedDeclarationIsRefusedWithItsReferences(t *testing.T) 
 		want []string
 	}{
 		{"an attribute a segment and an archived flag's rule name", func() (int, []byte) {
-			r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "plan"))
+			r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "plan", &management.DeleteAttributeParams{IfMatch: ifMatch(1)}))
 			return r.StatusCode(), r.Body
 		}, []string{"segment paying ", "flag retired development"}},
 		{"an attribute a rule names", func() (int, []byte) {
-			r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "region"))
+			r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "region", &management.DeleteAttributeParams{IfMatch: ifMatch(1)}))
 			return r.StatusCode(), r.Body
 		}, []string{"flag new_checkout staging"}},
 		{"a unit type a segment, a rollout and an override name", func() (int, []byte) {
-			r := do(admin.DeleteUnitTypeWithResponse(t.Context(), p.Key, "organization"))
+			r := do(admin.DeleteUnitTypeWithResponse(t.Context(), p.Key, "organization", &management.DeleteUnitTypeParams{IfMatch: ifMatch(1)}))
 			return r.StatusCode(), r.Body
 		}, []string{"segment named_organizations ", "flag banner development", "flag banner staging", "flag new_checkout production"}},
 	}
@@ -129,14 +129,14 @@ func TestDeletingAReferencedDeclarationIsRefusedWithItsReferences(t *testing.T) 
 		t.Errorf("GET unit type organization after a refused delete = %d", r.StatusCode())
 	}
 
-	if r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "spare")); r.StatusCode() != http.StatusNoContent {
+	if r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "spare", &management.DeleteAttributeParams{IfMatch: ifMatch(1)})); r.StatusCode() != http.StatusNoContent {
 		t.Errorf("deleting an attribute nothing names = %d %s", r.StatusCode(), r.Body)
 	}
-	if r := do(admin.DeleteUnitTypeWithResponse(t.Context(), p.Key, "device")); r.StatusCode() != http.StatusNoContent {
+	if r := do(admin.DeleteUnitTypeWithResponse(t.Context(), p.Key, "device", &management.DeleteUnitTypeParams{IfMatch: ifMatch(1)})); r.StatusCode() != http.StatusNoContent {
 		t.Errorf("deleting a unit type nothing names = %d %s", r.StatusCode(), r.Body)
 	}
 	mustPut(t, admin, p.Key, "new_checkout", "staging", 2, management.FlagConfigurationPut{OffVariation: "false", Fallthrough: "false"})
-	if r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "region")); r.StatusCode() != http.StatusNoContent {
+	if r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "region", &management.DeleteAttributeParams{IfMatch: ifMatch(1)})); r.StatusCode() != http.StatusNoContent {
 		t.Errorf("deleting an attribute no rule names any more = %d %s", r.StatusCode(), r.Body)
 	}
 }
@@ -159,11 +159,11 @@ func TestDeclarationWritesBumpEveryEnvironment(t *testing.T) {
 			return r.StatusCode(), r.Body
 		}, http.StatusCreated, true},
 		{"rename a unit type", func() (int, []byte) {
-			r := do(admin.UpdateUnitTypeWithResponse(t.Context(), p.Key, "organization", management.UnitTypePatch{Name: ptr("Company")}))
+			r := do(admin.UpdateUnitTypeWithResponse(t.Context(), p.Key, "organization", &management.UpdateUnitTypeParams{IfMatch: ifMatch(1)}, management.UnitTypePatch{Name: ptr("Company")}))
 			return r.StatusCode(), r.Body
 		}, http.StatusOK, false},
 		{"delete a unit type", func() (int, []byte) {
-			r := do(admin.DeleteUnitTypeWithResponse(t.Context(), p.Key, "organization"))
+			r := do(admin.DeleteUnitTypeWithResponse(t.Context(), p.Key, "organization", &management.DeleteUnitTypeParams{IfMatch: ifMatch(2)}))
 			return r.StatusCode(), r.Body
 		}, http.StatusNoContent, true},
 		{"create an attribute", func() (int, []byte) {
@@ -171,15 +171,15 @@ func TestDeclarationWritesBumpEveryEnvironment(t *testing.T) {
 			return r.StatusCode(), r.Body
 		}, http.StatusCreated, true},
 		{"describe an attribute", func() (int, []byte) {
-			r := do(admin.UpdateAttributeWithResponse(t.Context(), p.Key, "plan", management.AttributePatch{Description: ptr("What they pay for.")}))
+			r := do(admin.UpdateAttributeWithResponse(t.Context(), p.Key, "plan", &management.UpdateAttributeParams{IfMatch: ifMatch(1)}, management.AttributePatch{Description: ptr("What they pay for.")}))
 			return r.StatusCode(), r.Body
 		}, http.StatusOK, false},
 		{"delete a standard attribute", func() (int, []byte) {
-			r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "os"))
+			r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "os", &management.DeleteAttributeParams{IfMatch: ifMatch(1)}))
 			return r.StatusCode(), r.Body
 		}, http.StatusConflict, false},
 		{"delete an attribute", func() (int, []byte) {
-			r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "plan"))
+			r := do(admin.DeleteAttributeWithResponse(t.Context(), p.Key, "plan", &management.DeleteAttributeParams{IfMatch: ifMatch(2)}))
 			return r.StatusCode(), r.Body
 		}, http.StatusNoContent, true},
 	}

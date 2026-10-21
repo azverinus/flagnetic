@@ -36,6 +36,7 @@ import { useCan } from "@/lib/access";
 import type { Permission } from "@/lib/access-names";
 import { ApiError, unwrap } from "@/lib/errors";
 import { descriptionSchema, keySchema, nameSchema } from "@/lib/forms";
+import { ifMatch } from "@/lib/http";
 import { useListMutation } from "@/lib/mutations";
 import { attributesQuery } from "@/lib/queries";
 
@@ -179,7 +180,14 @@ function Attributes() {
         onDone={() => setDeleting(undefined)}
         title={(key) => t`Delete ${key}`}
         confirmLabel={<Trans>Delete attribute</Trans>}
-        remove={(key) => unwrap(deleteAttribute({ path: { project, attribute: key } }))}
+        remove={(key) =>
+          unwrap(
+            deleteAttribute({
+              path: { project, attribute: key },
+              headers: deleting && ifMatch(deleting.version),
+            }),
+          )
+        }
         list={attributesQuery(project).queryKey}
       >
         {(key) => (
@@ -232,6 +240,7 @@ function AttributeForm({
           ? updateAttribute({
               path: { project, attribute: attribute.key },
               body: { name, description },
+              headers: ifMatch(attribute.version),
             })
           : createAttribute({
               path: { project },

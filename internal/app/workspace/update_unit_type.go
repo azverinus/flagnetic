@@ -5,6 +5,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // UnitTypeUpdater stores a unit type's changed name and description.
@@ -27,15 +28,18 @@ func NewUpdateUnitType(tx Transactor, store UnitTypeUpdater, rec Recorder) *Upda
 	return &UpdateUnitType{tx: tx, store: store, rec: rec}
 }
 
-// UpdateUnitTypeCommand is a change to the unit type Key of Project.
+// UpdateUnitTypeCommand is a change to the unit type Key of Project, based
+// on the version Expected names.
 type UpdateUnitTypeCommand struct {
-	Project workspace.ProjectID
-	Key     string
-	Change  workspace.UnitTypeChange
-	Request governance.Request
+	Project  workspace.ProjectID
+	Key      string
+	Change   workspace.UnitTypeChange
+	Expected precondition.Version
+	Request  governance.Request
 }
 
-// Handle applies the change and returns the unit type as it is after it; a
+// Handle applies the change, validated first and then judged against the
+// version it was based on, and returns the unit type as it is after it; a
 // change to the values it already has stores and records nothing.
 func (h *UpdateUnitType) Handle(ctx context.Context, cmd UpdateUnitTypeCommand) (workspace.UnitType, error) {
 	now := h.rec.clock.Now()
@@ -46,9 +50,15 @@ func (h *UpdateUnitType) Handle(ctx context.Context, cmd UpdateUnitTypeCommand) 
 			return notFound(err, "unit type")
 		}
 		after, changed, err := before.Change(cmd.Change, now)
-		if err != nil || !changed {
-			out = before
+		if err != nil {
 			return err
+		}
+		if err = precondition.Check(cmd.Expected, before.Version); err != nil {
+			return err
+		}
+		if !changed {
+			out = before
+			return nil
 		}
 		if err := h.store.UpdateUnitType(ctx, after); err != nil {
 			return err

@@ -62,20 +62,20 @@ func TestEnvironmentLifecycle(t *testing.T) {
 	if got.JSON200 == nil || *got.JSON200 != qa {
 		t.Errorf("GET = %d %s, want %+v", got.StatusCode(), got.Body, qa)
 	}
-	renamed := do(admin.UpdateEnvironmentWithResponse(t.Context(), p, "qa", management.EnvironmentPatch{Name: ptr("Quality")}))
+	renamed := do(admin.UpdateEnvironmentWithResponse(t.Context(), p, "qa", &management.UpdateEnvironmentParams{IfMatch: ifMatch(1)}, management.EnvironmentPatch{Name: ptr("Quality")}))
 	if renamed.JSON200 == nil || renamed.JSON200.Name != "Quality" || renamed.JSON200.Key != "qa" || renamed.JSON200.SortOrder != 4 {
 		t.Errorf("PATCH = %d %s", renamed.StatusCode(), renamed.Body)
 	}
 	if keys := environmentKeys(t, admin, p); !slices.Equal(keys, []string{"development", "staging", "production", "qa"}) {
 		t.Errorf("environments = %v", keys)
 	}
-	deleted := do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "qa"))
+	deleted := do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "qa", &management.DeleteEnvironmentParams{IfMatch: ifMatch(2)}))
 	status(t, "delete", deleted.StatusCode(), deleted.Body, http.StatusNoContent)
 	gone := do(admin.GetEnvironmentWithResponse(t.Context(), p, "qa"))
 	assertProblem(t, "GET deleted", gone.StatusCode(), gone.Body, http.StatusNotFound, "not_found")
-	again := do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "qa"))
+	again := do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "qa", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
 	assertProblem(t, "delete again", again.StatusCode(), again.Body, http.StatusNotFound, "not_found")
-	patchGone := do(admin.UpdateEnvironmentWithResponse(t.Context(), p, "qa", management.EnvironmentPatch{Name: ptr("x")}))
+	patchGone := do(admin.UpdateEnvironmentWithResponse(t.Context(), p, "qa", &management.UpdateEnvironmentParams{IfMatch: ifMatch(1)}, management.EnvironmentPatch{Name: ptr("x")}))
 	assertProblem(t, "PATCH deleted", patchGone.StatusCode(), patchGone.Body, http.StatusNotFound, "not_found")
 }
 
@@ -89,9 +89,9 @@ func TestEnvironmentKeysMustMatchThePatternBeUniqueAndStayImmutable(t *testing.T
 	}
 	dup := do(admin.CreateEnvironmentWithResponse(t.Context(), p, management.EnvironmentCreate{Key: "staging", Name: "Again"}))
 	assertProblem(t, "a key in use", dup.StatusCode(), dup.Body, http.StatusConflict, "already_exists")
-	rekey := do(admin.UpdateEnvironmentWithResponse(t.Context(), p, "staging", management.EnvironmentPatch{Key: ptr("stage")}))
+	rekey := do(admin.UpdateEnvironmentWithResponse(t.Context(), p, "staging", &management.UpdateEnvironmentParams{IfMatch: ifMatch(1)}, management.EnvironmentPatch{Key: ptr("stage")}))
 	assertProblem(t, "a new key", rekey.StatusCode(), rekey.Body, http.StatusUnprocessableEntity, "key_immutable")
-	blank := do(admin.UpdateEnvironmentWithResponse(t.Context(), p, "staging", management.EnvironmentPatch{Name: ptr("")}))
+	blank := do(admin.UpdateEnvironmentWithResponse(t.Context(), p, "staging", &management.UpdateEnvironmentParams{IfMatch: ifMatch(1)}, management.EnvironmentPatch{Name: ptr("")}))
 	assertProblem(t, "a blank name", blank.StatusCode(), blank.Body, http.StatusUnprocessableEntity, "invalid_environment")
 	if keys := environmentKeys(t, admin, p); !slices.Equal(keys, []string{"development", "staging", "production"}) {
 		t.Errorf("environments = %v, want the defaults unchanged", keys)
@@ -103,10 +103,10 @@ func TestTheLastEnvironmentCannotBeDeleted(t *testing.T) {
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey()).Key
 	for _, key := range []string{"development", "staging"} {
-		res := do(admin.DeleteEnvironmentWithResponse(t.Context(), p, key))
+		res := do(admin.DeleteEnvironmentWithResponse(t.Context(), p, key, &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
 		status(t, "delete "+key, res.StatusCode(), res.Body, http.StatusNoContent)
 	}
-	last := do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "production"))
+	last := do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "production", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
 	assertProblem(t, "the last", last.StatusCode(), last.Body, http.StatusConflict, "last_environment")
 	if keys := environmentKeys(t, admin, p); !slices.Equal(keys, []string{"production"}) {
 		t.Errorf("environments = %v, want production kept", keys)
@@ -117,11 +117,13 @@ func TestTwoDeletionsAtOnceNeverRemoveTheLastEnvironment(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey()).Key
-	do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "development"))
+	do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "development", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
 
 	statuses := make(chan int, 2)
 	for _, key := range []string{"staging", "production"} {
-		go func() { statuses <- do(admin.DeleteEnvironmentWithResponse(t.Context(), p, key)).StatusCode() }()
+		go func() {
+			statuses <- do(admin.DeleteEnvironmentWithResponse(t.Context(), p, key, &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)})).StatusCode()
+		}()
 	}
 	got := []int{<-statuses, <-statuses}
 	slices.Sort(got)
@@ -160,20 +162,20 @@ func TestUnitTypeLifecycle(t *testing.T) {
 	if !slices.Equal(keys, []string{"anonymous", "organization", "user"}) {
 		t.Errorf("unit types = %v", keys)
 	}
-	patched := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "organization", management.UnitTypePatch{
+	patched := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "organization", &management.UpdateUnitTypeParams{IfMatch: ifMatch(1)}, management.UnitTypePatch{
 		Name: ptr("Company"), Description: ptr(""),
 	}))
-	want := management.UnitType{Id: u.Id, Key: "organization", Name: "Company", Description: ""}
+	want := management.UnitType{Id: u.Id, Key: "organization", Name: "Company", Description: "", Version: 2}
 	if patched.JSON200 == nil || *patched.JSON200 != want {
 		t.Errorf("PATCH = %d %s, want %+v", patched.StatusCode(), patched.Body, want)
 	}
-	deleted := do(admin.DeleteUnitTypeWithResponse(t.Context(), p, "organization"))
+	deleted := do(admin.DeleteUnitTypeWithResponse(t.Context(), p, "organization", &management.DeleteUnitTypeParams{IfMatch: ifMatch(2)}))
 	status(t, "delete", deleted.StatusCode(), deleted.Body, http.StatusNoContent)
 	gone := do(admin.GetUnitTypeWithResponse(t.Context(), p, "organization"))
 	assertProblem(t, "GET deleted", gone.StatusCode(), gone.Body, http.StatusNotFound, "not_found")
-	patchGone := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "organization", management.UnitTypePatch{Name: ptr("x")}))
+	patchGone := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "organization", &management.UpdateUnitTypeParams{IfMatch: ifMatch(1)}, management.UnitTypePatch{Name: ptr("x")}))
 	assertProblem(t, "PATCH deleted", patchGone.StatusCode(), patchGone.Body, http.StatusNotFound, "not_found")
-	again := do(admin.DeleteUnitTypeWithResponse(t.Context(), p, "organization"))
+	again := do(admin.DeleteUnitTypeWithResponse(t.Context(), p, "organization", &management.DeleteUnitTypeParams{IfMatch: ifMatch(1)}))
 	assertProblem(t, "delete again", again.StatusCode(), again.Body, http.StatusNotFound, "not_found")
 }
 
@@ -193,7 +195,7 @@ func TestAttributeLifecycle(t *testing.T) {
 			t.Errorf("created = %+v", a)
 		}
 	}
-	patched := do(admin.UpdateAttributeWithResponse(t.Context(), p, "a_string", management.AttributePatch{
+	patched := do(admin.UpdateAttributeWithResponse(t.Context(), p, "a_string", &management.UpdateAttributeParams{IfMatch: ifMatch(1)}, management.AttributePatch{
 		Name: ptr("Plan tier"), Description: ptr("The plan paid for."),
 	}))
 	if patched.JSON200 == nil || patched.JSON200.Name != "Plan tier" || patched.JSON200.Description != "The plan paid for." ||
@@ -208,11 +210,11 @@ func TestAttributeLifecycle(t *testing.T) {
 	if list.JSON200 == nil || len(list.JSON200.Items) != 16 {
 		t.Errorf("attributes = %d %s, want the ten standard and six declared", list.StatusCode(), list.Body)
 	}
-	deleted := do(admin.DeleteAttributeWithResponse(t.Context(), p, "a_string"))
+	deleted := do(admin.DeleteAttributeWithResponse(t.Context(), p, "a_string", &management.DeleteAttributeParams{IfMatch: ifMatch(2)}))
 	status(t, "delete", deleted.StatusCode(), deleted.Body, http.StatusNoContent)
 	gone := do(admin.GetAttributeWithResponse(t.Context(), p, "a_string"))
 	assertProblem(t, "GET deleted", gone.StatusCode(), gone.Body, http.StatusNotFound, "not_found")
-	again := do(admin.DeleteAttributeWithResponse(t.Context(), p, "a_string"))
+	again := do(admin.DeleteAttributeWithResponse(t.Context(), p, "a_string", &management.DeleteAttributeParams{IfMatch: ifMatch(1)}))
 	assertProblem(t, "delete again", again.StatusCode(), again.Body, http.StatusNotFound, "not_found")
 }
 
@@ -286,10 +288,10 @@ func TestDeclarationKeysAndTypesAreValidatedAndImmutable(t *testing.T) {
 		"an empty name":      {management.AttributePatch{Name: ptr("")}, "invalid_attribute"},
 		"a long description": {management.AttributePatch{Description: ptr(strings.Repeat("x", 2001))}, "invalid_attribute"},
 	} {
-		res := do(admin.UpdateAttributeWithResponse(t.Context(), p, "tier", patch.body))
+		res := do(admin.UpdateAttributeWithResponse(t.Context(), p, "tier", &management.UpdateAttributeParams{IfMatch: ifMatch(1)}, patch.body))
 		assertProblem(t, name, res.StatusCode(), res.Body, http.StatusUnprocessableEntity, patch.code)
 	}
-	rekey := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "user", management.UnitTypePatch{Key: ptr("member")}))
+	rekey := do(admin.UpdateUnitTypeWithResponse(t.Context(), p, "user", &management.UpdateUnitTypeParams{IfMatch: ifMatch(1)}, management.UnitTypePatch{Key: ptr("member")}))
 	assertProblem(t, "a unit type's new key", rekey.StatusCode(), rekey.Body, http.StatusUnprocessableEntity, "key_immutable")
 	got := do(admin.GetAttributeWithResponse(t.Context(), p, "tier"))
 	if got.JSON200 == nil || *got.JSON200 != *created.JSON201 {
@@ -301,11 +303,11 @@ func TestStandardAttributesCannotBeDeletedOrRetyped(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey()).Key
-	del := do(admin.DeleteAttributeWithResponse(t.Context(), p, "app_version"))
+	del := do(admin.DeleteAttributeWithResponse(t.Context(), p, "app_version", &management.DeleteAttributeParams{IfMatch: ifMatch(1)}))
 	assertProblem(t, "delete", del.StatusCode(), del.Body, http.StatusConflict, "standard_attribute")
-	retype := do(admin.UpdateAttributeWithResponse(t.Context(), p, "app_version", management.AttributePatch{Type: ptr("string")}))
+	retype := do(admin.UpdateAttributeWithResponse(t.Context(), p, "app_version", &management.UpdateAttributeParams{IfMatch: ifMatch(1)}, management.AttributePatch{Type: ptr("string")}))
 	assertProblem(t, "retype", retype.StatusCode(), retype.Body, http.StatusUnprocessableEntity, "type_immutable")
-	renamed := do(admin.UpdateAttributeWithResponse(t.Context(), p, "app_version", management.AttributePatch{
+	renamed := do(admin.UpdateAttributeWithResponse(t.Context(), p, "app_version", &management.UpdateAttributeParams{IfMatch: ifMatch(1)}, management.AttributePatch{
 		Name: ptr("Mobile app version"), Description: ptr("The application version."),
 	}))
 	if a := renamed.JSON200; a == nil || a.Key != "app_version" || a.Type != "semver" || a.Name != "Mobile app version" ||
@@ -325,18 +327,18 @@ func TestDeclarationEndpointsOfAnUnknownProjectAreNotFound(t *testing.T) {
 		"list environments":  do(admin.ListEnvironmentsWithResponse(ctx, p)),
 		"create environment": do(admin.CreateEnvironmentWithResponse(ctx, p, management.EnvironmentCreate{Key: "qa", Name: "QA"})),
 		"get environment":    do(admin.GetEnvironmentWithResponse(ctx, p, "production")),
-		"update environment": do(admin.UpdateEnvironmentWithResponse(ctx, p, "production", management.EnvironmentPatch{Name: ptr("x")})),
-		"delete environment": do(admin.DeleteEnvironmentWithResponse(ctx, p, "production")),
+		"update environment": do(admin.UpdateEnvironmentWithResponse(ctx, p, "production", &management.UpdateEnvironmentParams{IfMatch: ifMatch(1)}, management.EnvironmentPatch{Name: ptr("x")})),
+		"delete environment": do(admin.DeleteEnvironmentWithResponse(ctx, p, "production", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)})),
 		"list unit types":    do(admin.ListUnitTypesWithResponse(ctx, p)),
 		"create unit type":   do(admin.CreateUnitTypeWithResponse(ctx, p, management.UnitTypeCreate{Key: "device", Name: "Device"})),
 		"get unit type":      do(admin.GetUnitTypeWithResponse(ctx, p, "user")),
-		"update unit type":   do(admin.UpdateUnitTypeWithResponse(ctx, p, "user", management.UnitTypePatch{Name: ptr("x")})),
-		"delete unit type":   do(admin.DeleteUnitTypeWithResponse(ctx, p, "user")),
+		"update unit type":   do(admin.UpdateUnitTypeWithResponse(ctx, p, "user", &management.UpdateUnitTypeParams{IfMatch: ifMatch(1)}, management.UnitTypePatch{Name: ptr("x")})),
+		"delete unit type":   do(admin.DeleteUnitTypeWithResponse(ctx, p, "user", &management.DeleteUnitTypeParams{IfMatch: ifMatch(1)})),
 		"list attributes":    do(admin.ListAttributesWithResponse(ctx, p)),
 		"create attribute":   do(admin.CreateAttributeWithResponse(ctx, p, management.AttributeCreate{Key: "tier", Name: "Tier", Type: "string"})),
 		"get attribute":      do(admin.GetAttributeWithResponse(ctx, p, "os")),
-		"update attribute":   do(admin.UpdateAttributeWithResponse(ctx, p, "os", management.AttributePatch{Name: ptr("x")})),
-		"delete attribute":   do(admin.DeleteAttributeWithResponse(ctx, p, "os")),
+		"update attribute":   do(admin.UpdateAttributeWithResponse(ctx, p, "os", &management.UpdateAttributeParams{IfMatch: ifMatch(1)}, management.AttributePatch{Name: ptr("x")})),
+		"delete attribute":   do(admin.DeleteAttributeWithResponse(ctx, p, "os", &management.DeleteAttributeParams{IfMatch: ifMatch(1)})),
 	} {
 		if res.StatusCode() != http.StatusNotFound {
 			t.Errorf("%s: status = %d, want 404", name, res.StatusCode())
@@ -391,19 +393,19 @@ func TestEveryWorkspaceWriteRecordsAnAuditEntry(t *testing.T) {
 	p, ctx := project.Key, t.Context()
 
 	qa := do(admin.CreateEnvironmentWithResponse(ctx, p, management.EnvironmentCreate{Key: "qa", Name: "QA"})).JSON201
-	do(admin.UpdateEnvironmentWithResponse(ctx, p, "qa", management.EnvironmentPatch{Name: ptr("Quality")}))
-	do(admin.UpdateEnvironmentWithResponse(ctx, p, "qa", management.EnvironmentPatch{Name: ptr("Quality")}))
-	do(admin.UpdateEnvironmentWithResponse(ctx, p, "qa", management.EnvironmentPatch{Key: ptr("test")}))
+	do(admin.UpdateEnvironmentWithResponse(ctx, p, "qa", &management.UpdateEnvironmentParams{IfMatch: ifMatch(1)}, management.EnvironmentPatch{Name: ptr("Quality")}))
+	do(admin.UpdateEnvironmentWithResponse(ctx, p, "qa", &management.UpdateEnvironmentParams{IfMatch: ifMatch(2)}, management.EnvironmentPatch{Name: ptr("Quality")}))
+	do(admin.UpdateEnvironmentWithResponse(ctx, p, "qa", &management.UpdateEnvironmentParams{IfMatch: ifMatch(1)}, management.EnvironmentPatch{Key: ptr("test")}))
 	do(admin.CreateEnvironmentWithResponse(ctx, p, management.EnvironmentCreate{Key: "qa", Name: "Again"}))
-	do(admin.DeleteEnvironmentWithResponse(ctx, p, "qa"))
+	do(admin.DeleteEnvironmentWithResponse(ctx, p, "qa", &management.DeleteEnvironmentParams{IfMatch: ifMatch(2)}))
 	device := do(admin.CreateUnitTypeWithResponse(ctx, p, management.UnitTypeCreate{Key: "device", Name: "Device"})).JSON201
-	do(admin.UpdateUnitTypeWithResponse(ctx, p, "device", management.UnitTypePatch{Name: ptr("Phone")}))
-	do(admin.DeleteUnitTypeWithResponse(ctx, p, "device"))
+	do(admin.UpdateUnitTypeWithResponse(ctx, p, "device", &management.UpdateUnitTypeParams{IfMatch: ifMatch(1)}, management.UnitTypePatch{Name: ptr("Phone")}))
+	do(admin.DeleteUnitTypeWithResponse(ctx, p, "device", &management.DeleteUnitTypeParams{IfMatch: ifMatch(2)}))
 	tier := do(admin.CreateAttributeWithResponse(ctx, p, management.AttributeCreate{Key: "tier", Name: "Tier", Type: "string"})).JSON201
-	do(admin.UpdateAttributeWithResponse(ctx, p, "tier", management.AttributePatch{Name: ptr("Plan tier")}))
-	do(admin.UpdateAttributeWithResponse(ctx, p, "tier", management.AttributePatch{Type: ptr("number")}))
-	do(admin.DeleteAttributeWithResponse(ctx, p, "app_version"))
-	do(admin.DeleteAttributeWithResponse(ctx, p, "tier"))
+	do(admin.UpdateAttributeWithResponse(ctx, p, "tier", &management.UpdateAttributeParams{IfMatch: ifMatch(1)}, management.AttributePatch{Name: ptr("Plan tier")}))
+	do(admin.UpdateAttributeWithResponse(ctx, p, "tier", &management.UpdateAttributeParams{IfMatch: ifMatch(1)}, management.AttributePatch{Type: ptr("number")}))
+	do(admin.DeleteAttributeWithResponse(ctx, p, "app_version", &management.DeleteAttributeParams{IfMatch: ifMatch(1)}))
+	do(admin.DeleteAttributeWithResponse(ctx, p, "tier", &management.DeleteAttributeParams{IfMatch: ifMatch(2)}))
 	if qa == nil || device == nil || tier == nil {
 		t.Fatal("a create failed")
 	}

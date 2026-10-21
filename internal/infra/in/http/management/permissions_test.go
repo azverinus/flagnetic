@@ -36,7 +36,7 @@ func matrix(t *testing.T) []matrixRow {
 			return res.StatusCode(), res.Body
 		}},
 		{"project.update", "updateProject", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
-			res := do(c.UpdateProjectWithResponse(t.Context(), p.Key, management.ProjectPatch{Name: ptr("Renamed " + projectKey())}))
+			res := do(c.UpdateProjectWithResponse(t.Context(), p.Key, &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Name: ptr("Renamed " + projectKey())}))
 			return res.StatusCode(), res.Body
 		}},
 		{"environment.manage", "createEnvironment", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {

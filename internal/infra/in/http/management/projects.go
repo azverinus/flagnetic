@@ -41,7 +41,7 @@ func (a *api) CreateProject(ctx context.Context, req CreateProjectRequestObject)
 	}
 	// A project is created with no grant, so nobody but the instance
 	// admins works in it yet.
-	return CreateProject201JSONResponse(projectOut(p, 0)), nil
+	return CreateProject201JSONResponse{Body: projectOut(p, 0), Headers: CreateProject201ResponseHeaders{ETag: etag(p.Version)}}, nil
 }
 
 // GetProject answers the project the seam found.
@@ -50,15 +50,20 @@ func (a *api) GetProject(ctx context.Context, _ GetProjectRequestObject) (GetPro
 	if err != nil {
 		return nil, err
 	}
-	return GetProject200JSONResponse(out[0]), nil
+	return GetProject200JSONResponse{Body: out[0], Headers: GetProject200ResponseHeaders{ETag: etag(out[0].Version)}}, nil
 }
 
 // UpdateProject renames the project or changes its description.
 func (a *api) UpdateProject(ctx context.Context, req UpdateProjectRequestObject) (UpdateProjectResponseObject, error) {
+	expected, err := ifMatch(req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
 	p, err := a.h.UpdateProject.Handle(ctx, appworkspace.UpdateProjectCommand{
-		Project: projectOf(ctx).project.ID,
-		Change:  workspace.ProjectChange{Key: req.Body.Key, Name: req.Body.Name, Description: req.Body.Description},
-		Request: requestOf(ctx),
+		Project:  projectOf(ctx).project.ID,
+		Change:   workspace.ProjectChange{Key: req.Body.Key, Name: req.Body.Name, Description: req.Body.Description},
+		Expected: expected,
+		Request:  requestOf(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -67,7 +72,7 @@ func (a *api) UpdateProject(ctx context.Context, req UpdateProjectRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	return UpdateProject200JSONResponse(out[0]), nil
+	return UpdateProject200JSONResponse{Body: out[0], Headers: UpdateProject200ResponseHeaders{ETag: etag(p.Version)}}, nil
 }
 
 // GetProjectMe answers what the caller holds in the project: their grants
@@ -99,5 +104,8 @@ func (a *api) projectsOut(ctx context.Context, projects ...workspace.Project) ([
 }
 
 func projectOut(p workspace.Project, members int) Project {
-	return Project{Id: openapi_types.UUID(p.ID.Bytes()), Key: p.Key, Name: p.Name, Description: p.Description, MemberCount: members}
+	return Project{
+		Id: openapi_types.UUID(p.ID.Bytes()), Key: p.Key, Name: p.Name, Description: p.Description, MemberCount: members,
+		Version: p.Version,
+	}
 }

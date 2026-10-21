@@ -48,3 +48,13 @@ export function configureClient(onUnauthenticated: () => void): void {
     fetch: managementFetch({ onUnauthenticated }),
   });
 }
+
+/**
+ * The header naming the version of an entity a write is based on, as the
+ * server answered it. The server refuses a write of a versioned entity
+ * without it, and refuses one based on a version that moved on since, so
+ * two people editing the same entity never overwrite each other unseen.
+ */
+export function ifMatch(version: number): { "If-Match": string } {
+  return { "If-Match": `"${version}"` };
+}

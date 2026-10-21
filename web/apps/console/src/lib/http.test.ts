@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiError, errorOf, unwrap } from "./errors";
-import { managementFetch } from "./http";
+import { ifMatch, managementFetch } from "./http";
 
 function answer(status: number, body?: unknown): Response {
   return new Response(body === undefined ? null : JSON.stringify(body), {
@@ -108,5 +108,11 @@ describe("a refusal", () => {
         Promise.resolve({ data: { ok: true }, response: new Response(null, { status: 200 }) }),
       ),
     ).resolves.toEqual({ ok: true });
+  });
+});
+
+describe("the version a write names", () => {
+  it("is sent as the strong entity tag the server answered", () => {
+    expect(ifMatch(7)).toEqual({ "If-Match": '"7"' });
   });
 });

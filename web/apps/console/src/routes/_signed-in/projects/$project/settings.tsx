@@ -4,6 +4,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -17,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
 import { unwrap } from "@/lib/errors";
 import { descriptionSchema, nameSchema } from "@/lib/forms";
+import { ifMatch } from "@/lib/http";
 import { projectQuery, projectsQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/settings")({
@@ -26,9 +28,12 @@ export const Route = createFileRoute("/_signed-in/projects/$project/settings")({
 
 function Settings() {
   const { t } = useLingui();
+  const { project } = Route.useParams();
   return (
     <PermissionGate permission="project.update" title={t`Settings`}>
-      <SettingsForm />
+      {/* Another project's settings start a form of their own: the values
+          and the version they were read at belong to one project. */}
+      <SettingsForm key={project} />
     </PermissionGate>
   );
 }
@@ -45,13 +50,19 @@ function SettingsForm() {
     resolver: zodResolver(schema),
     defaultValues: { name: project.name, description: project.description },
   });
+  // The version the form's values were read at, kept apart from the query:
+  // a refetch that brings someone else's change must not make a save
+  // overwrite it unseen.
+  const [base, setBase] = useState(project.version);
   const save = useMutation({
-    mutationFn: (body: Values) => unwrap(updateProject({ path: { project: key }, body })),
+    mutationFn: (body: Values) =>
+      unwrap(updateProject({ path: { project: key }, body, headers: ifMatch(base) })),
     meta: { toast: false },
     onSuccess: (saved: Project) => {
       queryClient.setQueryData(projectQuery(key).queryKey, saved);
       void queryClient.invalidateQueries({ queryKey: projectsQuery.queryKey, exact: true });
       form.reset({ name: saved.name, description: saved.description });
+      setBase(saved.version);
       toast.success(t`The project is saved.`);
     },
   });

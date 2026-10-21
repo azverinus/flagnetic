@@ -5,6 +5,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // EnvironmentDeleter deletes an environment unless it is its project's last.
@@ -27,11 +28,13 @@ func NewDeleteEnvironment(tx Transactor, store EnvironmentDeleter, rec Recorder)
 	return &DeleteEnvironment{tx: tx, store: store, rec: rec}
 }
 
-// DeleteEnvironmentCommand names the environment to delete.
+// DeleteEnvironmentCommand names the environment to delete and the version
+// of it the deletion is based on.
 type DeleteEnvironmentCommand struct {
-	Project workspace.ProjectID
-	Key     string
-	Request governance.Request
+	Project  workspace.ProjectID
+	Key      string
+	Expected precondition.Version
+	Request  governance.Request
 }
 
 // Handle deletes the environment. The project's row is locked first, so two
@@ -45,6 +48,9 @@ func (h *DeleteEnvironment) Handle(ctx context.Context, cmd DeleteEnvironmentCom
 		e, err := h.store.EnvironmentByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "environment")
+		}
+		if err = precondition.Check(cmd.Expected, e.Version); err != nil {
+			return err
 		}
 		count, err := h.store.CountEnvironments(ctx, cmd.Project)
 		if err != nil {

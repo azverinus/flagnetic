@@ -142,7 +142,7 @@ func TestARevertIsRefusedForWhatItCannotRestore(t *testing.T) {
 	if first := revert(t, admin, p.Key, "banner", "qa", ifMatch(2), 1); first.JSON200 == nil || first.JSON200.On || first.JSON200.Version != 3 {
 		t.Errorf("reverting qa to version 1 = %d %s, want it switched off again", first.StatusCode(), first.Body)
 	}
-	if deleted := do(admin.DeleteEnvironmentWithResponse(t.Context(), p.Key, "qa")); deleted.StatusCode() != http.StatusNoContent {
+	if deleted := do(admin.DeleteEnvironmentWithResponse(t.Context(), p.Key, "qa", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)})); deleted.StatusCode() != http.StatusNoContent {
 		t.Fatalf("DELETE qa = %d %s", deleted.StatusCode(), deleted.Body)
 	}
 	do(admin.CreateEnvironmentWithResponse(t.Context(), p.Key, management.EnvironmentCreate{Key: "qa", Name: "QA again"}))

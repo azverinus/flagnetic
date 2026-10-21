@@ -1532,6 +1532,10 @@ msgid "Some fields need correcting."
 msgstr "Исправьте некоторые поля."
 
 #: src/lib/problem-messages.ts
+msgid "Someone else changed this since you opened it. Reload to see their changes, then make yours again."
+msgstr "Кто-то другой изменил это, пока вы редактировали. Перезагрузите страницу, чтобы увидеть его изменения, и внесите свои заново."
+
+#: src/lib/problem-messages.ts
 msgid "Something went wrong on the server."
 msgstr "На сервере что-то пошло не так."
 

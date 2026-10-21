@@ -162,18 +162,18 @@ func TestProjectKeyIsImmutableAndNameIsEditable(t *testing.T) {
 	created := createProject(t, admin, key)
 
 	renamed := "renamed"
-	res, err := admin.UpdateProjectWithResponse(t.Context(), key, management.ProjectPatch{Key: &renamed})
+	res, err := admin.UpdateProjectWithResponse(t.Context(), key, &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Key: &renamed})
 	if err != nil {
 		t.Fatal(err)
 	}
 	assertProblem(t, "a new key", res.StatusCode(), res.Body, http.StatusUnprocessableEntity, "key_immutable")
 
 	name, description := "Mobile apps", "iOS and Android"
-	res, err = admin.UpdateProjectWithResponse(t.Context(), key, management.ProjectPatch{Name: &name, Description: &description})
+	res, err = admin.UpdateProjectWithResponse(t.Context(), key, &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Name: &name, Description: &description})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := management.Project{Id: created.Id, Key: key, Name: name, Description: description}
+	want := management.Project{Id: created.Id, Key: key, Name: name, Description: description, Version: 2}
 	if res.JSON200 == nil || *res.JSON200 != want {
 		t.Fatalf("PATCH = %d %s, want %+v", res.StatusCode(), res.Body, want)
 	}
@@ -195,7 +195,7 @@ func TestUnknownProjectIsNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertProblem(t, "GET", get.StatusCode(), get.Body, http.StatusNotFound, "not_found")
-	patch, err := admin.UpdateProjectWithResponse(t.Context(), "no-such-project", management.ProjectPatch{Name: &name})
+	patch, err := admin.UpdateProjectWithResponse(t.Context(), "no-such-project", &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Name: &name})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +213,7 @@ func TestAnUnknownProjectIsNotFoundBeforeThePermissionIsJudged(t *testing.T) {
 	srv := testkit.StartServer(t)
 	stranger := testkit.Client(t, srv, testkit.MemberToken(t, testkit.Pool(t), access.ScopeProjectAdmin))
 	name := "x"
-	res, err := stranger.UpdateProjectWithResponse(t.Context(), "no-such-project", management.ProjectPatch{Name: &name})
+	res, err := stranger.UpdateProjectWithResponse(t.Context(), "no-such-project", &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Name: &name})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestAnUnknownProjectIsNotFoundBeforeThePermissionIsJudged(t *testing.T) {
 
 	key := projectKey()
 	createProject(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), key)
-	res, err = stranger.UpdateProjectWithResponse(t.Context(), key, management.ProjectPatch{Name: &name})
+	res, err = stranger.UpdateProjectWithResponse(t.Context(), key, &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Name: &name})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +320,7 @@ func TestAProjectTokenReachesOnlyItsProject(t *testing.T) {
 		assertProblem(t, key, refused.StatusCode(), refused.Body, http.StatusForbidden, "forbidden")
 	}
 	name := "x"
-	patch, err := pipeline.UpdateProjectWithResponse(t.Context(), mine.Key, management.ProjectPatch{Name: &name})
+	patch, err := pipeline.UpdateProjectWithResponse(t.Context(), mine.Key, &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Name: &name})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,7 +401,7 @@ func TestEveryProjectWriteRecordsAnAuditEntry(t *testing.T) {
 	}
 	name, key := "Mobile apps", "renamed"
 	for _, patch := range []management.ProjectPatch{{Key: &key}, {Name: &name}, {Name: &name}} {
-		if _, patchErr := admin.UpdateProjectWithResponse(t.Context(), "mobile", patch); patchErr != nil {
+		if _, patchErr := admin.UpdateProjectWithResponse(t.Context(), "mobile", &management.UpdateProjectParams{IfMatch: ifMatch(1)}, patch); patchErr != nil {
 			t.Fatal(patchErr)
 		}
 	}
@@ -409,7 +409,7 @@ func TestEveryProjectWriteRecordsAnAuditEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	renamed, err := admin.UpdateProjectWithResponse(t.Context(), "mobile", management.ProjectPatch{})
+	renamed, err := admin.UpdateProjectWithResponse(t.Context(), "mobile", &management.UpdateProjectParams{IfMatch: ifMatch(2)}, management.ProjectPatch{})
 	if err != nil {
 		t.Fatal(err)
 	}

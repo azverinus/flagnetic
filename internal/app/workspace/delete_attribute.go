@@ -5,6 +5,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
 // AttributeDeleter deletes an attribute.
@@ -29,11 +30,13 @@ func NewDeleteAttribute(tx Transactor, store AttributeDeleter, guard Declaration
 	return &DeleteAttribute{tx: tx, store: store, guard: guard, rulesets: rulesets, rec: rec}
 }
 
-// DeleteAttributeCommand names the attribute to delete.
+// DeleteAttributeCommand names the attribute to delete and the version of
+// it the deletion is based on.
 type DeleteAttributeCommand struct {
-	Project workspace.ProjectID
-	Key     string
-	Request governance.Request
+	Project  workspace.ProjectID
+	Key      string
+	Expected precondition.Version
+	Request  governance.Request
 }
 
 // Handle deletes the attribute unless it is standard or a rule or segment
@@ -47,9 +50,15 @@ func (h *DeleteAttribute) Handle(ctx context.Context, cmd DeleteAttributeCommand
 		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
 			return err
 		}
-		attr, err := h.store.AttributeByKey(ctx, cmd.Project, cmd.Key, false)
+		// A rename locks the attribute's row, not the project's, so the row is
+		// locked here too: the version judged below is then the one a
+		// rename in flight committed, never the one it is replacing.
+		attr, err := h.store.AttributeByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "attribute")
+		}
+		if err = precondition.Check(cmd.Expected, attr.Version); err != nil {
+			return err
 		}
 		if err := attr.CanDelete(); err != nil {
 			return err

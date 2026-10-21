@@ -353,6 +353,9 @@ type Attribute struct {
 
 	// Type The type of an attribute's values; `semver` is a semantic version, `list` a list of strings.
 	Type AttributeType `json:"type"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
 }
 
 // AttributeCreate defines model for AttributeCreate.
@@ -392,6 +395,9 @@ type AttributeListItem struct {
 	// rollout, an override or a segment's condition. Deleting it is
 	// refused while this is above zero.
 	UsageCount DeclarationUsageCount `json:"usage_count"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
 }
 
 // AttributePatch defines model for AttributePatch.
@@ -553,6 +559,9 @@ type Environment struct {
 
 	// SortOrder Where the environment is listed among its project's, the first created first.
 	SortOrder int `json:"sort_order"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
 }
 
 // EnvironmentCreate defines model for EnvironmentCreate.
@@ -1136,6 +1145,9 @@ type Project struct {
 	// MemberCount How many active members hold a grant in the project.
 	MemberCount int  `json:"member_count"`
 	Name        Name `json:"name"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
 }
 
 // ProjectCreate defines model for ProjectCreate.
@@ -1439,6 +1451,9 @@ type UnitType struct {
 	// Key Names the entity in URLs, SDK calls and rules, and never changes.
 	Key  Key  `json:"key"`
 	Name Name `json:"name"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
 }
 
 // UnitTypeCreate defines model for UnitTypeCreate.
@@ -1469,6 +1484,9 @@ type UnitTypeListItem struct {
 	// rollout, an override or a segment's condition. Deleting it is
 	// refused while this is above zero.
 	UsageCount DeclarationUsageCount `json:"usage_count"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
 }
 
 // UnitTypePatch defines model for UnitTypePatch.
@@ -1686,6 +1704,36 @@ type ListMembersParams struct {
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
 }
 
+// UpdateProjectParams defines parameters for UpdateProject.
+type UpdateProjectParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// DeleteAttributeParams defines parameters for DeleteAttribute.
+type DeleteAttributeParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// UpdateAttributeParams defines parameters for UpdateAttribute.
+type UpdateAttributeParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // ListProjectAuditEntriesParams defines parameters for ListProjectAuditEntries.
 type ListProjectAuditEntriesParams struct {
 	// Actor A member's identifier; their own changes and those of their personal access tokens.
@@ -1721,6 +1769,26 @@ type ListProjectAuditEntriesParams struct {
 
 	// Limit How many entries a page holds at most.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// DeleteEnvironmentParams defines parameters for DeleteEnvironment.
+type DeleteEnvironmentParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// UpdateEnvironmentParams defines parameters for UpdateEnvironment.
+type UpdateEnvironmentParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // ListFlagsParams defines parameters for ListFlags.
@@ -1866,6 +1934,26 @@ type DeleteSegmentParams struct {
 
 // UpdateSegmentParams defines parameters for UpdateSegment.
 type UpdateSegmentParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// DeleteUnitTypeParams defines parameters for DeleteUnitType.
+type DeleteUnitTypeParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// UpdateUnitTypeParams defines parameters for UpdateUnitType.
+type UpdateUnitTypeParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
 	// answered it (`"7"`, or `7`). Required: without it the write is
 	// refused `428 precondition_required`, and with any other version than
@@ -2497,7 +2585,7 @@ type ClientInterface interface {
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /projects/{project} (the `UpdateProject` operationId).
-	UpdateProjectWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateProjectWithBody(ctx context.Context, project ProjectKey, params *UpdateProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateProject Rename a project or change its description
 	//
@@ -2506,7 +2594,7 @@ type ClientInterface interface {
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /projects/{project} (the `UpdateProject` operationId).
-	UpdateProject(ctx context.Context, project ProjectKey, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateProject(ctx context.Context, project ProjectKey, params *UpdateProjectParams, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListAttributes The project's attributes
 	//
@@ -2537,7 +2625,7 @@ type ClientInterface interface {
 	// `standard_attribute`, and one a rule's condition or a segment still
 	// names, an archived flag's included, with `in_use` listing what
 	// names it.
-	DeleteAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, params *DeleteAttributeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAttribute performs a GET /projects/{project}/attributes/{attribute} (the `GetAttribute` operationId) request.
 	GetAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2546,13 +2634,13 @@ type ClientInterface interface {
 	// with any type of body and a specified content type.
 	//
 	// Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
-	UpdateAttributeWithBody(ctx context.Context, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateAttributeWithBody(ctx context.Context, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateAttribute performs a PATCH /projects/{project}/attributes/{attribute} (the `UpdateAttribute` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
 	// Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
-	UpdateAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, body UpdateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, body UpdateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProjectAuditEntries The project's audit log
 	//
@@ -2596,7 +2684,7 @@ type ClientInterface interface {
 	// DeleteEnvironment performs a DELETE /projects/{project}/environments/{environment} (the `DeleteEnvironment` operationId) request.
 	//
 	// Deletes the environment; the last one of a project is refused with `last_environment`.
-	DeleteEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *DeleteEnvironmentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetEnvironment performs a GET /projects/{project}/environments/{environment} (the `GetEnvironment` operationId) request.
 	GetEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2605,13 +2693,13 @@ type ClientInterface interface {
 	// with any type of body and a specified content type.
 	//
 	// Renames the environment; the key never changes (`key_immutable`).
-	UpdateEnvironmentWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateEnvironmentWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateEnvironment performs a PATCH /projects/{project}/environments/{environment} (the `UpdateEnvironment` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
 	// Renames the environment; the key never changes (`key_immutable`).
-	UpdateEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// EvaluateWithBody Evaluate flags for a context, as the environment's SDKs would
 	//
@@ -3183,7 +3271,7 @@ type ClientInterface interface {
 	// Deletes the unit type. A unit type a rule's condition, a rollout,
 	// an override or a segment still names, an archived flag's included,
 	// is refused with `in_use` listing what names it.
-	DeleteUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *DeleteUnitTypeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetUnitType performs a GET /projects/{project}/unit-types/{unit_type} (the `GetUnitType` operationId) request.
 	GetUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3192,13 +3280,13 @@ type ClientInterface interface {
 	// with any type of body and a specified content type.
 	//
 	// Renames the unit type or changes its description; the key never changes (`key_immutable`).
-	UpdateUnitTypeWithBody(ctx context.Context, project ProjectKey, unitType UnitTypeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateUnitTypeWithBody(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateUnitType performs a PATCH /projects/{project}/unit-types/{unit_type} (the `UpdateUnitType` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
 	// Renames the unit type or changes its description; the key never changes (`key_immutable`).
-	UpdateUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, body UpdateUnitTypeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, body UpdateUnitTypeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListRoles The roles and their permissions
 	//
@@ -4073,8 +4161,8 @@ func (c *Client) GetProject(ctx context.Context, project ProjectKey, reqEditors 
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PATCH /projects/{project} (the `UpdateProject` operationId).
-func (c *Client) UpdateProjectWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateProjectRequestWithBody(c.Server, project, contentType, body)
+func (c *Client) UpdateProjectWithBody(ctx context.Context, project ProjectKey, params *UpdateProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateProjectRequestWithBody(c.Server, project, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4092,8 +4180,8 @@ func (c *Client) UpdateProjectWithBody(ctx context.Context, project ProjectKey, 
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PATCH /projects/{project} (the `UpdateProject` operationId).
-func (c *Client) UpdateProject(ctx context.Context, project ProjectKey, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateProjectRequest(c.Server, project, body)
+func (c *Client) UpdateProject(ctx context.Context, project ProjectKey, params *UpdateProjectParams, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateProjectRequest(c.Server, project, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4163,8 +4251,8 @@ func (c *Client) CreateAttribute(ctx context.Context, project ProjectKey, body C
 // `standard_attribute`, and one a rule's condition or a segment still
 // names, an archived flag's included, with `in_use` listing what
 // names it.
-func (c *Client) DeleteAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteAttributeRequest(c.Server, project, attribute)
+func (c *Client) DeleteAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, params *DeleteAttributeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteAttributeRequest(c.Server, project, attribute, params)
 	if err != nil {
 		return nil, err
 	}
@@ -4192,8 +4280,8 @@ func (c *Client) GetAttribute(ctx context.Context, project ProjectKey, attribute
 // with any type of body and a specified content type.
 //
 // Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
-func (c *Client) UpdateAttributeWithBody(ctx context.Context, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateAttributeRequestWithBody(c.Server, project, attribute, contentType, body)
+func (c *Client) UpdateAttributeWithBody(ctx context.Context, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAttributeRequestWithBody(c.Server, project, attribute, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4208,8 +4296,8 @@ func (c *Client) UpdateAttributeWithBody(ctx context.Context, project ProjectKey
 // Takes a body of the `application/json` content type.
 //
 // Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
-func (c *Client) UpdateAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, body UpdateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateAttributeRequest(c.Server, project, attribute, body)
+func (c *Client) UpdateAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, body UpdateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAttributeRequest(c.Server, project, attribute, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4312,8 +4400,8 @@ func (c *Client) CreateEnvironment(ctx context.Context, project ProjectKey, body
 // DeleteEnvironment performs a DELETE /projects/{project}/environments/{environment} (the `DeleteEnvironment` operationId) request.
 //
 // Deletes the environment; the last one of a project is refused with `last_environment`.
-func (c *Client) DeleteEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteEnvironmentRequest(c.Server, project, environment)
+func (c *Client) DeleteEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *DeleteEnvironmentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteEnvironmentRequest(c.Server, project, environment, params)
 	if err != nil {
 		return nil, err
 	}
@@ -4341,8 +4429,8 @@ func (c *Client) GetEnvironment(ctx context.Context, project ProjectKey, environ
 // with any type of body and a specified content type.
 //
 // Renames the environment; the key never changes (`key_immutable`).
-func (c *Client) UpdateEnvironmentWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateEnvironmentRequestWithBody(c.Server, project, environment, contentType, body)
+func (c *Client) UpdateEnvironmentWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateEnvironmentRequestWithBody(c.Server, project, environment, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4357,8 +4445,8 @@ func (c *Client) UpdateEnvironmentWithBody(ctx context.Context, project ProjectK
 // Takes a body of the `application/json` content type.
 //
 // Renames the environment; the key never changes (`key_immutable`).
-func (c *Client) UpdateEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateEnvironmentRequest(c.Server, project, environment, body)
+func (c *Client) UpdateEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateEnvironmentRequest(c.Server, project, environment, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5389,8 +5477,8 @@ func (c *Client) CreateUnitType(ctx context.Context, project ProjectKey, body Cr
 // Deletes the unit type. A unit type a rule's condition, a rollout,
 // an override or a segment still names, an archived flag's included,
 // is refused with `in_use` listing what names it.
-func (c *Client) DeleteUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteUnitTypeRequest(c.Server, project, unitType)
+func (c *Client) DeleteUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *DeleteUnitTypeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteUnitTypeRequest(c.Server, project, unitType, params)
 	if err != nil {
 		return nil, err
 	}
@@ -5418,8 +5506,8 @@ func (c *Client) GetUnitType(ctx context.Context, project ProjectKey, unitType U
 // with any type of body and a specified content type.
 //
 // Renames the unit type or changes its description; the key never changes (`key_immutable`).
-func (c *Client) UpdateUnitTypeWithBody(ctx context.Context, project ProjectKey, unitType UnitTypeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateUnitTypeRequestWithBody(c.Server, project, unitType, contentType, body)
+func (c *Client) UpdateUnitTypeWithBody(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateUnitTypeRequestWithBody(c.Server, project, unitType, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5434,8 +5522,8 @@ func (c *Client) UpdateUnitTypeWithBody(ctx context.Context, project ProjectKey,
 // Takes a body of the `application/json` content type.
 //
 // Renames the unit type or changes its description; the key never changes (`key_immutable`).
-func (c *Client) UpdateUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, body UpdateUnitTypeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateUnitTypeRequest(c.Server, project, unitType, body)
+func (c *Client) UpdateUnitType(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, body UpdateUnitTypeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateUnitTypeRequest(c.Server, project, unitType, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6760,18 +6848,18 @@ func NewGetProjectRequest(server string, project ProjectKey) (*http.Request, err
 }
 
 // NewUpdateProjectRequest calls the generic UpdateProject builder with application/json body
-func NewUpdateProjectRequest(server string, project ProjectKey, body UpdateProjectJSONRequestBody) (*http.Request, error) {
+func NewUpdateProjectRequest(server string, project ProjectKey, params *UpdateProjectParams, body UpdateProjectJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateProjectRequestWithBody(server, project, "application/json", bodyReader)
+	return NewUpdateProjectRequestWithBody(server, project, params, "application/json", bodyReader)
 }
 
 // NewUpdateProjectRequestWithBody constructs an http.Request for the UpdateProject method, with any body, and a specified content type
-func NewUpdateProjectRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+func NewUpdateProjectRequestWithBody(server string, project ProjectKey, params *UpdateProjectParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -6802,6 +6890,21 @@ func NewUpdateProjectRequestWithBody(server string, project ProjectKey, contentT
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -6888,7 +6991,7 @@ func NewCreateAttributeRequestWithBody(server string, project ProjectKey, conten
 }
 
 // NewDeleteAttributeRequest constructs an http.Request for the DeleteAttribute method
-func NewDeleteAttributeRequest(server string, project ProjectKey, attribute AttributeKey) (*http.Request, error) {
+func NewDeleteAttributeRequest(server string, project ProjectKey, attribute AttributeKey, params *DeleteAttributeParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -6923,6 +7026,21 @@ func NewDeleteAttributeRequest(server string, project ProjectKey, attribute Attr
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -6970,18 +7088,18 @@ func NewGetAttributeRequest(server string, project ProjectKey, attribute Attribu
 }
 
 // NewUpdateAttributeRequest calls the generic UpdateAttribute builder with application/json body
-func NewUpdateAttributeRequest(server string, project ProjectKey, attribute AttributeKey, body UpdateAttributeJSONRequestBody) (*http.Request, error) {
+func NewUpdateAttributeRequest(server string, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, body UpdateAttributeJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateAttributeRequestWithBody(server, project, attribute, "application/json", bodyReader)
+	return NewUpdateAttributeRequestWithBody(server, project, attribute, params, "application/json", bodyReader)
 }
 
 // NewUpdateAttributeRequestWithBody constructs an http.Request for the UpdateAttribute method, with any body, and a specified content type
-func NewUpdateAttributeRequestWithBody(server string, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader) (*http.Request, error) {
+func NewUpdateAttributeRequestWithBody(server string, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -7019,6 +7137,21 @@ func NewUpdateAttributeRequestWithBody(server string, project ProjectKey, attrib
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -7339,7 +7472,7 @@ func NewCreateEnvironmentRequestWithBody(server string, project ProjectKey, cont
 }
 
 // NewDeleteEnvironmentRequest constructs an http.Request for the DeleteEnvironment method
-func NewDeleteEnvironmentRequest(server string, project ProjectKey, environment EnvironmentKey) (*http.Request, error) {
+func NewDeleteEnvironmentRequest(server string, project ProjectKey, environment EnvironmentKey, params *DeleteEnvironmentParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -7374,6 +7507,21 @@ func NewDeleteEnvironmentRequest(server string, project ProjectKey, environment 
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -7421,18 +7569,18 @@ func NewGetEnvironmentRequest(server string, project ProjectKey, environment Env
 }
 
 // NewUpdateEnvironmentRequest calls the generic UpdateEnvironment builder with application/json body
-func NewUpdateEnvironmentRequest(server string, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody) (*http.Request, error) {
+func NewUpdateEnvironmentRequest(server string, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, body UpdateEnvironmentJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateEnvironmentRequestWithBody(server, project, environment, "application/json", bodyReader)
+	return NewUpdateEnvironmentRequestWithBody(server, project, environment, params, "application/json", bodyReader)
 }
 
 // NewUpdateEnvironmentRequestWithBody constructs an http.Request for the UpdateEnvironment method, with any body, and a specified content type
-func NewUpdateEnvironmentRequestWithBody(server string, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader) (*http.Request, error) {
+func NewUpdateEnvironmentRequestWithBody(server string, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -7470,6 +7618,21 @@ func NewUpdateEnvironmentRequestWithBody(server string, project ProjectKey, envi
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -9260,7 +9423,7 @@ func NewCreateUnitTypeRequestWithBody(server string, project ProjectKey, content
 }
 
 // NewDeleteUnitTypeRequest constructs an http.Request for the DeleteUnitType method
-func NewDeleteUnitTypeRequest(server string, project ProjectKey, unitType UnitTypeKey) (*http.Request, error) {
+func NewDeleteUnitTypeRequest(server string, project ProjectKey, unitType UnitTypeKey, params *DeleteUnitTypeParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -9295,6 +9458,21 @@ func NewDeleteUnitTypeRequest(server string, project ProjectKey, unitType UnitTy
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -9342,18 +9520,18 @@ func NewGetUnitTypeRequest(server string, project ProjectKey, unitType UnitTypeK
 }
 
 // NewUpdateUnitTypeRequest calls the generic UpdateUnitType builder with application/json body
-func NewUpdateUnitTypeRequest(server string, project ProjectKey, unitType UnitTypeKey, body UpdateUnitTypeJSONRequestBody) (*http.Request, error) {
+func NewUpdateUnitTypeRequest(server string, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, body UpdateUnitTypeJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateUnitTypeRequestWithBody(server, project, unitType, "application/json", bodyReader)
+	return NewUpdateUnitTypeRequestWithBody(server, project, unitType, params, "application/json", bodyReader)
 }
 
 // NewUpdateUnitTypeRequestWithBody constructs an http.Request for the UpdateUnitType method, with any body, and a specified content type
-func NewUpdateUnitTypeRequestWithBody(server string, project ProjectKey, unitType UnitTypeKey, contentType string, body io.Reader) (*http.Request, error) {
+func NewUpdateUnitTypeRequestWithBody(server string, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -9391,6 +9569,21 @@ func NewUpdateUnitTypeRequestWithBody(server string, project ProjectKey, unitTyp
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -9975,7 +10168,7 @@ type ClientWithResponsesInterface interface {
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /projects/{project} (the `UpdateProject` operationId).
-	UpdateProjectWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error)
+	UpdateProjectWithBodyWithResponse(ctx context.Context, project ProjectKey, params *UpdateProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error)
 
 	// UpdateProjectWithResponse Rename a project or change its description
 	//
@@ -9984,7 +10177,7 @@ type ClientWithResponsesInterface interface {
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /projects/{project} (the `UpdateProject` operationId).
-	UpdateProjectWithResponse(ctx context.Context, project ProjectKey, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error)
+	UpdateProjectWithResponse(ctx context.Context, project ProjectKey, params *UpdateProjectParams, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error)
 
 	// ListAttributesWithResponse The project's attributes
 	//
@@ -10019,7 +10212,7 @@ type ClientWithResponsesInterface interface {
 	// names it.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DeleteAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*DeleteAttributeResponse, error)
+	DeleteAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, params *DeleteAttributeParams, reqEditors ...RequestEditorFn) (*DeleteAttributeResponse, error)
 
 	// GetAttributeWithResponse performs a GET /projects/{project}/attributes/{attribute} (the `GetAttribute` operationId) request.
 	//
@@ -10032,13 +10225,13 @@ type ClientWithResponsesInterface interface {
 	// Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
 	//
 	// Returns a wrapper object for the known response body format(s).
-	UpdateAttributeWithBodyWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAttributeResponse, error)
+	UpdateAttributeWithBodyWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAttributeResponse, error)
 
 	// UpdateAttributeWithResponse performs a PATCH /projects/{project}/attributes/{attribute} (the `UpdateAttribute` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
-	UpdateAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, body UpdateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAttributeResponse, error)
+	UpdateAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, body UpdateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAttributeResponse, error)
 
 	// ListProjectAuditEntriesWithResponse The project's audit log
 	//
@@ -10090,7 +10283,7 @@ type ClientWithResponsesInterface interface {
 	// Deletes the environment; the last one of a project is refused with `last_environment`.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DeleteEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*DeleteEnvironmentResponse, error)
+	DeleteEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *DeleteEnvironmentParams, reqEditors ...RequestEditorFn) (*DeleteEnvironmentResponse, error)
 
 	// GetEnvironmentWithResponse performs a GET /projects/{project}/environments/{environment} (the `GetEnvironment` operationId) request.
 	//
@@ -10103,13 +10296,13 @@ type ClientWithResponsesInterface interface {
 	// Renames the environment; the key never changes (`key_immutable`).
 	//
 	// Returns a wrapper object for the known response body format(s).
-	UpdateEnvironmentWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error)
+	UpdateEnvironmentWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error)
 
 	// UpdateEnvironmentWithResponse performs a PATCH /projects/{project}/environments/{environment} (the `UpdateEnvironment` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Renames the environment; the key never changes (`key_immutable`).
-	UpdateEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error)
+	UpdateEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error)
 
 	// EvaluateWithBodyWithResponse Evaluate flags for a context, as the environment's SDKs would
 	//
@@ -10721,7 +10914,7 @@ type ClientWithResponsesInterface interface {
 	// is refused with `in_use` listing what names it.
 	//
 	// Returns a wrapper object for the known response body format(s).
-	DeleteUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, reqEditors ...RequestEditorFn) (*DeleteUnitTypeResponse, error)
+	DeleteUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *DeleteUnitTypeParams, reqEditors ...RequestEditorFn) (*DeleteUnitTypeResponse, error)
 
 	// GetUnitTypeWithResponse performs a GET /projects/{project}/unit-types/{unit_type} (the `GetUnitType` operationId) request.
 	//
@@ -10734,13 +10927,13 @@ type ClientWithResponsesInterface interface {
 	// Renames the unit type or changes its description; the key never changes (`key_immutable`).
 	//
 	// Returns a wrapper object for the known response body format(s).
-	UpdateUnitTypeWithBodyWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUnitTypeResponse, error)
+	UpdateUnitTypeWithBodyWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUnitTypeResponse, error)
 
 	// UpdateUnitTypeWithResponse performs a PATCH /projects/{project}/unit-types/{unit_type} (the `UpdateUnitType` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Renames the unit type or changes its description; the key never changes (`key_immutable`).
-	UpdateUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, body UpdateUnitTypeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUnitTypeResponse, error)
+	UpdateUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, body UpdateUnitTypeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUnitTypeResponse, error)
 
 	// ListRolesWithResponse The roles and their permissions
 	//
@@ -12858,6 +13051,11 @@ func (r ListProjectsResponse) ContentType() string {
 	return ""
 }
 
+// CreateProjectResponse201Headers the declared response headers of an HTTP 201 response for CreateProject
+type CreateProjectResponse201Headers struct {
+	ETag *string
+}
+
 // CreateProjectResponse401Headers the declared response headers of an HTTP 401 response for CreateProject
 type CreateProjectResponse401Headers struct {
 	WWWAuthenticate *string
@@ -12876,6 +13074,8 @@ type CreateProjectResponse struct {
 	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateProjectResponse201Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *CreateProjectResponse401Headers
 }
@@ -12934,6 +13134,11 @@ func (r CreateProjectResponse) ContentType() string {
 	return ""
 }
 
+// GetProjectResponse200Headers the declared response headers of an HTTP 200 response for GetProject
+type GetProjectResponse200Headers struct {
+	ETag *string
+}
+
 // GetProjectResponse401Headers the declared response headers of an HTTP 401 response for GetProject
 type GetProjectResponse401Headers struct {
 	WWWAuthenticate *string
@@ -12950,6 +13155,8 @@ type GetProjectResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetProjectResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *GetProjectResponse401Headers
 }
@@ -13003,6 +13210,11 @@ func (r GetProjectResponse) ContentType() string {
 	return ""
 }
 
+// UpdateProjectResponse200Headers the declared response headers of an HTTP 200 response for UpdateProject
+type UpdateProjectResponse200Headers struct {
+	ETag *string
+}
+
 // UpdateProjectResponse401Headers the declared response headers of an HTTP 401 response for UpdateProject
 type UpdateProjectResponse401Headers struct {
 	WWWAuthenticate *string
@@ -13013,14 +13225,22 @@ type UpdateProjectResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Project
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateProjectResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *UpdateProjectResponse401Headers
 }
@@ -13028,6 +13248,11 @@ type UpdateProjectResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r UpdateProjectResponse) GetJSON200() *Project {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateProjectResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
 }
 
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
@@ -13045,9 +13270,19 @@ func (r UpdateProjectResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
 }
 
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateProjectResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r UpdateProjectResponse) GetApplicationproblemJSON422() *Invalid {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateProjectResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
 }
 
 // GetBody returns the raw response body bytes
@@ -13148,6 +13383,11 @@ func (r ListAttributesResponse) ContentType() string {
 	return ""
 }
 
+// CreateAttributeResponse201Headers the declared response headers of an HTTP 201 response for CreateAttribute
+type CreateAttributeResponse201Headers struct {
+	ETag *string
+}
+
 // CreateAttributeResponse401Headers the declared response headers of an HTTP 401 response for CreateAttribute
 type CreateAttributeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -13168,6 +13408,8 @@ type CreateAttributeResponse struct {
 	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateAttributeResponse201Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *CreateAttributeResponse401Headers
 }
@@ -13239,6 +13481,8 @@ type DeleteAttributeResponse401Headers struct {
 type DeleteAttributeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
@@ -13247,8 +13491,17 @@ type DeleteAttributeResponse struct {
 	ApplicationproblemJSON404 *NotFound
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *DeleteAttributeResponse401Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeleteAttributeResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
 }
 
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
@@ -13269,6 +13522,16 @@ func (r DeleteAttributeResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r DeleteAttributeResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r DeleteAttributeResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r DeleteAttributeResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
 }
 
 // GetBody returns the raw response body bytes
@@ -13300,6 +13563,11 @@ func (r DeleteAttributeResponse) ContentType() string {
 	return ""
 }
 
+// GetAttributeResponse200Headers the declared response headers of an HTTP 200 response for GetAttribute
+type GetAttributeResponse200Headers struct {
+	ETag *string
+}
+
 // GetAttributeResponse401Headers the declared response headers of an HTTP 401 response for GetAttribute
 type GetAttributeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -13316,6 +13584,8 @@ type GetAttributeResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetAttributeResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *GetAttributeResponse401Headers
 }
@@ -13369,6 +13639,11 @@ func (r GetAttributeResponse) ContentType() string {
 	return ""
 }
 
+// UpdateAttributeResponse200Headers the declared response headers of an HTTP 200 response for UpdateAttribute
+type UpdateAttributeResponse200Headers struct {
+	ETag *string
+}
+
 // UpdateAttributeResponse401Headers the declared response headers of an HTTP 401 response for UpdateAttribute
 type UpdateAttributeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -13379,14 +13654,22 @@ type UpdateAttributeResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Attribute
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateAttributeResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *UpdateAttributeResponse401Headers
 }
@@ -13394,6 +13677,11 @@ type UpdateAttributeResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r UpdateAttributeResponse) GetJSON200() *Attribute {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateAttributeResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
 }
 
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
@@ -13411,9 +13699,19 @@ func (r UpdateAttributeResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
 }
 
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateAttributeResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r UpdateAttributeResponse) GetApplicationproblemJSON422() *Invalid {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateAttributeResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
 }
 
 // GetBody returns the raw response body bytes
@@ -13659,6 +13957,11 @@ func (r ListEnvironmentsResponse) ContentType() string {
 	return ""
 }
 
+// CreateEnvironmentResponse201Headers the declared response headers of an HTTP 201 response for CreateEnvironment
+type CreateEnvironmentResponse201Headers struct {
+	ETag *string
+}
+
 // CreateEnvironmentResponse401Headers the declared response headers of an HTTP 401 response for CreateEnvironment
 type CreateEnvironmentResponse401Headers struct {
 	WWWAuthenticate *string
@@ -13679,6 +13982,8 @@ type CreateEnvironmentResponse struct {
 	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateEnvironmentResponse201Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *CreateEnvironmentResponse401Headers
 }
@@ -13750,6 +14055,8 @@ type DeleteEnvironmentResponse401Headers struct {
 type DeleteEnvironmentResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
@@ -13758,8 +14065,17 @@ type DeleteEnvironmentResponse struct {
 	ApplicationproblemJSON404 *NotFound
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *DeleteEnvironmentResponse401Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeleteEnvironmentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
 }
 
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
@@ -13780,6 +14096,16 @@ func (r DeleteEnvironmentResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r DeleteEnvironmentResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r DeleteEnvironmentResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r DeleteEnvironmentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
 }
 
 // GetBody returns the raw response body bytes
@@ -13811,6 +14137,11 @@ func (r DeleteEnvironmentResponse) ContentType() string {
 	return ""
 }
 
+// GetEnvironmentResponse200Headers the declared response headers of an HTTP 200 response for GetEnvironment
+type GetEnvironmentResponse200Headers struct {
+	ETag *string
+}
+
 // GetEnvironmentResponse401Headers the declared response headers of an HTTP 401 response for GetEnvironment
 type GetEnvironmentResponse401Headers struct {
 	WWWAuthenticate *string
@@ -13827,6 +14158,8 @@ type GetEnvironmentResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetEnvironmentResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *GetEnvironmentResponse401Headers
 }
@@ -13880,6 +14213,11 @@ func (r GetEnvironmentResponse) ContentType() string {
 	return ""
 }
 
+// UpdateEnvironmentResponse200Headers the declared response headers of an HTTP 200 response for UpdateEnvironment
+type UpdateEnvironmentResponse200Headers struct {
+	ETag *string
+}
+
 // UpdateEnvironmentResponse401Headers the declared response headers of an HTTP 401 response for UpdateEnvironment
 type UpdateEnvironmentResponse401Headers struct {
 	WWWAuthenticate *string
@@ -13890,14 +14228,22 @@ type UpdateEnvironmentResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *Environment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateEnvironmentResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *UpdateEnvironmentResponse401Headers
 }
@@ -13905,6 +14251,11 @@ type UpdateEnvironmentResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r UpdateEnvironmentResponse) GetJSON200() *Environment {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateEnvironmentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
 }
 
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
@@ -13922,9 +14273,19 @@ func (r UpdateEnvironmentResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
 }
 
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateEnvironmentResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r UpdateEnvironmentResponse) GetApplicationproblemJSON422() *Invalid {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateEnvironmentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
 }
 
 // GetBody returns the raw response body bytes
@@ -16592,6 +16953,11 @@ func (r ListUnitTypesResponse) ContentType() string {
 	return ""
 }
 
+// CreateUnitTypeResponse201Headers the declared response headers of an HTTP 201 response for CreateUnitType
+type CreateUnitTypeResponse201Headers struct {
+	ETag *string
+}
+
 // CreateUnitTypeResponse401Headers the declared response headers of an HTTP 401 response for CreateUnitType
 type CreateUnitTypeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -16612,6 +16978,8 @@ type CreateUnitTypeResponse struct {
 	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateUnitTypeResponse201Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *CreateUnitTypeResponse401Headers
 }
@@ -16683,6 +17051,8 @@ type DeleteUnitTypeResponse401Headers struct {
 type DeleteUnitTypeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
@@ -16691,8 +17061,17 @@ type DeleteUnitTypeResponse struct {
 	ApplicationproblemJSON404 *NotFound
 	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
 	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *DeleteUnitTypeResponse401Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeleteUnitTypeResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
 }
 
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
@@ -16713,6 +17092,16 @@ func (r DeleteUnitTypeResponse) GetApplicationproblemJSON404() *NotFound {
 // GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
 func (r DeleteUnitTypeResponse) GetApplicationproblemJSON409() *Conflict {
 	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r DeleteUnitTypeResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r DeleteUnitTypeResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
 }
 
 // GetBody returns the raw response body bytes
@@ -16744,6 +17133,11 @@ func (r DeleteUnitTypeResponse) ContentType() string {
 	return ""
 }
 
+// GetUnitTypeResponse200Headers the declared response headers of an HTTP 200 response for GetUnitType
+type GetUnitTypeResponse200Headers struct {
+	ETag *string
+}
+
 // GetUnitTypeResponse401Headers the declared response headers of an HTTP 401 response for GetUnitType
 type GetUnitTypeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -16760,6 +17154,8 @@ type GetUnitTypeResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetUnitTypeResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *GetUnitTypeResponse401Headers
 }
@@ -16813,6 +17209,11 @@ func (r GetUnitTypeResponse) ContentType() string {
 	return ""
 }
 
+// UpdateUnitTypeResponse200Headers the declared response headers of an HTTP 200 response for UpdateUnitType
+type UpdateUnitTypeResponse200Headers struct {
+	ETag *string
+}
+
 // UpdateUnitTypeResponse401Headers the declared response headers of an HTTP 401 response for UpdateUnitType
 type UpdateUnitTypeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -16823,14 +17224,22 @@ type UpdateUnitTypeResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *UnitType
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *Unauthenticated
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
 	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateUnitTypeResponse200Headers
 	// Headers401 the parsed response headers for an HTTP 401 response
 	Headers401 *UpdateUnitTypeResponse401Headers
 }
@@ -16838,6 +17247,11 @@ type UpdateUnitTypeResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r UpdateUnitTypeResponse) GetJSON200() *UnitType {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateUnitTypeResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
 }
 
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
@@ -16855,9 +17269,19 @@ func (r UpdateUnitTypeResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
 }
 
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateUnitTypeResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
 // GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
 func (r UpdateUnitTypeResponse) GetApplicationproblemJSON422() *Invalid {
 	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateUnitTypeResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
 }
 
 // GetBody returns the raw response body bytes
@@ -17700,8 +18124,8 @@ func (c *ClientWithResponses) GetProjectWithResponse(ctx context.Context, projec
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /projects/{project} (the `UpdateProject` operationId).
-func (c *ClientWithResponses) UpdateProjectWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error) {
-	rsp, err := c.UpdateProjectWithBody(ctx, project, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UpdateProjectWithBodyWithResponse(ctx context.Context, project ProjectKey, params *UpdateProjectParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error) {
+	rsp, err := c.UpdateProjectWithBody(ctx, project, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -17715,8 +18139,8 @@ func (c *ClientWithResponses) UpdateProjectWithBodyWithResponse(ctx context.Cont
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PATCH /projects/{project} (the `UpdateProject` operationId).
-func (c *ClientWithResponses) UpdateProjectWithResponse(ctx context.Context, project ProjectKey, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error) {
-	rsp, err := c.UpdateProject(ctx, project, body, reqEditors...)
+func (c *ClientWithResponses) UpdateProjectWithResponse(ctx context.Context, project ProjectKey, params *UpdateProjectParams, body UpdateProjectJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateProjectResponse, error) {
+	rsp, err := c.UpdateProject(ctx, project, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -17774,8 +18198,8 @@ func (c *ClientWithResponses) CreateAttributeWithResponse(ctx context.Context, p
 // names it.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DeleteAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*DeleteAttributeResponse, error) {
-	rsp, err := c.DeleteAttribute(ctx, project, attribute, reqEditors...)
+func (c *ClientWithResponses) DeleteAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, params *DeleteAttributeParams, reqEditors ...RequestEditorFn) (*DeleteAttributeResponse, error) {
+	rsp, err := c.DeleteAttribute(ctx, project, attribute, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -17799,8 +18223,8 @@ func (c *ClientWithResponses) GetAttributeWithResponse(ctx context.Context, proj
 // Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) UpdateAttributeWithBodyWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAttributeResponse, error) {
-	rsp, err := c.UpdateAttributeWithBody(ctx, project, attribute, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UpdateAttributeWithBodyWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAttributeResponse, error) {
+	rsp, err := c.UpdateAttributeWithBody(ctx, project, attribute, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -17811,8 +18235,8 @@ func (c *ClientWithResponses) UpdateAttributeWithBodyWithResponse(ctx context.Co
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Renames the attribute or changes its description; the key and the type never change (`key_immutable`, `type_immutable`).
-func (c *ClientWithResponses) UpdateAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, body UpdateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAttributeResponse, error) {
-	rsp, err := c.UpdateAttribute(ctx, project, attribute, body, reqEditors...)
+func (c *ClientWithResponses) UpdateAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, params *UpdateAttributeParams, body UpdateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAttributeResponse, error) {
+	rsp, err := c.UpdateAttribute(ctx, project, attribute, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -17899,8 +18323,8 @@ func (c *ClientWithResponses) CreateEnvironmentWithResponse(ctx context.Context,
 // Deletes the environment; the last one of a project is refused with `last_environment`.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DeleteEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*DeleteEnvironmentResponse, error) {
-	rsp, err := c.DeleteEnvironment(ctx, project, environment, reqEditors...)
+func (c *ClientWithResponses) DeleteEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *DeleteEnvironmentParams, reqEditors ...RequestEditorFn) (*DeleteEnvironmentResponse, error) {
+	rsp, err := c.DeleteEnvironment(ctx, project, environment, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -17924,8 +18348,8 @@ func (c *ClientWithResponses) GetEnvironmentWithResponse(ctx context.Context, pr
 // Renames the environment; the key never changes (`key_immutable`).
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) UpdateEnvironmentWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error) {
-	rsp, err := c.UpdateEnvironmentWithBody(ctx, project, environment, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UpdateEnvironmentWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error) {
+	rsp, err := c.UpdateEnvironmentWithBody(ctx, project, environment, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -17936,8 +18360,8 @@ func (c *ClientWithResponses) UpdateEnvironmentWithBodyWithResponse(ctx context.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Renames the environment; the key never changes (`key_immutable`).
-func (c *ClientWithResponses) UpdateEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error) {
-	rsp, err := c.UpdateEnvironment(ctx, project, environment, body, reqEditors...)
+func (c *ClientWithResponses) UpdateEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *UpdateEnvironmentParams, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error) {
+	rsp, err := c.UpdateEnvironment(ctx, project, environment, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -18824,8 +19248,8 @@ func (c *ClientWithResponses) CreateUnitTypeWithResponse(ctx context.Context, pr
 // is refused with `in_use` listing what names it.
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) DeleteUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, reqEditors ...RequestEditorFn) (*DeleteUnitTypeResponse, error) {
-	rsp, err := c.DeleteUnitType(ctx, project, unitType, reqEditors...)
+func (c *ClientWithResponses) DeleteUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *DeleteUnitTypeParams, reqEditors ...RequestEditorFn) (*DeleteUnitTypeResponse, error) {
+	rsp, err := c.DeleteUnitType(ctx, project, unitType, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -18849,8 +19273,8 @@ func (c *ClientWithResponses) GetUnitTypeWithResponse(ctx context.Context, proje
 // Renames the unit type or changes its description; the key never changes (`key_immutable`).
 //
 // Returns a wrapper object for the known response body format(s).
-func (c *ClientWithResponses) UpdateUnitTypeWithBodyWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUnitTypeResponse, error) {
-	rsp, err := c.UpdateUnitTypeWithBody(ctx, project, unitType, contentType, body, reqEditors...)
+func (c *ClientWithResponses) UpdateUnitTypeWithBodyWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUnitTypeResponse, error) {
+	rsp, err := c.UpdateUnitTypeWithBody(ctx, project, unitType, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -18861,8 +19285,8 @@ func (c *ClientWithResponses) UpdateUnitTypeWithBodyWithResponse(ctx context.Con
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Renames the unit type or changes its description; the key never changes (`key_immutable`).
-func (c *ClientWithResponses) UpdateUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, body UpdateUnitTypeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUnitTypeResponse, error) {
-	rsp, err := c.UpdateUnitType(ctx, project, unitType, body, reqEditors...)
+func (c *ClientWithResponses) UpdateUnitTypeWithResponse(ctx context.Context, project ProjectKey, unitType UnitTypeKey, params *UpdateUnitTypeParams, body UpdateUnitTypeJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUnitTypeResponse, error) {
+	rsp, err := c.UpdateUnitType(ctx, project, unitType, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -20832,6 +21256,16 @@ func ParseCreateProjectResponse(rsp *http.Response) (*CreateProjectResponse, err
 	}
 
 	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateProjectResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
 	case rsp.StatusCode == 401:
 		var headers CreateProjectResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -20892,6 +21326,16 @@ func ParseGetProjectResponse(rsp *http.Response) (*GetProjectResponse, error) {
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers GetProjectResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetProjectResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -20928,6 +21372,13 @@ func ParseUpdateProjectResponse(rsp *http.Response) (*UpdateProjectResponse, err
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthenticated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -20949,6 +21400,13 @@ func ParseUpdateProjectResponse(rsp *http.Response) (*UpdateProjectResponse, err
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Invalid
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -20956,9 +21414,26 @@ func ParseUpdateProjectResponse(rsp *http.Response) (*UpdateProjectResponse, err
 		}
 		response.ApplicationproblemJSON422 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateProjectResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers UpdateProjectResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -21093,6 +21568,16 @@ func ParseCreateAttributeResponse(rsp *http.Response) (*CreateAttributeResponse,
 	}
 
 	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateAttributeResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
 	case rsp.StatusCode == 401:
 		var headers CreateAttributeResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -21125,6 +21610,13 @@ func ParseDeleteAttributeResponse(rsp *http.Response) (*DeleteAttributeResponse,
 	case rsp.StatusCode == 204:
 		break // No content-type
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthenticated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -21152,6 +21644,20 @@ func ParseDeleteAttributeResponse(rsp *http.Response) (*DeleteAttributeResponse,
 			return nil, err
 		}
 		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
 
 	}
 
@@ -21216,6 +21722,16 @@ func ParseGetAttributeResponse(rsp *http.Response) (*GetAttributeResponse, error
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers GetAttributeResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetAttributeResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -21252,6 +21768,13 @@ func ParseUpdateAttributeResponse(rsp *http.Response) (*UpdateAttributeResponse,
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthenticated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -21273,6 +21796,13 @@ func ParseUpdateAttributeResponse(rsp *http.Response) (*UpdateAttributeResponse,
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Invalid
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -21280,9 +21810,26 @@ func ParseUpdateAttributeResponse(rsp *http.Response) (*UpdateAttributeResponse,
 		}
 		response.ApplicationproblemJSON422 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateAttributeResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers UpdateAttributeResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -21544,6 +22091,16 @@ func ParseCreateEnvironmentResponse(rsp *http.Response) (*CreateEnvironmentRespo
 	}
 
 	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateEnvironmentResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
 	case rsp.StatusCode == 401:
 		var headers CreateEnvironmentResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -21576,6 +22133,13 @@ func ParseDeleteEnvironmentResponse(rsp *http.Response) (*DeleteEnvironmentRespo
 	case rsp.StatusCode == 204:
 		break // No content-type
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthenticated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -21603,6 +22167,20 @@ func ParseDeleteEnvironmentResponse(rsp *http.Response) (*DeleteEnvironmentRespo
 			return nil, err
 		}
 		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
 
 	}
 
@@ -21667,6 +22245,16 @@ func ParseGetEnvironmentResponse(rsp *http.Response) (*GetEnvironmentResponse, e
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers GetEnvironmentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetEnvironmentResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -21703,6 +22291,13 @@ func ParseUpdateEnvironmentResponse(rsp *http.Response) (*UpdateEnvironmentRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthenticated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -21724,6 +22319,13 @@ func ParseUpdateEnvironmentResponse(rsp *http.Response) (*UpdateEnvironmentRespo
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Invalid
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -21731,9 +22333,26 @@ func ParseUpdateEnvironmentResponse(rsp *http.Response) (*UpdateEnvironmentRespo
 		}
 		response.ApplicationproblemJSON422 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateEnvironmentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers UpdateEnvironmentResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -24225,6 +24844,16 @@ func ParseCreateUnitTypeResponse(rsp *http.Response) (*CreateUnitTypeResponse, e
 	}
 
 	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateUnitTypeResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
 	case rsp.StatusCode == 401:
 		var headers CreateUnitTypeResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -24257,6 +24886,13 @@ func ParseDeleteUnitTypeResponse(rsp *http.Response) (*DeleteUnitTypeResponse, e
 	case rsp.StatusCode == 204:
 		break // No content-type
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthenticated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -24284,6 +24920,20 @@ func ParseDeleteUnitTypeResponse(rsp *http.Response) (*DeleteUnitTypeResponse, e
 			return nil, err
 		}
 		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
 
 	}
 
@@ -24348,6 +24998,16 @@ func ParseGetUnitTypeResponse(rsp *http.Response) (*GetUnitTypeResponse, error) 
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers GetUnitTypeResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetUnitTypeResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -24384,6 +25044,13 @@ func ParseUpdateUnitTypeResponse(rsp *http.Response) (*UpdateUnitTypeResponse, e
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Unauthenticated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -24405,6 +25072,13 @@ func ParseUpdateUnitTypeResponse(rsp *http.Response) (*UpdateUnitTypeResponse, e
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Invalid
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -24412,9 +25086,26 @@ func ParseUpdateUnitTypeResponse(rsp *http.Response) (*UpdateUnitTypeResponse, e
 		}
 		response.ApplicationproblemJSON422 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateUnitTypeResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers UpdateUnitTypeResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
@@ -24580,7 +25271,7 @@ type ServerInterface interface {
 	GetProject(w http.ResponseWriter, r *http.Request, project ProjectKey)
 	// UpdateProject Rename a project or change its description
 	// (PATCH /projects/{project})
-	UpdateProject(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	UpdateProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params UpdateProjectParams)
 	// ListAttributes The project's attributes
 	// (GET /projects/{project}/attributes)
 	ListAttributes(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -24589,13 +25280,13 @@ type ServerInterface interface {
 	CreateAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey)
 
 	// (DELETE /projects/{project}/attributes/{attribute})
-	DeleteAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey)
+	DeleteAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey, params DeleteAttributeParams)
 
 	// (GET /projects/{project}/attributes/{attribute})
 	GetAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey)
 
 	// (PATCH /projects/{project}/attributes/{attribute})
-	UpdateAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey)
+	UpdateAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey, params UpdateAttributeParams)
 	// ListProjectAuditEntries The project's audit log
 	// (GET /projects/{project}/audit)
 	ListProjectAuditEntries(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListProjectAuditEntriesParams)
@@ -24610,13 +25301,13 @@ type ServerInterface interface {
 	CreateEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey)
 
 	// (DELETE /projects/{project}/environments/{environment})
-	DeleteEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	DeleteEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, params DeleteEnvironmentParams)
 
 	// (GET /projects/{project}/environments/{environment})
 	GetEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
 
 	// (PATCH /projects/{project}/environments/{environment})
-	UpdateEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	UpdateEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, params UpdateEnvironmentParams)
 	// Evaluate Evaluate flags for a context, as the environment's SDKs would
 	// (POST /projects/{project}/environments/{environment}/evaluate)
 	Evaluate(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
@@ -24715,13 +25406,13 @@ type ServerInterface interface {
 	CreateUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey)
 
 	// (DELETE /projects/{project}/unit-types/{unit_type})
-	DeleteUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey, unitType UnitTypeKey)
+	DeleteUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey, unitType UnitTypeKey, params DeleteUnitTypeParams)
 
 	// (GET /projects/{project}/unit-types/{unit_type})
 	GetUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey, unitType UnitTypeKey)
 
 	// (PATCH /projects/{project}/unit-types/{unit_type})
-	UpdateUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey, unitType UnitTypeKey)
+	UpdateUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey, unitType UnitTypeKey, params UpdateUnitTypeParams)
 	// ListRoles The roles and their permissions
 	// (GET /roles)
 	ListRoles(w http.ResponseWriter, r *http.Request)
@@ -25588,8 +26279,32 @@ func (siw *ServerInterfaceWrapper) UpdateProject(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateProjectParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateProject(w, r, project)
+		siw.Handler.UpdateProject(w, r, project, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -25675,8 +26390,32 @@ func (siw *ServerInterfaceWrapper) DeleteAttribute(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteAttributeParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteAttribute(w, r, project, attribute)
+		siw.Handler.DeleteAttribute(w, r, project, attribute, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -25745,8 +26484,32 @@ func (siw *ServerInterfaceWrapper) UpdateAttribute(w http.ResponseWriter, r *htt
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAttributeParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateAttribute(w, r, project, attribute)
+		siw.Handler.UpdateAttribute(w, r, project, attribute, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -26052,8 +26815,32 @@ func (siw *ServerInterfaceWrapper) DeleteEnvironment(w http.ResponseWriter, r *h
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteEnvironmentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteEnvironment(w, r, project, environment)
+		siw.Handler.DeleteEnvironment(w, r, project, environment, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -26122,8 +26909,32 @@ func (siw *ServerInterfaceWrapper) UpdateEnvironment(w http.ResponseWriter, r *h
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateEnvironmentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateEnvironment(w, r, project, environment)
+		siw.Handler.UpdateEnvironment(w, r, project, environment, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -27672,8 +28483,32 @@ func (siw *ServerInterfaceWrapper) DeleteUnitType(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteUnitTypeParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteUnitType(w, r, project, unitType)
+		siw.Handler.DeleteUnitType(w, r, project, unitType, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -27742,8 +28577,32 @@ func (siw *ServerInterfaceWrapper) UpdateUnitType(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateUnitTypeParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateUnitType(w, r, project, unitType)
+		siw.Handler.UpdateUnitType(w, r, project, unitType, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -30311,15 +31170,25 @@ type CreateProjectResponseObject interface {
 	VisitCreateProjectResponse(w http.ResponseWriter) error
 }
 
-type CreateProject201JSONResponse Project
+type CreateProject201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateProject201JSONResponse struct {
+	Body    Project
+	Headers CreateProject201ResponseHeaders
+}
 
 func (response CreateProject201JSONResponse) VisitCreateProjectResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(201)
 	_, err := buf.WriteTo(w)
 	return err
@@ -30400,15 +31269,25 @@ type GetProjectResponseObject interface {
 	VisitGetProjectResponse(w http.ResponseWriter) error
 }
 
-type GetProject200JSONResponse Project
+type GetProject200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetProject200JSONResponse struct {
+	Body    Project
+	Headers GetProject200ResponseHeaders
+}
 
 func (response GetProject200JSONResponse) VisitGetProjectResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
@@ -30467,6 +31346,7 @@ func (response GetProject404ApplicationProblemPlusJSONResponse) VisitGetProjectR
 
 type UpdateProjectRequestObject struct {
 	Project ProjectKey `json:"project"`
+	Params  UpdateProjectParams
 	Body    *UpdateProjectJSONRequestBody
 }
 
@@ -30474,16 +31354,42 @@ type UpdateProjectResponseObject interface {
 	VisitUpdateProjectResponse(w http.ResponseWriter) error
 }
 
-type UpdateProject200JSONResponse Project
+type UpdateProject200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateProject200JSONResponse struct {
+	Body    Project
+	Headers UpdateProject200ResponseHeaders
+}
 
 func (response UpdateProject200JSONResponse) VisitUpdateProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateProject400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateProject400ApplicationProblemPlusJSONResponse) VisitUpdateProjectResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -30539,6 +31445,22 @@ func (response UpdateProject404ApplicationProblemPlusJSONResponse) VisitUpdatePr
 	return err
 }
 
+type UpdateProject412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateProject412ApplicationProblemPlusJSONResponse) VisitUpdateProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateProject422ApplicationProblemPlusJSONResponse struct {
 	InvalidApplicationProblemPlusJSONResponse
 }
@@ -30551,6 +31473,22 @@ func (response UpdateProject422ApplicationProblemPlusJSONResponse) VisitUpdatePr
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateProject428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateProject428ApplicationProblemPlusJSONResponse) VisitUpdateProjectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -30637,15 +31575,25 @@ type CreateAttributeResponseObject interface {
 	VisitCreateAttributeResponse(w http.ResponseWriter) error
 }
 
-type CreateAttribute201JSONResponse Attribute
+type CreateAttribute201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateAttribute201JSONResponse struct {
+	Body    Attribute
+	Headers CreateAttribute201ResponseHeaders
+}
 
 func (response CreateAttribute201JSONResponse) VisitCreateAttributeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(201)
 	_, err := buf.WriteTo(w)
 	return err
@@ -30737,6 +31685,7 @@ func (response CreateAttribute422ApplicationProblemPlusJSONResponse) VisitCreate
 type DeleteAttributeRequestObject struct {
 	Project   ProjectKey   `json:"project"`
 	Attribute AttributeKey `json:"attribute"`
+	Params    DeleteAttributeParams
 }
 
 type DeleteAttributeResponseObject interface {
@@ -30749,6 +31698,22 @@ type DeleteAttribute204Response struct {
 func (response DeleteAttribute204Response) VisitDeleteAttributeResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type DeleteAttribute400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAttribute400ApplicationProblemPlusJSONResponse) VisitDeleteAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type DeleteAttribute401ApplicationProblemPlusJSONResponse struct {
@@ -30818,6 +31783,38 @@ func (response DeleteAttribute409ApplicationProblemPlusJSONResponse) VisitDelete
 	return err
 }
 
+type DeleteAttribute412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAttribute412ApplicationProblemPlusJSONResponse) VisitDeleteAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteAttribute428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteAttribute428ApplicationProblemPlusJSONResponse) VisitDeleteAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetAttributeRequestObject struct {
 	Project   ProjectKey   `json:"project"`
 	Attribute AttributeKey `json:"attribute"`
@@ -30827,15 +31824,25 @@ type GetAttributeResponseObject interface {
 	VisitGetAttributeResponse(w http.ResponseWriter) error
 }
 
-type GetAttribute200JSONResponse Attribute
+type GetAttribute200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetAttribute200JSONResponse struct {
+	Body    Attribute
+	Headers GetAttribute200ResponseHeaders
+}
 
 func (response GetAttribute200JSONResponse) VisitGetAttributeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
@@ -30895,6 +31902,7 @@ func (response GetAttribute404ApplicationProblemPlusJSONResponse) VisitGetAttrib
 type UpdateAttributeRequestObject struct {
 	Project   ProjectKey   `json:"project"`
 	Attribute AttributeKey `json:"attribute"`
+	Params    UpdateAttributeParams
 	Body      *UpdateAttributeJSONRequestBody
 }
 
@@ -30902,16 +31910,42 @@ type UpdateAttributeResponseObject interface {
 	VisitUpdateAttributeResponse(w http.ResponseWriter) error
 }
 
-type UpdateAttribute200JSONResponse Attribute
+type UpdateAttribute200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateAttribute200JSONResponse struct {
+	Body    Attribute
+	Headers UpdateAttribute200ResponseHeaders
+}
 
 func (response UpdateAttribute200JSONResponse) VisitUpdateAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAttribute400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAttribute400ApplicationProblemPlusJSONResponse) VisitUpdateAttributeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -30967,6 +32001,22 @@ func (response UpdateAttribute404ApplicationProblemPlusJSONResponse) VisitUpdate
 	return err
 }
 
+type UpdateAttribute412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAttribute412ApplicationProblemPlusJSONResponse) VisitUpdateAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateAttribute422ApplicationProblemPlusJSONResponse struct {
 	InvalidApplicationProblemPlusJSONResponse
 }
@@ -30979,6 +32029,22 @@ func (response UpdateAttribute422ApplicationProblemPlusJSONResponse) VisitUpdate
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAttribute428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAttribute428ApplicationProblemPlusJSONResponse) VisitUpdateAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -31229,15 +32295,25 @@ type CreateEnvironmentResponseObject interface {
 	VisitCreateEnvironmentResponse(w http.ResponseWriter) error
 }
 
-type CreateEnvironment201JSONResponse Environment
+type CreateEnvironment201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateEnvironment201JSONResponse struct {
+	Body    Environment
+	Headers CreateEnvironment201ResponseHeaders
+}
 
 func (response CreateEnvironment201JSONResponse) VisitCreateEnvironmentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(201)
 	_, err := buf.WriteTo(w)
 	return err
@@ -31329,6 +32405,7 @@ func (response CreateEnvironment422ApplicationProblemPlusJSONResponse) VisitCrea
 type DeleteEnvironmentRequestObject struct {
 	Project     ProjectKey     `json:"project"`
 	Environment EnvironmentKey `json:"environment"`
+	Params      DeleteEnvironmentParams
 }
 
 type DeleteEnvironmentResponseObject interface {
@@ -31341,6 +32418,22 @@ type DeleteEnvironment204Response struct {
 func (response DeleteEnvironment204Response) VisitDeleteEnvironmentResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type DeleteEnvironment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnvironment400ApplicationProblemPlusJSONResponse) VisitDeleteEnvironmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type DeleteEnvironment401ApplicationProblemPlusJSONResponse struct {
@@ -31410,6 +32503,38 @@ func (response DeleteEnvironment409ApplicationProblemPlusJSONResponse) VisitDele
 	return err
 }
 
+type DeleteEnvironment412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnvironment412ApplicationProblemPlusJSONResponse) VisitDeleteEnvironmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEnvironment428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEnvironment428ApplicationProblemPlusJSONResponse) VisitDeleteEnvironmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetEnvironmentRequestObject struct {
 	Project     ProjectKey     `json:"project"`
 	Environment EnvironmentKey `json:"environment"`
@@ -31419,15 +32544,25 @@ type GetEnvironmentResponseObject interface {
 	VisitGetEnvironmentResponse(w http.ResponseWriter) error
 }
 
-type GetEnvironment200JSONResponse Environment
+type GetEnvironment200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetEnvironment200JSONResponse struct {
+	Body    Environment
+	Headers GetEnvironment200ResponseHeaders
+}
 
 func (response GetEnvironment200JSONResponse) VisitGetEnvironmentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
@@ -31487,6 +32622,7 @@ func (response GetEnvironment404ApplicationProblemPlusJSONResponse) VisitGetEnvi
 type UpdateEnvironmentRequestObject struct {
 	Project     ProjectKey     `json:"project"`
 	Environment EnvironmentKey `json:"environment"`
+	Params      UpdateEnvironmentParams
 	Body        *UpdateEnvironmentJSONRequestBody
 }
 
@@ -31494,16 +32630,42 @@ type UpdateEnvironmentResponseObject interface {
 	VisitUpdateEnvironmentResponse(w http.ResponseWriter) error
 }
 
-type UpdateEnvironment200JSONResponse Environment
+type UpdateEnvironment200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateEnvironment200JSONResponse struct {
+	Body    Environment
+	Headers UpdateEnvironment200ResponseHeaders
+}
 
 func (response UpdateEnvironment200JSONResponse) VisitUpdateEnvironmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateEnvironment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateEnvironment400ApplicationProblemPlusJSONResponse) VisitUpdateEnvironmentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -31559,6 +32721,22 @@ func (response UpdateEnvironment404ApplicationProblemPlusJSONResponse) VisitUpda
 	return err
 }
 
+type UpdateEnvironment412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateEnvironment412ApplicationProblemPlusJSONResponse) VisitUpdateEnvironmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateEnvironment422ApplicationProblemPlusJSONResponse struct {
 	InvalidApplicationProblemPlusJSONResponse
 }
@@ -31571,6 +32749,22 @@ func (response UpdateEnvironment422ApplicationProblemPlusJSONResponse) VisitUpda
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateEnvironment428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateEnvironment428ApplicationProblemPlusJSONResponse) VisitUpdateEnvironmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -34983,15 +36177,25 @@ type CreateUnitTypeResponseObject interface {
 	VisitCreateUnitTypeResponse(w http.ResponseWriter) error
 }
 
-type CreateUnitType201JSONResponse UnitType
+type CreateUnitType201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateUnitType201JSONResponse struct {
+	Body    UnitType
+	Headers CreateUnitType201ResponseHeaders
+}
 
 func (response CreateUnitType201JSONResponse) VisitCreateUnitTypeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(201)
 	_, err := buf.WriteTo(w)
 	return err
@@ -35083,6 +36287,7 @@ func (response CreateUnitType422ApplicationProblemPlusJSONResponse) VisitCreateU
 type DeleteUnitTypeRequestObject struct {
 	Project  ProjectKey  `json:"project"`
 	UnitType UnitTypeKey `json:"unit_type"`
+	Params   DeleteUnitTypeParams
 }
 
 type DeleteUnitTypeResponseObject interface {
@@ -35095,6 +36300,22 @@ type DeleteUnitType204Response struct {
 func (response DeleteUnitType204Response) VisitDeleteUnitTypeResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type DeleteUnitType400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnitType400ApplicationProblemPlusJSONResponse) VisitDeleteUnitTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type DeleteUnitType401ApplicationProblemPlusJSONResponse struct {
@@ -35164,6 +36385,38 @@ func (response DeleteUnitType409ApplicationProblemPlusJSONResponse) VisitDeleteU
 	return err
 }
 
+type DeleteUnitType412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnitType412ApplicationProblemPlusJSONResponse) VisitDeleteUnitTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUnitType428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUnitType428ApplicationProblemPlusJSONResponse) VisitDeleteUnitTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetUnitTypeRequestObject struct {
 	Project  ProjectKey  `json:"project"`
 	UnitType UnitTypeKey `json:"unit_type"`
@@ -35173,15 +36426,25 @@ type GetUnitTypeResponseObject interface {
 	VisitGetUnitTypeResponse(w http.ResponseWriter) error
 }
 
-type GetUnitType200JSONResponse UnitType
+type GetUnitType200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetUnitType200JSONResponse struct {
+	Body    UnitType
+	Headers GetUnitType200ResponseHeaders
+}
 
 func (response GetUnitType200JSONResponse) VisitGetUnitTypeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
@@ -35241,6 +36504,7 @@ func (response GetUnitType404ApplicationProblemPlusJSONResponse) VisitGetUnitTyp
 type UpdateUnitTypeRequestObject struct {
 	Project  ProjectKey  `json:"project"`
 	UnitType UnitTypeKey `json:"unit_type"`
+	Params   UpdateUnitTypeParams
 	Body     *UpdateUnitTypeJSONRequestBody
 }
 
@@ -35248,16 +36512,42 @@ type UpdateUnitTypeResponseObject interface {
 	VisitUpdateUnitTypeResponse(w http.ResponseWriter) error
 }
 
-type UpdateUnitType200JSONResponse UnitType
+type UpdateUnitType200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateUnitType200JSONResponse struct {
+	Body    UnitType
+	Headers UpdateUnitType200ResponseHeaders
+}
 
 func (response UpdateUnitType200JSONResponse) VisitUpdateUnitTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUnitType400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUnitType400ApplicationProblemPlusJSONResponse) VisitUpdateUnitTypeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -35313,6 +36603,22 @@ func (response UpdateUnitType404ApplicationProblemPlusJSONResponse) VisitUpdateU
 	return err
 }
 
+type UpdateUnitType412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUnitType412ApplicationProblemPlusJSONResponse) VisitUpdateUnitTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateUnitType422ApplicationProblemPlusJSONResponse struct {
 	InvalidApplicationProblemPlusJSONResponse
 }
@@ -35325,6 +36631,22 @@ func (response UpdateUnitType422ApplicationProblemPlusJSONResponse) VisitUpdateU
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUnitType428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUnitType428ApplicationProblemPlusJSONResponse) VisitUpdateUnitTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -36511,10 +37833,11 @@ func (sh *strictHandler) GetProject(w http.ResponseWriter, r *http.Request, proj
 }
 
 // UpdateProject operation middleware
-func (sh *strictHandler) UpdateProject(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+func (sh *strictHandler) UpdateProject(w http.ResponseWriter, r *http.Request, project ProjectKey, params UpdateProjectParams) {
 	var request UpdateProjectRequestObject
 
 	request.Project = project
+	request.Params = params
 
 	var body UpdateProjectJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -36603,11 +37926,12 @@ func (sh *strictHandler) CreateAttribute(w http.ResponseWriter, r *http.Request,
 }
 
 // DeleteAttribute operation middleware
-func (sh *strictHandler) DeleteAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey) {
+func (sh *strictHandler) DeleteAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey, params DeleteAttributeParams) {
 	var request DeleteAttributeRequestObject
 
 	request.Project = project
 	request.Attribute = attribute
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.DeleteAttribute(ctx, request.(DeleteAttributeRequestObject))
@@ -36657,11 +37981,12 @@ func (sh *strictHandler) GetAttribute(w http.ResponseWriter, r *http.Request, pr
 }
 
 // UpdateAttribute operation middleware
-func (sh *strictHandler) UpdateAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey) {
+func (sh *strictHandler) UpdateAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey, params UpdateAttributeParams) {
 	var request UpdateAttributeRequestObject
 
 	request.Project = project
 	request.Attribute = attribute
+	request.Params = params
 
 	var body UpdateAttributeJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -36804,11 +38129,12 @@ func (sh *strictHandler) CreateEnvironment(w http.ResponseWriter, r *http.Reques
 }
 
 // DeleteEnvironment operation middleware
-func (sh *strictHandler) DeleteEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey) {
+func (sh *strictHandler) DeleteEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, params DeleteEnvironmentParams) {
 	var request DeleteEnvironmentRequestObject
 
 	request.Project = project
 	request.Environment = environment
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.DeleteEnvironment(ctx, request.(DeleteEnvironmentRequestObject))
@@ -36858,11 +38184,12 @@ func (sh *strictHandler) GetEnvironment(w http.ResponseWriter, r *http.Request, 
 }
 
 // UpdateEnvironment operation middleware
-func (sh *strictHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey) {
+func (sh *strictHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, params UpdateEnvironmentParams) {
 	var request UpdateEnvironmentRequestObject
 
 	request.Project = project
 	request.Environment = environment
+	request.Params = params
 
 	var body UpdateEnvironmentJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -37862,11 +39189,12 @@ func (sh *strictHandler) CreateUnitType(w http.ResponseWriter, r *http.Request, 
 }
 
 // DeleteUnitType operation middleware
-func (sh *strictHandler) DeleteUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey, unitType UnitTypeKey) {
+func (sh *strictHandler) DeleteUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey, unitType UnitTypeKey, params DeleteUnitTypeParams) {
 	var request DeleteUnitTypeRequestObject
 
 	request.Project = project
 	request.UnitType = unitType
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.DeleteUnitType(ctx, request.(DeleteUnitTypeRequestObject))
@@ -37916,11 +39244,12 @@ func (sh *strictHandler) GetUnitType(w http.ResponseWriter, r *http.Request, pro
 }
 
 // UpdateUnitType operation middleware
-func (sh *strictHandler) UpdateUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey, unitType UnitTypeKey) {
+func (sh *strictHandler) UpdateUnitType(w http.ResponseWriter, r *http.Request, project ProjectKey, unitType UnitTypeKey, params UpdateUnitTypeParams) {
 	var request UpdateUnitTypeRequestObject
 
 	request.Project = project
 	request.UnitType = unitType
+	request.Params = params
 
 	var body UpdateUnitTypeJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
