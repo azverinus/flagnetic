@@ -50,7 +50,10 @@ func (h *DeleteUnitType) Handle(ctx context.Context, cmd DeleteUnitTypeCommand) 
 		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
 			return err
 		}
-		u, err := h.store.UnitTypeByKey(ctx, cmd.Project, cmd.Key, false)
+		// A rename locks the unit type's row, not the project's, so the row is
+		// locked here too: the version judged below is then the one a
+		// rename in flight committed, never the one it is replacing.
+		u, err := h.store.UnitTypeByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "unit type")
 		}

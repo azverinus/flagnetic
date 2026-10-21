@@ -50,7 +50,10 @@ func (h *DeleteAttribute) Handle(ctx context.Context, cmd DeleteAttributeCommand
 		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
 			return err
 		}
-		attr, err := h.store.AttributeByKey(ctx, cmd.Project, cmd.Key, false)
+		// A rename locks the attribute's row, not the project's, so the row is
+		// locked here too: the version judged below is then the one a
+		// rename in flight committed, never the one it is replacing.
+		attr, err := h.store.AttributeByKey(ctx, cmd.Project, cmd.Key, true)
 		if err != nil {
 			return notFound(err, "attribute")
 		}

@@ -28,9 +28,12 @@ export const Route = createFileRoute("/_signed-in/projects/$project/settings")({
 
 function Settings() {
   const { t } = useLingui();
+  const { project } = Route.useParams();
   return (
     <PermissionGate permission="project.update" title={t`Settings`}>
-      <SettingsForm />
+      {/* Another project's settings start a form of their own: the values
+          and the version they were read at belong to one project. */}
+      <SettingsForm key={project} />
     </PermissionGate>
   );
 }
