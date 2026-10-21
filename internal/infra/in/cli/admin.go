@@ -36,7 +36,7 @@ Commands:
 
   create --email <email> [--name <name>]
       Add an active instance admin with a password: FLAGNETIC_ADMIN_PASSWORD,
-      or one generated and printed once on standard output.
+      or one generated and printed once on standard error.
 
   promote --email <email>
       Make the member with this email an instance admin.
@@ -137,8 +137,8 @@ func adminCreate(ctx context.Context, cl commandLine, cfg config.Config, log *sl
 		fmt.Fprintln(cl.stderr, "Instance admin created with the password in FLAGNETIC_ADMIN_PASSWORD.")
 		return exitOK
 	}
-	fmt.Fprintln(cl.stderr, "Instance admin created. This password is shown once; store it now:")
-	fmt.Fprintln(cl.stdout, res.GeneratedPassword.Reveal())
+	// On stderr, as bootstrap shows it: stdout stays for machine output.
+	fmt.Fprintf(cl.stderr, "Instance admin created. Their password is shown once; store it now:\nPassword: %s\n", res.GeneratedPassword.Reveal())
 	return exitOK
 }
 

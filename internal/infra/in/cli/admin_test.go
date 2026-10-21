@@ -226,11 +226,13 @@ func TestAdminCreateMakesInstanceAdminsWhoCanSignIn(t *testing.T) {
 		t.Fatalf("create with a password: exit code = %d, stdout = %q; want 0 and nothing; stderr:\n%s", r.code, r.stdout, r.stderr)
 	}
 	generated := run(map[string]string{"DATABASE_URL": url}, nil, "admin", "create", "--email", "second@example.com")
-	password := strings.TrimSpace(generated.stdout)
-	testkit.RecordSecret(password)
-	if generated.code != 0 || !regexp.MustCompile(`^[0-9A-Za-z]{24}$`).MatchString(password) {
-		t.Fatalf("create without a password: exit code = %d, stdout = %q; want the generated password alone", generated.code, generated.stdout)
+	shown := regexp.MustCompile(`(?m)^Password: ([0-9A-Za-z]{24})$`).FindStringSubmatch(generated.stderr)
+	if generated.code != 0 || shown == nil || generated.stdout != "" {
+		t.Fatalf("create without a password: exit code = %d, stdout = %q, stderr:\n%s\nwant the generated password once on stderr, as bootstrap shows it",
+			generated.code, generated.stdout, generated.stderr)
 	}
+	password := shown[1]
+	testkit.RecordSecret(password)
 	dup := run(env, nil, "admin", "create", "--email", "FIRST@example.com")
 	if dup.code != 1 || dup.stdout != "" || !strings.Contains(dup.stderr, "already") {
 		t.Errorf("a second member with the email: exit code = %d, stdout = %q, stderr:\n%s\nwant 1 and already", dup.code, dup.stdout, dup.stderr)

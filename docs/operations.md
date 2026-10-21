@@ -58,7 +58,7 @@ FLAGNETIC_ADMIN_PASSWORD='…' flagnetic admin bootstrap --email ops@example.com
 
 Two more commands work the same way, for a second instance admin or one who lost their way in:
 
-- `flagnetic admin create --email <email> [--name <name>]` adds an active instance admin with a password: `FLAGNETIC_ADMIN_PASSWORD` under the same policy, or one generated and printed alone on standard output. An email the instance already holds is refused (exit code 1).
+- `flagnetic admin create --email <email> [--name <name>]` adds an active instance admin with a password: `FLAGNETIC_ADMIN_PASSWORD` under the same policy, or one generated and printed once on standard error, as bootstrap does. An email the instance already holds is refused (exit code 1).
 - `flagnetic admin promote --email <email>` makes an existing member an instance admin; for one who already is, it does nothing. An unknown email is refused (exit code 1).
 
 Both are recorded in the audit log with the CLI as their actor.
