@@ -40,17 +40,15 @@ type SignInStore interface {
 // AttemptStore counts the failed attempts at a password, per email and per
 // source, which lock an email and throttle a source.
 type AttemptStore interface {
-	// ReserveAttempt counts an attempt on the email keyed email from source
-	// at now as a failure before its password is verified, in one atomic
-	// step, and returns what it found.
-	ReserveAttempt(ctx context.Context, email string, source netip.Prefix, now time.Time) (access.Reservation, error)
-	// ClearAttempt takes back the failure reserved in the source's window
-	// that started at windowStart, and ends the email's consecutive
-	// failures, once the password proved right.
-	ClearAttempt(ctx context.Context, email string, source netip.Prefix, windowStart time.Time) error
-	// ReleaseAttempt takes back the failure reserved when the password
-	// could not be verified at all, which is no wrong guess.
-	ReleaseAttempt(ctx context.Context, email string, source netip.Prefix, windowStart time.Time) error
+	// ReserveAttempt counts a as a failure before its password is verified,
+	// in one atomic step, and returns what it found.
+	ReserveAttempt(ctx context.Context, a access.Attempt) (access.Reservation, error)
+	// ClearAttempt takes back the failure r reserved, and ends the email's
+	// consecutive failures, once the password proved right.
+	ClearAttempt(ctx context.Context, r access.Reservation) error
+	// ReleaseAttempt takes back the failure r reserved when the attempt
+	// guessed nothing: its password could not be verified, or proved right.
+	ReleaseAttempt(ctx context.Context, r access.Reservation) error
 }
 
 // ErrInvalidCredentials refuses a sign-in whatever went wrong with the email
@@ -118,12 +116,11 @@ const reasonWrongPassword = "wrong_password"
 // right. Failures of a known member are audited, attempts on unknown emails
 // are not: the log records people, not an attacker's input.
 func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, error) {
-	key, source := access.AttemptKey(cmd.Email), access.SourceOf(cmd.ClientIP)
-	reserved, err := h.store.ReserveAttempt(ctx, key, source, h.clock.Now())
+	reserved, err := h.store.ReserveAttempt(ctx, access.NewAttempt(cmd.Email, cmd.ClientIP, h.clock.Now()))
 	if err != nil {
 		return SignInResult{}, err
 	}
-	if refusal := reserved.Refusal(h.clock.Now()); refusal != nil {
+	if refusal := reserved.Refusal(); refusal != nil {
 		// Refused before any hash: a locked email or a throttled source
 		// takes no hashing slot from the members signing in.
 		return SignInResult{}, refusal
@@ -139,7 +136,7 @@ func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, e
 	if utf8.RuneCountInString(cmd.Password.Reveal()) <= access.MaxPasswordLength {
 		if ok, outdated, err = h.hasher.Verify(ctx, cmd.Password, hash); err != nil {
 			// Busy, or the stored hash unreadable: nothing was guessed.
-			return SignInResult{}, errors.Join(err, h.store.ReleaseAttempt(context.WithoutCancel(ctx), key, source, reserved.WindowStart))
+			return SignInResult{}, errors.Join(err, h.store.ReleaseAttempt(context.WithoutCancel(ctx), reserved))
 		}
 	}
 	switch {
@@ -151,21 +148,18 @@ func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, e
 		return SignInResult{}, h.fail(ctx, cmd, member, reserved, string(member.Status))
 	}
 
-	res, err := h.succeed(ctx, cmd, member, outdated, func(ctx context.Context) error {
-		return h.store.ClearAttempt(ctx, key, source, reserved.WindowStart)
-	})
+	res, err := h.succeed(ctx, cmd, member, reserved, outdated)
 	if err != nil {
 		// The password proved right, so whatever failed after was no wrong
 		// guess: a member who knows their password is never locked by it.
-		return SignInResult{}, errors.Join(err, h.store.ReleaseAttempt(context.WithoutCancel(ctx), key, source, reserved.WindowStart))
+		return SignInResult{}, errors.Join(err, h.store.ReleaseAttempt(context.WithoutCancel(ctx), reserved))
 	}
 	return res, nil
 }
 
 // succeed opens a session for member, whose password proved right, rehashing
-// it when outdated, and clears the attempt in the same unit of work.
-func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.Member, outdated bool,
-	clear func(context.Context) error,
+// it when outdated, and clears the attempt reserved in the same unit of work.
+func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.Member, reserved access.Reservation, outdated bool,
 ) (SignInResult, error) {
 	var (
 		rehash string
@@ -188,7 +182,7 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.M
 		return SignInResult{}, err
 	}
 	if err := h.tx.Within(ctx, func(ctx context.Context) error {
-		if err := clear(ctx); err != nil {
+		if err := h.store.ClearAttempt(ctx, reserved); err != nil {
 			return err
 		}
 		return h.open(ctx, session, rehash, entry)
@@ -222,13 +216,12 @@ func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Memb
 	now := h.clock.Now()
 	req := governance.Request{Actor: memberActor(member), ID: cmd.RequestID}
 	records := []governance.Record{signInRecord("auth.sign_in_failed", member, map[string]any{"reason": reason})}
-	if reserved.Locks() {
+	if locks, wait := reserved.Locks(); locks {
 		records = append(records, governance.Record{
 			Action: "auth.locked_out",
 			Entity: governance.Entity{Kind: "member", ID: member.ID.String(), Key: member.Email},
 			After: map[string]any{
-				"email": member.Email, "failures": reserved.Failures,
-				"retry_after_seconds": int(access.LockoutWindow(reserved.Failures) / time.Second),
+				"email": member.Email, "failures": reserved.Failures, "retry_after_seconds": int(wait / time.Second),
 			},
 		})
 	}

@@ -18,27 +18,36 @@ const (
 	longestLockout   = time.Hour
 )
 
-// LockoutWindows returns how long the failures from the threshold on lock
-// the email: the first entry for the fifth failure, the second for the
-// sixth, and the last for every failure after.
-func LockoutWindows() []time.Duration {
-	var out []time.Duration
-	for w := firstLockout; ; w *= 2 {
-		if w >= longestLockout {
-			return append(out, longestLockout)
-		}
-		out = append(out, w)
-	}
-}
-
 // LockoutWindow returns how long the failures-th consecutive failure on an
 // email locks it, 0 below the threshold.
 func LockoutWindow(failures int) time.Duration {
 	if failures < LockoutThreshold {
 		return 0
 	}
-	windows := LockoutWindows()
-	return windows[min(failures-LockoutThreshold, len(windows)-1)]
+	w := firstLockout
+	for range failures - LockoutThreshold {
+		if w >= longestLockout {
+			break
+		}
+		w *= 2
+	}
+	return min(w, longestLockout)
+}
+
+// LockoutSchedule returns LockoutWindow of each consecutive failure, the
+// first entry for the first failure, up to the first failure that locks for
+// the longest window, which every failure after it locks for too. The store
+// counting failures locks an email by it in the same step as it counts, so
+// the lock it stores is the one this function decides.
+func LockoutSchedule() []time.Duration {
+	var out []time.Duration
+	for n := 1; ; n++ {
+		w := LockoutWindow(n)
+		out = append(out, w)
+		if w == longestLockout {
+			return out
+		}
+	}
 }
 
 // The throttle of a source: a hundred failures within a window of fifteen
@@ -66,19 +75,37 @@ func SourceOf(ip netip.Addr) netip.Prefix {
 	return p
 }
 
-// AttemptKey returns the key an email's failures are counted under: the
-// email trimmed and in lower case, as members are found by it.
-func AttemptKey(email string) string { return strings.ToLower(strings.TrimSpace(email)) }
+// Attempt is one attempt at a password, counted under its email and its
+// source.
+type Attempt struct {
+	// Email is the email the attempt names, trimmed and in lower case, as
+	// members are found by it.
+	Email string
+	// Source is the source the attempt comes from, as SourceOf gives it.
+	Source netip.Prefix
+	// At is when the attempt is made; it is judged at that time throughout.
+	At time.Time
+}
 
-// Reservation is what reserving a failure before a password is verified
-// found: whether the email or the source refuses the attempt, and the
-// failures counted with this one.
+// NewAttempt returns the attempt naming email from the address ip at at.
+func NewAttempt(email string, ip netip.Addr, at time.Time) Attempt {
+	return Attempt{Email: strings.ToLower(strings.TrimSpace(email)), Source: SourceOf(ip), At: at}
+}
+
+// Reservation is what reserving a failure for an attempt before its password
+// is verified found: whether the email or the source refuses the attempt,
+// the failures counted with this one, and the lock it starts.
 type Reservation struct {
+	Attempt
 	// LockedUntil is when an email locked before this attempt unlocks; zero
 	// when it was not locked, and then the attempt counts as a failure.
 	LockedUntil time.Time
-	// Failures are the consecutive failures on the email, this one included.
+	// Failures are the consecutive failures on the email, this one
+	// included; 0 when the attempt was not counted against the email.
 	Failures int
+	// LocksUntil is when the lock this attempt's failure starts ends, as
+	// stored; zero when it starts none.
+	LocksUntil time.Time
 	// SourceFailures are the failures of the source in the current window,
 	// this one included.
 	SourceFailures int
@@ -87,19 +114,26 @@ type Reservation struct {
 }
 
 // Refusal returns why the attempt is refused before its password is
-// verified at now, or nil when it is verified: a throttled source first,
-// then a locked email. A refused attempt takes no hashing slot.
-func (r Reservation) Refusal(now time.Time) error {
+// verified, judged at the time the attempt was reserved, or nil when it is
+// verified: a throttled source first, then a locked email. A refused attempt
+// takes no hashing slot.
+func (r Reservation) Refusal() error {
 	if r.SourceFailures > SourceFailureLimit {
 		return apperrors.RateLimited("rate_limited", "too many failed attempts from this address; wait before trying again",
-			r.WindowStart.Add(SourceWindow).Sub(now))
+			r.WindowStart.Add(SourceWindow).Sub(r.At))
 	}
-	if r.LockedUntil.After(now) {
-		wait := r.LockedUntil.Sub(now)
-		return apperrors.RateLimited("locked", "too many failed sign-ins on this email; wait before trying again", wait)
+	if r.LockedUntil.After(r.At) {
+		return apperrors.RateLimited("locked", "too many failed sign-ins on this email; wait before trying again",
+			r.LockedUntil.Sub(r.At))
 	}
 	return nil
 }
 
-// Locks reports whether this attempt, should it fail, locks the email.
-func (r Reservation) Locks() bool { return r.LockedUntil.IsZero() && r.Failures >= LockoutThreshold }
+// Locks reports whether this attempt, should it fail, locks the email, and
+// for how long.
+func (r Reservation) Locks() (bool, time.Duration) {
+	if r.LocksUntil.IsZero() {
+		return false, 0
+	}
+	return true, r.LocksUntil.Sub(r.At)
+}

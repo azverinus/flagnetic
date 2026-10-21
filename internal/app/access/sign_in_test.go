@@ -37,8 +37,13 @@ func (v *countingVerifier) Verify(ctx context.Context, p secret.String, encoded 
 
 func newSignIn(t *testing.T, hasher appaccess.PasswordVerifier) *appaccess.SignIn {
 	t.Helper()
+	return newSignInAt(t, clock.System{}, hasher)
+}
+
+// newSignInAt returns the handler reading the time from c.
+func newSignInAt(t *testing.T, c clock.Clock, hasher appaccess.PasswordVerifier) *appaccess.SignIn {
+	t.Helper()
 	pool := testkit.Pool(t)
-	c := clock.System{}
 	return appaccess.NewSignIn(postgres.NewTransactor(pool), pgaccess.NewStore(pool), hasher, pggovernance.NewAuditLog(pool),
 		c, id.NewSource(c), rand.Reader, bytes.Repeat([]byte{1}, 32))
 }
@@ -163,5 +168,33 @@ func TestARightPasswordNeverCountsAsAFailure(t *testing.T) {
 	h := newSignIn(t, password.NewHasher(password.DefaultParams))
 	if _, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New(m.Password), ClientIP: from}); err != nil {
 		t.Errorf("the right password once a rehash can run: %v, want signed in: the right password counted no failure", err)
+	}
+}
+
+// busyVerify finds no slot to verify any password.
+type busyVerify struct{ *password.Hasher }
+
+func (busyVerify) Verify(context.Context, secret.String, string) (bool, bool, error) {
+	return false, false, password.ErrBusy
+}
+
+func TestABusyAttemptLiftsTheLockItStarted(t *testing.T) {
+	c := testkit.Clock()
+	m := testkit.NewMember(t, testkit.Pool(t))
+	from := anAddress()
+	attempt := func(h *appaccess.SignIn) string {
+		_, err := h.Handle(t.Context(), appaccess.SignInCommand{Email: m.Email, Password: secret.New("not-the-password-9"), ClientIP: from})
+		return codeOf(err)
+	}
+	free, busy := newSignInAt(t, c, password.NewHasher(password.DefaultParams)), newSignInAt(t, c, busyVerify{})
+	for range access.LockoutThreshold {
+		attempt(free)
+	}
+	c.Advance(access.LockoutWindow(access.LockoutThreshold) + time.Second)
+	if code := attempt(busy); code != "busy" {
+		t.Fatalf("an attempt with no slot after the lock ended: %s, want busy", code)
+	}
+	if code := attempt(free); code != "invalid_credentials" {
+		t.Errorf("a wrong password after the busy attempt: %s, want invalid_credentials: the busy attempt guessed nothing and locked nothing", code)
 	}
 }

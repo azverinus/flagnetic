@@ -20,10 +20,10 @@ func TestFiveConsecutiveFailuresLockForAMinuteDoublingUpToAnHour(t *testing.T) {
 			t.Errorf("LockoutWindow(%d) = %v, want %v", failures, got, window)
 		}
 	}
-	if got := access.LockoutWindows(); !slices.Equal(got, []time.Duration{
-		time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute, 16 * time.Minute, 32 * time.Minute, time.Hour,
+	if got := access.LockoutSchedule(); !slices.Equal(got, []time.Duration{
+		0, 0, 0, 0, time.Minute, 2 * time.Minute, 4 * time.Minute, 8 * time.Minute, 16 * time.Minute, 32 * time.Minute, time.Hour,
 	}) {
-		t.Errorf("LockoutWindows() = %v", got)
+		t.Errorf("LockoutSchedule() = %v, want the window of each failure from the first to the first locking for an hour", got)
 	}
 }
 
@@ -44,16 +44,19 @@ func TestIPv6SourcesAreCountedByTheir64AndIPv4ByTheAddress(t *testing.T) {
 	}
 }
 
-func TestAnAttemptIsKeyedByItsEmailWhateverItsCaseAndSpaces(t *testing.T) {
-	if got := access.AttemptKey("  Ada@Example.COM "); got != "ada@example.com" {
-		t.Errorf("AttemptKey = %q", got)
+func TestAnAttemptIsKeyedByItsEmailWhateverItsCaseAndSpacesAndBySource(t *testing.T) {
+	now := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
+	a := access.NewAttempt("  Ada@Example.COM ", netip.MustParseAddr("2001:db8:1:2::9"), now)
+	if a.Email != "ada@example.com" || a.Source.String() != "2001:db8:1:2::/64" || !a.At.Equal(now) {
+		t.Errorf("NewAttempt = %+v", a)
 	}
 }
 
 func TestAReservationRefusesAThrottledSourceFirstThenALockedEmail(t *testing.T) {
 	now := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
 	refusal := func(r access.Reservation) (string, time.Duration) {
-		e, ok := apperrors.From(r.Refusal(now))
+		r.At = now
+		e, ok := apperrors.From(r.Refusal())
 		if !ok {
 			return "", 0
 		}
@@ -76,16 +79,17 @@ func TestAReservationRefusesAThrottledSourceFirstThenALockedEmail(t *testing.T) 
 	}
 }
 
-func TestOnlyAnAttemptReservedAtTheThresholdOrPastItLocks(t *testing.T) {
-	now := time.Now()
-	for r, locks := range map[access.Reservation]bool{
-		{Failures: 4}:                   false,
-		{Failures: 5}:                   true,
-		{Failures: 9}:                   true,
-		{Failures: 0, LockedUntil: now}: false,
-	} {
-		if r.Locks() != locks {
-			t.Errorf("%+v: Locks = %v, want %v", r, r.Locks(), locks)
-		}
+func TestAReservationIsJudgedAtTheTimeItWasMade(t *testing.T) {
+	at := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
+	r := access.Reservation{Attempt: access.Attempt{At: at}, LockedUntil: at.Add(time.Second), WindowStart: at}
+	if e, ok := apperrors.From(r.Refusal()); !ok || e.Code != "locked" || e.RetryAfter != time.Second {
+		t.Errorf("a lock ending a second after the reservation: %v, want locked for a second", r.Refusal())
+	}
+	if locks, wait := r.Locks(); locks {
+		t.Errorf("a reservation that starts no lock: Locks = %v %v", locks, wait)
+	}
+	r = access.Reservation{Attempt: access.Attempt{At: at}, Failures: 6, LocksUntil: at.Add(2 * time.Minute)}
+	if locks, wait := r.Locks(); !locks || wait != 2*time.Minute {
+		t.Errorf("a failure locking for two minutes from the reservation: Locks = %v %v", locks, wait)
 	}
 }
