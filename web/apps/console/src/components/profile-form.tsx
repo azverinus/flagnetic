@@ -141,7 +141,13 @@ export function ProfileForm({ member }: { member: ProfileMember }) {
           )}
         />
       </FormPage>
-      <UnsavedChangesBar dirty={isDirty} onDiscard={() => form.reset()} pending={save.isPending} />
+      <UnsavedChangesBar
+        dirty={isDirty}
+        // The form keeps edits through a change of the member under it;
+        // discarding drops them.
+        onDiscard={() => form.reset(undefined, { keepDirtyValues: false })}
+        pending={save.isPending}
+      />
     </>
   );
 }

@@ -7,12 +7,14 @@ import {
   BoxesIcon,
   HistoryIcon,
   LayersIcon,
+  KeyRoundIcon,
   LayoutDashboardIcon,
   type LucideIcon,
   RotateCwIcon,
   ServerIcon,
   SettingsIcon,
   TagsIcon,
+  UsersIcon,
 } from "lucide-react";
 import { useId } from "react";
 
@@ -83,11 +85,15 @@ const projectScreens = [
   },
 ] satisfies ProjectScreen[];
 
-type InstanceScreen = Screen & { to: "/admin/projects" | "/admin/audit" };
+type InstanceScreen = Screen & {
+  to: "/admin/projects" | "/admin/members" | "/admin/auth-settings" | "/admin/audit";
+};
 
 /** The screens of the instance, listed to instance admins. */
 const instanceScreens: InstanceScreen[] = [
   { to: "/admin/projects", label: msg`Projects`, icon: LayersIcon },
+  { to: "/admin/members", label: msg`Members`, icon: UsersIcon },
+  { to: "/admin/auth-settings", label: msg`Auth settings`, icon: KeyRoundIcon },
   { to: "/admin/audit", label: msg`Audit log`, icon: HistoryIcon },
 ];
 

@@ -56,6 +56,28 @@ export async function seedProject(prefix: string): Promise<string> {
 }
 
 /**
+ * Someone invited by the instance admin who has not accepted yet, with
+ * the invitation's one-time link. The email carries the time, so a
+ * retried run does not meet its own member.
+ */
+export async function seedInvitation(
+  prefix: string,
+  name: string,
+): Promise<{ id: string; email: string; name: string; link: string }> {
+  const email = `${prefix}-${Date.now().toString(36)}@flagnetic.test`;
+  const invited = must(
+    `inviting ${email}`,
+    await inviteMember({ client: managementClient(), body: { email, display_name: name } }),
+  );
+  return { id: invited.member.id, email, name, link: invited.invitation?.url ?? "" };
+}
+
+/** The path of an invitation's link, which a page of the suite opens. */
+export function pathOf(link: string): string {
+  return new URL(link).pathname;
+}
+
+/**
  * A member of one spec's own, invited by the instance admin and signed up
  * through the invitation, so that what the spec changes of them (their
  * name, password, sessions and tokens) never reaches another spec. The
@@ -66,12 +88,7 @@ export async function seedMember(
   name: string,
   password: string,
 ): Promise<Credentials & { id: string; name: string }> {
-  const email = `${prefix}-${Date.now().toString(36)}@flagnetic.test`;
-  const invited = must(
-    `inviting ${email}`,
-    await inviteMember({ client: managementClient(), body: { email, display_name: name } }),
-  );
-  const link = invited.invitation?.url ?? "";
+  const { id, email, link } = await seedInvitation(prefix, name);
   const anonymous = createClient(createConfig({ baseUrl: `${readState().baseURL}/api/v1` }));
   const accepted = await acceptInvitation({
     client: anonymous,
@@ -86,5 +103,5 @@ export async function seedMember(
     `signing ${email} out of the acceptance`,
     await signOut({ client: anonymous, headers: { Cookie: cookie } }),
   );
-  return { id: invited.member.id, email, password, name };
+  return { id, email, password, name };
 }

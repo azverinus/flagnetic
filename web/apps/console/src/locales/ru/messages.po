@@ -11,10 +11,75 @@ msgstr ""
 msgid "{browser} on {os}"
 msgstr "{browser} на {os}"
 
+#: src/components/duration-input.tsx
+msgid "{count, plural, one {day} other {days}}"
+msgstr "{count, plural, one {день} few {дня} many {дней} other {дня}}"
+
+#: src/components/duration-input.tsx
+msgid "{count, plural, one {hour} other {hours}}"
+msgstr "{count, plural, one {час} few {часа} many {часов} other {часа}}"
+
+#: src/components/duration-input.tsx
+msgid "{count, plural, one {minute} other {minutes}}"
+msgstr "{count, plural, one {минута} few {минуты} many {минут} other {минуты}}"
+
+#: src/components/duration-input.tsx
+msgid "{count, plural, one {second} other {seconds}}"
+msgstr "{count, plural, one {секунда} few {секунды} many {секунд} other {секунды}}"
+
+#: src/components/member-credentials.tsx
+msgid "{live, plural, one {Revoke # session} other {Revoke # sessions}}"
+msgstr "{live, plural, one {Отозвать # сеанс} few {Отозвать # сеанса} many {Отозвать # сеансов} other {Отозвать # сеанса}}"
+
+#: src/components/member-actions.tsx
+msgid "{name} can sign in again. What deactivation revoked stays revoked: their sessions and API tokens do not come back."
+msgstr "Участник {name} снова сможет входить. Отозванное при деактивации не вернётся: прежние сеансы и API-токены останутся отозванными."
+
+#: src/components/member-credentials.tsx
+msgid "{name} has no API token."
+msgstr "У участника {name} нет API-токенов."
+
+#: src/components/member-actions.tsx
+msgid "{name} is an instance admin."
+msgstr "Участник {name} теперь администратор экземпляра."
+
+#: src/components/member-actions.tsx
+msgid "{name} is deactivated."
+msgstr "Участник {name} деактивирован."
+
+#: src/components/invitation-link-dialog.tsx
+msgid "{name} is invited"
+msgstr "Участник {name} приглашён"
+
+#: src/components/invitation-link-dialog.tsx
+msgid "{name} is invited again"
+msgstr "Участник {name} приглашён снова"
+
+#: src/components/member-actions.tsx
+msgid "{name} is no longer an instance admin."
+msgstr "Участник {name} больше не администратор экземпляра."
+
+#: src/components/member-credentials.tsx
+msgid "{name} is not signed in anywhere."
+msgstr "Участник {name} нигде не вошёл."
+
+#: src/components/member-actions.tsx
+msgid "{name} is reactivated."
+msgstr "Участник {name} снова активен."
+
+#: src/components/member-actions.tsx
+msgid "{name} keeps only the roles their grants give them in each project."
+msgstr "У участника {name} останутся только роли, выданные ему в проектах."
+
+#: src/components/invitation-link-dialog.tsx
+msgid "{name} never set a password, so they join again through this link."
+msgstr "Участник {name} так и не задал пароль, поэтому присоединится заново по этой ссылке."
+
 #: src/components/session-list.tsx
 msgid "{others, plural, one {Revoke # session} other {Revoke # sessions}}"
 msgstr "{others, plural, one {Отозвать # сеанс} few {Отозвать # сеанса} many {Отозвать # сеансов} other {Отозвать # сеанса}}"
 
+#: src/components/member-credentials.tsx
 #: src/components/session-list.tsx
 msgid "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
 msgstr "{revoked, plural, one {Отозван # сеанс.} few {Отозвано # сеанса.} many {Отозвано # сеансов.} other {Отозвано # сеанса.}}"
@@ -27,6 +92,14 @@ msgstr "{when} с {ip}"
 msgid "A key never changes once it is set."
 msgstr "Ключ, однажды заданный, больше не меняется."
 
+#: src/components/invitation-link-dialog.tsx
+msgid "A new invitation link for {name}"
+msgstr "Новая ссылка-приглашение для участника {name}"
+
+#: src/components/member-actions.tsx
+msgid "A new invitation link is issued."
+msgstr "Выпущена новая ссылка-приглашение."
+
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "A new project starts with the environments development, staging and production, the unit types user and anonymous, and the standard attributes."
 msgstr "Новый проект создаётся с окружениями development, staging и production, типами единиц user и anonymous и стандартными атрибутами."
@@ -35,9 +108,18 @@ msgstr "Новый проект создаётся с окружениями dev
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr "Выдать вам роль в нём может владелец проекта или администратор экземпляра."
 
+#: src/components/member-credentials.tsx
 #: src/components/session-list.tsx
 msgid "A revoked device is signed out at its next request."
 msgstr "Устройство с отозванным сеансом выходит из системы при следующем запросе."
+
+#: src/components/auth-settings-form.tsx
+msgid "A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older."
+msgstr "Через столько времени после входа сеанс завершается, как бы активно им ни пользовались. Уменьшение сразу завершает уже более старые сеансы."
+
+#: src/components/auth-settings-form.tsx
+msgid "A session ends this long after its last request."
+msgstr "Через столько времени после последнего запроса сеанс завершается."
 
 #: src/lib/problem-messages.ts
 msgid "A token cannot carry a scope you do not hold yourself."
@@ -55,6 +137,14 @@ msgstr "Токен позволяет скрипту действовать от
 msgid "A year"
 msgstr "Год"
 
+#: src/components/invitation-acceptance.tsx
+msgid "Accept invitation"
+msgstr "Принять приглашение"
+
+#: src/components/invitation-acceptance.tsx
+msgid "Accept your invitation"
+msgstr "Примите приглашение"
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Action"
@@ -65,6 +155,7 @@ msgid "Actions"
 msgstr "Действия"
 
 #: src/components/token-list.tsx
+#: src/lib/members.ts
 msgid "Active"
 msgstr "Действует"
 
@@ -98,6 +189,18 @@ msgstr "Все проекты"
 msgid "An attribute's type is fixed once it is declared."
 msgstr "Тип атрибута после объявления не меняется."
 
+#: src/components/member-actions.tsx
+msgid "An instance admin administers every project, every member and the instance's settings."
+msgstr "Администратор экземпляра управляет всеми проектами, всеми участниками и настройками экземпляра."
+
+#: src/components/invitation-acceptance.tsx
+msgid "An invitation link works once, for seven days, and only until a newer one replaces it. Ask an instance admin for a new link, or sign in if you have already joined."
+msgstr "Ссылка-приглашение срабатывает один раз, в течение семи дней и только пока её не заменила более новая. Попросите у администратора экземпляра новую ссылку или войдите, если вы уже присоединились."
+
+#: src/components/member-form.tsx
+msgid "Another member already has this email address."
+msgstr "Этот адрес электронной почты уже есть у другого участника."
+
 #: src/components/audit-log.tsx
 msgid "Any"
 msgstr "Любое"
@@ -116,6 +219,7 @@ msgstr "API-токен создан"
 msgid "API token revoked"
 msgstr "API-токен отозван"
 
+#: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/tokens.tsx
 msgid "API tokens"
@@ -129,6 +233,7 @@ msgstr "Оформление"
 msgid "Apply filters"
 msgstr "Применить фильтры"
 
+#: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
 msgstr "Не меньше 12 символов или столько, сколько требует этот экземпляр. Подобрать пароль мешает именно длина."
@@ -172,6 +277,11 @@ msgstr "Запись журнала аудита"
 #: src/routes/_signed-in/projects/$project/audit.tsx
 msgid "Audit log"
 msgstr "Журнал аудита"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/admin/auth-settings.tsx
+msgid "Auth settings"
+msgstr "Настройки аутентификации"
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
@@ -224,6 +334,10 @@ msgstr "изменено"
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr "После смены пароля все остальные устройства выйдут из системы; на этом вход сохранится."
 
+#: src/components/invitation-acceptance.tsx
+msgid "Choose a password."
+msgstr "Придумайте пароль."
+
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
 msgstr "Выберите более надёжный пароль."
@@ -275,6 +389,10 @@ msgstr "Командная строка"
 msgid "Confirm the new password"
 msgstr "Повторите новый пароль"
 
+#: src/components/invitation-acceptance.tsx
+msgid "Confirm the password"
+msgstr "Повторите пароль"
+
 #: src/components/ui/reveal-secret.tsx
 msgid "Copied to the clipboard."
 msgstr "Скопировано в буфер обмена."
@@ -325,6 +443,26 @@ msgstr "Тёмная"
 msgid "Date"
 msgstr "Дата"
 
+#: src/components/member-actions.tsx
+msgid "Deactivate"
+msgstr "Деактивировать"
+
+#: src/components/member-actions.tsx
+msgid "Deactivate {name}"
+msgstr "Деактивировать участника {name}"
+
+#: src/lib/members.ts
+msgid "Deactivated"
+msgstr "Деактивирован"
+
+#: src/components/member-actions.tsx
+msgid "Deactivation ends every session and API token of {name} at once, and they cannot sign in until reactivated. Project tokens they created keep working."
+msgstr "Деактивация сразу завершает все сеансы и отзывает все API-токены участника {name}, и войти он не сможет, пока его не активируют снова. Созданные им токены проектов продолжат работать."
+
+#: src/components/member-actions.tsx
+msgid "Deactivation ends every session and API token of yours at once, this one included, and you cannot sign in until another instance admin reactivates you."
+msgstr "Деактивация сразу завершает все ваши сеансы, включая этот, и отзывает все ваши API-токены. Войти вы сможете, только когда другой администратор экземпляра активирует вас снова."
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Declare the kinds of unit its flags are served to."
 msgstr "Объявите виды единиц, которым отдаются его флаги."
@@ -367,19 +505,29 @@ msgstr "Устройство"
 msgid "Discard"
 msgstr "Отменить изменения"
 
+#: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Display name"
 msgstr "Отображаемое имя"
+
+#: src/components/member-actions.tsx
+msgid "Edit"
+msgstr "Изменить"
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Edit {key}"
 msgstr "Изменить {key}"
 
+#: src/components/member-actions.tsx
+msgid "Edit {name}"
+msgstr "Изменить участника {name}"
+
 #: src/lib/access-names.ts
 msgid "edit the project"
 msgstr "изменять проект"
 
+#: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 #: src/components/sign-in-form.tsx
 msgid "Email"
@@ -389,9 +537,14 @@ msgstr "Электронная почта"
 msgid "Ends at the latest"
 msgstr "Завершится не позднее"
 
+#: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Enter a display name."
 msgstr "Введите отображаемое имя."
+
+#: src/lib/auth-settings.ts
+msgid "Enter a duration from {from} to {to}."
+msgstr "Укажите длительность от {from} до {to}."
 
 #: src/lib/forms.ts
 #: src/lib/problem-messages.ts
@@ -409,6 +562,14 @@ msgstr "Введите корректный адрес электронной п
 #: src/lib/problem-messages.ts
 msgid "Enter a value from {min} to {max}."
 msgstr "Введите значение от {min} до {max}."
+
+#: src/lib/auth-settings.ts
+msgid "Enter a whole number."
+msgstr "Введите целое число."
+
+#: src/components/member-form.tsx
+msgid "Enter an email address."
+msgstr "Введите адрес электронной почты."
 
 #: src/components/password-form.tsx
 msgid "Enter your current password."
@@ -460,9 +621,37 @@ msgstr "Все изменения в этом проекте, сначала н�
 msgid "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
 msgstr "Все изменения в этом экземпляре: во всех проектах и вне их, например участники, входы и настройки."
 
+#: src/components/member-credentials.tsx
+msgid "Every device {name} is signed in on is signed out at its next request. Their API tokens keep working."
+msgstr "Каждое устройство, на котором вошёл участник {name}, выйдет при следующем запросе. Его API-токены продолжат работать."
+
 #: src/components/session-list.tsx
 msgid "Every device but this one is signed out at its next request and must sign in again."
 msgstr "Все устройства, кроме этого, выйдут из системы при следующем запросе, и на них придётся войти снова."
+
+#: src/components/member-credentials.tsx
+msgid "Every device you are signed in on is signed out, this one included, and you will have to sign in again. Your API tokens keep working."
+msgstr "Вы выйдете на всех устройствах, включая это, и вам придётся войти снова. Ваши API-токены продолжат работать."
+
+#: src/components/invitation-link-dialog.tsx
+msgid "Every earlier link for {name} no longer works."
+msgstr "Прежние ссылки для участника {name} больше не работают."
+
+#: src/components/member-actions.tsx
+msgid "Every earlier link for {name} stops working. The new one is shown once."
+msgstr "Прежние ссылки для участника {name} перестанут работать. Новая ссылка будет показана один раз."
+
+#: src/components/auth-settings-form.tsx
+msgid "Every new API token must have an expiry; none may live forever."
+msgstr "У каждого нового API-токена должен быть срок действия: бессрочных токенов не будет."
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Every status"
+msgstr "Любой статус"
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
+msgstr "Все, кто может входить в этот экземпляр. Что участник может делать в проекте, определяют выданные ему там роли."
 
 #: src/components/app-shell.tsx
 msgid "Expand the sidebar"
@@ -503,6 +692,10 @@ msgstr "Как в браузере"
 msgid "From"
 msgstr "С"
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Go to the members"
+msgstr "К участникам"
+
 #: src/components/not-found.tsx
 msgid "Go to the start page"
 msgstr "На стартовую страницу"
@@ -515,6 +708,10 @@ msgstr "Роль участника"
 #: src/lib/audit.ts
 msgid "Grant removed"
 msgstr "Роль отозвана"
+
+#: src/routes/_signed-in/admin/auth-settings.tsx
+msgid "How long sessions last, how long API tokens may live, and how long passwords must be. Every replica of the instance applies a change within a second."
+msgstr "Сколько длятся сеансы, сколько могут жить API-токены и какой длины должны быть пароли. Каждая реплика экземпляра применяет изменение в течение секунды."
 
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
@@ -540,6 +737,11 @@ msgstr "В действии, ключе объекта и имени автор�
 msgid "Instance"
 msgstr "Экземпляр"
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Instance admin"
+msgstr "Администратор экземпляра"
+
 #: src/routes/_signed-in/admin/route.tsx
 msgid "Instance administration"
 msgstr "Администрирование экземпляра"
@@ -552,13 +754,45 @@ msgstr "Приглашение принято"
 msgid "Invitation issued again"
 msgstr "Приглашение выдано повторно"
 
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Invite"
+msgstr "Пригласить"
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Invite a member"
+msgstr "Пригласить участника"
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Invite member"
+msgstr "Пригласить участника"
+
+#: src/lib/members.ts
+msgid "Invited"
+msgstr "Приглашён"
+
 #: src/components/session-list.tsx
 msgid "IP address"
 msgstr "IP-адрес"
 
+#: src/components/member-actions.tsx
+msgid "Issue a new invitation link"
+msgstr "Выпустить новую ссылку-приглашение"
+
+#: src/components/member-actions.tsx
+msgid "Issue a new invitation link for {name}"
+msgstr "Выпустить новую ссылку-приглашение для участника {name}"
+
+#: src/components/member-actions.tsx
+msgid "Issue link"
+msgstr "Выпустить ссылку"
+
 #: src/lib/problem-messages.ts
 msgid "It does not exist, or it was deleted."
 msgstr "Этого не существует, или это было удалено."
+
+#: src/components/invitation-acceptance.tsx
+msgid "Joining…"
+msgstr "Присоединяемся…"
 
 #: src/components/theme-choice.tsx
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
@@ -585,6 +819,11 @@ msgstr "Язык"
 #: src/components/session-list.tsx
 msgid "Last seen"
 msgstr "Последняя активность"
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Last sign-in"
+msgstr "Последний вход"
 
 #: src/components/token-list.tsx
 msgid "Last used"
@@ -631,6 +870,14 @@ msgstr "Назначен администратором экземпляра"
 msgid "Maintainer"
 msgstr "Сопровождающий"
 
+#: src/components/member-actions.tsx
+msgid "Make {name} an instance admin"
+msgstr "Сделать участника {name} администратором экземпляра"
+
+#: src/components/member-actions.tsx
+msgid "Make instance admin"
+msgstr "Сделать администратором экземпляра"
+
 #: src/lib/access-names.ts
 msgid "manage environments"
 msgstr "управлять окружениями"
@@ -647,10 +894,16 @@ msgstr "управлять типами единиц и атрибутами"
 msgid "manage who has access"
 msgstr "управлять доступом"
 
+#: src/components/auth-settings-form.tsx
+msgid "Maximum token lifetime"
+msgstr "Наибольший срок действия токена"
+
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
 #: src/components/audit-log.tsx
 #: src/lib/audit.ts
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
 msgid "Member"
 msgstr "Участник"
 
@@ -666,15 +919,26 @@ msgstr "Участник деактивирован"
 msgid "Member invited"
 msgstr "Участник приглашён"
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Member not found"
+msgstr "Участник не найден"
+
 #: src/lib/audit.ts
 msgid "Member reactivated"
 msgstr "Участник активирован снова"
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Member since"
+msgstr "Участник с"
 
 #: src/lib/audit.ts
 msgid "Member updated"
 msgstr "Участник изменён"
 
+#: src/components/navigation.tsx
 #: src/components/projects-table.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
+#: src/routes/_signed-in/admin/members/route.tsx
 msgid "Members"
 msgstr "Участники"
 
@@ -689,6 +953,10 @@ msgstr "Участники"
 msgid "Name"
 msgstr "Название"
 
+#: src/components/search-field.tsx
+msgid "Name or email"
+msgstr "Имя или адрес почты"
+
 #: src/lib/access.ts
 msgid "Needs the permission to {name}, held by {list}."
 msgstr "Нужно право {name}, оно есть у ролей {list}."
@@ -699,6 +967,8 @@ msgstr "Нужно право {name}."
 
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
 msgid "Never"
 msgstr "Никогда"
 
@@ -731,6 +1001,10 @@ msgstr "Новый тип единицы"
 msgid "Newest entries"
 msgstr "Самые новые записи"
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "No"
+msgstr "Нет"
+
 #: src/components/audit-log.tsx
 msgid "No entry matches these filters."
 msgstr "Нет записей, подходящих под эти фильтры."
@@ -738,6 +1012,18 @@ msgstr "Нет записей, подходящих под эти фильтры
 #: src/lib/audit.ts
 msgid "No longer an instance admin"
 msgstr "Больше не администратор экземпляра"
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "No member has this identifier. The link may be mistyped or old."
+msgstr "Участника с таким идентификатором нет. Возможно, ссылка набрана с ошибкой или устарела."
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "No member matches the search and the status filter."
+msgstr "Ни один участник не подходит под поиск и фильтр по статусу."
+
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "No members yet."
+msgstr "Участников пока нет."
 
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "No project has this key. It may be mistyped, or the link may point to another instance."
@@ -795,6 +1081,10 @@ msgstr "Более старые записи"
 msgid "One with this key already exists."
 msgstr "Объект с таким ключом уже существует."
 
+#: src/components/member-credentials.tsx
+msgid "Only {name} creates their tokens. Project tokens they created belong to their projects, not to them."
+msgstr "Свои токены создаёт только сам участник {name}. Созданные им токены проектов принадлежат проектам, а не ему."
+
 #: src/lib/problem-messages.ts
 msgid "Only a signed-in session can do this, not an API token."
 msgstr "Это можно сделать только в сеансе входа, а не с API-токеном."
@@ -802,6 +1092,10 @@ msgstr "Это можно сделать только в сеансе входа
 #: src/routes/_signed-in/admin/route.tsx
 msgid "Only an instance admin can open it."
 msgstr "Его может открыть только администратор экземпляра."
+
+#: src/lib/problem-messages.ts
+msgid "Only an invited member has an invitation to replace."
+msgstr "Заменить приглашение можно только у приглашённого участника."
 
 #: src/components/navigation.tsx
 msgid "Overview"
@@ -820,6 +1114,7 @@ msgstr "Страница не найдена"
 msgid "Pages of entries"
 msgstr "Страницы записей"
 
+#: src/components/invitation-acceptance.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Password"
@@ -828,6 +1123,10 @@ msgstr "Пароль"
 #: src/lib/audit.ts
 msgid "Password changed"
 msgstr "Пароль изменён"
+
+#: src/components/auth-settings-form.tsx
+msgid "Password minimum length"
+msgstr "Наименьшая длина пароля"
 
 #: src/components/personal-menu.tsx
 #: src/routes/_signed-in/settings/route.tsx
@@ -865,10 +1164,20 @@ msgstr "Проект: {label}"
 
 #: src/components/navigation.tsx
 #: src/components/project-switcher.tsx
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/index.tsx
 msgid "Projects"
 msgstr "Проекты"
+
+#: src/components/member-actions.tsx
+msgid "Reactivate"
+msgstr "Активировать снова"
+
+#: src/components/member-actions.tsx
+msgid "Reactivate {name}"
+msgstr "Активировать участника {name} снова"
 
 #: src/lib/personal-tokens.ts
 msgid "Read everything you can read."
@@ -907,6 +1216,18 @@ msgstr "Отозвать {revokingName}"
 msgid "Revoke all other sessions"
 msgstr "Отозвать все остальные сеансы"
 
+#: src/components/member-credentials.tsx
+msgid "Revoke all sessions"
+msgstr "Отозвать все сеансы"
+
+#: src/components/member-actions.tsx
+msgid "Revoke instance admin"
+msgstr "Снять права администратора экземпляра"
+
+#: src/components/member-actions.tsx
+msgid "Revoke instance admin from {name}"
+msgstr "Снять с участника {name} права администратора экземпляра"
+
 #: src/components/session-list.tsx
 msgid "Revoke session"
 msgstr "Отозвать сеанс"
@@ -931,6 +1252,8 @@ msgstr "Отозван"
 msgid "Role granted"
 msgstr "Роль выдана"
 
+#: src/components/auth-settings-form.tsx
+#: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -946,6 +1269,7 @@ msgid "Scopes"
 msgstr "Области доступа"
 
 #: src/components/audit-log.tsx
+#: src/components/search-field.tsx
 msgid "Search"
 msgstr "Поиск"
 
@@ -967,10 +1291,19 @@ msgstr "Передавайте его как токен Bearer в заголов
 msgid "Session"
 msgstr "Сеанс"
 
+#: src/components/auth-settings-form.tsx
+msgid "Session absolute timeout"
+msgstr "Предельная длительность сеанса"
+
 #: src/lib/audit.ts
 msgid "Session ended"
 msgstr "Сеанс завершён"
 
+#: src/components/auth-settings-form.tsx
+msgid "Session idle timeout"
+msgstr "Тайм-аут бездействия сеанса"
+
+#: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/settings/route.tsx
 #: src/routes/_signed-in/settings/sessions.tsx
 msgid "Sessions"
@@ -985,6 +1318,11 @@ msgstr "Настройки"
 msgid "Sidebar"
 msgstr "Боковая панель"
 
+#: src/components/member-credentials.tsx
+msgid "Sign {name} out everywhere"
+msgstr "Завершить все сеансы участника {name}"
+
+#: src/components/invitation-acceptance.tsx
 #: src/components/sign-in-form.tsx
 #: src/routes/sign-in.tsx
 msgid "Sign in"
@@ -993,6 +1331,10 @@ msgstr "Войти"
 #: src/components/personal-menu.tsx
 msgid "Sign out"
 msgstr "Выйти"
+
+#: src/components/member-credentials.tsx
+msgid "Sign yourself out everywhere"
+msgstr "Завершить все свои сеансы"
 
 #: src/lib/audit.ts
 msgid "Sign-in failed"
@@ -1039,6 +1381,11 @@ msgstr "Начните со строчной латинской буквы; да
 msgid "State"
 msgstr "Состояние"
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "Status"
+msgstr "Статус"
+
 #. An attribute type.
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
@@ -1063,9 +1410,17 @@ msgstr "Это устройство выйдет из системы при сл
 msgid "That is not your current password."
 msgstr "Это не ваш текущий пароль."
 
+#: src/components/member-credentials.tsx
+msgid "The API tokens of {name}"
+msgstr "API-токены участника {name}"
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "The attribute {key} is no longer declared, and its key can be declared again."
 msgstr "Атрибут {key} больше не объявлен, и его ключ можно объявить снова."
+
+#: src/components/auth-settings-form.tsx
+msgid "The auth settings are saved."
+msgstr "Настройки аутентификации сохранены."
 
 #: src/components/ui/reveal-secret.tsx
 msgid "The browser refused the clipboard. Select the value and copy it by hand."
@@ -1074,6 +1429,10 @@ msgstr "Браузер не дал доступ к буферу обмена. В
 #: src/components/profile-form.tsx
 msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
 msgstr "Язык консоли на всех устройствах, где вы входите. «Как в браузере» — первый из языков браузера, который есть в консоли."
+
+#: src/components/member-credentials.tsx
+msgid "The devices {name} is signed in on"
+msgstr "Устройства, на которых вошёл участник {name}"
 
 #: src/components/session-list.tsx
 msgid "The devices you are signed in on"
@@ -1091,6 +1450,14 @@ msgstr "Запись не содержит значений."
 msgid "The environment {key} is deleted. This cannot be undone."
 msgstr "Окружение {key} будет удалено. Отменить это нельзя."
 
+#: src/components/auth-settings-form.tsx
+msgid "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
+msgstr "Сколько символов как минимум должно быть в пароле, выбранном с этого момента: от 12 до 128. Заданные раньше пароли продолжат работать."
+
+#: src/components/auth-settings-form.tsx
+msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
+msgstr "На какой наибольший срок можно создать новый API-токен. У созданных раньше токенов срок не изменится."
+
 #: src/lib/problem-messages.ts
 msgid "The idle timeout cannot be longer than the absolute timeout."
 msgstr "Тайм-аут бездействия не может быть больше абсолютного тайм-аута."
@@ -1098,6 +1465,14 @@ msgstr "Тайм-аут бездействия не может быть боль
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 msgstr "Виды единиц, которым отдаётся флаг, например пользователь или устройство. Ключ не должен совпадать с ключами атрибутов и никогда не меняется."
+
+#: src/lib/problem-messages.ts
+msgid "The member is deactivated. Reactivate them first."
+msgstr "Участник деактивирован. Сначала активируйте его снова."
+
+#: src/components/member-actions.tsx
+msgid "The member is saved."
+msgstr "Участник сохранён."
 
 #: src/lib/audit.ts
 msgid "The member whose API token is {token}"
@@ -1118,6 +1493,10 @@ msgstr "Пароль слишком короткий или слишком дл�
 #: src/lib/problem-messages.ts
 msgid "The password must not contain your email address."
 msgstr "Пароль не должен содержать ваш адрес электронной почты."
+
+#: src/components/invitation-acceptance.tsx
+msgid "The passwords do not match."
+msgstr "Пароли не совпадают."
 
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "The project is saved."
@@ -1192,6 +1571,10 @@ msgstr "Тема"
 msgid "There is nothing at this address. The link may be old or mistyped."
 msgstr "По этому адресу ничего нет. Возможно, ссылка устарела или в ней опечатка."
 
+#: src/routes/_signed-in/admin/members/index.tsx
+msgid "They get a link to set their password, shown to you once. What they may do in a project comes from the grants a project owner gives them."
+msgstr "Участник получит ссылку, чтобы задать пароль; она будет показана вам один раз. Что он сможет делать в проекте, определяют роли, которые выдаст ему владелец проекта."
+
 #: src/components/session-list.tsx
 msgid "This device"
 msgstr "Это устройство"
@@ -1213,9 +1596,25 @@ msgstr "В этом экземпляре уже есть проект с так�
 msgid "This instance requires every token to expire."
 msgstr "На этом экземпляре у каждого токена должен быть срок действия."
 
+#: src/components/invitation-link-dialog.tsx
+msgid "This instance sends no mail, so pass this link to {name} yourself. It works once, until {until}."
+msgstr "Этот экземпляр не отправляет почту, поэтому передайте ссылку участнику {name} сами. Она сработает один раз, до {until}."
+
+#: src/lib/problem-messages.ts
+msgid "This invitation link no longer works: it was used, replaced by a newer one, or it expired."
+msgstr "Эта ссылка-приглашение больше не работает: ею уже воспользовались, её заменила более новая или истёк её срок."
+
+#: src/components/invitation-acceptance.tsx
+msgid "This invitation no longer works"
+msgstr "Это приглашение больше не действует"
+
 #: src/lib/problem-messages.ts
 msgid "This is further ahead than this instance allows."
 msgstr "Это дальше, чем разрешает этот экземпляр."
+
+#: src/lib/problem-messages.ts
+msgid "This is the instance's last active instance admin. Make another member instance admin first."
+msgstr "Это последний активный администратор экземпляра. Сначала сделайте администратором другого участника."
 
 #: src/components/ui/reveal-secret.tsx
 msgid "This is the only time it is shown. It is kept encrypted and never shown again, so if it is lost, rotate it."
@@ -1263,6 +1662,10 @@ msgstr "Время"
 msgid "To"
 msgstr "По"
 
+#: src/components/auth-settings-form.tsx
+msgid "Token expiry required"
+msgstr "Срок действия токена обязателен"
+
 #: src/lib/problem-messages.ts
 msgid "Too long."
 msgstr "Слишком длинно."
@@ -1303,6 +1706,18 @@ msgstr "Тип"
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Введите {typeToConfirm} для подтверждения"
+
+#: src/components/auth-settings-form.tsx
+msgid "Unit of the maximum token lifetime"
+msgstr "Единица наибольшего срока действия токена"
+
+#: src/components/auth-settings-form.tsx
+msgid "Unit of the session absolute timeout"
+msgstr "Единица предельной длительности сеанса"
+
+#: src/components/auth-settings-form.tsx
+msgid "Unit of the session idle timeout"
+msgstr "Единица тайм-аута бездействия сеанса"
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
@@ -1367,6 +1782,10 @@ msgstr "Наблюдатель"
 msgid "Welcome, {name}. Choose a project to work in."
 msgstr "Здравствуйте, {name}. Выберите проект для работы."
 
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "What {name} holds"
+msgstr "Что есть у участника {name}"
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
 msgstr "То, что таргетинг знает о единице. Стандартные атрибуты есть в каждом проекте: их можно переименовать, но не удалить. Тип после объявления не меняется."
@@ -1386,6 +1805,14 @@ msgstr "Всё, что пользуется токеном, с этого мом
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr "Откуда проект отдаёт значения. Ключ после создания не меняется, название можно изменить."
+
+#: src/routes/_signed-in/admin/members/$member.tsx
+msgid "Yes"
+msgstr "Да"
+
+#: src/components/invitation-acceptance.tsx
+msgid "You are invited to this Flagnetic instance as {name} ({email}). Choose a password to join; the link works until {until}."
+msgstr "Вас пригласили в этот экземпляр Flagnetic как {name} ({email}). Придумайте пароль, чтобы присоединиться; ссылка действует до {until}."
 
 #: src/lib/problem-messages.ts
 msgid "You are not signed in."
@@ -1418,6 +1845,10 @@ msgstr "У вас есть несохранённые изменения."
 #: src/routes/_signed-in/index.tsx
 msgid "You hold no grant in any project yet. Ask a project owner or an instance admin."
 msgstr "У вас пока нет роли ни в одном проекте. Обратитесь к владельцу проекта или администратору экземпляра."
+
+#: src/components/member-actions.tsx
+msgid "You keep only the roles your grants give you, and lose the instance's screens at once."
+msgstr "У вас останутся только роли, выданные вам в проектах, а экраны экземпляра сразу станут недоступны."
 
 #: src/lib/problem-messages.ts
 msgid "You may not do this."

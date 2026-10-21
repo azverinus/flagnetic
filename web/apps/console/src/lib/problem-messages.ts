@@ -5,7 +5,7 @@ import { msg } from "@lingui/core/macro";
 import { formatLifetime, formatNumber, formatWait } from "@/i18n/format";
 
 import { permissionName } from "./access-names";
-import type { ApiError } from "./errors";
+import { ApiError } from "./errors";
 
 /**
  * Server refusals in the member's language. The server names every refusal
@@ -83,6 +83,18 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`A key never changes once it is set.`);
     case "scope_not_allowed":
       return i18n._(msg`A token cannot carry a scope you do not hold yourself.`);
+    case "last_instance_admin":
+      return i18n._(
+        msg`This is the instance's last active instance admin. Make another member instance admin first.`,
+      );
+    case "member_not_invited":
+      return i18n._(msg`Only an invited member has an invitation to replace.`);
+    case "member_deactivated":
+      return i18n._(msg`The member is deactivated. Reactivate them first.`);
+    case "invitation_gone":
+      return i18n._(
+        msg`This invitation link no longer works: it was used, replaced by a newer one, or it expired.`,
+      );
     default:
       if (error.code.startsWith("invalid_") && error.violations.length > 0) {
         return i18n._(msg`Some fields need correcting.`);
@@ -180,4 +192,16 @@ export function violationsByPointer(i18n: I18n, error: ApiError): Map<string, st
     if (!out.has(violation.pointer)) out.set(violation.pointer, violationMessage(i18n, violation));
   }
   return out;
+}
+
+/**
+ * The refusal a form explains above its actions: none when it concerns
+ * one of the form's fields, since that field says it under itself, and
+ * the refusal as it is otherwise.
+ */
+export function formRefusal(refusal: unknown, fieldPointers: readonly string[]): unknown {
+  return refusal instanceof ApiError &&
+    refusal.violations.some((violation) => fieldPointers.includes(violation.pointer))
+    ? undefined
+    : refusal;
 }

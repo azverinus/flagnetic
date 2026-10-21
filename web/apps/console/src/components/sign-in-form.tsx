@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { ApiError, unwrap } from "@/lib/errors";
 import { problemMessage, retryWait } from "@/lib/problem-messages";
 import { authMethodsQuery } from "@/lib/queries";
+import { forgetsSecret } from "@/lib/mutations";
 
 export type SignInFormProps = {
   /** Set when the member was sent here because their session ended. */
@@ -52,6 +53,8 @@ export function SignInForm({ ended, onSignedIn }: SignInFormProps) {
   });
   const submit = useMutation({
     mutationFn: (body: z.infer<typeof schema>) => unwrap(signIn({ body })),
+    // The password is in the variables.
+    ...forgetsSecret,
     meta: { toast: false, readsAuditAgain: false },
     onSuccess: onSignedIn,
   });
