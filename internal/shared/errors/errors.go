@@ -90,7 +90,8 @@ type Error struct {
 	// Extensions are code-specific members a client may read, such as the
 	// references that block a deletion.
 	Extensions map[string]any
-	// RetryAfter is how long to wait before retrying, for KindRateLimited.
+	// RetryAfter is how long to wait before retrying, for KindRateLimited
+	// and, when known, KindUnavailable.
 	RetryAfter time.Duration
 
 	cause error
@@ -138,6 +139,15 @@ func RateLimited(code, detail string, retryAfter time.Duration) *Error {
 
 // Unavailable reports a dependency failure worth retrying later.
 func Unavailable(code, detail string) *Error { return newError(KindUnavailable, code, detail) }
+
+// WithRetryAfter returns a copy of e saying how long to wait before
+// retrying, for an unavailable error whose wait is known, such as a busy
+// resource.
+func (e *Error) WithRetryAfter(d time.Duration) *Error {
+	c := e.clone()
+	c.RetryAfter = d
+	return c
+}
 
 // clone copies e deeply enough that changing the copy never changes e: errors
 // are often package-level values reused by every caller.

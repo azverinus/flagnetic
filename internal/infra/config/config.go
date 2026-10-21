@@ -55,8 +55,11 @@ type Config struct {
 	// InsecureCookies lets the session cookie go without Secure off
 	// localhost.
 	InsecureCookies bool
-	ConfigFile      string
-	ListenAddr      string
+	// PasswordHashConcurrency bounds the password hashes a replica runs at
+	// once.
+	PasswordHashConcurrency int
+	ConfigFile              string
+	ListenAddr              string
 	// MetricsListenAddr is "" when metrics are switched off.
 	MetricsListenAddr string
 	AutoMigrate       bool
@@ -171,6 +174,22 @@ func Settings() []Setting {
 					return errors.New("not true or false")
 				}
 				cfg.InsecureCookies = b
+				return nil
+			},
+		},
+		{
+			Name:    "FLAGNETIC_PASSWORD_HASH_CONCURRENCY",
+			Key:     "password_hash_concurrency",
+			Default: "4",
+			Description: "How many passwords one replica hashes or verifies at once. Each takes 64 MiB of memory for about a tenth of a second, " +
+				"so the bound keeps a burst of sign-ins from exhausting the replica. A sign-in that waits more than 2 seconds for a slot is answered 503 `busy` with `Retry-After`.",
+			Example: "8",
+			apply: func(cfg *Config, v string) error {
+				n, err := strconv.Atoi(v)
+				if err != nil || n < 1 {
+					return errors.New("not a whole number of at least 1")
+				}
+				cfg.PasswordHashConcurrency = n
 				return nil
 			},
 		},

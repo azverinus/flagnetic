@@ -140,6 +140,9 @@ func WithInsecureCookies() ServerOption {
 	return func(o *serverOptions) { o.web.InsecureCookies = true }
 }
 
+// defaultHashConcurrency is FLAGNETIC_PASSWORD_HASH_CONCURRENCY's default.
+const defaultHashConcurrency = 4
+
 // SecretKey is the secret key of every in-process server.
 const SecretKey = "test secret key of the in-process server, 32+ bytes"
 
@@ -178,8 +181,8 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	if c == nil {
 		c = clock.System{}
 	}
-	compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Web{
-		Keyring: secret.NewKeyring(secret.New(SecretKey)), Options: o.web,
+	compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Options{
+		Keyring: secret.NewKeyring(secret.New(SecretKey)), PasswordHashConcurrency: defaultHashConcurrency, Options: o.web,
 	})
 	for _, r := range o.routes {
 		h.Handle(r.pattern, r.build(h), r.opts...)

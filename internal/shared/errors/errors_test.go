@@ -112,6 +112,14 @@ func TestRateLimitedCarriesItsRetryDelay(t *testing.T) {
 	}
 }
 
+func TestAnUnavailableErrorCarriesARetryDelayWithoutChangingTheOriginal(t *testing.T) {
+	busy := errors.Unavailable("busy", "no slot")
+	e := busy.WithRetryAfter(time.Second)
+	if e.RetryAfter != time.Second || busy.RetryAfter != 0 || e.Code != "busy" {
+		t.Errorf("RetryAfter = %v and %v on the original, want 1s and none", e.RetryAfter, busy.RetryAfter)
+	}
+}
+
 func TestIsKindAnswersForAWrappedChain(t *testing.T) {
 	err := fmt.Errorf("x: %w", errors.Conflict("flag_key_taken", "taken"))
 	if !errors.IsKind(err, errors.KindConflict) {

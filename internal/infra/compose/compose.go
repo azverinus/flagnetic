@@ -38,24 +38,30 @@ func NewDeps(pool *pgxpool.Pool, c clock.Clock) Deps {
 	return Deps{Pool: pool, Clock: c, IDs: id.NewSource(c)}
 }
 
-// Web is how a replica treats browsers.
-type Web struct {
+// Options are how a replica serves, as its configuration sets them.
+type Options struct {
 	// Keyring holds the instance's secret key, which session cookies are
 	// signed under.
 	Keyring *secret.Keyring
+	// PasswordHashConcurrency bounds the password hashes and verifications
+	// the replica runs at once.
+	PasswordHashConcurrency int
 	management.Options
 }
 
 // Management mounts the management API on edge, its metrics on reg.
-func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, web Web) {
+func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Options) {
 	tx, auditLog := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
 	rec := appworkspace.NewRecorder(auditLog, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
-	sessionKey := web.Keyring.Key(secret.UseSessionCookie)
+	sessionKey := o.Keyring.Key(secret.UseSessionCookie)
+	// One hasher serves every use case of the replica, so its bound is the
+	// replica's.
+	hasher := password.NewBoundedHasher(password.DefaultParams, o.PasswordHashConcurrency, password.SlotWait)
 	management.Mount(edge, management.Handlers{
 		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, d.Clock),
 		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, d.Clock, sessionKey),
-		SignIn: appaccess.NewSignIn(tx, accessStore, Hasher(), auditLog, d.Clock, d.IDs,
+		SignIn: appaccess.NewSignIn(tx, accessStore, hasher, auditLog, d.Clock, d.IDs,
 			rand.Reader, sessionKey),
 		SignOut:            appaccess.NewSignOut(tx, accessStore, auditLog, d.Clock, d.IDs),
 		ProjectPermissions: appaccess.NewProjectPermissions(),
@@ -86,10 +92,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, web We
 
 		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
-	}, reg, web.Options)
+	}, reg, o.Options)
 }
 
-// Hasher returns the password hasher of a replica.
+// Hasher returns the password hasher of a command line, which hashes one
+// password and needs no bound.
 func Hasher() *password.Hasher { return password.NewHasher(password.DefaultParams) }
 
 // Bootstrap returns the use case creating the first instance admin.

@@ -9,9 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/argon2"
+	"golang.org/x/sync/semaphore"
 
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
@@ -32,17 +35,67 @@ type Params struct {
 // that a stolen hash resists guessing, fast enough for a sign-in.
 var DefaultParams = Params{MemoryKiB: 64 * 1024, Time: 3, Threads: 2, SaltLength: 16, KeyLength: 32}
 
-// Hasher hashes passwords with its parameters.
+// Hasher hashes passwords with its parameters, at most a bounded number at
+// once when it was given a bound.
 type Hasher struct {
 	params Params
+	// slots bound the hashes and verifications running at once; nil for
+	// none.
+	slots *semaphore.Weighted
+	wait  time.Duration
 }
 
-// NewHasher returns a hasher with params.
+// NewHasher returns a hasher with params and no bound, for a command that
+// hashes one password.
 func NewHasher(params Params) *Hasher { return &Hasher{params: params} }
+
+// SlotWait is how long a hash waits for a slot of a bounded hasher before it
+// is answered busy, and BusyRetryAfter how long a client is then told to
+// wait.
+const (
+	SlotWait       = 2 * time.Second
+	BusyRetryAfter = time.Second
+)
+
+// NewBoundedHasher returns a hasher with params running at most slots
+// hashes and verifications at once. Each takes its parameters' memory, 64
+// MiB by default, so the bound keeps a burst of sign-ins from exhausting a
+// replica's memory; one that waits longer than wait for a slot is answered
+// busy.
+func NewBoundedHasher(params Params, slots int, wait time.Duration) *Hasher {
+	return &Hasher{params: params, slots: semaphore.NewWeighted(int64(slots)), wait: wait}
+}
+
+// ErrBusy answers a hash that found no slot in time: the replica is hashing
+// as many passwords as it may, and the client retries shortly.
+var ErrBusy = apperrors.Unavailable("busy", "too many sign-ins are being checked at once; retry shortly").WithRetryAfter(BusyRetryAfter)
+
+// Occupy takes a slot as a hash would and returns its release, so work of
+// the caller's own counts against the bound; a test holds slots this way to
+// see the bound answer.
+func (h *Hasher) Occupy(ctx context.Context) (release func(), err error) {
+	if h.slots == nil {
+		return func() {}, nil
+	}
+	waitCtx, cancel := context.WithTimeout(ctx, h.wait)
+	defer cancel()
+	if err := h.slots.Acquire(waitCtx, 1); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, ErrBusy
+	}
+	return func() { h.slots.Release(1) }, nil
+}
 
 // Hash returns the PHC string of password under a fresh salt:
 // $argon2id$v=19$m=65536,t=3,p=2$<salt>$<key>, both in unpadded base64.
-func (h *Hasher) Hash(_ context.Context, password secret.String) (string, error) {
+func (h *Hasher) Hash(ctx context.Context, password secret.String) (string, error) {
+	release, err := h.Occupy(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer release()
 	salt := make([]byte, h.params.SaltLength)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("drawing a salt: %w", err)
@@ -66,7 +119,12 @@ var errMalformedHash = errors.New("password hash is not an argon2id PHC string")
 // whether encoded was made under parameters other than the hasher's, so a
 // successful sign-in rehashes it. An empty encoded is verified against a
 // hash no password matches, at the same cost.
-func (h *Hasher) Verify(_ context.Context, password secret.String, encoded string) (ok, outdated bool, err error) {
+func (h *Hasher) Verify(ctx context.Context, password secret.String, encoded string) (ok, outdated bool, err error) {
+	release, err := h.Occupy(ctx)
+	if err != nil {
+		return false, false, err
+	}
+	defer release()
 	if encoded == "" {
 		encoded = dummyHash
 	}

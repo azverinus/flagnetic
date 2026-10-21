@@ -3,8 +3,10 @@ package password_test
 import (
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
@@ -54,4 +56,32 @@ func TestAHashUnderOlderParametersIsOutdated(t *testing.T) {
 	if !ok || !outdated || err != nil {
 		t.Errorf("ok %v, outdated %v, err %v; want verified and outdated", ok, outdated, err)
 	}
+}
+
+func TestABoundedHasherAnswersBusyWhileEverySlotIsHeld(t *testing.T) {
+	h := password.NewBoundedHasher(password.DefaultParams, 2, 50*time.Millisecond)
+	var releases []func()
+	for range 2 {
+		release, err := h.Occupy(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		releases = append(releases, release)
+	}
+	start := time.Now()
+	_, err := h.Hash(t.Context(), secret.New("lantern-quartz-meadow-2291"))
+	if e, ok := apperrors.From(err); !ok || e.Code != "busy" || e.Kind != apperrors.KindUnavailable || e.RetryAfter != time.Second {
+		t.Fatalf("hash with every slot held: %v, want unavailable busy retrying after a second", err)
+	}
+	if waited := time.Since(start); waited < 50*time.Millisecond {
+		t.Errorf("answered busy after %v, want after the wait for a slot", waited)
+	}
+	if _, _, err := h.Verify(t.Context(), secret.New("x"), ""); !apperrors.IsKind(err, apperrors.KindUnavailable) {
+		t.Errorf("verify with every slot held: %v, want busy", err)
+	}
+	releases[0]()
+	if _, err := h.Hash(t.Context(), secret.New("lantern-quartz-meadow-2291")); err != nil {
+		t.Errorf("hash once a slot is free: %v", err)
+	}
+	releases[1]()
 }

@@ -103,7 +103,7 @@ func problemOf(err error) problem {
 				status: k.status, code: e.Code, title: k.title, detail: e.Detail,
 				violations: e.Violations, extensions: e.Extensions,
 			}
-			if e.Kind == apperrors.KindRateLimited {
+			if e.Kind == apperrors.KindRateLimited || e.Kind == apperrors.KindUnavailable {
 				p.retryAfter = e.RetryAfter
 			}
 			return p

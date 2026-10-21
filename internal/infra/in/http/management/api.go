@@ -127,8 +127,17 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 		// route without an entry is a stale build, refused at start.
 		panic("management: no operation table entry for " + pattern + "; run task generate")
 	}
-	rt.a.edge.Handle(pattern, rt.a.seam(op, http.HandlerFunc(h)))
+	var opts []flaghttp.RouteOption
+	if strings.HasPrefix(path, BaseURL+"/auth/") {
+		opts = append(opts, flaghttp.MaxBodyBytes(authBodyLimit))
+	}
+	rt.a.edge.Handle(pattern, rt.a.seam(op, http.HandlerFunc(h)), opts...)
 }
+
+// authBodyLimit caps the bodies of the operations that check a password,
+// which hold an email and a password at most 128 characters long, so a huge
+// body costs nothing before it is refused.
+const authBodyLimit = 8 << 10
 
 func (rt router) ServeHTTP(w http.ResponseWriter, r *http.Request) { rt.a.edge.ServeHTTP(w, r) }
 

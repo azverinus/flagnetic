@@ -150,6 +150,15 @@ func TestRateLimitedWritesRetryAfter(t *testing.T) {
 	}
 }
 
+func TestAnUnavailableErrorWithARetryDelayWritesRetryAfter(t *testing.T) {
+	srv := testkit.StartServer(t, failing("GET /test/busy", apperrors.Unavailable("busy", "no slot").WithRetryAfter(time.Second)))
+	p := request(t, "GET", srv.URL+"/test/busy", nil)
+	checkProblem(t, p, 503, "busy", "Unavailable")
+	if got := p.header.Get("Retry-After"); got != "1" || p.body["retry_after"] != 1.0 {
+		t.Errorf("Retry-After = %q, retry_after = %v; want 1", got, p.body["retry_after"])
+	}
+}
+
 func TestAnErrorWithoutAKindIsInternalAndLogged(t *testing.T) {
 	srv := testkit.StartServer(t, failing("GET /test/broken", fmt.Errorf("query flags: %w", errors.New("connection reset"))))
 	p := request(t, "GET", srv.URL+"/test/broken", nil)
