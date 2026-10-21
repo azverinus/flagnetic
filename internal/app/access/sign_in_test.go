@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sync/semaphore"
+
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
@@ -64,7 +66,7 @@ func codeOf(err error) string {
 }
 
 func TestParallelWrongSignInsLockAfterAboutOneVerificationPastTheThreshold(t *testing.T) {
-	v := &countingVerifier{Hasher: password.NewBoundedHasher(password.DefaultParams, 4, password.SlotWait)}
+	v := &countingVerifier{Hasher: password.NewBoundedHasher(password.DefaultParams, semaphore.NewWeighted(4), password.SlotWait)}
 	h := newSignIn(t, v)
 	m := testkit.NewMember(t, testkit.Pool(t))
 	const attempts = 24
@@ -91,7 +93,8 @@ func TestParallelWrongSignInsLockAfterAboutOneVerificationPastTheThreshold(t *te
 
 func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {
 	const wait = 200 * time.Millisecond
-	hasher := password.NewBoundedHasher(password.DefaultParams, 2, wait)
+	slots := semaphore.NewWeighted(2)
+	hasher := password.NewBoundedHasher(password.DefaultParams, slots, wait)
 	h := newSignIn(t, hasher)
 	m := testkit.NewMember(t, testkit.Pool(t))
 	from := anAddress()
@@ -101,13 +104,9 @@ func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {
 		return codeOf(err), time.Since(start)
 	}
 
-	var releases []func()
-	for range 2 {
-		release, err := hasher.Occupy(t.Context())
-		if err != nil {
-			t.Fatal(err)
-		}
-		releases = append(releases, release)
+	// The test holds every slot, as hashes running for other sign-ins would.
+	if err := slots.Acquire(t.Context(), 2); err != nil {
+		t.Fatal(err)
 	}
 	for range 6 {
 		if code, took := attempt(m.Email, "not-the-password-9", from); code != "busy" || took < wait {
@@ -132,9 +131,7 @@ func TestEverySlotHeldAnswersBusyAndRefusedAttemptsTakeNoSlot(t *testing.T) {
 		t.Errorf("a throttled source with every slot held: %s after %v, want rate_limited at once", code, took)
 	}
 
-	for _, release := range releases {
-		release()
-	}
+	slots.Release(2)
 	// The busy attempts were no guesses: they counted nothing.
 	if code, _ := attempt(m.Email, "not-the-password-9", from); code != "invalid_credentials" {
 		t.Errorf("a wrong password once slots are free: %s, want invalid_credentials, not locked by the busy attempts", code)

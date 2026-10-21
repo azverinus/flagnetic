@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sync/semaphore"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
@@ -57,7 +58,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	sessionKey := o.Keyring.Key(secret.UseSessionCookie)
 	// One hasher serves every use case of the replica, so its bound is the
 	// replica's.
-	hasher := password.NewBoundedHasher(password.DefaultParams, o.PasswordHashConcurrency, password.SlotWait)
+	hasher := password.NewBoundedHasher(password.DefaultParams,
+		semaphore.NewWeighted(int64(o.PasswordHashConcurrency)), password.SlotWait)
 	management.Mount(edge, management.Handlers{
 		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, d.Clock),
 		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, d.Clock, sessionKey),

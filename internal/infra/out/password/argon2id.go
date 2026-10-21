@@ -57,23 +57,23 @@ const (
 	BusyRetryAfter = time.Second
 )
 
-// NewBoundedHasher returns a hasher with params running at most slots
-// hashes and verifications at once. Each takes its parameters' memory, 64
-// MiB by default, so the bound keeps a burst of sign-ins from exhausting a
-// replica's memory; one that waits longer than wait for a slot is answered
-// busy.
-func NewBoundedHasher(params Params, slots int, wait time.Duration) *Hasher {
-	return &Hasher{params: params, slots: semaphore.NewWeighted(int64(slots)), wait: wait}
+// NewBoundedHasher returns a hasher with params running at most as many
+// hashes and verifications at once as slots holds, each taking one. Each
+// takes its parameters' memory, 64 MiB by default, so the bound keeps a
+// burst of sign-ins from exhausting a replica's memory; one that waits
+// longer than wait for a slot is answered busy. The slots are the
+// replica's: whatever else holds one, a test among them, counts against the
+// bound.
+func NewBoundedHasher(params Params, slots *semaphore.Weighted, wait time.Duration) *Hasher {
+	return &Hasher{params: params, slots: slots, wait: wait}
 }
 
 // ErrBusy answers a hash that found no slot in time: the replica is hashing
 // as many passwords as it may, and the client retries shortly.
 var ErrBusy = apperrors.Unavailable("busy", "too many sign-ins are being checked at once; retry shortly").WithRetryAfter(BusyRetryAfter)
 
-// Occupy takes a slot as a hash would and returns its release, so work of
-// the caller's own counts against the bound; a test holds slots this way to
-// see the bound answer.
-func (h *Hasher) Occupy(ctx context.Context) (release func(), err error) {
+// occupy takes a slot for a hash or a verification and returns its release.
+func (h *Hasher) occupy(ctx context.Context) (release func(), err error) {
 	if h.slots == nil {
 		return func() {}, nil
 	}
@@ -91,7 +91,7 @@ func (h *Hasher) Occupy(ctx context.Context) (release func(), err error) {
 // Hash returns the PHC string of password under a fresh salt:
 // $argon2id$v=19$m=65536,t=3,p=2$<salt>$<key>, both in unpadded base64.
 func (h *Hasher) Hash(ctx context.Context, password secret.String) (string, error) {
-	release, err := h.Occupy(ctx)
+	release, err := h.occupy(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -120,7 +120,7 @@ var errMalformedHash = errors.New("password hash is not an argon2id PHC string")
 // successful sign-in rehashes it. An empty encoded is verified against a
 // hash no password matches, at the same cost.
 func (h *Hasher) Verify(ctx context.Context, password secret.String, encoded string) (ok, outdated bool, err error) {
-	release, err := h.Occupy(ctx)
+	release, err := h.occupy(ctx)
 	if err != nil {
 		return false, false, err
 	}
