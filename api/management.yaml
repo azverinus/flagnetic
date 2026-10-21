@@ -1,0 +1,160 @@
+openapi: 3.0.3
+info:
+  title: Flagnetic management API
+  version: "1"
+  description: |
+    The API everything in the console is built on, for scripts and pipelines
+    too. It is served under `/api/v1`.
+
+    Every operation declares what it requires in `x-permission`: a permission
+    of the catalog, which a caller holds in a project through the roles they
+    were granted there, or one of `public` (anyone), `member` (any credential
+    acting for a member) and `instance_admin`. An API token is further
+    narrowed by its scopes: each permission falls under one scope, and a token
+    exercises it only when it carries that scope. Operations marked
+    `x-session-required` refuse every API token.
+
+    Errors are problem documents (RFC 9457) with a stable `code`.
+servers:
+  - url: /api/v1
+security:
+  - bearer: []
+paths:
+  /me:
+    get:
+      operationId: getMe
+      summary: Who the caller is
+      description: The member the credential in use acts for, the credential itself, and the address the request came from.
+      x-permission: member
+      tags: [me]
+      responses:
+        "200":
+          description: The caller.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: An API token, `fn_pat_…` for a personal access token or `fn_prj_…` for a project token, in the `Authorization` header. A token in the query string is never read.
+  responses:
+    Unauthenticated:
+      description: |
+        No credential, or one that is not accepted: `unauthenticated` without
+        a credential; `invalid_token`, `token_revoked` or `token_expired` for
+        an API token, with a `WWW-Authenticate` header naming the code.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Forbidden:
+      description: |
+        The caller may not perform the operation: `forbidden` (with the
+        missing `permission`), `session_required` or `insufficient_scope`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Problem:
+      type: object
+      description: A problem document (RFC 9457). Code-specific values are further members.
+      required: [type, title, status, code, request_id]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+          description: Stable snake_case name of the problem, which clients branch on.
+        detail:
+          type: string
+          description: An English explanation for humans; never what a client branches on.
+        request_id:
+          type: string
+        retry_after:
+          type: integer
+          description: Seconds to wait before retrying, for a rate limit.
+        permission:
+          type: string
+          description: The permission the caller lacks, for `forbidden`.
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Violation"
+    Violation:
+      type: object
+      required: [pointer, code, detail]
+      properties:
+        pointer:
+          type: string
+          description: JSON Pointer into the request body.
+        code:
+          type: string
+        detail:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+          description: The values of the rule broken, such as the bounds of a length, for a client to explain the violation in its own language.
+    MemberStatus:
+      type: string
+      enum: [invited, active, deactivated]
+    Me:
+      type: object
+      required: [credential, client_ip]
+      properties:
+        member:
+          $ref: "#/components/schemas/MeMember"
+        credential:
+          $ref: "#/components/schemas/Credential"
+        client_ip:
+          type: string
+          description: The address the request came from, as the server sees it behind its trusted proxies.
+    MeMember:
+      type: object
+      description: The member the credential acts for; absent for a project token, which acts for none.
+      required: [id, email, display_name, status, instance_admin, locale]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        display_name:
+          type: string
+        status:
+          $ref: "#/components/schemas/MemberStatus"
+        instance_admin:
+          type: boolean
+        locale:
+          type: string
+          nullable: true
+          description: The console language the member chose; null follows the browser.
+    Credential:
+      type: object
+      required: [method]
+      properties:
+        method:
+          type: string
+          enum: [token, session]
+        token_id:
+          type: string
+          format: uuid
+          description: The API token in use, for the token method.
+        token_name:
+          type: string

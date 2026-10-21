@@ -6,6 +6,7 @@ How to run Flagnetic in production: what it needs, how it starts and stops, and 
 
 - **PostgreSQL 16 or newer.** `serve` and `migrate` read the server version at start and refuse an older one with a message naming it. Flagnetic is tested on the oldest and the newest supported versions.
 - **Synchronized clocks.** Every replica judges time by its own wall clock (expiry, leases, scheduled changes), so run NTP or your platform's time sync on every host. Coordination between replicas tolerates seconds of skew, not minutes.
+- **A secret key.** `serve` refuses to start without `FLAGNETIC_SECRET_KEY`, or with one shorter than 32 bytes (exit code 2); see [The secret key](#the-secret-key).
 
 Any number of replicas can run against one database; every replica serves every API and runs every background worker, and they coordinate only through PostgreSQL.
 
@@ -15,6 +16,7 @@ Any number of replicas can run against one database; every replica serves every 
 |---|---|
 | `flagnetic serve` | Runs a replica. |
 | `flagnetic migrate` | Applies pending migrations and exits. Safe to run again, and safe to run from several places at once. |
+| `flagnetic admin bootstrap` | Creates the first instance admin and their API token; see [The first instance admin](#the-first-instance-admin). |
 | `flagnetic healthcheck` | Asks the replica on the configured listen address whether it is ready; exits 0 when it is, 1 otherwise. |
 | `flagnetic version` | Prints the version. |
 
@@ -31,6 +33,27 @@ With `FLAGNETIC_AUTO_MIGRATE=false`, `serve` compares the database's schema with
 - **Behind** (the job has not run yet): `serve` refuses to start, exit code 1, naming both versions and `flagnetic migrate`. New code never meets an old schema.
 - **Ahead** (a binary rolled back after a newer one migrated): `serve` starts and logs a warning naming both versions. Migrations only add to the schema in a way older binaries ignore, so a rollback keeps working.
 - **Equal**: `serve` starts without a word.
+
+## The secret key
+
+`FLAGNETIC_SECRET_KEY` is the instance's secret key: secrets the instance stores are sealed (encrypted) under it, and sessions are signed with it. It must be at least 32 bytes long; `serve` refuses a shorter one (exit code 2), since the keys it derives are no stronger than the key itself. Generate a long random value once, for example with `openssl rand -base64 32`, give every replica the same one, and keep it in your secret store.
+
+**Keep the key for the life of the instance.** On its first start the instance stores a canary, a random value sealed under the key, and every replica opens it on every start. A replica given another key cannot open it and refuses to start, exit code 1, with a message naming `FLAGNETIC_SECRET_KEY`: a mistyped or rotated key stops the deploy instead of silently losing what the instance sealed. Start it again with the original key.
+
+## The first instance admin
+
+A fresh instance has no one who can sign in. `flagnetic admin bootstrap` creates the first instance admin, with a password and an API token, from the command line and the database's own configuration:
+
+```sh
+FLAGNETIC_ADMIN_PASSWORD='…' flagnetic admin bootstrap --email ops@example.com --name "Ops" --token-file /run/secrets/flagnetic-token --if-absent
+```
+
+- `--email` is required; `--name` defaults to the email's local part.
+- The password is `FLAGNETIC_ADMIN_PASSWORD`. Without it, one is generated and printed once on standard error.
+- The API token carries every scope and does not expire: whoever runs the command holds the database's credentials already. It is printed on standard output, or written to `--token-file` instead, so a provisioning script can pick it up without it reaching a log. The file is created new, with mode 0600, before anything else: a path that exists or cannot be created stops the command (exit code 1) with nothing created, and the token is then never printed. With `--if-absent` on an instance that has an instance admin, the file is not touched.
+- Once an instance admin exists, bootstrap is refused with exit code 1, so it never adds a second one by accident. With `--if-absent` that is a success that does nothing (exit 0), which makes provisioning safe to rerun.
+- Two bootstraps running at once cannot both succeed. Both changes are recorded in the audit log with the CLI as their actor.
+- The schema must be migrated first (`flagnetic migrate`, or a replica started once).
 
 ## Probes
 
@@ -101,6 +124,7 @@ A second SIGTERM or SIGINT at any point exits at once with code 1, for an operat
 
 ```bash
 cd deploy
+echo "FLAGNETIC_SECRET_KEY=$(openssl rand -base64 32)" > .env   # once; keep this file
 docker compose up
 ```
 

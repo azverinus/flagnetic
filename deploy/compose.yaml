@@ -1,5 +1,10 @@
 # Flagnetic with its PostgreSQL, for evaluation and as a starting point for a
-# deployment. From this directory:
+# deployment. From this directory, once, store a secret key in .env, which
+# Compose reads (keep it: the instance refuses to start under another one):
+#
+#   echo "FLAGNETIC_SECRET_KEY=$(openssl rand -base64 32)" > .env
+#
+# then:
 #
 #   docker compose up
 #
@@ -44,6 +49,7 @@ services:
     environment:
       DATABASE_URL: *database
       FLAGNETIC_AUTO_MIGRATE: "false"
+      FLAGNETIC_SECRET_KEY: ${FLAGNETIC_SECRET_KEY:?store a secret key in deploy/.env first; see the top of compose.yaml}
     ports:
       - "8080:8080"
       - "9090:9090"

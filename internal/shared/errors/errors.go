@@ -70,6 +70,10 @@ type Violation struct {
 	Code string
 	// Detail explains the violation to a human.
 	Detail string
+	// Params are the values of the rule broken, such as the bounds of a
+	// length, so a client explains the violation in its own words and
+	// language from the code and these; nil when the rule has none.
+	Params map[string]any
 }
 
 // Error is an error of a kind. Its fields other than the cause are what a

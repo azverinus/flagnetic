@@ -39,6 +39,8 @@ Durations are written as a number and a unit: ` + "`500ms`, `15s`, `2m`" + `.
 		switch {
 		case s.Required:
 			def = "required"
+		case s.RequiredBy != "":
+			def = "required by `" + s.RequiredBy + "`"
 		case s.Default != "":
 			def = "`" + s.Default + "`"
 		}

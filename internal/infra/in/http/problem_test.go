@@ -115,17 +115,23 @@ func TestEveryKindIsAnsweredAsAProblemDocument(t *testing.T) {
 func TestFieldViolationsAndExtensionsAreMembers(t *testing.T) {
 	err := apperrors.Invalid("request_invalid", "two fields are wrong",
 		apperrors.Violation{Pointer: "/variations/1/value", Code: "type", Detail: "must be a boolean"},
+		apperrors.Violation{Pointer: "/password", Code: "weak_password", Detail: "too short", Params: map[string]any{"rule": "length", "min": 12}},
 	).WithExtension("references", []string{"segment beta"}).WithExtension("status", "shadowed")
 	srv := testkit.StartServer(t, failing("POST /test/flags", err))
 
 	p := request(t, "POST", srv.URL+"/test/flags", nil)
 	checkProblem(t, p, 422, "request_invalid", "Invalid")
 	violations, _ := p.body["errors"].([]any)
-	if len(violations) != 1 {
+	if len(violations) != 2 {
 		t.Fatalf("errors = %v", p.body["errors"])
 	}
 	if v := violations[0].(map[string]any); v["pointer"] != "/variations/1/value" || v["code"] != "type" || v["detail"] != "must be a boolean" {
 		t.Errorf("errors[0] = %v", v)
+	} else if _, ok := v["params"]; ok {
+		t.Errorf("errors[0] = %v, want no params member when the violation has none", v)
+	}
+	if params, _ := violations[1].(map[string]any)["params"].(map[string]any); params["rule"] != "length" || params["min"] != 12.0 {
+		t.Errorf("errors[1].params = %v, want the rule and its bound", params)
 	}
 	if refs, _ := p.body["references"].([]any); len(refs) != 1 || refs[0] != "segment beta" {
 		t.Errorf("references = %v, want the extension as a top-level member", p.body["references"])
