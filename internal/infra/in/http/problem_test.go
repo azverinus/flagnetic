@@ -178,6 +178,7 @@ func TestAdapterOnlyProblems(t *testing.T) {
 	srv := testkit.StartServer(t,
 		failing("POST /test/decode", flaghttp.InvalidRequest("the body is not JSON")),
 		failing("PUT /test/write", flaghttp.PreconditionRequired("send If-Match with the version you read")),
+		failing("POST /test/form", flaghttp.UnsupportedMediaType("the body must be sent as application/json")),
 	)
 	p := request(t, "POST", srv.URL+"/test/decode", nil)
 	checkProblem(t, p, 400, "invalid_request", "Invalid request")
@@ -185,6 +186,7 @@ func TestAdapterOnlyProblems(t *testing.T) {
 		t.Errorf("detail = %v", p.body["detail"])
 	}
 	checkProblem(t, request(t, "PUT", srv.URL+"/test/write", nil), 428, "precondition_required", "Precondition required")
+	checkProblem(t, request(t, "POST", srv.URL+"/test/form", nil), 415, "unsupported_media_type", "Unsupported media type")
 }
 
 func TestUnmatchedRoutesAreProblems(t *testing.T) {
