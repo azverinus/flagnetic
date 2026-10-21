@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [go, actions]
+        language: [go, actions, javascript-typescript]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
