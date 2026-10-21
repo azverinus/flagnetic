@@ -22,6 +22,8 @@ Set `DATABASE_URL` to an existing PostgreSQL to skip testcontainers.
 
 `task build` builds the console, then the binary that embeds it. `go build` alone needs no Node: a binary built without the console serves a placeholder page in its place, and says so in its log. `task web:dev` serves the console with live reload on port 5173, sending API requests to a binary running on `FLAGNETIC_URL` (default `http://localhost:8080`).
 
+`task web:e2e` runs the console end to end: Playwright builds the binary with the console embedded, starts it against a throwaway PostgreSQL in Docker, bootstraps an instance admin through the CLI, seeds through the generated client, and drives Chromium (`pnpm --dir web e2e:install` downloads it once). The binary runs under a test clock: a spec moves the server's time by writing a duration into the offset file (`advanceClock` in `web/e2e/support/instance.ts`), which `serve` accepts only with `FLAGNETIC_TEST_HARNESS=playwright` and listening on loopback.
+
 ### Strings in the console
 
 Every string a member reads goes through [Lingui](https://lingui.dev), with the English text as its ID: `<Trans>` in JSX, `` t`...` `` from `useLingui()` for an attribute, `` msg`...` `` for a string defined outside a component. The lint rule `lingui/no-unlocalized-strings` fails on a string written any other way. After adding or changing one, run `task web:extract` and commit the catalogs in `web/apps/console/src/locales`; CI fails when extraction would change them, and when a language lacks a translation. Server errors are translated by their `code`, with the values they depend on read from the problem document and its violations' `params`, in `web/apps/console/src/lib/problem-messages.ts`.

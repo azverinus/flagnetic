@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:local": "./scripts/with-postgres.sh playwright test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@flagnetic/api": "workspace:*"

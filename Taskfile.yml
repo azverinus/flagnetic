@@ -100,6 +100,12 @@ tasks:
       - pnpm --dir web test
       - pnpm --dir web i18n:check
 
+  web:e2e:
+    desc: Run the console end to end against the real binary and a throwaway PostgreSQL
+    deps: [web:install]
+    cmds:
+      - env -u DATABASE_URL pnpm --dir web/e2e test:local
+
   web:extract:
     desc: Extract the console's messages into its catalogs
     deps: [web:install]
