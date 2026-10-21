@@ -574,6 +574,82 @@ type EnvironmentPatch struct {
 	Name *Name   `json:"name,omitempty"`
 }
 
+// Evaluation defines model for Evaluation.
+type Evaluation struct {
+	// Flags The result of each flag evaluated, by flag key.
+	Flags map[string]EvaluationResult `json:"flags"`
+
+	// RulesetVersion The version of the environment's saved ruleset, which a draft does not move.
+	RulesetVersion int64 `json:"ruleset_version"`
+}
+
+// EvaluationContext What flags are evaluated for: unit IDs by unit type, each of at most
+// 256 bytes, an empty one counting as absent; and attribute values by
+// key, as SDKs send them. A context with no units is valid: rules on
+// attributes apply, while rollouts and overrides are skipped.
+type EvaluationContext struct {
+	Attributes *map[string]interface{} `json:"attributes,omitempty"`
+	Units      *map[string]string      `json:"units,omitempty"`
+}
+
+// EvaluationDraft An unsaved configuration of one flag in the environment, evaluated in place of the saved one and never stored.
+type EvaluationDraft struct {
+	Configuration FlagConfigurationPut `json:"configuration"`
+
+	// Flag The key of a flag of the project that is not archived.
+	Flag string `json:"flag"`
+}
+
+// EvaluationRequest defines model for EvaluationRequest.
+type EvaluationRequest struct {
+	// Context What flags are evaluated for: unit IDs by unit type, each of at most
+	// 256 bytes, an empty one counting as absent; and attribute values by
+	// key, as SDKs send them. A context with no units is valid: rules on
+	// attributes apply, while rollouts and overrides are skipped.
+	Context EvaluationContext `json:"context"`
+
+	// Draft An unsaved configuration of one flag in the environment, evaluated in place of the saved one and never stored.
+	Draft *EvaluationDraft `json:"draft,omitempty"`
+
+	// Flags The keys of the flags to evaluate; absent for every flag that is not archived.
+	Flags *[]string `json:"flags,omitempty"`
+}
+
+// EvaluationResult What one flag serves the context, and why, as the reference
+// evaluator computes it. `type` and `automatic_exposure` are absent
+// only for `flag_not_found`.
+type EvaluationResult struct {
+	AutomaticExposure *bool `json:"automatic_exposure,omitempty"`
+
+	// Bucket The unit's bucket, 0 to 9,999, for reason `rollout`; the unit is in the rollout because its bucket is below the percentage.
+	Bucket *int `json:"bucket,omitempty"`
+
+	// ErrorCode Why the result is an error: `flag_not_found`, `prerequisite_cycle` or `inconsistent_ruleset`.
+	ErrorCode *string `json:"error_code,omitempty"`
+
+	// OverrideInfluenced Whether an override decided the result, directly or through a prerequisite.
+	OverrideInfluenced bool `json:"override_influenced"`
+
+	// Prerequisite The key of the flag-level prerequisite that failed, for reason `prerequisite_failed`.
+	Prerequisite *string `json:"prerequisite,omitempty"`
+
+	// Reason `off`, `override`, `rule`, `rollout`, `fallthrough`, `prerequisite_failed` or `error`.
+	Reason string `json:"reason"`
+
+	// RuleId The rule that served, for reasons `rule` and `rollout`.
+	RuleId *openapi_types.UUID `json:"rule_id,omitempty"`
+
+	// Salt The salt of the rollout that served, for reason `rollout`.
+	Salt *string   `json:"salt,omitempty"`
+	Type *FlagType `json:"type,omitempty"`
+
+	// Value A JSON value of the flag's type, never null, of at most 64 KiB once compact.
+	Value *VariationValue `json:"value,omitempty"`
+
+	// Variation The served variation's key; absent for an error.
+	Variation *string `json:"variation,omitempty"`
+}
+
 // Flag A flag's definition with its configuration in every environment, by the environments' order.
 type Flag struct {
 	// ArchivedAt When the flag was archived, hidden from SDKs; null while it is not.
@@ -1805,6 +1881,9 @@ type CreateEnvironmentJSONRequestBody = EnvironmentCreate
 // UpdateEnvironmentJSONRequestBody defines body for UpdateEnvironment for application/json ContentType.
 type UpdateEnvironmentJSONRequestBody = EnvironmentPatch
 
+// EvaluateJSONRequestBody defines body for Evaluate for application/json ContentType.
+type EvaluateJSONRequestBody = EvaluationRequest
+
 // CreateFlagJSONRequestBody defines body for CreateFlag for application/json ContentType.
 type CreateFlagJSONRequestBody = FlagCreate
 
@@ -2492,6 +2571,50 @@ type ClientInterface interface {
 	//
 	// Renames the environment; the key never changes (`key_immutable`).
 	UpdateEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EvaluateWithBody Evaluate flags for a context, as the environment's SDKs would
+	//
+	// Evaluates the environment's saved configuration for a context, with
+	// the full reason of each result: the served value and variation,
+	// the reason, the rule that served, the error code, and for a rollout
+	// the unit's bucket and the rollout's salt. It evaluates every flag
+	// that is not archived, or only the flags named, where a key the
+	// ruleset does not hold answers `error` with `flag_not_found`.
+	//
+	// A `draft` evaluates one flag's unsaved configuration in place of
+	// its saved one, every other flag seeing it as SDKs would once it is
+	// saved. It is validated as replacing the configuration would
+	// validate it (`invalid_configuration`, its pointers under
+	// `/draft/configuration`), with no `If-Match`, and is never stored:
+	// nothing changes and nothing is recorded. A context whose unit ID is
+	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
+	EvaluateWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Evaluate Evaluate flags for a context, as the environment's SDKs would
+	//
+	// Evaluates the environment's saved configuration for a context, with
+	// the full reason of each result: the served value and variation,
+	// the reason, the rule that served, the error code, and for a rollout
+	// the unit's bucket and the rollout's salt. It evaluates every flag
+	// that is not archived, or only the flags named, where a key the
+	// ruleset does not hold answers `error` with `flag_not_found`.
+	//
+	// A `draft` evaluates one flag's unsaved configuration in place of
+	// its saved one, every other flag seeing it as SDKs would once it is
+	// saved. It is validated as replacing the configuration would
+	// validate it (`invalid_configuration`, its pointers under
+	// `/draft/configuration`), with no `If-Match`, and is never stored:
+	// nothing changes and nothing is recorded. A context whose unit ID is
+	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
+	Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListFlags The project's flags
 	//
@@ -4115,6 +4238,70 @@ func (c *Client) UpdateEnvironmentWithBody(ctx context.Context, project ProjectK
 // Renames the environment; the key never changes (`key_immutable`).
 func (c *Client) UpdateEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateEnvironmentRequest(c.Server, project, environment, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EvaluateWithBody Evaluate flags for a context, as the environment's SDKs would
+//
+// Evaluates the environment's saved configuration for a context, with
+// the full reason of each result: the served value and variation,
+// the reason, the rule that served, the error code, and for a rollout
+// the unit's bucket and the rollout's salt. It evaluates every flag
+// that is not archived, or only the flags named, where a key the
+// ruleset does not hold answers `error` with `flag_not_found`.
+//
+// A `draft` evaluates one flag's unsaved configuration in place of
+// its saved one, every other flag seeing it as SDKs would once it is
+// saved. It is validated as replacing the configuration would
+// validate it (`invalid_configuration`, its pointers under
+// `/draft/configuration`), with no `If-Match`, and is never stored:
+// nothing changes and nothing is recorded. A context whose unit ID is
+// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
+func (c *Client) EvaluateWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEvaluateRequestWithBody(c.Server, project, environment, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// Evaluate Evaluate flags for a context, as the environment's SDKs would
+//
+// Evaluates the environment's saved configuration for a context, with
+// the full reason of each result: the served value and variation,
+// the reason, the rule that served, the error code, and for a rollout
+// the unit's bucket and the rollout's salt. It evaluates every flag
+// that is not archived, or only the flags named, where a key the
+// ruleset does not hold answers `error` with `flag_not_found`.
+//
+// A `draft` evaluates one flag's unsaved configuration in place of
+// its saved one, every other flag seeing it as SDKs would once it is
+// saved. It is validated as replacing the configuration would
+// validate it (`invalid_configuration`, its pointers under
+// `/draft/configuration`), with no `If-Match`, and is never stored:
+// nothing changes and nothing is recorded. A context whose unit ID is
+// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
+func (c *Client) Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEvaluateRequest(c.Server, project, environment, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7046,6 +7233,60 @@ func NewUpdateEnvironmentRequestWithBody(server string, project ProjectKey, envi
 	return req, nil
 }
 
+// NewEvaluateRequest calls the generic Evaluate builder with application/json body
+func NewEvaluateRequest(server string, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewEvaluateRequestWithBody(server, project, environment, "application/json", bodyReader)
+}
+
+// NewEvaluateRequestWithBody constructs an http.Request for the Evaluate method, with any body, and a specified content type
+func NewEvaluateRequestWithBody(server string, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/evaluate", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListFlagsRequest constructs an http.Request for the ListFlags method
 func NewListFlagsRequest(server string, project ProjectKey, params *ListFlagsParams) (*http.Request, error) {
 	var err error
@@ -9476,6 +9717,50 @@ type ClientWithResponsesInterface interface {
 	//
 	// Renames the environment; the key never changes (`key_immutable`).
 	UpdateEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error)
+
+	// EvaluateWithBodyWithResponse Evaluate flags for a context, as the environment's SDKs would
+	//
+	// Evaluates the environment's saved configuration for a context, with
+	// the full reason of each result: the served value and variation,
+	// the reason, the rule that served, the error code, and for a rollout
+	// the unit's bucket and the rollout's salt. It evaluates every flag
+	// that is not archived, or only the flags named, where a key the
+	// ruleset does not hold answers `error` with `flag_not_found`.
+	//
+	// A `draft` evaluates one flag's unsaved configuration in place of
+	// its saved one, every other flag seeing it as SDKs would once it is
+	// saved. It is validated as replacing the configuration would
+	// validate it (`invalid_configuration`, its pointers under
+	// `/draft/configuration`), with no `If-Match`, and is never stored:
+	// nothing changes and nothing is recorded. A context whose unit ID is
+	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
+	EvaluateWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EvaluateResponse, error)
+
+	// EvaluateWithResponse Evaluate flags for a context, as the environment's SDKs would
+	//
+	// Evaluates the environment's saved configuration for a context, with
+	// the full reason of each result: the served value and variation,
+	// the reason, the rule that served, the error code, and for a rollout
+	// the unit's bucket and the rollout's salt. It evaluates every flag
+	// that is not archived, or only the flags named, where a key the
+	// ruleset does not hold answers `error` with `flag_not_found`.
+	//
+	// A `draft` evaluates one flag's unsaved configuration in place of
+	// its saved one, every other flag seeing it as SDKs would once it is
+	// saved. It is validated as replacing the configuration would
+	// validate it (`invalid_configuration`, its pointers under
+	// `/draft/configuration`), with no `If-Match`, and is never stored:
+	// nothing changes and nothing is recorded. A context whose unit ID is
+	// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
+	EvaluateWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*EvaluateResponse, error)
 
 	// ListFlagsWithResponse The project's flags
 	//
@@ -13198,6 +13483,96 @@ func (r UpdateEnvironmentResponse) ContentType() string {
 	return ""
 }
 
+// EvaluateResponse401Headers the declared response headers of an HTTP 401 response for Evaluate
+type EvaluateResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type EvaluateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Evaluation
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *EvaluateResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r EvaluateResponse) GetJSON200() *Evaluation {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r EvaluateResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r EvaluateResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r EvaluateResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r EvaluateResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r EvaluateResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r EvaluateResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r EvaluateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EvaluateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EvaluateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EvaluateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListFlagsResponse401Headers the declared response headers of an HTTP 401 response for ListFlags
 type ListFlagsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -16874,6 +17249,62 @@ func (c *ClientWithResponses) UpdateEnvironmentWithResponse(ctx context.Context,
 	return ParseUpdateEnvironmentResponse(rsp)
 }
 
+// EvaluateWithBodyWithResponse Evaluate flags for a context, as the environment's SDKs would
+//
+// Evaluates the environment's saved configuration for a context, with
+// the full reason of each result: the served value and variation,
+// the reason, the rule that served, the error code, and for a rollout
+// the unit's bucket and the rollout's salt. It evaluates every flag
+// that is not archived, or only the flags named, where a key the
+// ruleset does not hold answers `error` with `flag_not_found`.
+//
+// A `draft` evaluates one flag's unsaved configuration in place of
+// its saved one, every other flag seeing it as SDKs would once it is
+// saved. It is validated as replacing the configuration would
+// validate it (`invalid_configuration`, its pointers under
+// `/draft/configuration`), with no `If-Match`, and is never stored:
+// nothing changes and nothing is recorded. A context whose unit ID is
+// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
+func (c *ClientWithResponses) EvaluateWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EvaluateResponse, error) {
+	rsp, err := c.EvaluateWithBody(ctx, project, environment, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEvaluateResponse(rsp)
+}
+
+// EvaluateWithResponse Evaluate flags for a context, as the environment's SDKs would
+//
+// Evaluates the environment's saved configuration for a context, with
+// the full reason of each result: the served value and variation,
+// the reason, the rule that served, the error code, and for a rollout
+// the unit's bucket and the rollout's salt. It evaluates every flag
+// that is not archived, or only the flags named, where a key the
+// ruleset does not hold answers `error` with `flag_not_found`.
+//
+// A `draft` evaluates one flag's unsaved configuration in place of
+// its saved one, every other flag seeing it as SDKs would once it is
+// saved. It is validated as replacing the configuration would
+// validate it (`invalid_configuration`, its pointers under
+// `/draft/configuration`), with no `If-Match`, and is never stored:
+// nothing changes and nothing is recorded. A context whose unit ID is
+// over 256 bytes is `invalid_context`. Evaluating records no exposure.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
+func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*EvaluateResponse, error) {
+	rsp, err := c.Evaluate(ctx, project, environment, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEvaluateResponse(rsp)
+}
+
 // ListFlagsWithResponse The project's flags
 //
 // The project's flags, each with its flag state in every environment,
@@ -20519,6 +20950,87 @@ func ParseUpdateEnvironmentResponse(rsp *http.Response) (*UpdateEnvironmentRespo
 	return response, nil
 }
 
+// ParseEvaluateResponse parses an HTTP response from a EvaluateWithResponse call
+func ParseEvaluateResponse(rsp *http.Response) (*EvaluateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EvaluateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Evaluation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers EvaluateResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListFlagsResponse parses an HTTP response from a ListFlagsWithResponse call
 func ParseListFlagsResponse(rsp *http.Response) (*ListFlagsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -23096,6 +23608,9 @@ type ServerInterface interface {
 
 	// (PATCH /projects/{project}/environments/{environment})
 	UpdateEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	// Evaluate Evaluate flags for a context, as the environment's SDKs would
+	// (POST /projects/{project}/environments/{environment}/evaluate)
+	Evaluate(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListFlagsParams)
@@ -24594,6 +25109,41 @@ func (siw *ServerInterfaceWrapper) UpdateEnvironment(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateEnvironment(w, r, project, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Evaluate operation middleware
+func (siw *ServerInterfaceWrapper) Evaluate(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Evaluate(w, r, project, environment)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -26211,6 +26761,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.DeleteEnvironment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.GetEnvironment)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.UpdateEnvironment)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/evaluate", wrapper.Evaluate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/unit-types", wrapper.ListUnitTypes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/unit-types", wrapper.CreateUnitType)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/unit-types/{unit_type}", wrapper.DeleteUnitType)
@@ -29871,6 +30422,129 @@ func (response UpdateEnvironment422ApplicationProblemPlusJSONResponse) VisitUpda
 	return err
 }
 
+type EvaluateRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+	Body        *EvaluateJSONRequestBody
+}
+
+type EvaluateResponseObject interface {
+	VisitEvaluateResponse(w http.ResponseWriter) error
+}
+
+type Evaluate200JSONResponse Evaluation
+
+func (response Evaluate200JSONResponse) VisitEvaluateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Evaluate400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response Evaluate400ApplicationProblemPlusJSONResponse) VisitEvaluateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Evaluate401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response Evaluate401ApplicationProblemPlusJSONResponse) VisitEvaluateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Evaluate403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response Evaluate403ApplicationProblemPlusJSONResponse) VisitEvaluateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Evaluate404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response Evaluate404ApplicationProblemPlusJSONResponse) VisitEvaluateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Evaluate409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response Evaluate409ApplicationProblemPlusJSONResponse) VisitEvaluateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Evaluate422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response Evaluate422ApplicationProblemPlusJSONResponse) VisitEvaluateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFlagsRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  ListFlagsParams
@@ -33358,6 +34032,9 @@ type StrictServerInterface interface {
 
 	// (PATCH /projects/{project}/environments/{environment})
 	UpdateEnvironment(ctx context.Context, request UpdateEnvironmentRequestObject) (UpdateEnvironmentResponseObject, error)
+	// Evaluate Evaluate flags for a context, as the environment's SDKs would
+	// (POST /projects/{project}/environments/{environment}/evaluate)
+	Evaluate(ctx context.Context, request EvaluateRequestObject) (EvaluateResponseObject, error)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(ctx context.Context, request ListFlagsRequestObject) (ListFlagsResponseObject, error)
@@ -34714,6 +35391,40 @@ func (sh *strictHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateEnvironmentResponseObject); ok {
 		if err := validResponse.VisitUpdateEnvironmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Evaluate operation middleware
+func (sh *strictHandler) Evaluate(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey) {
+	var request EvaluateRequestObject
+
+	request.Project = project
+	request.Environment = environment
+
+	var body EvaluateJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Evaluate(ctx, request.(EvaluateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Evaluate")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EvaluateResponseObject); ok {
+		if err := validResponse.VisitEvaluateResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

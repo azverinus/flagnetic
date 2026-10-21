@@ -113,11 +113,14 @@ func InitialConfiguration(f Flag, environment workspace.EnvironmentID, by *acces
 const (
 	maxRules             = 50
 	maxOverrides         = 200
-	maxUnitIDBytes       = 256
 	maxNoteLength        = 200
 	maxPercentage        = 10_000
 	maxPrerequisiteDepth = 5
 )
+
+// MaxUnitIDBytes bounds a unit ID, in an override as in a context
+// evaluated: SDKs hash it on every evaluation of a rollout.
+const MaxUnitIDBytes = 256
 
 // The refusal of an invalid write to a configuration.
 const (
@@ -344,8 +347,8 @@ func (ck *check) override(pointer string, o OverrideInput, f Flag, d Declaration
 	switch {
 	case o.UnitID == "":
 		ck.add(pointer+"/unit_id", "invalid_value", "a unit ID is not empty", map[string]any{"min": 1})
-	case len(o.UnitID) > maxUnitIDBytes:
-		ck.add(pointer+"/unit_id", "too_long", "a unit ID has at most 256 bytes", map[string]any{"max": maxUnitIDBytes})
+	case len(o.UnitID) > MaxUnitIDBytes:
+		ck.add(pointer+"/unit_id", "too_long", "a unit ID has at most 256 bytes", map[string]any{"max": MaxUnitIDBytes})
 	}
 	note := ""
 	if o.Note != nil {

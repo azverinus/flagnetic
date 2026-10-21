@@ -141,21 +141,21 @@ func (s *Store) UpdateConfiguration(ctx context.Context, c flags.Configuration) 
 }
 
 const configurationSelect = `
-	SELECT e.key, c.environment_id, c.document, c.updated_at, c.updated_by, c.version
+	SELECT c.flag_id, e.key, c.environment_id, c.document, c.updated_at, c.updated_by, c.version
 	FROM flag_configurations c JOIN environments e ON e.id = c.environment_id`
 
-func scanConfiguration(row pgx.Row, flag flags.FlagID) (flags.EnvironmentConfiguration, error) {
+func scanConfiguration(row pgx.Row) (flags.EnvironmentConfiguration, error) {
 	var (
 		ec        flags.EnvironmentConfiguration
-		ek        [16]byte
+		fk, ek    [16]byte
 		doc       []byte
 		updatedBy *[16]byte
 	)
 	c := &ec.Configuration
-	if err := row.Scan(&ec.Environment, &ek, &doc, &c.UpdatedAt, &updatedBy, &c.Version); err != nil {
+	if err := row.Scan(&fk, &ec.Environment, &ek, &doc, &c.UpdatedAt, &updatedBy, &c.Version); err != nil {
 		return ec, err
 	}
-	c.Flag, c.Environment, c.UpdatedAt = flag, id.FromBytes[workspace.Environment](ek), c.UpdatedAt.UTC()
+	c.Flag, c.Environment, c.UpdatedAt = id.FromBytes[flags.Flag](fk), id.FromBytes[workspace.Environment](ek), c.UpdatedAt.UTC()
 	if updatedBy != nil {
 		m := id.FromBytes[access.Member](*updatedBy)
 		c.UpdatedBy = &m
@@ -175,11 +175,31 @@ func (s *Store) Configurations(ctx context.Context, flag flags.FlagID) ([]flags.
 	defer rows.Close()
 	out := []flags.EnvironmentConfiguration{}
 	for rows.Next() {
-		ec, err := scanConfiguration(rows, flag)
+		ec, err := scanConfiguration(rows)
 		if err != nil {
 			return nil, err
 		}
 		out = append(out, ec)
+	}
+	return out, rows.Err()
+}
+
+// EnvironmentConfigurations returns the configuration of every flag of
+// environment's project there, archived flags included.
+func (s *Store) EnvironmentConfigurations(ctx context.Context, environment workspace.EnvironmentID) ([]flags.Configuration, error) {
+	rows, err := s.db(ctx).Query(ctx, configurationSelect+`
+		WHERE c.environment_id = $1`, environment.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("reading an environment's configurations: %w", err)
+	}
+	defer rows.Close()
+	out := []flags.Configuration{}
+	for rows.Next() {
+		ec, err := scanConfiguration(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ec.Configuration)
 	}
 	return out, rows.Err()
 }
@@ -189,7 +209,7 @@ func (s *Store) Configurations(ctx context.Context, flag flags.FlagID) ([]flags.
 // environment.
 func (s *Store) Configuration(ctx context.Context, flag flags.FlagID, environment string) (flags.EnvironmentConfiguration, error) {
 	ec, err := scanConfiguration(s.db(ctx).QueryRow(ctx, configurationSelect+`
-		WHERE c.flag_id = $1 AND e.key = $2`, flag.Bytes(), environment), flag)
+		WHERE c.flag_id = $1 AND e.key = $2`, flag.Bytes(), environment))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ec, appflags.ErrNotFound
 	}

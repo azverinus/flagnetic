@@ -1125,6 +1125,99 @@ export type SegmentPatch = {
   conditions?: Array<Condition>;
 };
 
+export type EvaluationRequest = {
+  context: EvaluationContext;
+  /**
+   * The keys of the flags to evaluate; absent for every flag that is not archived.
+   */
+  flags?: Array<string>;
+  draft?: EvaluationDraft;
+};
+
+/**
+ * What flags are evaluated for: unit IDs by unit type, each of at most
+ * 256 bytes, an empty one counting as absent; and attribute values by
+ * key, as SDKs send them. A context with no units is valid: rules on
+ * attributes apply, while rollouts and overrides are skipped.
+ *
+ */
+export type EvaluationContext = {
+  units?: {
+    [key: string]: string;
+  };
+  attributes?: {
+    [key: string]: unknown;
+  };
+};
+
+/**
+ * An unsaved configuration of one flag in the environment, evaluated in place of the saved one and never stored.
+ */
+export type EvaluationDraft = {
+  /**
+   * The key of a flag of the project that is not archived.
+   */
+  flag: string;
+  configuration: FlagConfigurationPut;
+};
+
+export type Evaluation = {
+  /**
+   * The version of the environment's saved ruleset, which a draft does not move.
+   */
+  ruleset_version: number;
+  /**
+   * The result of each flag evaluated, by flag key.
+   */
+  flags: {
+    [key: string]: EvaluationResult;
+  };
+};
+
+/**
+ * What one flag serves the context, and why, as the reference
+ * evaluator computes it. `type` and `automatic_exposure` are absent
+ * only for `flag_not_found`.
+ *
+ */
+export type EvaluationResult = {
+  type?: FlagType;
+  value?: VariationValue;
+  /**
+   * The served variation's key; absent for an error.
+   */
+  variation?: string;
+  /**
+   * `off`, `override`, `rule`, `rollout`, `fallthrough`, `prerequisite_failed` or `error`.
+   */
+  reason: string;
+  /**
+   * The rule that served, for reasons `rule` and `rollout`.
+   */
+  rule_id?: string;
+  automatic_exposure?: boolean;
+  /**
+   * The key of the flag-level prerequisite that failed, for reason `prerequisite_failed`.
+   */
+  prerequisite?: string;
+  /**
+   * The unit's bucket, 0 to 9,999, for reason `rollout`; the unit is in the rollout because its bucket is below the percentage.
+   */
+  bucket?: number;
+  /**
+   * The salt of the rollout that served, for reason `rollout`.
+   */
+  salt?: string;
+  /**
+   * Why the result is an error: `flag_not_found`, `prerequisite_cycle` or `inconsistent_ruleset`.
+   */
+  error_code?: string;
+  /**
+   * Whether an override decided the result, directly or through a prerequisite.
+   */
+  override_influenced: boolean;
+};
+
 /**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
@@ -2433,6 +2526,70 @@ export type UpdateEnvironmentResponses = {
 
 export type UpdateEnvironmentResponse =
   UpdateEnvironmentResponses[keyof UpdateEnvironmentResponses];
+
+export type EvaluateData = {
+  body: EvaluationRequest;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/environments/{environment}/evaluate";
+};
+
+export type EvaluateErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type EvaluateError = EvaluateErrors[keyof EvaluateErrors];
+
+export type EvaluateResponses = {
+  /**
+   * The result of every flag evaluated, by flag key.
+   */
+  200: Evaluation;
+};
+
+export type EvaluateResponse = EvaluateResponses[keyof EvaluateResponses];
 
 export type ListUnitTypesData = {
   body?: never;

@@ -132,3 +132,15 @@ func TestIsKindAnswersForAWrappedChain(t *testing.T) {
 		t.Error("IsKind on a plain error = true")
 	}
 }
+
+func TestUnderPointsViolationsIntoALargerBodyWithoutChangingTheOriginal(t *testing.T) {
+	orig := errors.Invalid("invalid_configuration", "bad", errors.Violation{Pointer: "/rules/0", Code: "too_many"},
+		errors.Violation{Pointer: "", Code: "too_many"})
+	under := orig.Under("/draft/configuration")
+	if under.Violations[0].Pointer != "/draft/configuration/rules/0" || under.Violations[1].Pointer != "/draft/configuration" {
+		t.Errorf("pointers = %+v", under.Violations)
+	}
+	if orig.Violations[0].Pointer != "/rules/0" {
+		t.Errorf("the original changed: %+v", orig.Violations)
+	}
+}

@@ -63,6 +63,9 @@ import type {
   DeleteUnitTypeData,
   DeleteUnitTypeErrors,
   DeleteUnitTypeResponses,
+  EvaluateData,
+  EvaluateErrors,
+  EvaluateResponses,
   GetAttributeData,
   GetAttributeErrors,
   GetAttributeResponses,
@@ -854,6 +857,45 @@ export const updateEnvironment = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/environments/{environment}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Evaluate flags for a context, as the environment's SDKs would
+ *
+ * Evaluates the environment's saved configuration for a context, with
+ * the full reason of each result: the served value and variation,
+ * the reason, the rule that served, the error code, and for a rollout
+ * the unit's bucket and the rollout's salt. It evaluates every flag
+ * that is not archived, or only the flags named, where a key the
+ * ruleset does not hold answers `error` with `flag_not_found`.
+ *
+ * A `draft` evaluates one flag's unsaved configuration in place of
+ * its saved one, every other flag seeing it as SDKs would once it is
+ * saved. It is validated as replacing the configuration would
+ * validate it (`invalid_configuration`, its pointers under
+ * `/draft/configuration`), with no `If-Match`, and is never stored:
+ * nothing changes and nothing is recorded. A context whose unit ID is
+ * over 256 bytes is `invalid_context`. Evaluating records no exposure.
+ *
+ */
+export const evaluate = <ThrowOnError extends boolean = false>(
+  options: Options<EvaluateData, ThrowOnError>,
+): RequestResult<EvaluateResponses, EvaluateErrors, ThrowOnError> =>
+  (options.client ?? client).post<EvaluateResponses, EvaluateErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/evaluate",
     ...options,
     headers: {
       "Content-Type": "application/json",

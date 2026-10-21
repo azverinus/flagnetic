@@ -28,15 +28,7 @@ func (a *api) PutFlagConfiguration(ctx context.Context, req PutFlagConfiguration
 	if err != nil {
 		return nil, err
 	}
-	b := req.Body
-	in := flags.ConfigurationInput{
-		On: b.On, OffVariation: b.OffVariation, Fallthrough: b.Fallthrough, Prerequisites: each(valueOr(b.Prerequisites, nil), prerequisiteIn),
-		Overrides: each(valueOr(b.Overrides, nil), func(o OverrideInput) flags.OverrideInput {
-			return flags.OverrideInput{UnitType: o.UnitType, UnitID: o.UnitId, Variation: o.Variation, Note: o.Note}
-		}),
-		Rules: each(valueOr(b.Rules, nil), ruleIn),
-	}
-	ec, err := a.h.ReplaceConfiguration.Handle(ctx, appflags.ReplaceConfigurationCommand{Configuration: cmd, Input: in})
+	ec, err := a.h.ReplaceConfiguration.Handle(ctx, appflags.ReplaceConfigurationCommand{Configuration: cmd, Input: configurationIn(*req.Body)})
 	if err != nil {
 		return nil, err
 	}
@@ -126,6 +118,17 @@ func configurationCommand(ctx context.Context, flag, environment string, header 
 		Project: projectID(ctx), Flag: flag, Environment: environment, Expected: expected, Caller: callerMember(ctx),
 		Request: requestOf(ctx),
 	}, err
+}
+
+// configurationIn returns the configuration b gives whole.
+func configurationIn(b FlagConfigurationPut) flags.ConfigurationInput {
+	return flags.ConfigurationInput{
+		On: b.On, OffVariation: b.OffVariation, Fallthrough: b.Fallthrough, Prerequisites: each(valueOr(b.Prerequisites, nil), prerequisiteIn),
+		Overrides: each(valueOr(b.Overrides, nil), func(o OverrideInput) flags.OverrideInput {
+			return flags.OverrideInput{UnitType: o.UnitType, UnitID: o.UnitId, Variation: o.Variation, Note: o.Note}
+		}),
+		Rules: each(valueOr(b.Rules, nil), ruleIn),
+	}
 }
 
 func prerequisiteIn(p Prerequisite) flags.Prerequisite {

@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
@@ -101,6 +102,7 @@ type Handlers struct {
 	SetOverride          *appflags.SetOverride
 	RemoveOverride       *appflags.RemoveOverride
 	RegenerateSalt       *appflags.RegenerateSalt
+	Evaluate             *appdelivery.Evaluate
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

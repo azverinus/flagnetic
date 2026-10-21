@@ -9,10 +9,8 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
-// ConfigurationReplacer stores a flag's configuration replaced whole, and
-// reads what it may name.
-type ConfigurationReplacer interface {
-	ConfigurationWriter
+// ReferentReader reads what a configuration may name.
+type ReferentReader interface {
 	// ProjectFlags returns every flag of project, archived ones included.
 	ProjectFlags(ctx context.Context, project workspace.ProjectID) ([]flags.Flag, error)
 	// Segments returns the project's segments by key.
@@ -20,6 +18,13 @@ type ConfigurationReplacer interface {
 	// Requirements returns, by flag key, the keys of the flags each flag's
 	// configuration in environment requires, archived flags included.
 	Requirements(ctx context.Context, environment workspace.EnvironmentID) (flags.Requirements, error)
+}
+
+// ConfigurationReplacer stores a flag's configuration replaced whole, and
+// reads what it may name.
+type ConfigurationReplacer interface {
+	ConfigurationWriter
+	ReferentReader
 }
 
 // ReplaceConfigurationDeps are what ReplaceConfiguration runs on.
@@ -59,7 +64,7 @@ func (h *ReplaceConfiguration) Handle(ctx context.Context, cmd ReplaceConfigurat
 	d := ConfigurationDeps{Tx: h.d.Tx, Projects: h.d.Projects, Store: h.d.Store, Rulesets: h.d.Rulesets, Recorder: h.d.Recorder}
 	c := cmd.Configuration
 	return writeConfiguration(ctx, d, c, func(ctx context.Context, f flags.Flag, before flags.Configuration, now time.Time) (configurationChange, error) {
-		r, err := h.referents(ctx, c.Project, before.Environment)
+		r, err := referentsOf(ctx, h.d.Store, h.d.Declarations, c.Project, before.Environment)
 		if err != nil {
 			return configurationChange{}, err
 		}
@@ -81,27 +86,28 @@ func (h *ReplaceConfiguration) Handle(ctx context.Context, cmd ReplaceConfigurat
 	})
 }
 
-// referents returns what a configuration of project in environment may
-// name.
-func (h *ReplaceConfiguration) referents(ctx context.Context, project workspace.ProjectID, environment workspace.EnvironmentID,
+// referentsOf returns what a configuration of project in environment may
+// name, read from store and declarations.
+func referentsOf(ctx context.Context, store ReferentReader, declarations Declarations, project workspace.ProjectID,
+	environment workspace.EnvironmentID,
 ) (flags.Referents, error) {
 	var (
 		r   flags.Referents
 		err error
 	)
-	if r.Flags, err = h.d.Store.ProjectFlags(ctx, project); err != nil {
+	if r.Flags, err = store.ProjectFlags(ctx, project); err != nil {
 		return r, err
 	}
-	segments, err := h.d.Store.Segments(ctx, project)
+	segments, err := store.Segments(ctx, project)
 	if err != nil {
 		return r, err
 	}
 	for _, s := range segments {
 		r.Segments = append(r.Segments, s.Key)
 	}
-	if r.Declarations, err = declarationsOf(ctx, h.d.Declarations, project); err != nil {
+	if r.Declarations, err = declarationsOf(ctx, declarations, project); err != nil {
 		return r, err
 	}
-	r.Requirements, err = h.d.Store.Requirements(ctx, environment)
+	r.Requirements, err = store.Requirements(ctx, environment)
 	return r, err
 }
