@@ -788,7 +788,7 @@ paths:
     delete:
       operationId: revokeMemberSessions
       summary: Sign a member out everywhere
-      description: Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared.
+      description: Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
       x-permission: instance_admin
       tags: [members]
       responses:

@@ -446,3 +446,18 @@ func TestASessionsLastRequestIsWrittenAtMostOnceAMinute(t *testing.T) {
 		t.Errorf("last seen = %v after a minute, want the request's time", got)
 	}
 }
+
+func TestAnInstanceAdminsTokenCannotSignItsOwnerOutThroughTheMembersRoute(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.NewMember(t, testkit.Pool(t), testkit.AsInstanceAdmin())
+	b := signedIn(t, srv, admin)
+	token := testkit.Client(t, srv, testkit.PersonalToken(t, testkit.Pool(t), admin.ID, "leaked",
+		access.ScopeRead, access.ScopeInstanceAdmin))
+
+	res, err := token.RevokeMemberSessionsWithResponse(t.Context(), admin.ID.String())
+	if err != nil || res.ApplicationproblemJSON403 == nil || res.ApplicationproblemJSON403.Code != "session_required" {
+		t.Errorf("DELETE /members/{owner}/sessions with the owner's token = %v %s, %v; want 403 session_required",
+			res.StatusCode(), res.Body, err)
+	}
+	wantSignedIn(t, b, "the token's owner")
+}

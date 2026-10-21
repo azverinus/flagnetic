@@ -957,7 +957,7 @@ type ClientInterface interface {
 
 	// RevokeMemberSessions Sign a member out everywhere
 	//
-	// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared.
+	// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
 	//
 	// Corresponds with DELETE /members/{member}/sessions (the `RevokeMemberSessions` operationId).
 	RevokeMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1440,7 +1440,7 @@ func (c *Client) RevokeMySession(ctx context.Context, session SessionID, reqEdit
 
 // RevokeMemberSessions Sign a member out everywhere
 //
-// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared.
+// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
 //
 // Corresponds with DELETE /members/{member}/sessions (the `RevokeMemberSessions` operationId).
 func (c *Client) RevokeMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3831,7 +3831,7 @@ type ClientWithResponsesInterface interface {
 
 	// RevokeMemberSessionsWithResponse Sign a member out everywhere
 	//
-	// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared.
+	// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -6814,7 +6814,7 @@ func (c *ClientWithResponses) RevokeMySessionWithResponse(ctx context.Context, s
 
 // RevokeMemberSessionsWithResponse Sign a member out everywhere
 //
-// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared.
+// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
 //
 // Returns a wrapper object for the known response body format(s).
 //

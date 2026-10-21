@@ -81,7 +81,7 @@ func (h *PurgeAuthRecords) Handle(ctx context.Context) (AuthPurged, error) {
 			return h.store.PurgeSourceFailures(ctx, failures, AuthRetentionBatch)
 		}},
 	} {
-		err := h.batches(ctx, step.count, step.purge)
+		err = h.batches(ctx, step.count, step.purge)
 		if errors.Is(err, errPurgingElsewhere) {
 			return purged, nil
 		}

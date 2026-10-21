@@ -139,11 +139,13 @@ func NewRevokeSessions(tx Transactor, store SessionRevoker, settings AuthSetting
 
 // Handle revokes the live sessions cmd selects and records one
 // session.revoked entry naming them; revoking none records nothing. A
-// member revokes their own sessions only from a session, so a leaked token
-// cannot sign its owner out; a session the member does not hold live is
+// member's own sessions are revoked only from a session, whichever route
+// names them, so a leaked token cannot sign its owner out, an instance
+// admin's included; a session the member does not hold live is
 // ErrSessionNotFound.
 func (h *RevokeSessions) Handle(ctx context.Context, cmd RevokeSessionsCommand) (RevokeSessionsResult, error) {
-	if cmd.Member.IsZero() && cmd.Caller.Session == nil {
+	own := cmd.Member.IsZero() || (cmd.Caller.Member != nil && cmd.Caller.Member.ID == cmd.Member)
+	if own && cmd.Caller.Session == nil {
 		return RevokeSessionsResult{}, access.ErrSessionRequired
 	}
 	settings, err := h.settings.AuthSettings(ctx)
