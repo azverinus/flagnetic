@@ -25,6 +25,21 @@ info:
     says it comes from another origin.
 
     Errors are problem documents (RFC 9457) with a stable `code`.
+
+    Every versioned entity (project, environment, unit type, attribute,
+    flag definition, flag configuration and segment) carries a `version`,
+    which counts its accepted changes from 1 and is answered as a strong
+    `ETag` (`"7"`) on every read of the entity and every write. A write
+    changing or deleting one names the version it was based on in
+    `If-Match`, quoted (`"7"`) or bare (`7`): without it the write is refused
+    `428 precondition_required`, and when the entity moved on since,
+    `412 version_mismatch` with the version it has now in `current_version`,
+    so two people editing the same entity never overwrite each other
+    unseen. Both are judged after the request is validated. The kill switch
+    and the writes of a single override need no `If-Match`, and still move
+    the configuration's version on. A write that changes nothing stores
+    nothing, keeps the version, records nothing and answers the entity as it
+    is.
 servers:
   - url: /api/v1
 security:

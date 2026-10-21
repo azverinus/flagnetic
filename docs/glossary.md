@@ -125,6 +125,14 @@ _Avoid_: feature, toggle, gate, remote config key, parameter
 **Flag type**:
 The kind of value a flag serves: boolean, string, number or JSON.
 
+**Flag definition**:
+What a flag is in every environment at once: its key, type, variations, automatic exposure, owner and descriptive fields, and whether it is archived.
+_Avoid_: flag settings, flag metadata (the descriptive fields alone)
+
+**Flag configuration**:
+What one flag serves in one environment: on or off, the off and fallthrough variations, prerequisites, overrides and rules. Every flag has one in every environment of its project, and each changes on its own.
+_Avoid_: targeting, flag environment, flag rules (rules are part of it)
+
 **Variation**:
 One of the named values a flag can serve. A boolean flag has exactly two; other types have as many as needed.
 _Avoid_: variant, value, option, arm
@@ -162,7 +170,7 @@ A substitution of a flag value inside an SDK, on a developer's machine or a non-
 _Avoid_: dev override, debug value, mock
 
 **Owner**:
-The member accountable for a flag or experiment: the person to ask before deleting it. Also the name of the built-in role holding every project permission, members and protection included; what the word is attached to says which is meant. Removing a member from a project is refused while they still own something in it.
+The member accountable for a flag or experiment: the person to ask before deleting it. Also the name of the built-in role holding every project permission, members and protection included; what the word is attached to says which is meant. Ownership never stops a member losing their grants or being deactivated; a flag whose owner has, is stale.
 
 **Flag state**:
 What a flag's configuration in one environment serves at a glance: on or off, and whether it has rules, a rollout or an experiment. A list of flags shows one state per environment and is filtered by one within one environment.

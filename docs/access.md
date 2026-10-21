@@ -110,7 +110,7 @@ Every change is recorded as an audit entry inside the transaction that makes it,
 
 - `GET /projects/{project}/audit` lists a project's entries for anyone holding `project.read` there, and `GET /projects/{project}/audit/{entry}` reads one.
 - `GET /audit` lists every entry of the instance for an instance admin, with a `project` filter taking a project's identifier.
-- Filters: `actor` (a member's identifier: their own changes and those of their personal access tokens), `actor_kind`, `action`, `entity_kind`, `entity_id` (which follows an entity whatever key it had), `environment`, `from` and `to` (both included), and `q`, text found in the action, the entity's key or the actor's name, whatever its case.
+- Filters: `actor` (a member's identifier: their own changes and those of their personal access tokens), `actor_kind`, `action`, `entity_kind`, `entity_id` (which follows an entity whatever key it had), `environment`, `kill_switch` (`true` for the uses of the [kill switch](flags.md#switching-on-and-off-the-kill-switch) alone, `false` for every other entry), `from` and `to` (both included), and `q`, text found in the action, the entity's key or the actor's name, whatever its case.
 - Newest first, 50 entries a page unless `limit` asks for up to 200; the answer's `next_cursor` fetches the next page.
 
 The console shows both logs, the project's under **Audit log** in the project navigation and the instance's under **Audit log** in the instance navigation, with these filters and each entry's values before and after.
