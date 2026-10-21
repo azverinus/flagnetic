@@ -83,6 +83,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Every write changing what SDKs receive moves the rulesets it changed
 	// on, through the delivery context.
 	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(d.Pool))
+	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
 	sessionKey := o.Keyring.Key(secret.UseSessionCookie)
 	// Every request judging a session reads the settings: the replica keeps
@@ -183,6 +184,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ReplaceConfiguration: appflags.NewReplaceConfiguration(appflags.ReplaceConfigurationDeps{
 			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
+		KillFlag: appflags.NewKillFlag(configuration),
+		SetOverride: appflags.NewSetOverride(appflags.SetOverrideDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		RemoveOverride: appflags.NewRemoveOverride(configuration),
+		RegenerateSalt: appflags.NewRegenerateSalt(configuration),
 
 		ListSegments: appflags.NewListSegments(flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

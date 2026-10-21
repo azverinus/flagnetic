@@ -79,6 +79,9 @@ type Record struct {
 	// JSON. They never hold a secret: a token appears by its hint.
 	Before any
 	After  any
+	// KillSwitch marks the record of a kill switch, which an auditor
+	// reviews apart from every other change.
+	KillSwitch bool
 }
 
 // Entry is one audit entry.

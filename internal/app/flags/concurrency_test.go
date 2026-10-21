@@ -40,6 +40,7 @@ type app struct {
 	replace  *appflags.ReplaceConfiguration
 	segment  *appflags.CreateSegment
 	deleteSg *appflags.DeleteSegment
+	kill     *appflags.KillFlag
 }
 
 func newApp(t *testing.T) *app {
@@ -66,6 +67,9 @@ func newApp(t *testing.T) *app {
 			Tx: tx, Projects: store, Declarations: ws, Store: store, Rulesets: rulesets, Recorder: rec,
 		}),
 		deleteSg: appflags.NewDeleteSegment(appflags.DeleteSegmentDeps{
+			Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec,
+		}),
+		kill: appflags.NewKillFlag(appflags.ConfigurationDeps{
 			Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec,
 		}),
 	}
@@ -110,9 +114,15 @@ func (a *app) flag(project workspace.ProjectID, key string, typ flags.Type, vs .
 // put replaces flag's configuration in production with in, based on
 // version 1.
 func (a *app) put(ctx context.Context, project workspace.ProjectID, flag string, in flags.ConfigurationInput) error {
+	return a.putOn(ctx, project, flag, 1, in)
+}
+
+// putOn replaces flag's configuration in production with in, based on
+// version.
+func (a *app) putOn(ctx context.Context, project workspace.ProjectID, flag string, version int64, in flags.ConfigurationInput) error {
 	_, err := a.replace.Handle(ctx, appflags.ReplaceConfigurationCommand{
 		Configuration: appflags.ConfigurationCommand{
-			Project: project, Flag: flag, Environment: "production", Expected: precondition.On(1), Request: a.req,
+			Project: project, Flag: flag, Environment: "production", Expected: precondition.On(version), Request: a.req,
 		},
 		Input: in,
 	})
@@ -209,4 +219,49 @@ func TestRemovingWhatAWriteStartsNamingNeverBothSucceed(t *testing.T) {
 
 func variation(key, value string) flags.VariationInput {
 	return flags.VariationInput{Key: key, Value: []byte(value)}
+}
+
+// A kill switch and a replace of the same configuration run one after the
+// other: the replace either lands first and is then switched off, or is
+// based on the version the kill switch moved past and refused. Either way
+// the flag ends off.
+func TestAKillSwitchAndAReplaceAtOnceSerialize(t *testing.T) {
+	a := newApp(t)
+	for round := range 10 {
+		p := a.project()
+		a.flag(p, "banner", flags.TypeBoolean)
+		on := flags.ConfigurationInput{On: true, OffVariation: "false", Fallthrough: "true"}
+		if err := a.put(t.Context(), p, "banner", on); err != nil {
+			t.Fatal(err)
+		}
+		on.Fallthrough = "false"
+		codes := race(
+			func() error {
+				_, _, err := a.kill.Handle(t.Context(), appflags.KillFlagCommand{Configuration: appflags.ConfigurationCommand{
+					Project: p, Flag: "banner", Environment: "production", Request: a.req,
+				}})
+				return err
+			},
+			func() error { return a.putOn(t.Context(), p, "banner", 2, on) },
+		)
+		if !slices.Equal(codes, []string{"", ""}) && !slices.Equal(codes, []string{"", "version_mismatch"}) {
+			t.Fatalf("round %d: refusals = %q, want the kill switch accepted and the replace accepted first or refused", round, codes)
+		}
+		c, err := a.store.Configuration(t.Context(), mustFlagID(t, a, p, "banner"), "production")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.Configuration.On {
+			t.Fatalf("round %d: the flag is on after a kill switch", round)
+		}
+	}
+}
+
+func mustFlagID(t *testing.T, a *app, project workspace.ProjectID, key string) flags.FlagID {
+	t.Helper()
+	f, err := a.store.FlagByKey(t.Context(), project, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f.ID
 }

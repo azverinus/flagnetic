@@ -54,6 +54,9 @@ import type {
   DeleteGrantData,
   DeleteGrantErrors,
   DeleteGrantResponses,
+  DeleteOverrideData,
+  DeleteOverrideErrors,
+  DeleteOverrideResponses,
   DeleteSegmentData,
   DeleteSegmentErrors,
   DeleteSegmentResponses,
@@ -105,6 +108,9 @@ import type {
   InviteMemberData,
   InviteMemberErrors,
   InviteMemberResponses,
+  KillFlagData,
+  KillFlagErrors,
+  KillFlagResponses,
   ListAttributesData,
   ListAttributesErrors,
   ListAttributesResponses,
@@ -162,9 +168,15 @@ import type {
   PutFlagConfigurationData,
   PutFlagConfigurationErrors,
   PutFlagConfigurationResponses,
+  PutOverrideData,
+  PutOverrideErrors,
+  PutOverrideResponses,
   ReactivateMemberData,
   ReactivateMemberErrors,
   ReactivateMemberResponses,
+  RegenerateRolloutSaltData,
+  RegenerateRolloutSaltErrors,
+  RegenerateRolloutSaltResponses,
   ReissueInvitationData,
   ReissueInvitationErrors,
   ReissueInvitationResponses,
@@ -1293,6 +1305,122 @@ export const putFlagConfiguration = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Switch a flag off in one environment at once
+ *
+ * The kill switch: switches the flag off in the environment, so it
+ * serves its off variation to everyone, and changes nothing else. It
+ * needs no `If-Match`, so it is never refused for an old page, and
+ * still moves the configuration's version on. A flag already off
+ * changes nothing and records nothing (`changed` false). The audit
+ * entry carries the reason and is marked as a kill switch, which the
+ * audit log is filtered by.
+ *
+ */
+export const killFlag = <ThrowOnError extends boolean = false>(
+  options: Options<KillFlagData, ThrowOnError>,
+): RequestResult<KillFlagResponses, KillFlagErrors, ThrowOnError> =>
+  (options.client ?? client).post<KillFlagResponses, KillFlagErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/environments/{environment}/kill",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Remove the override of one unit
+ *
+ * Removes one override without replacing the configuration, and needs
+ * no `If-Match`; the configuration's version still moves on. A unit
+ * without an override is `not_found`.
+ *
+ */
+export const deleteOverride = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteOverrideData, ThrowOnError>,
+): RequestResult<DeleteOverrideResponses, DeleteOverrideErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteOverrideResponses, DeleteOverrideErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}",
+    ...options,
+  });
+
+/**
+ * Pin a variation for one unit
+ *
+ * Sets one override without replacing the configuration, and needs
+ * no `If-Match`; the configuration's version still moves on. An
+ * override of the unit is replaced, variation and note together, and
+ * written by the caller; another is added, up to 200. Validated like
+ * an override of a whole configuration (`invalid_configuration`).
+ * Setting what the override already is changes nothing.
+ *
+ */
+export const putOverride = <ThrowOnError extends boolean = false>(
+  options: Options<PutOverrideData, ThrowOnError>,
+): RequestResult<PutOverrideResponses, PutOverrideErrors, ThrowOnError> =>
+  (options.client ?? client).put<PutOverrideResponses, PutOverrideErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Give a rollout a new salt
+ *
+ * Gives the rollout of the rule a new salt, which reshuffles which
+ * units it serves: units in it may fall out and others come in. It is
+ * the only way a rollout's salt changes. A rule that is not a rollout
+ * is `not_a_rollout`.
+ *
+ */
+export const regenerateRolloutSalt = <ThrowOnError extends boolean = false>(
+  options: Options<RegenerateRolloutSaltData, ThrowOnError>,
+): RequestResult<RegenerateRolloutSaltResponses, RegenerateRolloutSaltErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RegenerateRolloutSaltResponses,
+    RegenerateRolloutSaltErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt",
+    ...options,
   });
 
 /**

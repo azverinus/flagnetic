@@ -8,6 +8,7 @@ import (
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
@@ -42,6 +43,81 @@ func (a *api) PutFlagConfiguration(ctx context.Context, req PutFlagConfiguration
 	}
 	return PutFlagConfiguration200JSONResponse{
 		Body: configurationOut(ec), Headers: PutFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+	}, nil
+}
+
+// KillFlag switches a flag off in one environment with the kill switch.
+func (a *api) KillFlag(ctx context.Context, req KillFlagRequestObject) (KillFlagResponseObject, error) {
+	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, nil)
+	if err != nil {
+		return nil, err
+	}
+	var reason *string
+	if req.Body != nil {
+		reason = req.Body.Reason
+	}
+	ec, killed, err := a.h.KillFlag.Handle(ctx, appflags.KillFlagCommand{Configuration: cmd, Reason: reason})
+	if err != nil {
+		return nil, err
+	}
+	return KillFlag200JSONResponse{
+		Body:    KillResult{Changed: killed, Configuration: configurationOut(ec)},
+		Headers: KillFlag200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+	}, nil
+}
+
+// PutOverride pins a variation for one unit.
+func (a *api) PutOverride(ctx context.Context, req PutOverrideRequestObject) (PutOverrideResponseObject, error) {
+	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, nil)
+	if err != nil {
+		return nil, err
+	}
+	ec, err := a.h.SetOverride.Handle(ctx, appflags.SetOverrideCommand{Configuration: cmd, Override: flags.OverrideInput{
+		UnitType: req.UnitType, UnitID: req.UnitId, Variation: req.Body.Variation, Note: req.Body.Note,
+	}})
+	if err != nil {
+		return nil, err
+	}
+	return PutOverride200JSONResponse{
+		Body: configurationOut(ec), Headers: PutOverride200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+	}, nil
+}
+
+// DeleteOverride removes the override of one unit.
+func (a *api) DeleteOverride(ctx context.Context, req DeleteOverrideRequestObject) (DeleteOverrideResponseObject, error) {
+	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, nil)
+	if err != nil {
+		return nil, err
+	}
+	ec, err := a.h.RemoveOverride.Handle(ctx, appflags.RemoveOverrideCommand{Configuration: cmd, UnitType: req.UnitType, UnitID: req.UnitId})
+	if err != nil {
+		return nil, err
+	}
+	return DeleteOverride200JSONResponse{
+		Body: configurationOut(ec), Headers: DeleteOverride200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+	}, nil
+}
+
+// errRuleNotFound answers a rule identifier that is not one: no
+// configuration has a rule by it.
+var errRuleNotFound = apperrors.NotFound("not_found", "the configuration has no rule with this identifier")
+
+// RegenerateRolloutSalt gives a rollout a new salt.
+func (a *api) RegenerateRolloutSalt(ctx context.Context, req RegenerateRolloutSaltRequestObject) (RegenerateRolloutSaltResponseObject, error) {
+	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	rule, err := id.Parse[flags.Rule](req.Rule)
+	if err != nil {
+		return nil, errRuleNotFound
+	}
+	ec, err := a.h.RegenerateSalt.Handle(ctx, appflags.RegenerateSaltCommand{Configuration: cmd, Rule: rule})
+	if err != nil {
+		return nil, err
+	}
+	return RegenerateRolloutSalt200JSONResponse{
+		Body: configurationOut(ec), Headers: RegenerateRolloutSalt200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
 }
 

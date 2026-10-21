@@ -31,6 +31,9 @@ type AuditFilter struct {
 	Environment workspace.EnvironmentID
 	// From and To bound the time of an entry, both included; zero for none.
 	From, To time.Time
+	// KillSwitch selects the entries of kill switches when true, every
+	// other entry when false; nil selects both.
+	KillSwitch *bool
 	// Q is text found, whatever its case, in the action, the entity's key or
 	// the actor's name.
 	Q string

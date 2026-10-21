@@ -663,6 +663,10 @@ export type AuditEntry = {
    */
   after: unknown;
   /**
+   * Whether the entry records a kill switch, switching a flag off in an emergency.
+   */
+  kill_switch: boolean;
+  /**
    * The request that made the change; null outside a request, such as for the command line.
    */
   request_id: string | null;
@@ -921,6 +925,29 @@ export type FlagConfigurationPut = {
   rules?: Array<RuleInput>;
 };
 
+export type OverridePut = {
+  variation: string;
+  /**
+   * At most 200 characters once trimmed; blank or absent is none.
+   */
+  note?: string | null;
+};
+
+export type Kill = {
+  /**
+   * Why, at most 2,000 characters; recorded in the audit log.
+   */
+  reason?: string | null;
+};
+
+export type KillResult = {
+  /**
+   * False when the flag was off already.
+   */
+  changed: boolean;
+  configuration: FlagConfiguration;
+};
+
 export type FlagList = {
   items: Array<FlagDefinition>;
   /**
@@ -1084,6 +1111,11 @@ export type AuditFrom = string;
  * The latest time of an entry, included.
  */
 export type AuditTo = string;
+
+/**
+ * Lists only the entries of kill switches when true, only the others when false.
+ */
+export type AuditKillSwitch = boolean;
 
 /**
  * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
@@ -3516,6 +3548,299 @@ export type PutFlagConfigurationResponses = {
 export type PutFlagConfigurationResponse =
   PutFlagConfigurationResponses[keyof PutFlagConfigurationResponses];
 
+export type KillFlagData = {
+  body?: Kill;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The flag's key.
+     */
+    flag: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/flags/{flag}/environments/{environment}/kill";
+};
+
+export type KillFlagErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type KillFlagError = KillFlagErrors[keyof KillFlagErrors];
+
+export type KillFlagResponses = {
+  /**
+   * Whether the flag was switched off, and the configuration as it is now.
+   */
+  200: KillResult;
+};
+
+export type KillFlagResponse = KillFlagResponses[keyof KillFlagResponses];
+
+export type DeleteOverrideData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The flag's key.
+     */
+    flag: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+    /**
+     * The unit type's key.
+     */
+    unit_type: string;
+    /**
+     * The unit's ID, of 1 to 256 bytes.
+     */
+    unit_id: string;
+  };
+  query?: never;
+  url: "/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}";
+};
+
+export type DeleteOverrideErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type DeleteOverrideError = DeleteOverrideErrors[keyof DeleteOverrideErrors];
+
+export type DeleteOverrideResponses = {
+  /**
+   * The configuration as it is now.
+   */
+  200: FlagConfiguration;
+};
+
+export type DeleteOverrideResponse = DeleteOverrideResponses[keyof DeleteOverrideResponses];
+
+export type PutOverrideData = {
+  body: OverridePut;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The flag's key.
+     */
+    flag: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+    /**
+     * The unit type's key.
+     */
+    unit_type: string;
+    /**
+     * The unit's ID, of 1 to 256 bytes.
+     */
+    unit_id: string;
+  };
+  query?: never;
+  url: "/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}";
+};
+
+export type PutOverrideErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type PutOverrideError = PutOverrideErrors[keyof PutOverrideErrors];
+
+export type PutOverrideResponses = {
+  /**
+   * The configuration as it is now.
+   */
+  200: FlagConfiguration;
+};
+
+export type PutOverrideResponse = PutOverrideResponses[keyof PutOverrideResponses];
+
+export type RegenerateRolloutSaltData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The flag's key.
+     */
+    flag: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+    /**
+     * The rule's identifier.
+     */
+    rule: string;
+  };
+  query?: never;
+  url: "/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt";
+};
+
+export type RegenerateRolloutSaltErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type RegenerateRolloutSaltError =
+  RegenerateRolloutSaltErrors[keyof RegenerateRolloutSaltErrors];
+
+export type RegenerateRolloutSaltResponses = {
+  /**
+   * The configuration as it is now.
+   */
+  200: FlagConfiguration;
+};
+
+export type RegenerateRolloutSaltResponse =
+  RegenerateRolloutSaltResponses[keyof RegenerateRolloutSaltResponses];
+
 export type ListSegmentsData = {
   body?: never;
   path: {
@@ -4289,6 +4614,10 @@ export type ListProjectAuditEntriesData = {
      * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
      */
     q?: string;
+    /**
+     * Lists only the entries of kill switches when true, only the others when false.
+     */
+    kill_switch?: boolean;
     /**
      * The `next_cursor` of the previous page.
      */
@@ -5077,6 +5406,10 @@ export type ListAuditEntriesData = {
      * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
      */
     q?: string;
+    /**
+     * Lists only the entries of kill switches when true, only the others when false.
+     */
+    kill_switch?: boolean;
     /**
      * The `next_cursor` of the previous page.
      */

@@ -97,6 +97,10 @@ type Handlers struct {
 
 	GetFlagConfiguration *appflags.GetFlagConfiguration
 	ReplaceConfiguration *appflags.ReplaceConfiguration
+	KillFlag             *appflags.KillFlag
+	SetOverride          *appflags.SetOverride
+	RemoveOverride       *appflags.RemoveOverride
+	RegenerateSalt       *appflags.RegenerateSalt
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

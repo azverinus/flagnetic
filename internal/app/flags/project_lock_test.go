@@ -42,6 +42,7 @@ func TestWritesOfAProjectGoneBeforeItsLockAreNotFound(t *testing.T) {
 	gone := id.New[workspace.Project](ids)
 	req := governance.Request{Actor: governance.CLIActor("test")}
 	flag := appflags.FlagCommand{Project: gone, Key: "checkout.newFlow", Request: req}
+	configurations := appflags.ConfigurationDeps{Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec}
 	configuration := appflags.ConfigurationCommand{Project: gone, Flag: flag.Key, Environment: "production", Request: req}
 	segment := appflags.SegmentCommand{Project: gone, Key: "beta", Request: req}
 	writes := map[string]func(ctx context.Context) error{
@@ -78,6 +79,24 @@ func TestWritesOfAProjectGoneBeforeItsLockAreNotFound(t *testing.T) {
 			_, err := appflags.NewReplaceConfiguration(appflags.ReplaceConfigurationDeps{
 				Tx: tx, Projects: store, Declarations: ws, Store: store, Rulesets: rulesets, Recorder: rec,
 			}).Handle(ctx, appflags.ReplaceConfigurationCommand{Configuration: configuration})
+			return err
+		},
+		"kill flag": func(ctx context.Context) error {
+			_, _, err := appflags.NewKillFlag(configurations).Handle(ctx, appflags.KillFlagCommand{Configuration: configuration})
+			return err
+		},
+		"set override": func(ctx context.Context) error {
+			_, err := appflags.NewSetOverride(appflags.SetOverrideDeps{
+				Tx: tx, Projects: store, Declarations: ws, Store: store, Rulesets: rulesets, Recorder: rec,
+			}).Handle(ctx, appflags.SetOverrideCommand{Configuration: configuration})
+			return err
+		},
+		"remove override": func(ctx context.Context) error {
+			_, err := appflags.NewRemoveOverride(configurations).Handle(ctx, appflags.RemoveOverrideCommand{Configuration: configuration})
+			return err
+		},
+		"regenerate salt": func(ctx context.Context) error {
+			_, err := appflags.NewRegenerateSalt(configurations).Handle(ctx, appflags.RegenerateSaltCommand{Configuration: configuration})
 			return err
 		},
 		"create segment": func(ctx context.Context) error {

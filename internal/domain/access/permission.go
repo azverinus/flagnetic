@@ -61,6 +61,9 @@ const (
 	// PermFlagConfigurationUpdate replaces a flag's configuration in an
 	// environment.
 	PermFlagConfigurationUpdate Permission = "flag_configuration.update"
+	// PermFlagConfigurationKill switches a flag off in an environment with
+	// the kill switch.
+	PermFlagConfigurationKill Permission = "flag_configuration.kill"
 	// PermSegmentEdit creates segments and changes them.
 	PermSegmentEdit Permission = "segment.edit"
 	// PermSegmentDelete deletes segments.
@@ -82,6 +85,7 @@ var catalog = []PermissionSpec{
 	{Name: PermFlagEdit, Scope: ScopeFlagsWrite},
 	{Name: PermFlagArchive, Scope: ScopeFlagsWrite},
 	{Name: PermFlagConfigurationUpdate, Scope: ScopeFlagsWrite},
+	{Name: PermFlagConfigurationKill, Scope: ScopeFlagsWrite},
 	{Name: PermSegmentEdit, Scope: ScopeFlagsWrite},
 	{Name: PermSegmentDelete, Scope: ScopeFlagsWrite},
 }
@@ -171,14 +175,16 @@ type Role struct {
 var roles = []Role{
 	{Name: RoleOwner, Permissions: []Permission{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermDeclarationManage,
-		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate, PermSegmentEdit,
-		PermSegmentDelete,
+		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
+		PermFlagConfigurationKill, PermSegmentEdit, PermSegmentDelete,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
-		PermFlagConfigurationUpdate, PermSegmentEdit, PermSegmentDelete,
+		PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermSegmentEdit, PermSegmentDelete,
 	}},
-	{Name: RoleDeveloper, Permissions: []Permission{PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermSegmentEdit}},
+	{Name: RoleDeveloper, Permissions: []Permission{
+		PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermSegmentEdit,
+	}},
 	{Name: RoleViewer, Permissions: []Permission{PermProjectRead}},
 }
 

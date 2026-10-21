@@ -42,7 +42,7 @@ func (a *api) ListAuditEntries(ctx context.Context, req ListAuditEntriesRequestO
 	q := req.Params
 	list, err := a.auditPage(ctx, project, ListProjectAuditEntriesParams{
 		Actor: q.Actor, ActorKind: q.ActorKind, Action: q.Action, EntityKind: q.EntityKind, EntityId: q.EntityId,
-		Environment: q.Environment, From: q.From, To: q.To, Q: q.Q, Cursor: q.Cursor, Limit: q.Limit,
+		Environment: q.Environment, From: q.From, To: q.To, Q: q.Q, KillSwitch: q.KillSwitch, Cursor: q.Cursor, Limit: q.Limit,
 	})
 	if err != nil {
 		return nil, err
@@ -69,6 +69,7 @@ func (a *api) GetProjectAuditEntry(ctx context.Context, req GetProjectAuditEntry
 func (a *api) auditPage(ctx context.Context, project workspace.ProjectID, q ListProjectAuditEntriesParams) (AuditEntryList, error) {
 	f := appgovernance.AuditFilter{
 		Project: project, Action: valueOf(q.Action), EntityKind: valueOf(q.EntityKind), EntityID: valueOf(q.EntityId), Q: valueOf(q.Q),
+		KillSwitch: q.KillSwitch,
 	}
 	if q.Actor != nil {
 		f.Actor = id.FromBytes[access.Member](*q.Actor)
@@ -116,7 +117,7 @@ func auditEntryOut(e governance.Entry) AuditEntry {
 		Id: openapi_types.UUID(e.ID.Bytes()), OccurredAt: e.OccurredAt.UTC(), Action: e.Action,
 		Actor:  Actor{Kind: ActorKind(e.Actor.Kind), Id: e.Actor.ID, Name: e.Actor.Name},
 		Entity: AuditEntity{Kind: e.Entity.Kind, Id: e.Entity.ID, Key: e.Entity.Key},
-		Before: e.Before, After: e.After,
+		Before: e.Before, After: e.After, KillSwitch: e.KillSwitch,
 	}
 	if !e.Project.IsZero() {
 		p := openapi_types.UUID(e.Project.Bytes())

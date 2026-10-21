@@ -59,6 +59,8 @@ type configurationChange struct {
 	// extra are values the audit entry records after the configuration's,
 	// such as the reason of a kill switch.
 	extra map[string]any
+	// killSwitch marks the audit entry as a kill switch's.
+	killSwitch bool
 }
 
 // writeConfiguration makes one write to the configuration cmd names, as
@@ -104,7 +106,7 @@ func writeConfiguration(ctx context.Context, d ConfigurationDeps, cmd Configurat
 		maps.Copy(after, ch.extra)
 		return d.Recorder.record(ctx, now, cmd.Request, governance.Record{
 			Project: cmd.Project, Environment: ch.after.Environment, Action: ch.action, Entity: flagEntity(f),
-			Before: configurationValues(before.Configuration), After: after,
+			Before: configurationValues(before.Configuration), After: after, KillSwitch: ch.killSwitch,
 		})
 	})
 	return out, err

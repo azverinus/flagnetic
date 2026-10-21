@@ -455,6 +455,7 @@ export const zAuditEntry = z.object({
   entity: zAuditEntity,
   before: z.unknown(),
   after: z.unknown(),
+  kill_switch: z.boolean(),
   request_id: z.string().nullable(),
 });
 
@@ -592,6 +593,15 @@ export const zServe = z.object({
   salt: z.string().optional(),
 });
 
+export const zOverridePut = z.object({
+  variation: z.string(),
+  note: z.string().nullish(),
+});
+
+export const zKill = z.object({
+  reason: z.string().nullish(),
+});
+
 export const zFlagList = z.object({
   items: z.array(zFlagDefinition),
   next_cursor: z.string().nullable(),
@@ -693,6 +703,11 @@ export const zFlagConfigurationPut = z.object({
   rules: z.array(zRuleInput).max(50).optional(),
 });
 
+export const zKillResult = z.object({
+  changed: z.boolean(),
+  configuration: zFlagConfiguration,
+});
+
 export const zSegment = z.object({
   id: z.uuid(),
   key: zKey,
@@ -761,6 +776,11 @@ export const zAuditFrom = z.iso.datetime();
  * The latest time of an entry, included.
  */
 export const zAuditTo = z.iso.datetime();
+
+/**
+ * Lists only the entries of kill switches when true, only the others when false.
+ */
+export const zAuditKillSwitch = z.boolean();
 
 /**
  * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
@@ -1261,6 +1281,63 @@ export const zPutFlagConfigurationPath = z.object({
  */
 export const zPutFlagConfigurationResponse = zFlagConfiguration;
 
+export const zKillFlagBody = zKill;
+
+export const zKillFlagPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * Whether the flag was switched off, and the configuration as it is now.
+ */
+export const zKillFlagResponse = zKillResult;
+
+export const zDeleteOverridePath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+  unit_type: z.string(),
+  unit_id: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zDeleteOverrideResponse = zFlagConfiguration;
+
+export const zPutOverrideBody = zOverridePut;
+
+export const zPutOverridePath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+  unit_type: z.string(),
+  unit_id: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zPutOverrideResponse = zFlagConfiguration;
+
+export const zRegenerateRolloutSaltHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zRegenerateRolloutSaltPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+  rule: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zRegenerateRolloutSaltResponse = zFlagConfiguration;
+
 export const zListSegmentsPath = z.object({
   project: z.string(),
 });
@@ -1414,6 +1491,7 @@ export const zListProjectAuditEntriesQuery = z.object({
   from: z.iso.datetime().optional(),
   to: z.iso.datetime().optional(),
   q: z.string().optional(),
+  kill_switch: z.boolean().optional(),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });
@@ -1557,6 +1635,7 @@ export const zListAuditEntriesQuery = z.object({
   from: z.iso.datetime().optional(),
   to: z.iso.datetime().optional(),
   q: z.string().optional(),
+  kill_switch: z.boolean().optional(),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });
