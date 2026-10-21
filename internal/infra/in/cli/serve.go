@@ -19,6 +19,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/buildinfo"
+	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
@@ -83,10 +84,15 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	edgeOpts := flaghttp.OptionsFrom(cfg)
 	edgeOpts.Logger, edgeOpts.DB, edgeOpts.Metrics = log, pool, flaghttp.NewMetrics(reg)
 	edge := flaghttp.New(edgeOpts)
-	compose.Management(edge, compose.NewDeps(pool, clock.System{}), reg, compose.Options{
+	background := compose.Management(edge, compose.NewDeps(pool, clock.System{}), reg, compose.Options{
 		Keyring: secret.NewKeyring(cfg.SecretKey), PasswordHashConcurrency: cfg.PasswordHashConcurrency,
 		Options: management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
 	})
+	for _, w := range background.Workers {
+		if err = runner.Register(w); err != nil {
+			return fail(log, "start failed", err)
+		}
+	}
 	for _, r := range o.routes {
 		edge.Handle(r.pattern, r.handler)
 	}
@@ -133,6 +139,9 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	defer runner.Stop(workerStopBound)
 	listeners := postgres.NewListeners(replica, pool, log, reg)
 	defer listeners.Stop(workerStopBound)
+	for _, l := range background.Listeners {
+		listeners.Start(l.Channel, l.Handler, pglisten.Options{})
+	}
 
 	select {
 	case err := <-served:

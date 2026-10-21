@@ -137,6 +137,88 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /me/sessions:
+    get:
+      operationId: listMySessions
+      summary: The caller's sessions
+      description: |
+        Every device the caller is signed in on, newest first, the one this
+        request is signed in to marked `current`. Sessions that have ended
+        are left out. A request with an API token marks none current.
+      x-permission: member
+      tags: [me]
+      responses:
+        "200":
+          description: The live sessions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      operationId: revokeMySessions
+      summary: Sign out every other device
+      description: |
+        Revokes every live session of the caller but the one this request is
+        signed in to, or that one too with `include_current`, which then
+        clears its cookie. Only a session may do this, so a leaked token
+        cannot sign its owner out.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      parameters:
+        - name: include_current
+          in: query
+          description: Revoke the session this request is signed in to as well.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: The number of sessions revoked.
+          headers:
+            Set-Cookie:
+              description: The session cookie, cleared when the current session was revoked.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRevocation"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /me/sessions/{session}:
+    parameters:
+      - $ref: "#/components/parameters/SessionID"
+    delete:
+      operationId: revokeMySession
+      summary: Sign out one device
+      description: |
+        Revokes one live session of the caller; revoking the one this request
+        is signed in to clears its cookie. A session of another member, one
+        that has ended or an identifier that names none is not found.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      responses:
+        "204":
+          description: Revoked.
+          headers:
+            Set-Cookie:
+              description: The session cookie, cleared when the session revoked is the current one.
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /roles:
     get:
       operationId: listRoles
@@ -681,6 +763,102 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /members/{member}/sessions:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    get:
+      operationId: listMemberSessions
+      summary: A member's sessions
+      description: Every device the member is signed in on, newest first, for an instance admin answering an incident. Sessions that have ended are left out.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The live sessions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: revokeMemberSessions
+      summary: Sign a member out everywhere
+      description: Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The number of sessions revoked.
+          headers:
+            Set-Cookie:
+              description: The session cookie, cleared when the session this request is signed in to was revoked.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRevocation"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /instance/auth-settings:
+    get:
+      operationId: getAuthSettings
+      summary: The instance's auth settings
+      x-permission: instance_admin
+      tags: [instance]
+      responses:
+        "200":
+          description: The settings in force.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSettings"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      operationId: updateAuthSettings
+      summary: Change the instance's auth settings
+      description: |
+        Replaces every setting. Every replica applies a change within a
+        second, and live sessions are judged by lowered timeouts at once: a
+        session past a lowered idle or absolute timeout ends. A raised
+        absolute timeout never lengthens a session that opened under a lower
+        one. Refused `invalid_auth_settings` naming each field that breaks a
+        rule: every duration a whole number of seconds from 60 to 315360000
+        (ten years), the idle timeout at most the absolute one, the password
+        minimum length from 12 to 128.
+      x-permission: instance_admin
+      tags: [instance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthSettings"
+      responses:
+        "200":
+          description: The settings as changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSettings"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /audit:
     get:
       operationId: listAuditEntries
@@ -817,6 +995,20 @@ components:
       in: path
       required: true
       description: The attribute's key.
+      schema:
+        type: string
+    SessionID:
+      name: session
+      in: path
+      required: true
+      description: The session's identifier, in either case.
+      schema:
+        type: string
+    MemberID:
+      name: member
+      in: path
+      required: true
+      description: The member's identifier.
       schema:
         type: string
     ProjectKey:
@@ -1117,6 +1309,79 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Role"
+    SessionMethod:
+      type: string
+      enum: [local]
+      description: How the member signed in; `local` is with their email and password.
+    Session:
+      type: object
+      description: One device a member is signed in on.
+      required: [id, method, client_ip, user_agent, created_at, last_seen_at, expires_at, current]
+      properties:
+        id:
+          type: string
+          format: uuid
+        method:
+          $ref: "#/components/schemas/SessionMethod"
+        client_ip:
+          type: string
+          nullable: true
+          description: The address the session opened from.
+        user_agent:
+          type: string
+          description: At most 256 bytes of the browser's User-Agent at sign-in.
+        created_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+          description: The session's last request, written at most once a minute.
+        expires_at:
+          type: string
+          format: date-time
+          description: When the absolute timeout in force ends the session, unless the idle timeout ends it first.
+        current:
+          type: boolean
+          description: Whether this is the session the request is signed in to.
+    SessionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+    SessionRevocation:
+      type: object
+      required: [revoked]
+      properties:
+        revoked:
+          type: integer
+          description: How many sessions were revoked.
+    AuthSettings:
+      type: object
+      description: The instance's rules for sessions, API tokens and passwords.
+      required: [session_idle_timeout_seconds, session_absolute_timeout_seconds, token_max_lifetime_seconds, token_expiry_required, password_min_length]
+      properties:
+        session_idle_timeout_seconds:
+          type: integer
+          format: int64
+          description: A session ends this long after its last request. 86400 (a day) on a fresh instance.
+        session_absolute_timeout_seconds:
+          type: integer
+          format: int64
+          description: A session ends this long after it opened, however much it is used. 2592000 (30 days) on a fresh instance.
+        token_max_lifetime_seconds:
+          type: integer
+          format: int64
+          description: The furthest ahead an API token may expire. 31536000 (365 days) on a fresh instance.
+        token_expiry_required:
+          type: boolean
+          description: Whether an API token must be created with an expiry. False on a fresh instance.
+        password_min_length:
+          type: integer
+          description: The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
     Grant:
       type: object
       description: One role held by one member in one project.

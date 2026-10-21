@@ -17,6 +17,8 @@ import (
 // MemberStore creates members.
 type MemberStore interface {
 	CreateMember(ctx context.Context, m access.Member, passwordHash string) error
+	// AuthSettingsReader gives the password policy's minimum length.
+	AuthSettingsReader
 }
 
 // CreateInstanceAdmin adds an instance admin with a password from the
@@ -66,7 +68,7 @@ func (h *CreateInstanceAdmin) Handle(ctx context.Context, cmd CreateInstanceAdmi
 	if err != nil {
 		return CreateInstanceAdminResult{}, err
 	}
-	password, res, err := h.passwordOf(cmd.Password, member)
+	password, res, err := h.passwordOf(ctx, cmd.Password, member)
 	if err != nil {
 		return CreateInstanceAdminResult{}, err
 	}
@@ -90,12 +92,20 @@ func (h *CreateInstanceAdmin) Handle(ctx context.Context, cmd CreateInstanceAdmi
 	return res, nil
 }
 
-func (h *CreateInstanceAdmin) passwordOf(given secret.String, m access.Member) (secret.String, CreateInstanceAdminResult, error) {
+// passwordOf returns the password the member gets: the one given, once the
+// policy in force accepts it, or one drawn at random, whose length and
+// randomness need no policy.
+func (h *CreateInstanceAdmin) passwordOf(ctx context.Context, given secret.String, m access.Member,
+) (secret.String, CreateInstanceAdminResult, error) {
 	if given.IsZero() {
 		p := access.GeneratePassword(m.Email, h.random)
 		return p, CreateInstanceAdminResult{GeneratedPassword: p}, nil
 	}
-	if err := access.CheckPassword(given.Reveal(), m.Email, access.MinPasswordLength); err != nil {
+	settings, err := h.store.AuthSettings(ctx)
+	if err != nil {
+		return secret.String{}, CreateInstanceAdminResult{}, err
+	}
+	if err := access.CheckPassword(given.Reveal(), m.Email, settings.PasswordMinLength); err != nil {
 		return secret.String{}, CreateInstanceAdminResult{}, err
 	}
 	return given, CreateInstanceAdminResult{}, nil

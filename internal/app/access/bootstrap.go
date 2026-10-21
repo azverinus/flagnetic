@@ -43,6 +43,8 @@ type InstanceAdmins interface {
 // tokens.
 type BootstrapStore interface {
 	InstanceAdmins
+	// AuthSettingsReader gives the password policy's minimum length.
+	AuthSettingsReader
 	// LockBootstrap serializes bootstraps until the unit of work ends, so two
 	// running at once cannot both find no instance admin.
 	LockBootstrap(ctx context.Context) error
@@ -122,7 +124,11 @@ func (h *Bootstrap) Handle(ctx context.Context, cmd BootstrapCommand) (Bootstrap
 	password := cmd.Password
 	if !password.IsZero() {
 		// Checked before any hash, like every password a person chooses.
-		if err := access.CheckPassword(password.Reveal(), member.Email, access.MinPasswordLength); err != nil {
+		settings, err := h.store.AuthSettings(ctx)
+		if err != nil {
+			return BootstrapResult{}, err
+		}
+		if err := access.CheckPassword(password.Reveal(), member.Email, settings.PasswordMinLength); err != nil {
 			return BootstrapResult{}, err
 		}
 	} else {

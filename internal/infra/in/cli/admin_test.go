@@ -13,7 +13,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -280,6 +282,34 @@ func TestAdminCreateRefusesAWeakPassword(t *testing.T) {
 		if r.code != 0 {
 			t.Errorf("%d code points: exit code = %d, stderr:\n%s; want accepted", len([]rune(password)), r.code, r.stderr)
 		}
+	}
+}
+
+func TestAChangedPasswordMinLengthRejectsAShorterPassword(t *testing.T) {
+	url := testkit.EmptyDatabase(t)
+	if r := migrate(url); r.code != 0 {
+		t.Fatalf("migrate: %s", r.stderr)
+	}
+	pool, err := pgxpool.New(t.Context(), url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	settings := access.DefaultAuthSettings
+	settings.PasswordMinLength = 16
+	if err := pgaccess.NewStore(pool).SaveAuthSettings(t.Context(), settings); err != nil {
+		t.Fatal(err)
+	}
+
+	r := run(map[string]string{"DATABASE_URL": url, "FLAGNETIC_ADMIN_PASSWORD": "Qz7!kR2@mLx9"}, nil,
+		"admin", "create", "--email", "short@example.com")
+	if r.code != 2 || !strings.Contains(r.stderr, "weak_password (length)") {
+		t.Errorf("12 characters under a minimum of 16: exit code = %d, stderr:\n%s\nwant 2 naming the length rule", r.code, r.stderr)
+	}
+	r = run(map[string]string{"DATABASE_URL": url, "FLAGNETIC_ADMIN_PASSWORD": "Qz7!kR2@mLx9Vt5#"}, nil,
+		"admin", "create", "--email", "long@example.com")
+	if r.code != 0 {
+		t.Errorf("16 characters under a minimum of 16: exit code = %d, stderr:\n%s\nwant accepted", r.code, r.stderr)
 	}
 }
 

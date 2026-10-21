@@ -53,6 +53,20 @@ func (s *Store) MemberByEmail(ctx context.Context, email string) (access.Member,
 	return member(), *hash, nil
 }
 
+// MemberByID returns the member with the identifier; ErrNotFound when
+// there is none.
+func (s *Store) MemberByID(ctx context.Context, member access.MemberID) (access.Member, error) {
+	dest, m := scanMember()
+	err := s.db(ctx).QueryRow(ctx, `SELECT `+memberColumns+` FROM members m WHERE m.id = $1`, member.Bytes()).Scan(dest...)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return access.Member{}, appaccess.ErrNotFound
+	}
+	if err != nil {
+		return access.Member{}, fmt.Errorf("reading a member: %w", err)
+	}
+	return m(), nil
+}
+
 // SetPasswordHash replaces the password hash of member.
 func (s *Store) SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error {
 	_, err := s.db(ctx).Exec(ctx, `UPDATE members SET password_hash = $2, updated_at = $3 WHERE id = $1`, member.Bytes(), hash, at)

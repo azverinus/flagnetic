@@ -153,6 +153,21 @@ func (e RoleName) Valid() bool {
 	}
 }
 
+// Defines values for SessionMethod.
+const (
+	SessionMethodLocal SessionMethod = "local"
+)
+
+// Valid indicates whether the value is a known member of the SessionMethod enum.
+func (e SessionMethod) Valid() bool {
+	switch e {
+	case SessionMethodLocal:
+		return true
+	default:
+		return false
+	}
+}
+
 // Actor defines model for Actor.
 type Actor struct {
 	// Id The member's or token's identifier, or a fixed name for the command line and the system.
@@ -266,6 +281,24 @@ type AuthMethods struct {
 
 	// Providers The identity providers a member signs in through; none yet.
 	Providers []map[string]interface{} `json:"providers"`
+}
+
+// AuthSettings The instance's rules for sessions, API tokens and passwords.
+type AuthSettings struct {
+	// PasswordMinLength The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
+	PasswordMinLength int `json:"password_min_length"`
+
+	// SessionAbsoluteTimeoutSeconds A session ends this long after it opened, however much it is used. 2592000 (30 days) on a fresh instance.
+	SessionAbsoluteTimeoutSeconds int64 `json:"session_absolute_timeout_seconds"`
+
+	// SessionIdleTimeoutSeconds A session ends this long after its last request. 86400 (a day) on a fresh instance.
+	SessionIdleTimeoutSeconds int64 `json:"session_idle_timeout_seconds"`
+
+	// TokenExpiryRequired Whether an API token must be created with an expiry. False on a fresh instance.
+	TokenExpiryRequired bool `json:"token_expiry_required"`
+
+	// TokenMaxLifetimeSeconds The furthest ahead an API token may expire. 31536000 (365 days) on a fresh instance.
+	TokenMaxLifetimeSeconds int64 `json:"token_max_lifetime_seconds"`
 }
 
 // Credential defines model for Credential.
@@ -439,6 +472,43 @@ type RoleList struct {
 // RoleName defines model for RoleName.
 type RoleName string
 
+// Session One device a member is signed in on.
+type Session struct {
+	// ClientIp The address the session opened from.
+	ClientIp  *string   `json:"client_ip"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// Current Whether this is the session the request is signed in to.
+	Current bool `json:"current"`
+
+	// ExpiresAt When the absolute timeout in force ends the session, unless the idle timeout ends it first.
+	ExpiresAt time.Time          `json:"expires_at"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// LastSeenAt The session's last request, written at most once a minute.
+	LastSeenAt time.Time `json:"last_seen_at"`
+
+	// Method How the member signed in; `local` is with their email and password.
+	Method SessionMethod `json:"method"`
+
+	// UserAgent At most 256 bytes of the browser's User-Agent at sign-in.
+	UserAgent string `json:"user_agent"`
+}
+
+// SessionList defines model for SessionList.
+type SessionList struct {
+	Items []Session `json:"items"`
+}
+
+// SessionMethod How the member signed in; `local` is with their email and password.
+type SessionMethod string
+
+// SessionRevocation defines model for SessionRevocation.
+type SessionRevocation struct {
+	// Revoked How many sessions were revoked.
+	Revoked int `json:"revoked"`
+}
+
 // SignInRequest defines model for SignInRequest.
 type SignInRequest struct {
 	Email    string `json:"email"`
@@ -529,8 +599,14 @@ type EnvironmentKey = string
 // Limit defines model for Limit.
 type Limit = int
 
+// MemberID defines model for MemberID.
+type MemberID = string
+
 // ProjectKey defines model for ProjectKey.
 type ProjectKey = string
+
+// SessionID defines model for SessionID.
+type SessionID = string
 
 // UnitTypeKey defines model for UnitTypeKey.
 type UnitTypeKey = string
@@ -602,6 +678,12 @@ type ListAuditEntriesParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// RevokeMySessionsParams defines parameters for RevokeMySessions.
+type RevokeMySessionsParams struct {
+	// IncludeCurrent Revoke the session this request is signed in to as well.
+	IncludeCurrent *bool `form:"include_current,omitempty" json:"include_current,omitempty"`
+}
+
 // ListProjectAuditEntriesParams defines parameters for ListProjectAuditEntries.
 type ListProjectAuditEntriesParams struct {
 	// Actor A member's identifier; their own changes and those of their personal access tokens.
@@ -638,6 +720,9 @@ type ListProjectAuditEntriesParams struct {
 
 // SignInJSONRequestBody defines body for SignIn for application/json ContentType.
 type SignInJSONRequestBody = SignInRequest
+
+// UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
+type UpdateAuthSettingsJSONRequestBody = AuthSettings
 
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectCreate
@@ -798,12 +883,91 @@ type ClientInterface interface {
 	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 	SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAuthSettings The instance's auth settings
+	//
+	// Corresponds with GET /instance/auth-settings (the `GetAuthSettings` operationId).
+	GetAuthSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAuthSettingsWithBody Change the instance's auth settings
+	//
+	// Replaces every setting. Every replica applies a change within a
+	// second, and live sessions are judged by lowered timeouts at once: a
+	// session past a lowered idle or absolute timeout ends. A raised
+	// absolute timeout never lengthens a session that opened under a lower
+	// one. Refused `invalid_auth_settings` naming each field that breaks a
+	// rule: every duration a whole number of seconds from 60 to 315360000
+	// (ten years), the idle timeout at most the absolute one, the password
+	// minimum length from 12 to 128.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+	UpdateAuthSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAuthSettings Change the instance's auth settings
+	//
+	// Replaces every setting. Every replica applies a change within a
+	// second, and live sessions are judged by lowered timeouts at once: a
+	// session past a lowered idle or absolute timeout ends. A raised
+	// absolute timeout never lengthens a session that opened under a lower
+	// one. Refused `invalid_auth_settings` naming each field that breaks a
+	// rule: every duration a whole number of seconds from 60 to 315360000
+	// (ten years), the idle timeout at most the absolute one, the password
+	// minimum length from 12 to 128.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+	UpdateAuthSettings(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetMe Who the caller is
 	//
 	// The member the credential in use acts for, the credential itself, and the address the request came from.
 	//
 	// Corresponds with GET /me (the `GetMe` operationId).
 	GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeMySessions Sign out every other device
+	//
+	// Revokes every live session of the caller but the one this request is
+	// signed in to, or that one too with `include_current`, which then
+	// clears its cookie. Only a session may do this, so a leaked token
+	// cannot sign its owner out.
+	//
+	// Corresponds with DELETE /me/sessions (the `RevokeMySessions` operationId).
+	RevokeMySessions(ctx context.Context, params *RevokeMySessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMySessions The caller's sessions
+	//
+	// Every device the caller is signed in on, newest first, the one this
+	// request is signed in to marked `current`. Sessions that have ended
+	// are left out. A request with an API token marks none current.
+	//
+	// Corresponds with GET /me/sessions (the `ListMySessions` operationId).
+	ListMySessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeMySession Sign out one device
+	//
+	// Revokes one live session of the caller; revoking the one this request
+	// is signed in to clears its cookie. A session of another member, one
+	// that has ended or an identifier that names none is not found.
+	//
+	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
+	RevokeMySession(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeMemberSessions Sign a member out everywhere
+	//
+	// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
+	//
+	// Corresponds with DELETE /members/{member}/sessions (the `RevokeMemberSessions` operationId).
+	RevokeMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMemberSessions A member's sessions
+	//
+	// Every device the member is signed in on, newest first, for an instance admin answering an incident. Sessions that have ended are left out.
+	//
+	// Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
+	ListMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProjects The projects the caller works in
 	//
@@ -1132,6 +1296,73 @@ func (c *Client) SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*h
 	return c.Client.Do(req)
 }
 
+// GetAuthSettings The instance's auth settings
+//
+// Corresponds with GET /instance/auth-settings (the `GetAuthSettings` operationId).
+func (c *Client) GetAuthSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthSettingsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAuthSettingsWithBody Change the instance's auth settings
+//
+// Replaces every setting. Every replica applies a change within a
+// second, and live sessions are judged by lowered timeouts at once: a
+// session past a lowered idle or absolute timeout ends. A raised
+// absolute timeout never lengthens a session that opened under a lower
+// one. Refused `invalid_auth_settings` naming each field that breaks a
+// rule: every duration a whole number of seconds from 60 to 315360000
+// (ten years), the idle timeout at most the absolute one, the password
+// minimum length from 12 to 128.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+func (c *Client) UpdateAuthSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthSettingsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateAuthSettings Change the instance's auth settings
+//
+// Replaces every setting. Every replica applies a change within a
+// second, and live sessions are judged by lowered timeouts at once: a
+// session past a lowered idle or absolute timeout ends. A raised
+// absolute timeout never lengthens a session that opened under a lower
+// one. Refused `invalid_auth_settings` naming each field that breaks a
+// rule: every duration a whole number of seconds from 60 to 315360000
+// (ten years), the idle timeout at most the absolute one, the password
+// minimum length from 12 to 128.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+func (c *Client) UpdateAuthSettings(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAuthSettingsRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetMe Who the caller is
 //
 // The member the credential in use acts for, the credential itself, and the address the request came from.
@@ -1139,6 +1370,98 @@ func (c *Client) SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*h
 // Corresponds with GET /me (the `GetMe` operationId).
 func (c *Client) GetMe(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMeRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeMySessions Sign out every other device
+//
+// Revokes every live session of the caller but the one this request is
+// signed in to, or that one too with `include_current`, which then
+// clears its cookie. Only a session may do this, so a leaked token
+// cannot sign its owner out.
+//
+// Corresponds with DELETE /me/sessions (the `RevokeMySessions` operationId).
+func (c *Client) RevokeMySessions(ctx context.Context, params *RevokeMySessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeMySessionsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMySessions The caller's sessions
+//
+// Every device the caller is signed in on, newest first, the one this
+// request is signed in to marked `current`. Sessions that have ended
+// are left out. A request with an API token marks none current.
+//
+// Corresponds with GET /me/sessions (the `ListMySessions` operationId).
+func (c *Client) ListMySessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMySessionsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeMySession Sign out one device
+//
+// Revokes one live session of the caller; revoking the one this request
+// is signed in to clears its cookie. A session of another member, one
+// that has ended or an identifier that names none is not found.
+//
+// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
+func (c *Client) RevokeMySession(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeMySessionRequest(c.Server, session)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeMemberSessions Sign a member out everywhere
+//
+// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
+//
+// Corresponds with DELETE /members/{member}/sessions (the `RevokeMemberSessions` operationId).
+func (c *Client) RevokeMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeMemberSessionsRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMemberSessions A member's sessions
+//
+// Every device the member is signed in on, newest first, for an instance admin answering an incident. Sessions that have ended are left out.
+//
+// Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
+func (c *Client) ListMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMemberSessionsRequest(c.Server, member)
 	if err != nil {
 		return nil, err
 	}
@@ -1954,6 +2277,73 @@ func NewSignOutRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewGetAuthSettingsRequest constructs an http.Request for the GetAuthSettings method
+func NewGetAuthSettingsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateAuthSettingsRequest calls the generic UpdateAuthSettings builder with application/json body
+func NewUpdateAuthSettingsRequest(server string, body UpdateAuthSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAuthSettingsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateAuthSettingsRequestWithBody constructs an http.Request for the UpdateAuthSettings method, with any body, and a specified content type
+func NewUpdateAuthSettingsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/instance/auth-settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetMeRequest constructs an http.Request for the GetMe method
 func NewGetMeRequest(server string) (*http.Request, error) {
 	var err error
@@ -1964,6 +2354,189 @@ func NewGetMeRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/me")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRevokeMySessionsRequest constructs an http.Request for the RevokeMySessions method
+func NewRevokeMySessionsRequest(server string, params *RevokeMySessionsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/sessions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.IncludeCurrent != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_current", *params.IncludeCurrent, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMySessionsRequest constructs an http.Request for the ListMySessions method
+func NewListMySessionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/sessions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRevokeMySessionRequest constructs an http.Request for the RevokeMySession method
+func NewRevokeMySessionRequest(server string, session SessionID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "session", session, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/sessions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRevokeMemberSessionsRequest constructs an http.Request for the RevokeMemberSessions method
+func NewRevokeMemberSessionsRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/sessions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMemberSessionsRequest constructs an http.Request for the ListMemberSessions method
+func NewListMemberSessionsRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/sessions", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -3174,6 +3747,45 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 	SignOutWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignOutResponse, error)
 
+	// GetAuthSettingsWithResponse The instance's auth settings
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /instance/auth-settings (the `GetAuthSettings` operationId).
+	GetAuthSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthSettingsResponse, error)
+
+	// UpdateAuthSettingsWithBodyWithResponse Change the instance's auth settings
+	//
+	// Replaces every setting. Every replica applies a change within a
+	// second, and live sessions are judged by lowered timeouts at once: a
+	// session past a lowered idle or absolute timeout ends. A raised
+	// absolute timeout never lengthens a session that opened under a lower
+	// one. Refused `invalid_auth_settings` naming each field that breaks a
+	// rule: every duration a whole number of seconds from 60 to 315360000
+	// (ten years), the idle timeout at most the absolute one, the password
+	// minimum length from 12 to 128.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+	UpdateAuthSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error)
+
+	// UpdateAuthSettingsWithResponse Change the instance's auth settings
+	//
+	// Replaces every setting. Every replica applies a change within a
+	// second, and live sessions are judged by lowered timeouts at once: a
+	// session past a lowered idle or absolute timeout ends. A raised
+	// absolute timeout never lengthens a session that opened under a lower
+	// one. Refused `invalid_auth_settings` naming each field that breaks a
+	// rule: every duration a whole number of seconds from 60 to 315360000
+	// (ten years), the idle timeout at most the absolute one, the password
+	// minimum length from 12 to 128.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+	UpdateAuthSettingsWithResponse(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error)
+
 	// GetMeWithResponse Who the caller is
 	//
 	// The member the credential in use acts for, the credential itself, and the address the request came from.
@@ -3182,6 +3794,58 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /me (the `GetMe` operationId).
 	GetMeWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMeResponse, error)
+
+	// RevokeMySessionsWithResponse Sign out every other device
+	//
+	// Revokes every live session of the caller but the one this request is
+	// signed in to, or that one too with `include_current`, which then
+	// clears its cookie. Only a session may do this, so a leaked token
+	// cannot sign its owner out.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /me/sessions (the `RevokeMySessions` operationId).
+	RevokeMySessionsWithResponse(ctx context.Context, params *RevokeMySessionsParams, reqEditors ...RequestEditorFn) (*RevokeMySessionsResponse, error)
+
+	// ListMySessionsWithResponse The caller's sessions
+	//
+	// Every device the caller is signed in on, newest first, the one this
+	// request is signed in to marked `current`. Sessions that have ended
+	// are left out. A request with an API token marks none current.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /me/sessions (the `ListMySessions` operationId).
+	ListMySessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMySessionsResponse, error)
+
+	// RevokeMySessionWithResponse Sign out one device
+	//
+	// Revokes one live session of the caller; revoking the one this request
+	// is signed in to clears its cookie. A session of another member, one
+	// that has ended or an identifier that names none is not found.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
+	RevokeMySessionWithResponse(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*RevokeMySessionResponse, error)
+
+	// RevokeMemberSessionsWithResponse Sign a member out everywhere
+	//
+	// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /members/{member}/sessions (the `RevokeMemberSessions` operationId).
+	RevokeMemberSessionsWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*RevokeMemberSessionsResponse, error)
+
+	// ListMemberSessionsWithResponse A member's sessions
+	//
+	// Every device the member is signed in on, newest first, for an instance admin answering an incident. Sessions that have ended are left out.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
+	ListMemberSessionsWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberSessionsResponse, error)
 
 	// ListProjectsWithResponse The projects the caller works in
 	//
@@ -3739,6 +4403,137 @@ func (r SignOutResponse) ContentType() string {
 	return ""
 }
 
+// GetAuthSettingsResponse401Headers the declared response headers of an HTTP 401 response for GetAuthSettings
+type GetAuthSettingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetAuthSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthSettings
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetAuthSettingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuthSettingsResponse) GetJSON200() *AuthSettings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetAuthSettingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetAuthSettingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuthSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuthSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateAuthSettingsResponse401Headers the declared response headers of an HTTP 401 response for UpdateAuthSettings
+type UpdateAuthSettingsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateAuthSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuthSettings
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateAuthSettingsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateAuthSettingsResponse) GetJSON200() *AuthSettings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateAuthSettingsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateAuthSettingsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateAuthSettingsResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateAuthSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAuthSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAuthSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateAuthSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetMeResponse401Headers the declared response headers of an HTTP 401 response for GetMe
 type GetMeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -3795,6 +4590,351 @@ func (r GetMeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetMeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeMySessionsResponse200Headers the declared response headers of an HTTP 200 response for RevokeMySessions
+type RevokeMySessionsResponse200Headers struct {
+	SetCookie *string
+}
+
+// RevokeMySessionsResponse401Headers the declared response headers of an HTTP 401 response for RevokeMySessions
+type RevokeMySessionsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeMySessionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SessionRevocation
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RevokeMySessionsResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeMySessionsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RevokeMySessionsResponse) GetJSON200() *SessionRevocation {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeMySessionsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeMySessionsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeMySessionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeMySessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeMySessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeMySessionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListMySessionsResponse401Headers the declared response headers of an HTTP 401 response for ListMySessions
+type ListMySessionsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMySessionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SessionList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMySessionsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMySessionsResponse) GetJSON200() *SessionList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMySessionsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMySessionsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMySessionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMySessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMySessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMySessionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeMySessionResponse204Headers the declared response headers of an HTTP 204 response for RevokeMySession
+type RevokeMySessionResponse204Headers struct {
+	SetCookie *string
+}
+
+// RevokeMySessionResponse401Headers the declared response headers of an HTTP 401 response for RevokeMySession
+type RevokeMySessionResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeMySessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *RevokeMySessionResponse204Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeMySessionResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeMySessionResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeMySessionResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevokeMySessionResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeMySessionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeMySessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeMySessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeMySessionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeMemberSessionsResponse200Headers the declared response headers of an HTTP 200 response for RevokeMemberSessions
+type RevokeMemberSessionsResponse200Headers struct {
+	SetCookie *string
+}
+
+// RevokeMemberSessionsResponse401Headers the declared response headers of an HTTP 401 response for RevokeMemberSessions
+type RevokeMemberSessionsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeMemberSessionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SessionRevocation
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RevokeMemberSessionsResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeMemberSessionsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RevokeMemberSessionsResponse) GetJSON200() *SessionRevocation {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeMemberSessionsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeMemberSessionsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevokeMemberSessionsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeMemberSessionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeMemberSessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeMemberSessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeMemberSessionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListMemberSessionsResponse401Headers the declared response headers of an HTTP 401 response for ListMemberSessions
+type ListMemberSessionsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMemberSessionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SessionList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMemberSessionsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMemberSessionsResponse) GetJSON200() *SessionList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMemberSessionsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMemberSessionsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListMemberSessionsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMemberSessionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMemberSessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMemberSessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMemberSessionsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -5548,6 +6688,63 @@ func (c *ClientWithResponses) SignOutWithResponse(ctx context.Context, reqEditor
 	return ParseSignOutResponse(rsp)
 }
 
+// GetAuthSettingsWithResponse The instance's auth settings
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /instance/auth-settings (the `GetAuthSettings` operationId).
+func (c *ClientWithResponses) GetAuthSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthSettingsResponse, error) {
+	rsp, err := c.GetAuthSettings(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthSettingsResponse(rsp)
+}
+
+// UpdateAuthSettingsWithBodyWithResponse Change the instance's auth settings
+//
+// Replaces every setting. Every replica applies a change within a
+// second, and live sessions are judged by lowered timeouts at once: a
+// session past a lowered idle or absolute timeout ends. A raised
+// absolute timeout never lengthens a session that opened under a lower
+// one. Refused `invalid_auth_settings` naming each field that breaks a
+// rule: every duration a whole number of seconds from 60 to 315360000
+// (ten years), the idle timeout at most the absolute one, the password
+// minimum length from 12 to 128.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+func (c *ClientWithResponses) UpdateAuthSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error) {
+	rsp, err := c.UpdateAuthSettingsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthSettingsResponse(rsp)
+}
+
+// UpdateAuthSettingsWithResponse Change the instance's auth settings
+//
+// Replaces every setting. Every replica applies a change within a
+// second, and live sessions are judged by lowered timeouts at once: a
+// session past a lowered idle or absolute timeout ends. A raised
+// absolute timeout never lengthens a session that opened under a lower
+// one. Refused `invalid_auth_settings` naming each field that breaks a
+// rule: every duration a whole number of seconds from 60 to 315360000
+// (ten years), the idle timeout at most the absolute one, the password
+// minimum length from 12 to 128.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /instance/auth-settings (the `UpdateAuthSettings` operationId).
+func (c *ClientWithResponses) UpdateAuthSettingsWithResponse(ctx context.Context, body UpdateAuthSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAuthSettingsResponse, error) {
+	rsp, err := c.UpdateAuthSettings(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAuthSettingsResponse(rsp)
+}
+
 // GetMeWithResponse Who the caller is
 //
 // The member the credential in use acts for, the credential itself, and the address the request came from.
@@ -5561,6 +6758,88 @@ func (c *ClientWithResponses) GetMeWithResponse(ctx context.Context, reqEditors 
 		return nil, err
 	}
 	return ParseGetMeResponse(rsp)
+}
+
+// RevokeMySessionsWithResponse Sign out every other device
+//
+// Revokes every live session of the caller but the one this request is
+// signed in to, or that one too with `include_current`, which then
+// clears its cookie. Only a session may do this, so a leaked token
+// cannot sign its owner out.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/sessions (the `RevokeMySessions` operationId).
+func (c *ClientWithResponses) RevokeMySessionsWithResponse(ctx context.Context, params *RevokeMySessionsParams, reqEditors ...RequestEditorFn) (*RevokeMySessionsResponse, error) {
+	rsp, err := c.RevokeMySessions(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeMySessionsResponse(rsp)
+}
+
+// ListMySessionsWithResponse The caller's sessions
+//
+// Every device the caller is signed in on, newest first, the one this
+// request is signed in to marked `current`. Sessions that have ended
+// are left out. A request with an API token marks none current.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/sessions (the `ListMySessions` operationId).
+func (c *ClientWithResponses) ListMySessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMySessionsResponse, error) {
+	rsp, err := c.ListMySessions(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMySessionsResponse(rsp)
+}
+
+// RevokeMySessionWithResponse Sign out one device
+//
+// Revokes one live session of the caller; revoking the one this request
+// is signed in to clears its cookie. A session of another member, one
+// that has ended or an identifier that names none is not found.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
+func (c *ClientWithResponses) RevokeMySessionWithResponse(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*RevokeMySessionResponse, error) {
+	rsp, err := c.RevokeMySession(ctx, session, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeMySessionResponse(rsp)
+}
+
+// RevokeMemberSessionsWithResponse Sign a member out everywhere
+//
+// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /members/{member}/sessions (the `RevokeMemberSessions` operationId).
+func (c *ClientWithResponses) RevokeMemberSessionsWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*RevokeMemberSessionsResponse, error) {
+	rsp, err := c.RevokeMemberSessions(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeMemberSessionsResponse(rsp)
+}
+
+// ListMemberSessionsWithResponse A member's sessions
+//
+// Every device the member is signed in on, newest first, for an instance admin answering an incident. Sessions that have ended are left out.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
+func (c *ClientWithResponses) ListMemberSessionsWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberSessionsResponse, error) {
+	rsp, err := c.ListMemberSessions(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMemberSessionsResponse(rsp)
 }
 
 // ListProjectsWithResponse The projects the caller works in
@@ -6283,6 +7562,119 @@ func ParseSignOutResponse(rsp *http.Response) (*SignOutResponse, error) {
 	return response, nil
 }
 
+// ParseGetAuthSettingsResponse parses an HTTP response from a GetAuthSettingsWithResponse call
+func ParseGetAuthSettingsResponse(rsp *http.Response) (*GetAuthSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthSettings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetAuthSettingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAuthSettingsResponse parses an HTTP response from a UpdateAuthSettingsWithResponse call
+func ParseUpdateAuthSettingsResponse(rsp *http.Response) (*UpdateAuthSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAuthSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthSettings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers UpdateAuthSettingsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetMeResponse parses an HTTP response from a GetMeWithResponse call
 func ParseGetMeResponse(rsp *http.Response) (*GetMeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -6323,6 +7715,318 @@ func ParseGetMeResponse(rsp *http.Response) (*GetMeResponse, error) {
 	switch {
 	case rsp.StatusCode == 401:
 		var headers GetMeResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeMySessionsResponse parses an HTTP response from a RevokeMySessionsWithResponse call
+func ParseRevokeMySessionsResponse(rsp *http.Response) (*RevokeMySessionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeMySessionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SessionRevocation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RevokeMySessionsResponse200Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RevokeMySessionsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListMySessionsResponse parses an HTTP response from a ListMySessionsWithResponse call
+func ParseListMySessionsResponse(rsp *http.Response) (*ListMySessionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMySessionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SessionList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMySessionsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeMySessionResponse parses an HTTP response from a RevokeMySessionWithResponse call
+func ParseRevokeMySessionResponse(rsp *http.Response) (*RevokeMySessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeMySessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		var headers RevokeMySessionResponse204Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers204 = &headers
+	case rsp.StatusCode == 401:
+		var headers RevokeMySessionResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeMemberSessionsResponse parses an HTTP response from a RevokeMemberSessionsWithResponse call
+func ParseRevokeMemberSessionsResponse(rsp *http.Response) (*RevokeMemberSessionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeMemberSessionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SessionRevocation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RevokeMemberSessionsResponse200Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RevokeMemberSessionsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListMemberSessionsResponse parses an HTTP response from a ListMemberSessionsWithResponse call
+func ParseListMemberSessionsResponse(rsp *http.Response) (*ListMemberSessionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMemberSessionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SessionList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMemberSessionsResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -7802,9 +9506,30 @@ type ServerInterface interface {
 	// SignOut Sign out
 	// (POST /auth/sign-out)
 	SignOut(w http.ResponseWriter, r *http.Request)
+	// GetAuthSettings The instance's auth settings
+	// (GET /instance/auth-settings)
+	GetAuthSettings(w http.ResponseWriter, r *http.Request)
+	// UpdateAuthSettings Change the instance's auth settings
+	// (PUT /instance/auth-settings)
+	UpdateAuthSettings(w http.ResponseWriter, r *http.Request)
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// RevokeMySessions Sign out every other device
+	// (DELETE /me/sessions)
+	RevokeMySessions(w http.ResponseWriter, r *http.Request, params RevokeMySessionsParams)
+	// ListMySessions The caller's sessions
+	// (GET /me/sessions)
+	ListMySessions(w http.ResponseWriter, r *http.Request)
+	// RevokeMySession Sign out one device
+	// (DELETE /me/sessions/{session})
+	RevokeMySession(w http.ResponseWriter, r *http.Request, session SessionID)
+	// RevokeMemberSessions Sign a member out everywhere
+	// (DELETE /members/{member}/sessions)
+	RevokeMemberSessions(w http.ResponseWriter, r *http.Request, member MemberID)
+	// ListMemberSessions A member's sessions
+	// (GET /members/{member}/sessions)
+	ListMemberSessions(w http.ResponseWriter, r *http.Request, member MemberID)
 	// ListProjects The projects the caller works in
 	// (GET /projects)
 	ListProjects(w http.ResponseWriter, r *http.Request)
@@ -8103,11 +9828,164 @@ func (siw *ServerInterfaceWrapper) SignOut(w http.ResponseWriter, r *http.Reques
 	handler.ServeHTTP(w, r)
 }
 
+// GetAuthSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAuthSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAuthSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAuthSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeMySessions operation middleware
+func (siw *ServerInterfaceWrapper) RevokeMySessions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevokeMySessionsParams
+
+	// ------------- Optional query parameter "include_current" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_current", r.URL.Query(), &params.IncludeCurrent, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "include_current"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_current", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeMySessions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMySessions operation middleware
+func (siw *ServerInterfaceWrapper) ListMySessions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMySessions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeMySession operation middleware
+func (siw *ServerInterfaceWrapper) RevokeMySession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "session" -------------
+	var session SessionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "session", r.PathValue("session"), &session, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeMySession(w, r, session)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeMemberSessions operation middleware
+func (siw *ServerInterfaceWrapper) RevokeMemberSessions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeMemberSessions(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMemberSessions operation middleware
+func (siw *ServerInterfaceWrapper) ListMemberSessions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMemberSessions(w, r, member)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9039,6 +10917,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/sign-out", wrapper.SignOut)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/methods", wrapper.GetAuthMethods)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions", wrapper.RevokeMySessions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sessions", wrapper.ListMySessions)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions/{session}", wrapper.RevokeMySession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/roles", wrapper.ListRoles)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects", wrapper.ListProjects)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects", wrapper.CreateProject)
@@ -9062,6 +10943,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.UpdateAttribute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit", wrapper.ListProjectAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit/{entry}", wrapper.GetProjectAuditEntry)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/sessions", wrapper.RevokeMemberSessions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/sessions", wrapper.ListMemberSessions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-settings", wrapper.GetAuthSettings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-settings", wrapper.UpdateAuthSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit", wrapper.ListAuditEntries)
 
 	return m
@@ -9432,6 +11317,135 @@ func (response SignOut403ApplicationProblemPlusJSONResponse) VisitSignOutRespons
 	return err
 }
 
+type GetAuthSettingsRequestObject struct {
+}
+
+type GetAuthSettingsResponseObject interface {
+	VisitGetAuthSettingsResponse(w http.ResponseWriter) error
+}
+
+type GetAuthSettings200JSONResponse AuthSettings
+
+func (response GetAuthSettings200JSONResponse) VisitGetAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthSettings401ApplicationProblemPlusJSONResponse) VisitGetAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAuthSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetAuthSettings403ApplicationProblemPlusJSONResponse) VisitGetAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthSettingsRequestObject struct {
+	Body *UpdateAuthSettingsJSONRequestBody
+}
+
+type UpdateAuthSettingsResponseObject interface {
+	VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error
+}
+
+type UpdateAuthSettings200JSONResponse AuthSettings
+
+func (response UpdateAuthSettings200JSONResponse) VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthSettings401ApplicationProblemPlusJSONResponse) VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthSettings403ApplicationProblemPlusJSONResponse) VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateAuthSettings422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateAuthSettings422ApplicationProblemPlusJSONResponse) VisitUpdateAuthSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -9484,6 +11498,360 @@ func (response GetMe403ApplicationProblemPlusJSONResponse) VisitGetMeResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMySessionsRequestObject struct {
+	Params RevokeMySessionsParams
+}
+
+type RevokeMySessionsResponseObject interface {
+	VisitRevokeMySessionsResponse(w http.ResponseWriter) error
+}
+
+type RevokeMySessions200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type RevokeMySessions200JSONResponse struct {
+	Body    SessionRevocation
+	Headers RevokeMySessions200ResponseHeaders
+}
+
+func (response RevokeMySessions200JSONResponse) VisitRevokeMySessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMySessions401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMySessions401ApplicationProblemPlusJSONResponse) VisitRevokeMySessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMySessions403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMySessions403ApplicationProblemPlusJSONResponse) VisitRevokeMySessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMySessionsRequestObject struct {
+}
+
+type ListMySessionsResponseObject interface {
+	VisitListMySessionsResponse(w http.ResponseWriter) error
+}
+
+type ListMySessions200JSONResponse SessionList
+
+func (response ListMySessions200JSONResponse) VisitListMySessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMySessions401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMySessions401ApplicationProblemPlusJSONResponse) VisitListMySessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMySessions403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMySessions403ApplicationProblemPlusJSONResponse) VisitListMySessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMySessionRequestObject struct {
+	Session SessionID `json:"session"`
+}
+
+type RevokeMySessionResponseObject interface {
+	VisitRevokeMySessionResponse(w http.ResponseWriter) error
+}
+
+type RevokeMySession204ResponseHeaders struct {
+	SetCookie *string
+}
+
+type RevokeMySession204Response struct {
+	Headers RevokeMySession204ResponseHeaders
+}
+
+func (response RevokeMySession204Response) VisitRevokeMySessionResponse(w http.ResponseWriter) error {
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeMySession401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMySession401ApplicationProblemPlusJSONResponse) VisitRevokeMySessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMySession403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMySession403ApplicationProblemPlusJSONResponse) VisitRevokeMySessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMySession404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMySession404ApplicationProblemPlusJSONResponse) VisitRevokeMySessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberSessionsRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type RevokeMemberSessionsResponseObject interface {
+	VisitRevokeMemberSessionsResponse(w http.ResponseWriter) error
+}
+
+type RevokeMemberSessions200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type RevokeMemberSessions200JSONResponse struct {
+	Body    SessionRevocation
+	Headers RevokeMemberSessions200ResponseHeaders
+}
+
+func (response RevokeMemberSessions200JSONResponse) VisitRevokeMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberSessions401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMemberSessions401ApplicationProblemPlusJSONResponse) VisitRevokeMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberSessions403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMemberSessions403ApplicationProblemPlusJSONResponse) VisitRevokeMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberSessions404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMemberSessions404ApplicationProblemPlusJSONResponse) VisitRevokeMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberSessionsRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type ListMemberSessionsResponseObject interface {
+	VisitListMemberSessionsResponse(w http.ResponseWriter) error
+}
+
+type ListMemberSessions200JSONResponse SessionList
+
+func (response ListMemberSessions200JSONResponse) VisitListMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberSessions401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberSessions401ApplicationProblemPlusJSONResponse) VisitListMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberSessions403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberSessions403ApplicationProblemPlusJSONResponse) VisitListMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberSessions404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberSessions404ApplicationProblemPlusJSONResponse) VisitListMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11371,9 +13739,30 @@ type StrictServerInterface interface {
 	// SignOut Sign out
 	// (POST /auth/sign-out)
 	SignOut(ctx context.Context, request SignOutRequestObject) (SignOutResponseObject, error)
+	// GetAuthSettings The instance's auth settings
+	// (GET /instance/auth-settings)
+	GetAuthSettings(ctx context.Context, request GetAuthSettingsRequestObject) (GetAuthSettingsResponseObject, error)
+	// UpdateAuthSettings Change the instance's auth settings
+	// (PUT /instance/auth-settings)
+	UpdateAuthSettings(ctx context.Context, request UpdateAuthSettingsRequestObject) (UpdateAuthSettingsResponseObject, error)
 	// GetMe Who the caller is
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// RevokeMySessions Sign out every other device
+	// (DELETE /me/sessions)
+	RevokeMySessions(ctx context.Context, request RevokeMySessionsRequestObject) (RevokeMySessionsResponseObject, error)
+	// ListMySessions The caller's sessions
+	// (GET /me/sessions)
+	ListMySessions(ctx context.Context, request ListMySessionsRequestObject) (ListMySessionsResponseObject, error)
+	// RevokeMySession Sign out one device
+	// (DELETE /me/sessions/{session})
+	RevokeMySession(ctx context.Context, request RevokeMySessionRequestObject) (RevokeMySessionResponseObject, error)
+	// RevokeMemberSessions Sign a member out everywhere
+	// (DELETE /members/{member}/sessions)
+	RevokeMemberSessions(ctx context.Context, request RevokeMemberSessionsRequestObject) (RevokeMemberSessionsResponseObject, error)
+	// ListMemberSessions A member's sessions
+	// (GET /members/{member}/sessions)
+	ListMemberSessions(ctx context.Context, request ListMemberSessionsRequestObject) (ListMemberSessionsResponseObject, error)
 	// ListProjects The projects the caller works in
 	// (GET /projects)
 	ListProjects(ctx context.Context, request ListProjectsRequestObject) (ListProjectsResponseObject, error)
@@ -11589,6 +13978,61 @@ func (sh *strictHandler) SignOut(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetAuthSettings operation middleware
+func (sh *strictHandler) GetAuthSettings(w http.ResponseWriter, r *http.Request) {
+	var request GetAuthSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAuthSettings(ctx, request.(GetAuthSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAuthSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAuthSettingsResponseObject); ok {
+		if err := validResponse.VisitGetAuthSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAuthSettings operation middleware
+func (sh *strictHandler) UpdateAuthSettings(w http.ResponseWriter, r *http.Request) {
+	var request UpdateAuthSettingsRequestObject
+
+	var body UpdateAuthSettingsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAuthSettings(ctx, request.(UpdateAuthSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAuthSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAuthSettingsResponseObject); ok {
+		if err := validResponse.VisitUpdateAuthSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -11606,6 +14050,134 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeMySessions operation middleware
+func (sh *strictHandler) RevokeMySessions(w http.ResponseWriter, r *http.Request, params RevokeMySessionsParams) {
+	var request RevokeMySessionsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeMySessions(ctx, request.(RevokeMySessionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeMySessions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeMySessionsResponseObject); ok {
+		if err := validResponse.VisitRevokeMySessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMySessions operation middleware
+func (sh *strictHandler) ListMySessions(w http.ResponseWriter, r *http.Request) {
+	var request ListMySessionsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMySessions(ctx, request.(ListMySessionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMySessions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMySessionsResponseObject); ok {
+		if err := validResponse.VisitListMySessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeMySession operation middleware
+func (sh *strictHandler) RevokeMySession(w http.ResponseWriter, r *http.Request, session SessionID) {
+	var request RevokeMySessionRequestObject
+
+	request.Session = session
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeMySession(ctx, request.(RevokeMySessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeMySession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeMySessionResponseObject); ok {
+		if err := validResponse.VisitRevokeMySessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeMemberSessions operation middleware
+func (sh *strictHandler) RevokeMemberSessions(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request RevokeMemberSessionsRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeMemberSessions(ctx, request.(RevokeMemberSessionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeMemberSessions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeMemberSessionsResponseObject); ok {
+		if err := validResponse.VisitRevokeMemberSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMemberSessions operation middleware
+func (sh *strictHandler) ListMemberSessions(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request ListMemberSessionsRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMemberSessions(ctx, request.(ListMemberSessionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMemberSessions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMemberSessionsResponseObject); ok {
+		if err := validResponse.VisitListMemberSessionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

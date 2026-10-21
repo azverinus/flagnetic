@@ -59,6 +59,33 @@ const (
 	SourceWindow       = 15 * time.Minute
 )
 
+// EmailFailureRetention is how long an email's failures are kept after its
+// last one once no lock holds it: long enough that a guesser pausing between
+// bursts still meets the lockout, short enough that a member's forgotten
+// mistakes stop counting against them.
+const EmailFailureRetention = 24 * time.Hour
+
+// FailureCutoffs are the instants before which counted failures no longer
+// matter, as the retention worker selects them in bulk.
+type FailureCutoffs struct {
+	// Now is when the cutoffs are judged: a lock running past it keeps its
+	// email's failures.
+	Now time.Time
+	// LastEmailFailureBy ends an unlocked email's failures when its last one
+	// is at or before it.
+	LastEmailFailureBy time.Time
+	// SourceWindowStartBy ends a source's failures when its window opened at
+	// or before it: the window is over, and the next failure opens another.
+	SourceWindowStartBy time.Time
+}
+
+// AttemptCutoffs returns the cutoffs at now.
+func AttemptCutoffs(now time.Time) FailureCutoffs {
+	return FailureCutoffs{
+		Now: now, LastEmailFailureBy: now.Add(-EmailFailureRetention), SourceWindowStartBy: now.Add(-SourceWindow),
+	}
+}
+
 // SourceOf returns the source an address's failures are counted against:
 // an IPv4 address alone, an IPv6 address with the rest of its /64, which one
 // subscriber usually holds whole. Without an address, the source is the
