@@ -193,7 +193,7 @@ func (h *SignIn) succeed(ctx context.Context, cmd SignInCommand, member access.M
 	}, h.d.Random, h.d.Key)
 	entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, governance.Request{
 		Actor: memberActor(member), ID: cmd.RequestID,
-	}, signInRecord("auth.signed_in", member, nil))
+	}, authRecord("auth.signed_in", member, nil))
 	if err != nil {
 		return SignInResult{}, err
 	}
@@ -231,11 +231,11 @@ func (h *SignIn) open(ctx context.Context, session access.Session, rehash string
 func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Member, reserved access.Reservation, reason string) error {
 	now := h.d.Clock.Now()
 	req := governance.Request{Actor: memberActor(member), ID: cmd.RequestID}
-	records := []governance.Record{signInRecord("auth.sign_in_failed", member, map[string]any{"reason": reason})}
+	records := []governance.Record{authRecord("auth.sign_in_failed", member, map[string]any{"reason": reason})}
 	if locks, wait := reserved.Locks(); locks {
 		records = append(records, governance.Record{
 			Action: "auth.locked_out",
-			Entity: governance.Entity{Kind: "member", ID: member.ID.String(), Key: member.Email},
+			Entity: memberEntity(member),
 			After: map[string]any{
 				"email": member.Email, "failures": reserved.Failures, "retry_after_seconds": int(wait / time.Second),
 			},
@@ -265,16 +265,22 @@ func memberActor(m access.Member) governance.Actor {
 	return ActorOf(access.Caller{Method: access.MethodSession, Member: &m})
 }
 
-// signInRecord is the audit record of action on member's sign-in. It
-// names the method and the email, never the password.
-func signInRecord(action string, m access.Member, more map[string]any) governance.Record {
+// authRecord is the audit record of action, a sign-in, a failed one or a
+// sign-out, of member. It names the method and the email, never the
+// password.
+func authRecord(action string, m access.Member, more map[string]any) governance.Record {
 	after := map[string]any{"method": access.SignInLocal, "email": m.Email}
 	for k, v := range more {
 		after[k] = v
 	}
 	return governance.Record{
 		Action: action,
-		Entity: governance.Entity{Kind: "member", ID: m.ID.String(), Key: m.Email},
+		Entity: memberEntity(m),
 		After:  after,
 	}
+}
+
+// memberEntity is m as the entity of an audit entry, keyed by their email.
+func memberEntity(m access.Member) governance.Entity {
+	return governance.Entity{Kind: "member", ID: m.ID.String(), Key: m.Email}
 }

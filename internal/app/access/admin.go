@@ -142,7 +142,7 @@ func (h *PromoteMember) Handle(ctx context.Context, email string, req governance
 		now := h.clock.Now()
 		entry, err := governance.NewEntry(id.New[governance.Entry](h.ids), now, req, governance.Record{
 			Action: "member.promoted",
-			Entity: governance.Entity{Kind: "member", ID: m.ID.String(), Key: m.Email},
+			Entity: memberEntity(m),
 			Before: map[string]any{"instance_admin": false},
 			After:  map[string]any{"instance_admin": true},
 		})

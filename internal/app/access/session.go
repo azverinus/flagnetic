@@ -91,7 +91,7 @@ func (h *SignOut) Handle(ctx context.Context, caller access.Caller, requestID st
 	now := h.clock.Now()
 	entry, err := governance.NewEntry(id.New[governance.Entry](h.ids), now, governance.Request{
 		Actor: ActorOf(caller), ID: requestID,
-	}, signInRecord("auth.signed_out", *caller.Member, nil))
+	}, authRecord("auth.signed_out", *caller.Member, nil))
 	if err != nil {
 		return err
 	}

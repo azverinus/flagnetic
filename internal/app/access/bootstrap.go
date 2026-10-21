@@ -196,7 +196,7 @@ func (h *InstanceAdminExists) Handle(ctx context.Context) (bool, error) {
 func memberCreated(m access.Member) governance.Record {
 	return governance.Record{
 		Action: "member.created",
-		Entity: governance.Entity{Kind: "member", ID: m.ID.String(), Key: m.Email},
+		Entity: memberEntity(m),
 		After: map[string]any{
 			"email": m.Email, "display_name": m.DisplayName, "status": m.Status, "instance_admin": m.InstanceAdmin,
 		},
