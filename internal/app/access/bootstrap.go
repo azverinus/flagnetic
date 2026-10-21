@@ -120,8 +120,13 @@ func (h *Bootstrap) Handle(ctx context.Context, cmd BootstrapCommand) (Bootstrap
 	}
 	res := BootstrapResult{Member: member, Token: value.Value}
 	password := cmd.Password
-	if password.IsZero() {
-		password = access.GeneratePassword(h.random)
+	if !password.IsZero() {
+		// Checked before any hash, like every password a person chooses.
+		if err := access.CheckPassword(password.Reveal(), member.Email, access.MinPasswordLength); err != nil {
+			return BootstrapResult{}, err
+		}
+	} else {
+		password = access.GeneratePassword(member.Email, h.random)
 		res.GeneratedPassword = password
 	}
 

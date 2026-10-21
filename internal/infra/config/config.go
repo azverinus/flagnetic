@@ -49,9 +49,14 @@ type Config struct {
 	DatabaseURL secret.String
 	// SecretKey is the instance's secret key, zero when not set; serve
 	// requires it.
-	SecretKey  secret.String
-	ConfigFile string
-	ListenAddr string
+	SecretKey secret.String
+	// BaseURL is the console's public origin, nil when not set.
+	BaseURL *url.URL
+	// InsecureCookies lets the session cookie go without Secure off
+	// localhost.
+	InsecureCookies bool
+	ConfigFile      string
+	ListenAddr      string
 	// MetricsListenAddr is "" when metrics are switched off.
 	MetricsListenAddr string
 	AutoMigrate       bool
@@ -133,6 +138,39 @@ func Settings() []Setting {
 			Example: "q3S0k1p2Rk7Jt0E5m9xV8bYcN4wZ6hL2aU1dG7fH0eI=",
 			apply: func(cfg *Config, v string) error {
 				cfg.SecretKey = secret.New(v)
+				return nil
+			},
+		},
+		{
+			Name: "FLAGNETIC_BASE_URL",
+			Key:  "base_url",
+			Description: "The public URL the console is reached at, such as the address of the reverse proxy in front. " +
+				"Its scheme decides whether the session cookie is `Secure`, and its origin is trusted for writes signed in through the console " +
+				"even when the proxy rewrites `Host`. When unset, the scheme and origin of each request are used.",
+			Example: "https://flags.example.com",
+			apply: func(cfg *Config, v string) error {
+				u, err := url.Parse(v)
+				if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
+					u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
+					return errors.New("not an http or https URL of a host, without a path")
+				}
+				cfg.BaseURL = &url.URL{Scheme: u.Scheme, Host: u.Host}
+				return nil
+			},
+		},
+		{
+			Name:    "FLAGNETIC_INSECURE_COOKIES",
+			Key:     "insecure_cookies",
+			Default: "false",
+			Description: "Send the session cookie without `Secure` over plain HTTP on a host other than localhost, for a trial without TLS. " +
+				"On localhost the cookie works over plain HTTP without it. Never set it where the console is reached over a network you do not trust.",
+			Example: "true",
+			apply: func(cfg *Config, v string) error {
+				b, err := strconv.ParseBool(v)
+				if err != nil {
+					return errors.New("not true or false")
+				}
+				cfg.InsecureCookies = b
 				return nil
 			},
 		},

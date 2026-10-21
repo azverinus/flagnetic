@@ -174,8 +174,9 @@ func guardDatabase(t testing.TB, url string) {
 }
 
 // recordingTransport records the secrets of every request a test client
-// sends and every response it receives: token values by their shape, and the
-// string members of a JSON body named as a password or a secret.
+// sends and every response it receives: token values by their shape, the
+// string members of a JSON body named as a password or a secret, and the
+// values of the cookies a response sets.
 type recordingTransport struct{}
 
 func (recordingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -199,6 +200,9 @@ func (recordingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 	recordBody(body)
 	res.Body = io.NopCloser(bytes.NewReader(body))
+	for _, c := range res.Cookies() {
+		RecordSecret(c.Value)
+	}
 	return res, nil
 }
 

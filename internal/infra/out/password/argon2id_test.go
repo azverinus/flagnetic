@@ -10,7 +10,7 @@ import (
 
 func TestAPasswordIsHashedAsAnArgon2idPHCStringUnderAFreshSalt(t *testing.T) {
 	h := password.NewHasher(password.DefaultParams)
-	a, err := h.Hash(t.Context(), secret.New("correct horse battery staple"))
+	a, err := h.Hash(t.Context(), secret.New("lantern-quartz-meadow-2291"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,8 +18,40 @@ func TestAPasswordIsHashedAsAnArgon2idPHCStringUnderAFreshSalt(t *testing.T) {
 	if !phc.MatchString(a) {
 		t.Errorf("hash %q is not an argon2id PHC string with a 16-byte salt and a 32-byte key", a)
 	}
-	b, err := h.Hash(t.Context(), secret.New("correct horse battery staple"))
+	b, err := h.Hash(t.Context(), secret.New("lantern-quartz-meadow-2291"))
 	if err != nil || a == b {
 		t.Errorf("hashing twice gave %q and %q, want different salts", a, b)
+	}
+}
+
+func TestAPasswordVerifiesAgainstItsHashAndNoOther(t *testing.T) {
+	h := password.NewHasher(password.DefaultParams)
+	encoded, err := h.Hash(t.Context(), secret.New("lantern-quartz-meadow-2291"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, outdated, err := h.Verify(t.Context(), secret.New("lantern-quartz-meadow-2291"), encoded); !ok || outdated || err != nil {
+		t.Errorf("right password: ok %v, outdated %v, err %v; want ok and current", ok, outdated, err)
+	}
+	if ok, _, err := h.Verify(t.Context(), secret.New("lantern-quartz-meadow-2292"), encoded); ok || err != nil {
+		t.Errorf("wrong password: ok %v, err %v; want refused", ok, err)
+	}
+	if ok, _, err := h.Verify(t.Context(), secret.New(""), ""); ok || err != nil {
+		t.Errorf("no hash: ok %v, err %v; want refused without an error", ok, err)
+	}
+	if _, _, err := h.Verify(t.Context(), secret.New("x"), "$2a$10$bcrypt"); err == nil {
+		t.Error("a hash of another scheme verified without an error")
+	}
+}
+
+func TestAHashUnderOlderParametersIsOutdated(t *testing.T) {
+	older := password.NewHasher(password.Params{MemoryKiB: 19456, Time: 2, Threads: 1, SaltLength: 16, KeyLength: 32})
+	encoded, err := older.Hash(t.Context(), secret.New("lantern-quartz-meadow-2291"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok, outdated, err := password.NewHasher(password.DefaultParams).Verify(t.Context(), secret.New("lantern-quartz-meadow-2291"), encoded)
+	if !ok || !outdated || err != nil {
+		t.Errorf("ok %v, outdated %v, err %v; want verified and outdated", ok, outdated, err)
 	}
 }

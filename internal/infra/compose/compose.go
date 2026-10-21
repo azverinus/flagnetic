@@ -22,6 +22,7 @@ import (
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
+	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
 // Deps are what a replica's use cases run on.
@@ -37,13 +38,26 @@ func NewDeps(pool *pgxpool.Pool, c clock.Clock) Deps {
 	return Deps{Pool: pool, Clock: c, IDs: id.NewSource(c)}
 }
 
+// Web is how a replica treats browsers.
+type Web struct {
+	// Keyring holds the instance's secret key, which session cookies are
+	// signed under.
+	Keyring *secret.Keyring
+	management.Options
+}
+
 // Management mounts the management API on edge, its metrics on reg.
-func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer) {
+func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, web Web) {
 	tx, auditLog := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
 	rec := appworkspace.NewRecorder(auditLog, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
+	sessionKey := web.Keyring.Key(secret.UseSessionCookie)
 	management.Mount(edge, management.Handlers{
-		AuthenticateToken:  appaccess.NewAuthenticateToken(accessStore, d.Clock),
+		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, d.Clock),
+		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, d.Clock, sessionKey),
+		SignIn: appaccess.NewSignIn(tx, accessStore, Hasher(), auditLog, d.Clock, d.IDs,
+			rand.Reader, sessionKey),
+		SignOut:            appaccess.NewSignOut(tx, accessStore, auditLog, d.Clock, d.IDs),
 		ProjectPermissions: appaccess.NewProjectPermissions(),
 		WorkingProjects:    appaccess.NewWorkingProjects(),
 
@@ -72,14 +86,31 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer) {
 
 		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
-	}, reg)
+	}, reg, web.Options)
 }
+
+// Hasher returns the password hasher of a replica.
+func Hasher() *password.Hasher { return password.NewHasher(password.DefaultParams) }
 
 // Bootstrap returns the use case creating the first instance admin.
 func Bootstrap(d Deps) *appaccess.Bootstrap {
 	return appaccess.NewBootstrap(postgres.NewTransactor(d.Pool), pgaccess.NewStore(d.Pool),
-		password.NewHasher(password.DefaultParams), pggovernance.NewAuditLog(d.Pool),
+		Hasher(), pggovernance.NewAuditLog(d.Pool),
 		d.Clock, d.IDs, rand.Reader)
+}
+
+// CreateInstanceAdmin returns the use case adding an instance admin from the
+// command line.
+func CreateInstanceAdmin(d Deps) *appaccess.CreateInstanceAdmin {
+	return appaccess.NewCreateInstanceAdmin(postgres.NewTransactor(d.Pool), pgaccess.NewStore(d.Pool), Hasher(),
+		pggovernance.NewAuditLog(d.Pool), d.Clock, d.IDs, rand.Reader)
+}
+
+// PromoteMember returns the use case making a member an instance admin from
+// the command line.
+func PromoteMember(d Deps) *appaccess.PromoteMember {
+	return appaccess.NewPromoteMember(postgres.NewTransactor(d.Pool), pgaccess.NewStore(d.Pool),
+		pggovernance.NewAuditLog(d.Pool), d.Clock, d.IDs)
 }
 
 // InstanceAdminExists returns the query telling whether the instance has an

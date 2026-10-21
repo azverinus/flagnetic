@@ -22,8 +22,15 @@ type Caller struct {
 	Method Method
 	// Token is the API token presented, for MethodToken.
 	Token *APIToken
+	// Session is the session signed in to, for MethodSession.
+	Session *Session
 	// Member is the member the credential acts for; nil for a project token.
 	Member *Member
+}
+
+// SessionCaller returns the caller signed in to s as holder.
+func SessionCaller(s Session, holder Member) Caller {
+	return Caller{Method: MethodSession, Session: &s, Member: &holder}
 }
 
 // TokenCaller returns the caller presenting tok, held by holder (nil for a

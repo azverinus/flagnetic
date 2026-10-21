@@ -9,7 +9,10 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/config"
@@ -30,6 +33,17 @@ Commands:
       exists or cannot be created stops the command with nothing created.
       Refused once an instance admin exists; with --if-absent that is a
       success that does nothing.
+
+  create --email <email> [--name <name>]
+      Add an active instance admin with a password: FLAGNETIC_ADMIN_PASSWORD,
+      or one generated and printed once on standard output.
+
+  promote --email <email>
+      Make the member with this email an instance admin.
+
+A password given in FLAGNETIC_ADMIN_PASSWORD must pass the password policy:
+12 to 128 characters, not containing the part of the email before the @,
+and not a common password. A refused one exits 2 naming the rule.
 `
 
 // commandLine carries what a command reads besides its configuration.
@@ -43,7 +57,7 @@ type commandLine struct {
 // any configuration is read: help on request, the usage and exit 2 otherwise.
 func adminHelp(args []string, stdout, stderr io.Writer) (code int, done bool) {
 	switch {
-	case len(args) > 0 && args[0] == "bootstrap":
+	case len(args) > 0 && (args[0] == "bootstrap" || args[0] == "create" || args[0] == "promote"):
 		return 0, false
 	case len(args) > 0 && (args[0] == "help" || args[0] == "-h" || args[0] == "--help"):
 		fmt.Fprint(stdout, adminUsage)
@@ -54,8 +68,111 @@ func adminHelp(args []string, stdout, stderr io.Writer) (code int, done bool) {
 }
 
 func admin(ctx context.Context, cl commandLine, cfg config.Config, log *slog.Logger, o options) int {
+	command := cl.args[0]
 	cl.args = cl.args[1:]
+	switch command {
+	case "create":
+		return adminCreate(ctx, cl, cfg, log, o)
+	case "promote":
+		return adminPromote(ctx, cl, cfg, log, o)
+	}
 	return adminBootstrap(ctx, cl, cfg, log, o)
+}
+
+// adminDatabase opens the migrated database an admin command works on, or
+// returns the exit code of the failure.
+func adminDatabase(ctx context.Context, command string, cfg config.Config, log *slog.Logger, o options) (*pgxpool.Pool, int) {
+	pool, err := openDatabase(ctx, cfg, log, o)
+	if err != nil {
+		return nil, fail(log, "admin "+command+" failed", err)
+	}
+	if err = checkSchema(ctx, pool, log, o); err != nil {
+		pool.Close()
+		return nil, fail(log, "admin "+command+" failed", err)
+	}
+	return pool, exitOK
+}
+
+// adminRefusal reports a refusal of an admin command on stderr and returns
+// its exit code: 2 for input to fix, such as a weak password, 1 otherwise.
+func adminRefusal(cl commandLine, command string, e *apperrors.Error) int {
+	if e.Kind == apperrors.KindInvalid {
+		fmt.Fprintf(cl.stderr, "admin %s: %s\n", command, describe(e))
+		return exitUsage
+	}
+	fmt.Fprintf(cl.stderr, "admin %s: %s\n", command, e.Detail)
+	return exitFailure
+}
+
+func adminCreate(ctx context.Context, cl commandLine, cfg config.Config, log *slog.Logger, o options) int {
+	fs := flag.NewFlagSet("admin create", flag.ContinueOnError)
+	fs.SetOutput(cl.stderr)
+	email := fs.String("email", "", "email of the instance admin (required)")
+	name := fs.String("name", "", "display name of the instance admin; the email's local part when absent")
+	if err := fs.Parse(cl.args); err != nil {
+		return exitUsage
+	}
+	if *email == "" || fs.NArg() > 0 {
+		fmt.Fprint(cl.stderr, "admin create: --email is required, and nothing else\n\n"+adminUsage)
+		return exitUsage
+	}
+	pool, code := adminDatabase(ctx, "create", cfg, log, o)
+	if pool == nil {
+		return code
+	}
+	defer pool.Close()
+
+	password, _ := cl.lookupEnv("FLAGNETIC_ADMIN_PASSWORD")
+	res, err := compose.CreateInstanceAdmin(compose.NewDeps(pool, clock.System{})).Handle(ctx, appaccess.CreateInstanceAdminCommand{
+		Email: *email, DisplayName: *name, Password: secret.New(password),
+		Request: governance.Request{Actor: governance.CLIActor("admin create")},
+	})
+	if e, ok := apperrors.From(err); ok {
+		return adminRefusal(cl, "create", e)
+	}
+	if err != nil {
+		return fail(log, "admin create failed", err)
+	}
+	if res.GeneratedPassword.IsZero() {
+		fmt.Fprintln(cl.stderr, "Instance admin created with the password in FLAGNETIC_ADMIN_PASSWORD.")
+		return exitOK
+	}
+	fmt.Fprintln(cl.stderr, "Instance admin created. This password is shown once; store it now:")
+	fmt.Fprintln(cl.stdout, res.GeneratedPassword.Reveal())
+	return exitOK
+}
+
+func adminPromote(ctx context.Context, cl commandLine, cfg config.Config, log *slog.Logger, o options) int {
+	fs := flag.NewFlagSet("admin promote", flag.ContinueOnError)
+	fs.SetOutput(cl.stderr)
+	email := fs.String("email", "", "email of the member to promote (required)")
+	if err := fs.Parse(cl.args); err != nil {
+		return exitUsage
+	}
+	if *email == "" || fs.NArg() > 0 {
+		fmt.Fprint(cl.stderr, "admin promote: --email is required, and nothing else\n\n"+adminUsage)
+		return exitUsage
+	}
+	pool, code := adminDatabase(ctx, "promote", cfg, log, o)
+	if pool == nil {
+		return code
+	}
+	defer pool.Close()
+
+	promoted, err := compose.PromoteMember(compose.NewDeps(pool, clock.System{})).Handle(ctx, *email,
+		governance.Request{Actor: governance.CLIActor("admin promote")})
+	if e, ok := apperrors.From(err); ok {
+		return adminRefusal(cl, "promote", e)
+	}
+	if err != nil {
+		return fail(log, "admin promote failed", err)
+	}
+	if !promoted {
+		fmt.Fprintf(cl.stderr, "%s already is an instance admin; nothing done.\n", *email)
+		return exitOK
+	}
+	fmt.Fprintf(cl.stderr, "%s is now an instance admin.\n", *email)
+	return exitOK
 }
 
 // nothingToBootstrap is what --if-absent says on an instance that has an
@@ -149,8 +266,12 @@ func adminBootstrap(ctx context.Context, cl commandLine, cfg config.Config, log 
 	return exitOK
 }
 
-// describe returns an invalid input's detail with its violations.
+// describe returns an invalid input's detail with its violations; a
+// password the policy refuses is named by its code and the rule it broke.
 func describe(e *apperrors.Error) string {
+	if rule := access.PasswordRule(e); rule != "" {
+		return e.Code + " (" + rule + "): " + e.Violations[0].Detail
+	}
 	s := e.Detail
 	for _, v := range e.Violations {
 		s += "; " + v.Pointer + ": " + v.Detail

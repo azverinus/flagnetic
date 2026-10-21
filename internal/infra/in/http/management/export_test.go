@@ -13,6 +13,6 @@ import (
 // judge an operation the document does not declare yet, such as a public
 // one.
 func SeamFor(edge *flaghttp.Server, h Handlers, op access.Operation, next http.Handler) http.Handler {
-	a := &api{edge: edge, h: h, refusals: newRefusals(prometheus.NewRegistry())}
+	a := newAPI(edge, h, newRefusals(prometheus.NewRegistry()), Options{})
 	return a.seam(op, next)
 }

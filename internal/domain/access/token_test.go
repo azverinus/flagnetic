@@ -86,7 +86,7 @@ func TestAMalformedTokenValueIsAnInvalidToken(t *testing.T) {
 }
 
 func TestAGeneratedPasswordIsTwentyFourBase62Characters(t *testing.T) {
-	p := access.GeneratePassword(rand.Reader).Reveal()
+	p := access.GeneratePassword("first@example.com", rand.Reader).Reveal()
 	if !regexp.MustCompile(`^[0-9A-Za-z]{24}$`).MatchString(p) {
 		t.Errorf("password %q is not 24 base62 characters", p)
 	}

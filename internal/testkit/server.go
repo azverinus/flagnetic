@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,11 +16,13 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
+	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
 // Server is a replica's public handler served in-process, for black-box HTTP
@@ -80,6 +83,7 @@ func (s *Server) Scrape(t testing.TB) string {
 }
 
 type serverOptions struct {
+	web     management.Options
 	clock   clock.Clock
 	workers []worker.Worker
 	pool    *pgxpool.Pool
@@ -119,6 +123,26 @@ func WithClock(c clock.Clock) ServerOption {
 	return func(o *serverOptions) { o.clock = c }
 }
 
+// WithBaseURL serves as if the console's public URL were baseURL, such as
+// https://flags.example.com.
+func WithBaseURL(baseURL string) ServerOption {
+	return func(o *serverOptions) {
+		u, err := url.Parse(baseURL)
+		if err != nil {
+			panic(err)
+		}
+		o.web.BaseURL = u
+	}
+}
+
+// WithInsecureCookies serves as FLAGNETIC_INSECURE_COOKIES does.
+func WithInsecureCookies() ServerOption {
+	return func(o *serverOptions) { o.web.InsecureCookies = true }
+}
+
+// SecretKey is the secret key of every in-process server.
+const SecretKey = "test secret key of the in-process server, 32+ bytes"
+
 // WithPool serves with pool instead of the package's migrated one, such as a
 // pool whose PostgreSQL is unreachable.
 func WithPool(pool *pgxpool.Pool) ServerOption {
@@ -154,7 +178,9 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	if c == nil {
 		c = clock.System{}
 	}
-	compose.Management(h, compose.NewDeps(o.pool, c), reg)
+	compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Web{
+		Keyring: secret.NewKeyring(secret.New(SecretKey)), Options: o.web,
+	})
 	for _, r := range o.routes {
 		h.Handle(r.pattern, r.build(h), r.opts...)
 	}

@@ -50,11 +50,25 @@ FLAGNETIC_ADMIN_PASSWORD='…' flagnetic admin bootstrap --email ops@example.com
 ```
 
 - `--email` is required; `--name` defaults to the email's local part.
-- The password is `FLAGNETIC_ADMIN_PASSWORD`. Without it, one is generated and printed once on standard error.
+- The password is `FLAGNETIC_ADMIN_PASSWORD`. Without it, one is generated and printed once on standard error. A password you give must pass the password policy: 12 to 128 characters, not containing the part of the email before the `@` (in any case), and not on the list of common passwords; there are no rules about character classes. A password the policy refuses stops the command with exit code 2, naming the rule (`weak_password (length)`, `(email)` or `(common)`), before anything is created.
 - The API token carries every scope and does not expire: whoever runs the command holds the database's credentials already. It is printed on standard output, or written to `--token-file` instead, so a provisioning script can pick it up without it reaching a log. The file is created new, with mode 0600, before anything else: a path that exists or cannot be created stops the command (exit code 1) with nothing created, and the token is then never printed. With `--if-absent` on an instance that has an instance admin, the file is not touched.
 - Once an instance admin exists, bootstrap is refused with exit code 1, so it never adds a second one by accident. With `--if-absent` that is a success that does nothing (exit 0), which makes provisioning safe to rerun.
 - Two bootstraps running at once cannot both succeed. Both changes are recorded in the audit log with the CLI as their actor.
 - The schema must be migrated first (`flagnetic migrate`, or a replica started once).
+
+Two more commands work the same way, for a second instance admin or one who lost their way in:
+
+- `flagnetic admin create --email <email> [--name <name>]` adds an active instance admin with a password: `FLAGNETIC_ADMIN_PASSWORD` under the same policy, or one generated and printed alone on standard output. An email the instance already holds is refused (exit code 1).
+- `flagnetic admin promote --email <email>` makes an existing member an instance admin; for one who already is, it does nothing. An unknown email is refused (exit code 1).
+
+Both are recorded in the audit log with the CLI as their actor.
+
+## Signing in to the console
+
+Members sign in with their email and password. A sign-in opens a session held by the server and referred to by the cookie `flagnetic_session` (`HttpOnly; SameSite=Lax`), signed under the secret key. A session ends at sign-out, after 24 hours without a request, or 30 days after it opened.
+
+- The cookie is `Secure` whenever the console is reached over HTTPS, and also over plain HTTP unless the host is `localhost` (or a loopback address), where browsers accept it without TLS. To try Flagnetic over plain HTTP on another host, set `FLAGNETIC_INSECURE_COOKIES=true`; never do so on a network you do not trust.
+- A write signed in by the cookie is refused (`403 cross_origin`) when the browser says it comes from another site, so a page elsewhere cannot act as a signed-in member. Requests with an API token are not checked: a browser never sends one by itself.
 
 ## Probes
 
@@ -68,6 +82,8 @@ Both are served on the public listener (`FLAGNETIC_LISTEN_ADDR`). A notification
 ## Behind a reverse proxy
 
 By default the client of a request is its TCP peer, and `X-Forwarded-For` and `X-Forwarded-Proto` are ignored, so a client cannot choose the address rate limits, sessions and audit entries see. Behind a load balancer or a reverse proxy, list the proxies in `FLAGNETIC_TRUSTED_PROXIES` (CIDR prefixes or single addresses, comma-separated). For a request from a listed proxy, `X-Forwarded-For` is read from the right, where each proxy appended the address it received the request from, and the first address that is not a listed proxy is the client; an entry that is not an address (some proxies write `unknown`) is skipped. The scheme is taken from the rightmost `X-Forwarded-Proto` entry when it is `http` or `https`. List only proxies you control: a listed address is believed about whoever it says the client is.
+
+Set `FLAGNETIC_BASE_URL` to the URL members open the console at, such as `https://flags.example.com`. Its scheme decides whether the session cookie is `Secure`, whatever the proxy forwards, and its origin is trusted for the console's writes even when the proxy rewrites `Host`. Without it, each request's own scheme (from `X-Forwarded-Proto` of a trusted proxy) and host are used.
 
 ## HTTP limits
 

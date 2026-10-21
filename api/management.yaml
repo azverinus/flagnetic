@@ -14,12 +14,92 @@ info:
     exercises it only when it carries that scope. Operations marked
     `x-session-required` refuse every API token.
 
+    A script authenticates with an API token as a bearer; the console with
+    the session cookie `POST /auth/sign-in` sets. When a request carries both,
+    the token is judged and the cookie ignored. A write authenticated by the
+    cookie is refused `cross_origin` when the browser says it comes from
+    another origin.
+
     Errors are problem documents (RFC 9457) with a stable `code`.
 servers:
   - url: /api/v1
 security:
   - bearer: []
+  - session: []
 paths:
+  /auth/sign-in:
+    post:
+      operationId: signIn
+      summary: Sign in with an email and a password
+      description: |
+        Opens a fresh session and sets its cookie. A wrong email, a wrong
+        password and a member who may not sign in all get the same
+        `invalid_credentials`, in comparable time. The body must be sent as
+        `application/json`, which a form on another site cannot send;
+        anything else is refused `cross_origin`.
+      x-permission: public
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInRequest"
+      responses:
+        "200":
+          description: Signed in. The body is the caller, as `GET /me` answers it.
+          headers:
+            Set-Cookie:
+              description: The session cookie `flagnetic_session`, `HttpOnly; Path=/; SameSite=Lax`, `Secure` unless the console is served over plain HTTP on localhost or with `FLAGNETIC_INSECURE_COOKIES`.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /auth/sign-out:
+    post:
+      operationId: signOut
+      summary: Sign out
+      description: Ends the session the request is signed in to and clears its cookie. With an API token there is no session to end, and nothing changes.
+      x-permission: member
+      tags: [auth]
+      responses:
+        "204":
+          description: Signed out.
+          headers:
+            Set-Cookie:
+              description: The session cookie, cleared.
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /auth/methods:
+    get:
+      operationId: getAuthMethods
+      summary: How members sign in
+      description: The ways the sign-in page offers, read before anyone is signed in.
+      x-permission: public
+      security: []
+      tags: [auth]
+      responses:
+        "200":
+          description: The sign-in methods.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMethods"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
   /me:
     get:
       operationId: getMe
@@ -732,6 +812,11 @@ components:
       type: http
       scheme: bearer
       description: An API token, `fn_pat_…` for a personal access token or `fn_prj_…` for a project token, in the `Authorization` header. A token in the query string is never read.
+    session:
+      type: apiKey
+      in: cookie
+      name: flagnetic_session
+      description: The session cookie `POST /auth/sign-in` sets, for the console. Ignored when an `Authorization` header is present.
   responses:
     BadRequest:
       description: "`invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return."
@@ -760,8 +845,11 @@ components:
     Unauthenticated:
       description: |
         No credential, or one that is not accepted: `unauthenticated` without
-        a credential; `invalid_token`, `token_revoked` or `token_expired` for
-        an API token, with a `WWW-Authenticate` header naming the code.
+        a credential (a session cookie the server did not issue counts as
+        none); `invalid_token`, `token_revoked` or `token_expired` for an API
+        token, with a `WWW-Authenticate` header naming the code;
+        `session_expired` for a session that has ended, whose cookie is
+        cleared; `invalid_credentials` for a sign-in.
       headers:
         WWW-Authenticate:
           schema:
@@ -773,7 +861,9 @@ components:
     Forbidden:
       description: |
         The caller may not perform the operation: `forbidden` (with the
-        missing `permission`), `session_required` or `insufficient_scope`.
+        missing `permission`), `session_required`, `insufficient_scope`, or
+        `cross_origin` for a write signed in by the session cookie that the
+        browser says comes from another origin.
       content:
         application/problem+json:
           schema:
@@ -823,6 +913,27 @@ components:
           type: object
           additionalProperties: true
           description: The values of the rule broken, such as the bounds of a length, for a client to explain the violation in its own language.
+    SignInRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+          format: password
+    AuthMethods:
+      type: object
+      required: [local_login_enabled, providers]
+      properties:
+        local_login_enabled:
+          type: boolean
+          description: Whether a member signs in with their email and password.
+        providers:
+          type: array
+          description: The identity providers a member signs in through; none yet.
+          items:
+            type: object
     MemberStatus:
       type: string
       enum: [invited, active, deactivated]
