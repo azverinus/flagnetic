@@ -72,6 +72,18 @@ const projectScreens = [
     permission: "project.read",
   },
   {
+    to: "/projects/$project/members",
+    label: msg`Members`,
+    icon: UsersIcon,
+    permission: "project.read",
+  },
+  {
+    to: "/projects/$project/tokens",
+    label: msg`Project tokens`,
+    icon: KeyRoundIcon,
+    permission: "project_token.manage",
+  },
+  {
     to: "/projects/$project/audit",
     label: msg`Audit log`,
     icon: HistoryIcon,

@@ -6,6 +6,7 @@ import {
   expiresAt,
   expiryChoices,
   offeredScopes,
+  projectTokenScopes,
   type TokenPolicy,
   tokenPolicy,
   tokenState,
@@ -17,13 +18,22 @@ const now = new Date("2026-10-21T12:00:00Z");
 
 describe("the scopes of a new personal access token", () => {
   it("offer instance:admin to an instance admin alone", () => {
-    expect(offeredScopes(false)).toEqual([
+    expect(offeredScopes({ instanceAdmin: false })).toEqual([
       "read",
       "flags:write",
       "experiments:write",
       "project:admin",
     ]);
-    expect(offeredScopes(true)).toContain("instance:admin");
+    expect(offeredScopes({ instanceAdmin: true })).toContain("instance:admin");
+  });
+
+  it("never offer instance:admin to a project token, which reaches its project only", () => {
+    expect(projectTokenScopes).toEqual([
+      "read",
+      "flags:write",
+      "experiments:write",
+      "project:admin",
+    ]);
   });
 
   it("always carry read beside a write scope, in the offered order", () => {

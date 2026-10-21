@@ -18,9 +18,18 @@ export function impliesRead(scope: Scope): boolean {
  * them: `instance:admin` only for an instance admin, since nobody else
  * holds it.
  */
-export function offeredScopes(instanceAdmin: boolean): Scope[] {
+export function offeredScopes({ instanceAdmin }: { instanceAdmin: boolean }): Scope[] {
   return allScopes.filter((scope) => instanceAdmin || scope !== "instance:admin");
 }
+
+/**
+ * The scopes a project token may be given, in the order the server lists
+ * them: never `instance:admin`, since a project token reaches its project
+ * only.
+ */
+export const projectTokenScopes: readonly Scope[] = allScopes.filter(
+  (scope) => scope !== "instance:admin",
+);
 
 /** The scopes chosen, with the `read` they imply, in the server's order. */
 export function withImpliedRead(chosen: readonly Scope[]): Scope[] {

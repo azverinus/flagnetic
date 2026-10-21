@@ -27,9 +27,25 @@ msgstr "{count, plural, one {минута} few {минуты} many {минут} 
 msgid "{count, plural, one {second} other {seconds}}"
 msgstr "{count, plural, one {секунда} few {секунды} many {секунд} other {секунды}}"
 
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "{holder} no longer holds {role} in this project and keeps their other roles here."
+msgstr "У участника {holder} больше не будет роли «{role}» в этом проекте; остальные его роли здесь сохранятся."
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "{holder} no longer holds any role in this project and leaves its members. They stay a member of the instance."
+msgstr "У участника {holder} не останется ролей в этом проекте, и он выйдет из числа его участников. Участником экземпляра он останется."
+
+#: src/components/grant-form.tsx
+msgid "{label}: {status}"
+msgstr "{label}: {status}"
+
 #: src/components/member-credentials.tsx
 msgid "{live, plural, one {Revoke # session} other {Revoke # sessions}}"
 msgstr "{live, plural, one {Отозвать # сеанс} few {Отозвать # сеанса} many {Отозвать # сеансов} other {Отозвать # сеанса}}"
+
+#: src/components/grant-form.tsx
+msgid "{name} ({email})"
+msgstr "{name} ({email})"
 
 #: src/components/member-actions.tsx
 msgid "{name} can sign in again. What deactivation revoked stays revoked: their sessions and API tokens do not come back."
@@ -92,6 +108,10 @@ msgstr "{when} с {ip}"
 msgid "A key never changes once it is set."
 msgstr "Ключ, однажды заданный, больше не меняется."
 
+#: src/lib/project-members.ts
+msgid "A member without a grant here"
+msgstr "Участник без роли в этом проекте"
+
 #: src/components/invitation-link-dialog.tsx
 msgid "A new invitation link for {name}"
 msgstr "Новая ссылка-приглашение для участника {name}"
@@ -107,6 +127,14 @@ msgstr "Новый проект создаётся с окружениями dev
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr "Выдать вам роль в нём может владелец проекта или администратор экземпляра."
+
+#: src/components/project-token-list.tsx
+msgid "A project token belongs to the project, not to whoever created it: it keeps working when they leave. Only a signed-in session creates one."
+msgstr "Токен проекта принадлежит проекту, а не тому, кто его создал: он продолжит работать, когда создатель уйдёт. Создать токен можно только в сеансе входа."
+
+#: src/components/token-create-form.tsx
+msgid "A project token does what its role allows in this project, narrowed to its scopes, and never manages who has access. Every write scope includes read."
+msgstr "Токен проекта может то, что разрешает его роль в этом проекте, в пределах своих областей доступа, и никогда не управляет доступом. Каждая область записи включает чтение."
 
 #: src/components/member-credentials.tsx
 #: src/components/session-list.tsx
@@ -233,6 +261,10 @@ msgstr "Оформление"
 msgid "Apply filters"
 msgstr "Применить фильтры"
 
+#: src/lib/access-names.ts
+msgid "archive and delete flags"
+msgstr "архивировать и удалять флаги"
+
 #: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
@@ -318,6 +350,10 @@ msgstr "Отмена"
 msgid "Change experiments."
 msgstr "Изменять эксперименты."
 
+#: src/lib/access-names.ts
+msgid "change flag configurations"
+msgstr "изменять конфигурации флагов"
+
 #: src/lib/personal-tokens.ts
 msgid "Change flags, segments and declarations."
 msgstr "Изменять флаги, сегменты и объявления."
@@ -334,9 +370,26 @@ msgstr "изменено"
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr "После смены пароля все остальные устройства выйдут из системы; на этом вход сохранится."
 
+#: src/components/grant-form.tsx
+msgid "Choose a member"
+msgstr "Выберите участника"
+
+#: src/components/grant-form.tsx
+msgid "Choose a member."
+msgstr "Выберите участника."
+
 #: src/components/invitation-acceptance.tsx
 msgid "Choose a password."
 msgstr "Придумайте пароль."
+
+#: src/components/role-field.tsx
+msgid "Choose a role"
+msgstr "Выберите роль"
+
+#: src/components/grant-form.tsx
+#: src/components/token-create-form.tsx
+msgid "Choose a role."
+msgstr "Выберите роль."
 
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
@@ -357,6 +410,14 @@ msgstr "Выберите тип."
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered languages."
 msgstr "Выберите один из предложенных языков."
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered members."
+msgstr "Выберите одного из предложенных участников."
+
+#: src/lib/problem-messages.ts
+msgid "Choose one of the offered roles."
+msgstr "Выберите одну из предложенных ролей."
 
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered scopes."
@@ -429,6 +490,10 @@ msgstr "Создать тип единицы"
 msgid "Created"
 msgstr "Создан"
 
+#: src/components/project-token-list.tsx
+msgid "Created by"
+msgstr "Создатель"
+
 #: src/components/password-form.tsx
 msgid "Current password"
 msgstr "Текущий пароль"
@@ -481,6 +546,10 @@ msgstr "Удалить атрибут"
 msgid "Delete environment"
 msgstr "Удалить окружение"
 
+#: src/lib/access-names.ts
+msgid "delete segments"
+msgstr "удалять сегменты"
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete unit type"
 msgstr "Удалить тип единицы"
@@ -522,6 +591,14 @@ msgstr "Изменить {key}"
 #: src/components/member-actions.tsx
 msgid "Edit {name}"
 msgstr "Изменить участника {name}"
+
+#: src/lib/access-names.ts
+msgid "edit flags"
+msgstr "изменять флаги"
+
+#: src/lib/access-names.ts
+msgid "edit segments"
+msgstr "изменять сегменты"
 
 #: src/lib/access-names.ts
 msgid "edit the project"
@@ -705,9 +782,29 @@ msgstr "На стартовую страницу"
 msgid "Grant"
 msgstr "Роль участника"
 
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Grant a role"
+msgstr "Выдать роль"
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Grant a role to {name}"
+msgstr "Выдать роль участнику {name}"
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Grant members of the instance the roles their work in it needs."
+msgstr "Выдайте участникам экземпляра роли, нужные для их работы в нём."
+
 #: src/lib/audit.ts
 msgid "Grant removed"
 msgstr "Роль отозвана"
+
+#: src/components/grant-form.tsx
+msgid "Grant role"
+msgstr "Выдать роль"
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Grants"
+msgstr "Роли"
 
 #: src/routes/_signed-in/admin/auth-settings.tsx
 msgid "How long sessions last, how long API tokens may live, and how long passwords must be. Every replica of the instance applies a change within a second."
@@ -837,6 +934,14 @@ msgstr "Уйти"
 msgid "Leave without saving?"
 msgstr "Уйти без сохранения?"
 
+#: src/lib/project-members.ts
+msgid "Lets the holder {list}."
+msgstr "Позволяет {list}."
+
+#: src/lib/project-members.ts
+msgid "Lets the holder do nothing yet."
+msgstr "Пока ничего не позволяет."
+
 #: src/components/personal-menu.tsx
 #: src/components/theme-choice.tsx
 msgid "Light"
@@ -894,6 +999,21 @@ msgstr "управлять типами единиц и атрибутами"
 msgid "manage who has access"
 msgstr "управлять доступом"
 
+#. A grant made by hand.
+#: src/lib/project-members.ts
+msgid "Manual, granted by {by} on {when}"
+msgstr "Выдана вручную участником {by} {when}"
+
+#. A grant made by hand.
+#: src/lib/project-members.ts
+msgid "Manual, granted on {when}"
+msgstr "Выдана вручную {when}"
+
+#. A grant made by hand.
+#: src/lib/project-members.ts
+msgid "Manual, granted on {when} by a member without a grant here"
+msgstr "Выдана вручную {when} участником без роли в этом проекте"
+
 #: src/components/auth-settings-form.tsx
 msgid "Maximum token lifetime"
 msgstr "Наибольший срок действия токена"
@@ -901,9 +1021,11 @@ msgstr "Наибольший срок действия токена"
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
 #: src/components/audit-log.tsx
+#: src/components/grant-form.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
+#: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Member"
 msgstr "Участник"
 
@@ -939,8 +1061,13 @@ msgstr "Участник изменён"
 #: src/components/projects-table.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 #: src/routes/_signed-in/admin/members/route.tsx
+#: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Members"
 msgstr "Участники"
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Members of the project"
+msgstr "Участники проекта"
 
 #: src/components/projects-table.tsx
 #: src/components/token-create-form.tsx
@@ -993,6 +1120,10 @@ msgstr "Новый пароль"
 msgid "New project"
 msgstr "Новый проект"
 
+#: src/components/project-token-list.tsx
+msgid "New project token"
+msgstr "Новый токен проекта"
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "New unit type"
 msgstr "Новый тип единицы"
@@ -1042,6 +1173,10 @@ msgstr "Проектов пока нет"
 msgid "No way to sign in is enabled on this instance. Ask its operator."
 msgstr "На этом экземпляре не включён ни один способ входа. Обратитесь к его администратору."
 
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Nobody holds a role in this project yet."
+msgstr "В этом проекте пока ни у кого нет роли."
+
 #. An audit entry's value before a creation or after a deletion.
 #: src/components/audit-entry-sheet.tsx
 msgid "none"
@@ -1055,6 +1190,10 @@ msgstr "не выбран"
 #: src/routes/_signed-in/$.tsx
 msgid "Not found"
 msgstr "Не найдено"
+
+#: src/lib/project-members.ts
+msgid "Not recorded"
+msgstr "Не записано"
 
 #: src/components/audit-log.tsx
 msgid "Nothing has been recorded yet."
@@ -1154,6 +1293,12 @@ msgstr "Проект создан"
 msgid "Project not found"
 msgstr "Проект не найден"
 
+#: src/components/navigation.tsx
+#: src/components/project-token-list.tsx
+#: src/routes/_signed-in/projects/$project/tokens.tsx
+msgid "Project tokens"
+msgstr "Токены проекта"
+
 #: src/lib/audit.ts
 msgid "Project updated"
 msgstr "Проект изменён"
@@ -1183,9 +1328,21 @@ msgstr "Активировать участника {name} снова"
 msgid "Read everything you can read."
 msgstr "Читать всё, что можете читать вы."
 
+#: src/components/grant-form.tsx
+msgid "Reading the members…"
+msgstr "Загружаем участников…"
+
 #: src/components/project-audit.tsx
 msgid "Recent activity"
 msgstr "Последние изменения"
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Remove {role} from {holder}"
+msgstr "Отозвать роль «{role}» у участника {holder}"
+
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "Remove grant"
+msgstr "Отозвать роль"
 
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "Rename {key}"
@@ -1248,6 +1405,11 @@ msgstr "Отозвать токен"
 msgid "Revoked"
 msgstr "Отозван"
 
+#: src/components/project-token-list.tsx
+#: src/components/role-field.tsx
+msgid "Role"
+msgstr "Роль"
+
 #: src/lib/audit.ts
 msgid "Role granted"
 msgstr "Роль выдана"
@@ -1281,6 +1443,10 @@ msgstr "Поиск проектов"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Semantic version"
 msgstr "Семантическая версия"
+
+#: src/components/project-token-list.tsx
+msgid "Send it as a bearer token in the Authorization header. Keep it where only the pipeline that uses it can read it."
+msgstr "Передавайте его как токен Bearer в заголовке Authorization. Храните его там, где его может прочитать только конвейер, который им пользуется."
 
 #: src/components/token-list.tsx
 msgid "Send it as a bearer token in the Authorization header. Keep it where only what uses it can read it."
@@ -1391,6 +1557,10 @@ msgstr "Статус"
 msgid "String"
 msgstr "Строка"
 
+#: src/lib/access-names.ts
+msgid "switch flags off with the kill switch"
+msgstr "выключать флаги аварийным выключателем"
+
 #. A kind of actor in the audit log.
 #: src/lib/audit.ts
 msgid "System"
@@ -1467,6 +1637,10 @@ msgid "The kinds of unit a flag is served to, such as a user or a device. A key 
 msgstr "Виды единиц, которым отдаётся флаг, например пользователь или устройство. Ключ не должен совпадать с ключами атрибутов и никогда не меняется."
 
 #: src/lib/problem-messages.ts
+msgid "The member already holds this role in the project."
+msgstr "У участника уже есть эта роль в проекте."
+
+#: src/lib/problem-messages.ts
 msgid "The member is deactivated. Reactivate them first."
 msgstr "Участник деактивирован. Сначала активируйте его снова."
 
@@ -1478,6 +1652,10 @@ msgstr "Участник сохранён."
 msgid "The member whose API token is {token}"
 msgstr "Участник, чей API-токен — {token}"
 
+#: src/routes/_signed-in/projects/$project/members.tsx
+msgid "The members holding a role in this project. A member may hold several, and can do whatever any of them allows."
+msgstr "Участники, у которых есть роль в этом проекте. Ролей может быть несколько, и участник может делать всё, что разрешает любая из них."
+
 #: src/components/project-audit.tsx
 msgid "The most recent changes in this project"
 msgstr "Самые недавние изменения в этом проекте"
@@ -1485,6 +1663,10 @@ msgstr "Самые недавние изменения в этом проект�
 #: src/components/password-form.tsx
 msgid "The new passwords do not match."
 msgstr "Новые пароли не совпадают."
+
+#: src/components/project-token-list.tsx
+msgid "The new project token"
+msgstr "Токен проекта создан"
 
 #: src/lib/problem-messages.ts
 msgid "The password is too short or too long."
@@ -1521,6 +1703,14 @@ msgstr "Запрос отправлен не в формате JSON."
 #: src/lib/problem-messages.ts
 msgid "The request was refused."
 msgstr "Запрос отклонён."
+
+#: src/lib/problem-messages.ts
+msgid "The role includes a permission you do not hold yourself here."
+msgstr "Роль включает право, которого у вас самих здесь нет."
+
+#: src/lib/problem-messages.ts
+msgid "The role includes the permission to {name}, which you do not hold yourself here."
+msgstr "Роль включает право {name}, которого у вас самих здесь нет."
 
 #: src/lib/problem-messages.ts
 msgid "The server could not be reached. Check your connection and try again."
@@ -1648,6 +1838,10 @@ msgstr "В этом проекте уже есть окружение с так�
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "This project has no attribute yet."
 msgstr "В этом проекте пока нет атрибутов."
+
+#: src/components/project-token-list.tsx
+msgid "This project has no token yet."
+msgstr "У этого проекта пока нет токенов."
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "This project has no unit type yet."
@@ -1821,6 +2015,10 @@ msgstr "Вы не вошли в систему."
 #: src/components/session-list.tsx
 msgid "You are signed in on this device only."
 msgstr "Вход выполнен только на этом устройстве."
+
+#: src/components/grant-form.tsx
+msgid "You can grant further roles to the members of this project. An instance admin grants a first role to anyone else."
+msgstr "Вы можете выдавать дополнительные роли участникам этого проекта. Первую роль всем остальным выдаёт администратор экземпляра."
 
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "You cannot open this project"
