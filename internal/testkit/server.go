@@ -181,9 +181,14 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	if c == nil {
 		c = clock.System{}
 	}
-	compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Options{
+	background := compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Options{
 		Keyring: secret.NewKeyring(secret.New(SecretKey)), PasswordHashConcurrency: defaultHashConcurrency, Options: o.web,
 	})
+	for _, w := range background.Workers {
+		if err := runner.Register(w); err != nil {
+			t.Fatal(err)
+		}
+	}
 	for _, r := range o.routes {
 		h.Handle(r.pattern, r.build(h), r.opts...)
 	}

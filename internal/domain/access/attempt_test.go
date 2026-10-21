@@ -93,3 +93,14 @@ func TestAReservationIsJudgedAtTheTimeItWasMade(t *testing.T) {
 		t.Errorf("a failure locking for two minutes from the reservation: Locks = %v %v", locks, wait)
 	}
 }
+
+func TestFailuresArePurgedOnlyOnceTheyCanNoLongerCount(t *testing.T) {
+	now := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
+	cut := access.AttemptCutoffs(now)
+	if !cut.LastEmailFailureBy.Equal(now.Add(-24*time.Hour)) || !cut.Now.Equal(now) {
+		t.Errorf("email cutoff = %+v, want a day before now", cut)
+	}
+	if !cut.SourceWindowStartBy.Equal(now.Add(-15 * time.Minute)) {
+		t.Errorf("source cutoff = %v, want the source window before now", cut.SourceWindowStartBy)
+	}
+}

@@ -33,6 +33,8 @@ type Handlers struct {
 	AuthenticateSession *appaccess.AuthenticateSession
 	SignIn              *appaccess.SignIn
 	SignOut             *appaccess.SignOut
+	ListSessions        *appaccess.ListSessions
+	RevokeSessions      *appaccess.RevokeSessions
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
 

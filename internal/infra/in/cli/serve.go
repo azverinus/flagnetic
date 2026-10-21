@@ -83,10 +83,15 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	edgeOpts := flaghttp.OptionsFrom(cfg)
 	edgeOpts.Logger, edgeOpts.DB, edgeOpts.Metrics = log, pool, flaghttp.NewMetrics(reg)
 	edge := flaghttp.New(edgeOpts)
-	compose.Management(edge, compose.NewDeps(pool, clock.System{}), reg, compose.Options{
+	background := compose.Management(edge, compose.NewDeps(pool, clock.System{}), reg, compose.Options{
 		Keyring: secret.NewKeyring(cfg.SecretKey), PasswordHashConcurrency: cfg.PasswordHashConcurrency,
 		Options: management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
 	})
+	for _, w := range background.Workers {
+		if err = runner.Register(w); err != nil {
+			return fail(log, "start failed", err)
+		}
+	}
 	for _, r := range o.routes {
 		edge.Handle(r.pattern, r.handler)
 	}

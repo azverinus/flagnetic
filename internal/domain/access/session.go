@@ -135,12 +135,55 @@ var ErrSessionExpired = apperrors.Unauthenticated("session_expired", "the sessio
 // current timeouts are applied to every live session, so lowering one takes
 // effect at once.
 func (s Session) Live(now time.Time, holder Member, t SessionTimeouts) bool {
-	end := s.ExpiresAt
-	if byNow := s.CreatedAt.Add(t.Absolute); byNow.Before(end) {
-		end = byNow
-	}
 	return s.RevokedAt == nil && holder.Status == MemberActive &&
-		now.Before(s.LastSeenAt.Add(t.Idle)) && now.Before(end)
+		now.Before(s.LastSeenAt.Add(t.Idle)) && now.Before(s.End(t))
+}
+
+// End is when the absolute timeout ends the session under the timeouts in
+// force: the earlier of the expiry stored at sign-in and its opening plus
+// the current absolute timeout, so a lowered timeout shortens it and a
+// raised one never lengthens it.
+func (s Session) End(t SessionTimeouts) time.Time {
+	if byNow := s.CreatedAt.Add(t.Absolute); byNow.Before(s.ExpiresAt) {
+		return byNow
+	}
+	return s.ExpiresAt
+}
+
+// LiveSessions returns the sessions of holder that still sign them in at
+// now, in the order given.
+func LiveSessions(sessions []Session, holder Member, now time.Time, t SessionTimeouts) []Session {
+	live := make([]Session, 0, len(sessions))
+	for _, s := range sessions {
+		if s.Live(now, holder, t) {
+			live = append(live, s)
+		}
+	}
+	return live
+}
+
+// SessionCutoffs are the instants that end a session at a given time, as
+// the retention worker selects ended sessions in bulk: a session is ended
+// when it is revoked, or its last request, its opening or its stored expiry
+// is at or before the cutoff for it.
+type SessionCutoffs struct {
+	LastSeenBy time.Time
+	CreatedBy  time.Time
+	ExpiresBy  time.Time
+}
+
+// EndedSessionCutoffs returns the cutoffs that end, at now under the
+// timeouts in force, exactly the sessions Live no longer admits, whatever
+// their member's status: a member who is not active has their sessions
+// revoked when their status changes.
+func EndedSessionCutoffs(now time.Time, t SessionTimeouts) SessionCutoffs {
+	return SessionCutoffs{LastSeenBy: now.Add(-t.Idle), CreatedBy: now.Add(-t.Absolute), ExpiresBy: now}
+}
+
+// Ended reports whether the cutoffs end s.
+func (c SessionCutoffs) Ended(s Session) bool {
+	return s.RevokedAt != nil || !s.LastSeenAt.After(c.LastSeenBy) || !s.CreatedAt.After(c.CreatedBy) ||
+		!s.ExpiresAt.After(c.ExpiresBy)
 }
 
 // NeedsTouch reports whether a request at now should write the session's

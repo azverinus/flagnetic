@@ -79,6 +79,10 @@ Guessing passwords is slow, and cannot exhaust a replica:
 - **Hashing bound.** Checking a password takes 64 MiB of memory for about a tenth of a second. Each replica checks at most `FLAGNETIC_PASSWORD_HASH_CONCURRENCY` (default 4) at once; a sign-in that waits more than 2 seconds for its turn is answered `503 busy` with `Retry-After`, and is not counted as a failure. Locked, throttled and oversized attempts are refused before they wait for a turn, and the request body of an operation that checks a password is limited to 8 KiB (`413 request_too_large`). Raise the bound only with the memory to match: each slot needs 64 MiB on top of the replica's own.
 - Sign-ins, sign-outs, failures (with their reason) and lockouts of members are recorded in the instance audit log; attempts on emails no member has are not.
 
+A member sees every device they are signed in on, with its address, browser and when it was last used, and signs out one of them, every other one, or all (`/me/sessions`). An instance admin does the same for any member (`/members/{member}/sessions`), to answer an incident. Only a session can sign its own member out: an API token is refused `403 session_required`, so a leaked token cannot lock its owner out. Every revocation is recorded in the instance audit log as `session.revoked`, naming the sessions it ended.
+
+Every replica runs the auth retention worker once an hour. It deletes ended sessions (revoked, idle or past their absolute timeout), an email's failed sign-ins a day after the last one once no lock holds it, and a source's failures once its fifteen-minute window is over, a thousand rows per transaction until nothing is left. One replica purges at a time; the others leave the work to it for that hour.
+
 ## Probes
 
 | Path | Answers | Use it for |
@@ -119,6 +123,7 @@ Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNET
 | `flagnetic_db_pool_acquires_total`, `_empty_acquires_total`, `_acquire_wait_seconds_total` | | Connections taken from the pool, how many had to wait, and how long they waited in total. |
 | `flagnetic_worker_rounds_total`, `_failures_total`, `_panics_total` | `worker` | Rounds of each background worker, how many failed, and how many panicked. A failed or panicking round is logged and the next round runs. |
 | `flagnetic_worker_round_duration_seconds` | `worker` | Time a worker's round took (histogram). |
+| `flagnetic_auth_purged_rows_total` | `kind` | Rows the auth retention worker deleted: `sessions`, `email_failures`, `source_failures`. |
 | `flagnetic_listener_up` | `channel` | Whether the replica is listening on a PostgreSQL notification channel, through which replicas tell each other about changes: 1 listening, 0 not. Each listener checks itself every 10 seconds by sending itself a notification, so a connection that went silent without failing is caught too. |
 | `go_*`, `process_*` | | The Go runtime and the process. |
 

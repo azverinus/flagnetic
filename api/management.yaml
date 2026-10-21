@@ -137,6 +137,88 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /me/sessions:
+    get:
+      operationId: listMySessions
+      summary: The caller's sessions
+      description: |
+        Every device the caller is signed in on, newest first, the one this
+        request is signed in to marked `current`. Sessions that have ended
+        are left out. A request with an API token marks none current.
+      x-permission: member
+      tags: [me]
+      responses:
+        "200":
+          description: The live sessions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      operationId: revokeMySessions
+      summary: Sign out every other device
+      description: |
+        Revokes every live session of the caller but the one this request is
+        signed in to, or that one too with `include_current`, which then
+        clears its cookie. Only a session may do this, so a leaked token
+        cannot sign its owner out.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      parameters:
+        - name: include_current
+          in: query
+          description: Revoke the session this request is signed in to as well.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: The number of sessions revoked.
+          headers:
+            Set-Cookie:
+              description: The session cookie, cleared when the current session was revoked.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRevocation"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /me/sessions/{session}:
+    parameters:
+      - $ref: "#/components/parameters/SessionID"
+    delete:
+      operationId: revokeMySession
+      summary: Sign out one device
+      description: |
+        Revokes one live session of the caller; revoking the one this request
+        is signed in to clears its cookie. A session of another member, one
+        that has ended or an identifier that names none is not found.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      responses:
+        "204":
+          description: Revoked.
+          headers:
+            Set-Cookie:
+              description: The session cookie, cleared when the session revoked is the current one.
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /roles:
     get:
       operationId: listRoles
@@ -681,6 +763,52 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /members/{member}/sessions:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    get:
+      operationId: listMemberSessions
+      summary: A member's sessions
+      description: Every device the member is signed in on, newest first, for an instance admin answering an incident. Sessions that have ended are left out.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The live sessions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: revokeMemberSessions
+      summary: Sign a member out everywhere
+      description: Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The number of sessions revoked.
+          headers:
+            Set-Cookie:
+              description: The session cookie, cleared when the session this request is signed in to was revoked.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRevocation"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /audit:
     get:
       operationId: listAuditEntries
@@ -817,6 +945,20 @@ components:
       in: path
       required: true
       description: The attribute's key.
+      schema:
+        type: string
+    SessionID:
+      name: session
+      in: path
+      required: true
+      description: The session's identifier, in either case.
+      schema:
+        type: string
+    MemberID:
+      name: member
+      in: path
+      required: true
+      description: The member's identifier.
       schema:
         type: string
     ProjectKey:
@@ -1117,6 +1259,56 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Role"
+    SessionMethod:
+      type: string
+      enum: [local]
+      description: How the member signed in; `local` is with their email and password.
+    Session:
+      type: object
+      description: One device a member is signed in on.
+      required: [id, method, client_ip, user_agent, created_at, last_seen_at, expires_at, current]
+      properties:
+        id:
+          type: string
+          format: uuid
+        method:
+          $ref: "#/components/schemas/SessionMethod"
+        client_ip:
+          type: string
+          nullable: true
+          description: The address the session opened from.
+        user_agent:
+          type: string
+          description: At most 256 bytes of the browser's User-Agent at sign-in.
+        created_at:
+          type: string
+          format: date-time
+        last_seen_at:
+          type: string
+          format: date-time
+          description: The session's last request, written at most once a minute.
+        expires_at:
+          type: string
+          format: date-time
+          description: When the absolute timeout in force ends the session, unless the idle timeout ends it first.
+        current:
+          type: boolean
+          description: Whether this is the session the request is signed in to.
+    SessionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+    SessionRevocation:
+      type: object
+      required: [revoked]
+      properties:
+        revoked:
+          type: integer
+          description: How many sessions were revoked.
     Grant:
       type: object
       description: One role held by one member in one project.

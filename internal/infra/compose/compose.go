@@ -16,6 +16,7 @@ import (
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
@@ -50,8 +51,16 @@ type Options struct {
 	management.Options
 }
 
-// Management mounts the management API on edge, its metrics on reg.
-func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Options) {
+// Background is the work a replica does besides answering requests, which
+// whoever runs the replica starts.
+type Background struct {
+	// Workers are registered with the replica's runner.
+	Workers []worker.Worker
+}
+
+// Management mounts the management API on edge, its metrics on reg, and
+// returns the background work its use cases need.
+func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Options) Background {
 	tx, auditLog := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
 	rec := appworkspace.NewRecorder(auditLog, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
@@ -68,6 +77,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Random: rand.Reader, Key: sessionKey,
 		}),
 		SignOut:            appaccess.NewSignOut(tx, accessStore, auditLog, d.Clock, d.IDs),
+		ListSessions:       appaccess.NewListSessions(accessStore, d.Clock),
+		RevokeSessions:     appaccess.NewRevokeSessions(tx, accessStore, auditLog, d.Clock, d.IDs),
 		ProjectPermissions: appaccess.NewProjectPermissions(),
 		WorkingProjects:    appaccess.NewWorkingProjects(),
 
@@ -97,6 +108,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
 	}, reg, o.Options)
+	return Background{
+		Workers: []worker.Worker{worker.AuthRetention(appaccess.NewPurgeAuthRecords(tx, accessStore, d.Clock), reg)},
+	}
 }
 
 // Hasher returns the password hasher of a command line, which hashes one

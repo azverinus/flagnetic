@@ -130,3 +130,70 @@ func TestASessionsLastRequestIsWrittenAtMostOnceAMinute(t *testing.T) {
 		t.Error("want no write within a minute and one after")
 	}
 }
+
+func TestASessionEndsAtTheEarlierOfItsStoredExpiryAndItsOpeningPlusTheCurrentTimeout(t *testing.T) {
+	s, _ := openSession(t, "test")
+	if got := s.End(access.DefaultSessionTimeouts); !got.Equal(now.Add(30 * 24 * time.Hour)) {
+		t.Errorf("end under the defaults = %v, want 30 days after opening", got)
+	}
+	if got := s.End(access.SessionTimeouts{Idle: time.Hour, Absolute: 2 * time.Hour}); !got.Equal(now.Add(2 * time.Hour)) {
+		t.Errorf("end under a lowered timeout = %v, want 2 hours after opening", got)
+	}
+	if got := s.End(access.SessionTimeouts{Idle: time.Hour, Absolute: 90 * 24 * time.Hour}); !got.Equal(now.Add(30 * 24 * time.Hour)) {
+		t.Errorf("end under a raised timeout = %v, want the stored expiry", got)
+	}
+}
+
+func TestLiveSessionsLeaveOutTheEndedOnes(t *testing.T) {
+	live, _ := openSession(t, "live")
+	idle, _ := openSession(t, "idle")
+	idle.LastSeenAt = now.Add(-25 * time.Hour)
+	revoked, _ := openSession(t, "revoked")
+	revokedAt := now
+	revoked.RevokedAt = &revokedAt
+	active := access.Member{Status: access.MemberActive}
+
+	got := access.LiveSessions([]access.Session{idle, live, revoked}, active, now.Add(time.Minute), access.DefaultSessionTimeouts)
+	if len(got) != 1 || got[0].ID != live.ID {
+		t.Errorf("live sessions = %v, want only the one in use", got)
+	}
+	if got := access.LiveSessions([]access.Session{live}, access.Member{Status: access.MemberDeactivated}, now, access.DefaultSessionTimeouts); len(got) != 0 {
+		t.Errorf("live sessions of a deactivated member = %v, want none", got)
+	}
+}
+
+// TestTheRetentionCutoffsEndExactlyTheSessionsThatAreNoLongerLive checks the
+// cutoffs the retention worker purges by against liveness itself, over
+// sessions on either side of each boundary.
+func TestTheRetentionCutoffsEndExactlyTheSessionsThatAreNoLongerLive(t *testing.T) {
+	active := access.Member{Status: access.MemberActive}
+	for _, timeouts := range []access.SessionTimeouts{
+		access.DefaultSessionTimeouts,
+		{Idle: time.Hour, Absolute: 2 * time.Hour},
+		{Idle: 90 * 24 * time.Hour, Absolute: 90 * 24 * time.Hour},
+	} {
+		at := now.Add(40 * 24 * time.Hour)
+		cut := access.EndedSessionCutoffs(at, timeouts)
+		for _, opened := range []time.Duration{-time.Second, 0, time.Second} {
+			for _, seen := range []time.Duration{-time.Second, 0, time.Second} {
+				for _, stored := range []time.Duration{-time.Second, 0, time.Second, 50 * 24 * time.Hour} {
+					s := access.Session{
+						CreatedAt:  at.Add(-timeouts.Absolute + opened),
+						LastSeenAt: at.Add(-timeouts.Idle + seen),
+						ExpiresAt:  at.Add(stored),
+					}
+					if s.LastSeenAt.Before(s.CreatedAt) {
+						s.LastSeenAt = s.CreatedAt
+					}
+					if cut.Ended(s) == s.Live(at, active, timeouts) {
+						t.Errorf("timeouts %v, session %+v: ended %v, live %v", timeouts, s, cut.Ended(s), s.Live(at, active, timeouts))
+					}
+				}
+			}
+		}
+		revokedAt := at
+		if !cut.Ended(access.Session{CreatedAt: at, LastSeenAt: at, ExpiresAt: at.Add(time.Hour), RevokedAt: &revokedAt}) {
+			t.Error("a revoked session is not ended")
+		}
+	}
+}
