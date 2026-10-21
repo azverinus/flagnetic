@@ -16,15 +16,21 @@ CREATE INDEX audit_entries_environment_id ON audit_entries (environment_id, id D
 -- actor's name through trigrams, which a leading wildcard cannot use a
 -- B-tree for.
 --
--- The extension may live in a schema outside the search path (another
--- schema of the same database created it first), so its operator class is
--- named through the schema it is in.
+-- An extension belongs to the whole database but its objects live in one
+-- schema, and dropping that schema drops the extension and, with it, the
+-- trigram index of every schema in the database. Created without a schema, it
+-- would land in the schema being migrated, so dropping one Flagnetic schema
+-- would break every other one sharing the database, even one still being
+-- migrated. It is therefore created in public, which dropping a Flagnetic
+-- schema of its own never removes. When the extension already exists,
+-- wherever an operator put it, it is used where it is, so its operator class
+-- is named through the schema it is in.
 -- +goose StatementBegin
 DO $$
 DECLARE
     trgm_schema text;
 BEGIN
-    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
     SELECT n.nspname INTO trgm_schema
     FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace
     WHERE e.extname = 'pg_trgm';
