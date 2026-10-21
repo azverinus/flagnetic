@@ -28,6 +28,15 @@ Set `DATABASE_URL` to an existing PostgreSQL to skip testcontainers.
 
 Every string a member reads goes through [Lingui](https://lingui.dev), with the English text as its ID: `<Trans>` in JSX, `` t`...` `` from `useLingui()` for an attribute, `` msg`...` `` for a string defined outside a component. The lint rule `lingui/no-unlocalized-strings` fails on a string written any other way. After adding or changing one, run `task web:extract` and commit the catalogs in `web/apps/console/src/locales`; CI fails when extraction would change them, and when a language lacks a translation. Server errors are translated by their `code`, with the values they depend on read from the problem document and its violations' `params`, in `web/apps/console/src/lib/problem-messages.ts`.
 
+### Adding a permission
+
+A permission arrives with the first operation that needs it:
+
+1. Add it to the catalog in `internal/domain/access/permission.go`, named `entity.verb`, with the token scope it falls under and, when it changes who has access to a project, as members only. Write it into the built-in roles in the same file: the owner holds every permission (a test fails otherwise), and the others hold what their name promises.
+2. Name it in the operation's `x-permission` in `api/management.yaml` and run `task generate`, which regenerates the operation table and fails on a name the catalog does not hold.
+3. Add its rows to the tests that hold the catalog and the roles row by row (`internal/domain/access/catalog_test.go`) and to the permission matrix of the management API (`internal/infra/in/http/management/permissions_test.go`), which calls one operation of each permission as every role and expects the refusal to name it; then to the tables in `docs/access.md`.
+4. In the console, add it to `Permission` in `web/apps/console/src/lib/access-names.ts` with the words that complete "the permission to …", so a disabled action can say what it needs, and translate them.
+
 ## How the code is organised
 
 Read [ARCHITECTURE.md](ARCHITECTURE.md). In short: domain rules in `internal/domain` as plain Go, use cases in `internal/app`, adapters in `internal/infra`, dependencies pointing inwards and enforced by the linter.
