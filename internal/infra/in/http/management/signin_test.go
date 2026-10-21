@@ -445,17 +445,24 @@ func TestASessionHoldsEveryScope(t *testing.T) {
 	}
 }
 
-func TestSigningOutWithATokenEndsNoSession(t *testing.T) {
+func TestSigningOutNeedsASessionAndATokenEndsNone(t *testing.T) {
 	srv := testkit.StartServer(t)
 	m := testkit.NewMember(t, testkit.Pool(t))
 	b := testkit.NewBrowser(t, srv.URL)
 	b.SignIn(t, m.Email, m.Password)
 	res, err := testkit.Client(t, srv, testkit.PersonalToken(t, testkit.Pool(t), m.ID, "script")).SignOutWithResponse(t.Context())
-	if err != nil || res.StatusCode() != http.StatusNoContent {
-		t.Fatalf("sign-out with a token = %d %s, want 204", res.StatusCode(), res.Body)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if me, _ := b.GetMeWithResponse(t.Context()); me.StatusCode() != http.StatusOK {
-		t.Errorf("GET /me with the session after a token signed out = %d, want 200: a token has no session to end", me.StatusCode())
+	if p := res.ApplicationproblemJSON403; p == nil || p.Code != "session_required" {
+		t.Fatalf("sign-out with a token = %d %s, want 403 session_required: a script must not believe it ended something", res.StatusCode(), res.Body)
+	}
+	me, err := b.GetMeWithResponse(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if me.StatusCode() != http.StatusOK {
+		t.Errorf("GET /me with the session after a token tried to sign out = %d, want 200", me.StatusCode())
 	}
 	if n := len(auditOf(t, srv, "auth.signed_out", m.ID.String())); n != 0 {
 		t.Errorf("%d signed_out entries, want none", n)

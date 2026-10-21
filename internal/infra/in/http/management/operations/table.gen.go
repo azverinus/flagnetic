@@ -29,7 +29,7 @@ var Table = map[string]access.Operation{
 	"PATCH /projects/{project}/environments/{environment}": {Name: "updateEnvironment", Requirement: "environment.manage", SessionRequired: false, Read: false, Scope: "project:admin", OpenToProjectTokens: false},
 	"PATCH /projects/{project}/unit-types/{unit_type}":     {Name: "updateUnitType", Requirement: "declaration.manage", SessionRequired: false, Read: false, Scope: "flags:write", OpenToProjectTokens: false},
 	"POST /auth/sign-in":                    {Name: "signIn", Requirement: "public", SessionRequired: false, Read: false, Scope: "", OpenToProjectTokens: false},
-	"POST /auth/sign-out":                   {Name: "signOut", Requirement: "member", SessionRequired: false, Read: false, Scope: "", OpenToProjectTokens: false},
+	"POST /auth/sign-out":                   {Name: "signOut", Requirement: "member", SessionRequired: true, Read: false, Scope: "", OpenToProjectTokens: false},
 	"POST /projects":                        {Name: "createProject", Requirement: "instance_admin", SessionRequired: false, Read: false, Scope: "instance:admin", OpenToProjectTokens: false},
 	"POST /projects/{project}/attributes":   {Name: "createAttribute", Requirement: "declaration.manage", SessionRequired: false, Read: false, Scope: "flags:write", OpenToProjectTokens: false},
 	"POST /projects/{project}/environments": {Name: "createEnvironment", Requirement: "environment.manage", SessionRequired: false, Read: false, Scope: "project:admin", OpenToProjectTokens: false},

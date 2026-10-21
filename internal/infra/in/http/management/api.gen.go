@@ -769,7 +769,7 @@ type ClientInterface interface {
 
 	// SignOut Sign out
 	//
-	// Ends the session the request is signed in to and clears its cookie. With an API token there is no session to end, and nothing changes.
+	// Ends the session the request is signed in to and clears its cookie. An API token has no session to end and is refused `session_required`, so a script never believes it ended something.
 	//
 	// Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 	SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1081,7 +1081,7 @@ func (c *Client) SignIn(ctx context.Context, body SignInJSONRequestBody, reqEdit
 
 // SignOut Sign out
 //
-// Ends the session the request is signed in to and clears its cookie. With an API token there is no session to end, and nothing changes.
+// Ends the session the request is signed in to and clears its cookie. An API token has no session to end and is refused `session_required`, so a script never believes it ended something.
 //
 // Corresponds with POST /auth/sign-out (the `SignOut` operationId).
 func (c *Client) SignOut(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3119,7 +3119,7 @@ type ClientWithResponsesInterface interface {
 
 	// SignOutWithResponse Sign out
 	//
-	// Ends the session the request is signed in to and clears its cookie. With an API token there is no session to end, and nothing changes.
+	// Ends the session the request is signed in to and clears its cookie. An API token has no session to end and is refused `session_required`, so a script never believes it ended something.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -5440,7 +5440,7 @@ func (c *ClientWithResponses) SignInWithResponse(ctx context.Context, body SignI
 
 // SignOutWithResponse Sign out
 //
-// Ends the session the request is signed in to and clears its cookie. With an API token there is no session to end, and nothing changes.
+// Ends the session the request is signed in to and clears its cookie. An API token has no session to end and is refused `session_required`, so a script never believes it ended something.
 //
 // Returns a wrapper object for the known response body format(s).
 //

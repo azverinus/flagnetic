@@ -82,10 +82,11 @@ func NewSignOut(tx Transactor, store SessionStore, audit AuditLog, c clock.Clock
 }
 
 // Handle revokes the caller's session and records the sign-out. A caller
-// presenting an API token has no session to end, and nothing happens.
+// presenting an API token has no session to end and is refused, so a script
+// never believes it ended something.
 func (h *SignOut) Handle(ctx context.Context, caller access.Caller, requestID string) error {
 	if caller.Session == nil || caller.Member == nil {
-		return nil
+		return access.ErrSessionRequired
 	}
 	now := h.clock.Now()
 	entry, err := governance.NewEntry(id.New[governance.Entry](h.ids), now, governance.Request{

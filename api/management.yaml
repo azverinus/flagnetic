@@ -68,8 +68,9 @@ paths:
     post:
       operationId: signOut
       summary: Sign out
-      description: Ends the session the request is signed in to and clears its cookie. With an API token there is no session to end, and nothing changes.
+      description: Ends the session the request is signed in to and clears its cookie. An API token has no session to end and is refused `session_required`, so a script never believes it ended something.
       x-permission: member
+      x-session-required: true
       tags: [auth]
       responses:
         "204":
