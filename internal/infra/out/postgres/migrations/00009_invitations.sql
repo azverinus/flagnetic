@@ -11,7 +11,7 @@ CREATE TABLE invitations (
     created_at   timestamptz NOT NULL,
     expires_at   timestamptz NOT NULL,
     -- When it was accepted, replaced, or consumed by its member's
-    -- deactivation or password change; null while it is open.
+    -- deactivation; null while it is open.
     consumed_at  timestamptz
 );
 

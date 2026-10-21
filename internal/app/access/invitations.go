@@ -298,8 +298,8 @@ type AcceptInvitationCommand struct {
 // Handle sets the member's first password, makes them active, consumes
 // their invitations and opens a session, recording
 // member.invitation_accepted and auth.signed_in. The attempt counts as a
-// failure of its source before the secret is looked up, so guessing secrets
-// is throttled with guessing passwords; a throttled source is refused
+// failure of its source before the secret is looked up, so a source
+// hammering acceptance is throttled with its sign-ins; a throttled source is refused
 // rate_limited before anything else. A secret that opens no invitation
 // keeps its failure and is answered invitation_gone; one that does takes it
 // back, whatever happens next. The password policy applies (weak_password),

@@ -24,6 +24,15 @@ const (
 	MemberDeactivated MemberStatus = "deactivated"
 )
 
+// ParseMemberStatus returns the status s names; false for none.
+func ParseMemberStatus(s string) (MemberStatus, bool) {
+	switch st := MemberStatus(s); st {
+	case MemberInvited, MemberActive, MemberDeactivated:
+		return st, true
+	}
+	return "", false
+}
+
 // Member is a person who uses the management API or the console.
 type Member struct {
 	ID MemberID

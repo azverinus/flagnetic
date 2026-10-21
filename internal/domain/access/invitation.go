@@ -44,7 +44,7 @@ type Invitation struct {
 	ExpiresAt time.Time
 	// ConsumedAt is when the invitation stopped being acceptable before it
 	// expired: accepted, replaced by another, or consumed when its member was
-	// deactivated or changed their password. Nil while it is open.
+	// deactivated. Nil while it is open.
 	ConsumedAt *time.Time
 }
 

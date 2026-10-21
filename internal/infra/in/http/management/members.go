@@ -14,12 +14,11 @@ import (
 func (a *api) ListMembers(ctx context.Context, req ListMembersRequestObject) (ListMembersResponseObject, error) {
 	var f appaccess.MemberFilter
 	if s := req.Params.Status; s != nil {
-		switch access.MemberStatus(*s) {
-		case access.MemberInvited, access.MemberActive, access.MemberDeactivated:
-			f.Status = access.MemberStatus(*s)
-		default:
+		status, ok := access.ParseMemberStatus(string(*s))
+		if !ok {
 			return nil, flaghttp.InvalidRequest("status must be invited, active or deactivated")
 		}
+		f.Status = status
 	}
 	if req.Params.Q != nil {
 		f.Q = *req.Params.Q

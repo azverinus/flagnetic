@@ -46,11 +46,9 @@ func TestAMemberNeedsAnEmailAndANameWithinBounds(t *testing.T) {
 	}
 }
 
-func ptr[T any](v T) *T { return &v }
-
 func TestAMemberIsEditedWithinTheBoundsOfANewOne(t *testing.T) {
 	m := access.Member{Email: "ada@example.com", DisplayName: "Ada", Status: access.MemberActive}
-	got, err := m.Edited(access.MemberChange{Email: ptr(" Ada.L@Example.com "), DisplayName: ptr(" Ada Lovelace "), InstanceAdmin: ptr(true)})
+	got, err := m.Edited(access.MemberChange{Email: new(" Ada.L@Example.com "), DisplayName: new(" Ada Lovelace "), InstanceAdmin: new(true)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,9 +63,9 @@ func TestAMemberIsEditedWithinTheBoundsOfANewOne(t *testing.T) {
 		pointer string
 		code    string
 	}{
-		"malformed email": {access.MemberChange{Email: ptr("ada")}, "/email", "invalid_email"},
-		"blank name":      {access.MemberChange{DisplayName: ptr("  ")}, "/display_name", "invalid_name"},
-		"long name":       {access.MemberChange{DisplayName: ptr(strings.Repeat("n", 201))}, "/display_name", "too_long"},
+		"malformed email": {access.MemberChange{Email: new("ada")}, "/email", "invalid_email"},
+		"blank name":      {access.MemberChange{DisplayName: new("  ")}, "/display_name", "invalid_name"},
+		"long name":       {access.MemberChange{DisplayName: new(strings.Repeat("n", 201))}, "/display_name", "too_long"},
 	} {
 		_, err := m.Edited(tc.change)
 		e, ok := apperrors.From(err)
@@ -112,5 +110,18 @@ func TestAReactivatedMemberIsActiveOnlyWithAPassword(t *testing.T) {
 	}
 	if got := m.Reactivated(false); got.Status != access.MemberInvited {
 		t.Errorf("without a password: %s, want invited", got.Status)
+	}
+}
+
+func TestAMemberStatusIsParsedByName(t *testing.T) {
+	for _, s := range []access.MemberStatus{access.MemberInvited, access.MemberActive, access.MemberDeactivated} {
+		if got, ok := access.ParseMemberStatus(string(s)); !ok || got != s {
+			t.Errorf("%s parsed as %q, %t", s, got, ok)
+		}
+	}
+	for _, s := range []string{"", "gone", "Active"} {
+		if _, ok := access.ParseMemberStatus(s); ok {
+			t.Errorf("%q parsed as a status", s)
+		}
 	}
 }
