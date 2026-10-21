@@ -58,6 +58,10 @@ const (
 	PermFlagEdit Permission = "flag.edit"
 	// PermFlagArchive archives, restores and deletes flags.
 	PermFlagArchive Permission = "flag.archive"
+	// PermSegmentEdit creates segments and changes them.
+	PermSegmentEdit Permission = "segment.edit"
+	// PermSegmentDelete deletes segments.
+	PermSegmentDelete Permission = "segment.delete"
 )
 
 // catalog is every permission an operation can require. Each context adds
@@ -74,6 +78,8 @@ var catalog = []PermissionSpec{
 	{Name: PermProjectTokenManage, Scope: ScopeProjectAdmin, MembersOnly: true},
 	{Name: PermFlagEdit, Scope: ScopeFlagsWrite},
 	{Name: PermFlagArchive, Scope: ScopeFlagsWrite},
+	{Name: PermSegmentEdit, Scope: ScopeFlagsWrite},
+	{Name: PermSegmentDelete, Scope: ScopeFlagsWrite},
 }
 
 // Catalog returns the permission catalog.
@@ -161,12 +167,13 @@ type Role struct {
 var roles = []Role{
 	{Name: RoleOwner, Permissions: []Permission{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermDeclarationManage,
-		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive,
+		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermSegmentEdit, PermSegmentDelete,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
+		PermSegmentEdit, PermSegmentDelete,
 	}},
-	{Name: RoleDeveloper, Permissions: []Permission{PermProjectRead, PermFlagEdit}},
+	{Name: RoleDeveloper, Permissions: []Permission{PermProjectRead, PermFlagEdit, PermSegmentEdit}},
 	{Name: RoleViewer, Permissions: []Permission{PermProjectRead}},
 }
 

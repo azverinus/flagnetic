@@ -93,6 +93,13 @@ type Handlers struct {
 	RestoreFlag *appflags.RestoreFlag
 	DeleteFlag  *appflags.DeleteFlag
 
+	ListSegments      *appflags.ListSegments
+	GetSegment        *appflags.GetSegment
+	CreateSegment     *appflags.CreateSegment
+	UpdateSegment     *appflags.UpdateSegment
+	DeleteSegment     *appflags.DeleteSegment
+	ListSegmentUsages *appflags.ListSegmentUsages
+
 	ListAuditEntries *appgovernance.ListAuditEntries
 	GetAuditEntry    *appgovernance.GetAuditEntry
 }

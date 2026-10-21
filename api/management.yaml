@@ -1101,6 +1101,177 @@ paths:
           $ref: "#/components/responses/VersionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/segments:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listSegments
+      summary: The project's segments
+      x-permission: project.read
+      tags: [segments]
+      responses:
+        "200":
+          description: The segments, by key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SegmentList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createSegment
+      summary: Create a segment
+      description: |
+        A segment holds at most 20 attribute conditions, each naming an
+        attribute or unit type the project declares with an operator
+        defined for its type and a value that operator accepts; segments do
+        not nest. A key in use is `already_exists`.
+      x-permission: segment.edit
+      tags: [segments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SegmentCreate"
+      responses:
+        "201":
+          description: Created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/segments/{segment}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SegmentKey"
+    get:
+      operationId: getSegment
+      summary: A segment
+      x-permission: project.read
+      tags: [segments]
+      responses:
+        "200":
+          description: The segment.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateSegment
+      summary: Change a segment
+      description: |
+        Changes the name, description, private switch or conditions; the
+        key never changes (`immutable`). Conditions are replaced as a list.
+        A change to the values the segment already has changes nothing and
+        records nothing.
+      x-permission: segment.edit
+      tags: [segments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SegmentPatch"
+      responses:
+        "200":
+          description: The segment as changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Segment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+    delete:
+      operationId: deleteSegment
+      summary: Delete a segment
+      x-permission: segment.delete
+      tags: [segments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/segments/{segment}/usages:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/SegmentKey"
+    get:
+      operationId: listSegmentUsages
+      summary: Where a segment is used
+      description: Every flag and environment whose rules name the segment, archived flags included, by flag key and then environment order.
+      x-permission: project.read
+      tags: [segments]
+      responses:
+        "200":
+          description: The usages.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferenceList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/members:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -1815,6 +1986,13 @@ components:
       in: path
       required: true
       description: The flag's key.
+      schema:
+        type: string
+    SegmentKey:
+      name: segment
+      in: path
+      required: true
+      description: The segment's key.
       schema:
         type: string
     IfMatch:
@@ -3077,3 +3255,107 @@ components:
           description: Every variation, in order, matched to the current ones by key.
           items:
             $ref: "#/components/schemas/VariationInput"
+    ReferenceList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reference"
+    Condition:
+      type: object
+      description: |
+        One comparison inside a rule or a segment. An `attribute` condition
+        names an attribute or unit type, an operator (`op`) and a `value`
+        (none for `exists`, `not_exists` and `is_empty`); `in_segment` and
+        `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+        one of its `variation`s. A segment holds attribute conditions only.
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          description: "`attribute`, `in_segment`, `not_in_segment` or `prerequisite`."
+        attribute:
+          type: string
+        op:
+          type: string
+        value:
+          description: A string, number, boolean or list, as the operator and the attribute's type need; null is no value.
+          nullable: true
+        segment:
+          type: string
+        flag:
+          type: string
+        variation:
+          type: string
+    Segment:
+      type: object
+      required: [id, key, name, description, private, conditions, created_at, updated_at, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        private:
+          type: boolean
+          description: Its conditions never leave the server; only server-side evaluation uses it.
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Condition"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          $ref: "#/components/schemas/Version"
+    SegmentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Segment"
+    SegmentCreate:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          $ref: "#/components/schemas/Key"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        private:
+          type: boolean
+        conditions:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/Condition"
+    SegmentPatch:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Refused with `immutable` whatever its value.
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
+        private:
+          type: boolean
+        conditions:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/Condition"

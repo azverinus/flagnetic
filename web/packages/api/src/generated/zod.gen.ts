@@ -583,6 +583,60 @@ export const zFlagPatch = z.object({
   variations: z.array(zVariationInput).optional(),
 });
 
+export const zReferenceList = z.object({
+  items: z.array(zReference),
+});
+
+/**
+ * One comparison inside a rule or a segment. An `attribute` condition
+ * names an attribute or unit type, an operator (`op`) and a `value`
+ * (none for `exists`, `not_exists` and `is_empty`); `in_segment` and
+ * `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+ * one of its `variation`s. A segment holds attribute conditions only.
+ *
+ */
+export const zCondition = z.object({
+  kind: z.string(),
+  attribute: z.string().optional(),
+  op: z.string().optional(),
+  value: z.unknown().optional(),
+  segment: z.string().optional(),
+  flag: z.string().optional(),
+  variation: z.string().optional(),
+});
+
+export const zSegment = z.object({
+  id: z.uuid(),
+  key: zKey,
+  name: zName,
+  description: zDescription,
+  private: z.boolean(),
+  conditions: z.array(zCondition),
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
+  version: zVersion,
+});
+
+export const zSegmentList = z.object({
+  items: z.array(zSegment),
+});
+
+export const zSegmentCreate = z.object({
+  key: zKey,
+  name: zName,
+  description: zDescription.optional(),
+  private: z.boolean().optional(),
+  conditions: z.array(zCondition).max(20).optional(),
+});
+
+export const zSegmentPatch = z.object({
+  key: z.string().optional(),
+  name: zName.optional(),
+  description: zDescription.optional(),
+  private: z.boolean().optional(),
+  conditions: z.array(zCondition).max(20).optional(),
+});
+
 /**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
@@ -639,6 +693,11 @@ export const zLimit = z.int().gte(1).lte(200).default(50);
  * The flag's key.
  */
 export const zFlagKey = z.string();
+
+/**
+ * The segment's key.
+ */
+export const zSegmentKey = z.string();
 
 /**
  * The version of the entity this write is based on, as its `ETag`
@@ -1071,6 +1130,76 @@ export const zRestoreFlagPath = z.object({
  * The flag as it is now.
  */
 export const zRestoreFlagResponse = zFlag;
+
+export const zListSegmentsPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The segments, by key.
+ */
+export const zListSegmentsResponse = zSegmentList;
+
+export const zCreateSegmentBody = zSegmentCreate;
+
+export const zCreateSegmentPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * Created.
+ */
+export const zCreateSegmentResponse = zSegment;
+
+export const zDeleteSegmentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zDeleteSegmentPath = z.object({
+  project: z.string(),
+  segment: z.string(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteSegmentResponse = z.void();
+
+export const zGetSegmentPath = z.object({
+  project: z.string(),
+  segment: z.string(),
+});
+
+/**
+ * The segment.
+ */
+export const zGetSegmentResponse = zSegment;
+
+export const zUpdateSegmentBody = zSegmentPatch;
+
+export const zUpdateSegmentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateSegmentPath = z.object({
+  project: z.string(),
+  segment: z.string(),
+});
+
+/**
+ * The segment as changed.
+ */
+export const zUpdateSegmentResponse = zSegment;
+
+export const zListSegmentUsagesPath = z.object({
+  project: z.string(),
+  segment: z.string(),
+});
+
+/**
+ * The usages.
+ */
+export const zListSegmentUsagesResponse = zReferenceList;
 
 export const zListProjectMembersPath = z.object({
   project: z.string(),

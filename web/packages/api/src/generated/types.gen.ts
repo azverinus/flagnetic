@@ -845,6 +845,72 @@ export type FlagPatch = {
   variations?: Array<VariationInput>;
 };
 
+export type ReferenceList = {
+  items: Array<Reference>;
+};
+
+/**
+ * One comparison inside a rule or a segment. An `attribute` condition
+ * names an attribute or unit type, an operator (`op`) and a `value`
+ * (none for `exists`, `not_exists` and `is_empty`); `in_segment` and
+ * `not_in_segment` name a `segment`; `prerequisite` names a `flag` and
+ * one of its `variation`s. A segment holds attribute conditions only.
+ *
+ */
+export type Condition = {
+  /**
+   * `attribute`, `in_segment`, `not_in_segment` or `prerequisite`.
+   */
+  kind: string;
+  attribute?: string;
+  op?: string;
+  /**
+   * A string, number, boolean or list, as the operator and the attribute's type need; null is no value.
+   */
+  value?: unknown;
+  segment?: string;
+  flag?: string;
+  variation?: string;
+};
+
+export type Segment = {
+  id: string;
+  key: Key;
+  name: Name;
+  description: Description;
+  /**
+   * Its conditions never leave the server; only server-side evaluation uses it.
+   */
+  private: boolean;
+  conditions: Array<Condition>;
+  created_at: string;
+  updated_at: string;
+  version: Version;
+};
+
+export type SegmentList = {
+  items: Array<Segment>;
+};
+
+export type SegmentCreate = {
+  key: Key;
+  name: Name;
+  description?: Description;
+  private?: boolean;
+  conditions?: Array<Condition>;
+};
+
+export type SegmentPatch = {
+  /**
+   * Refused with `immutable` whatever its value.
+   */
+  key?: string;
+  name?: Name;
+  description?: Description;
+  private?: boolean;
+  conditions?: Array<Condition>;
+};
+
 /**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
@@ -901,6 +967,11 @@ export type Limit = number;
  * The flag's key.
  */
 export type FlagKey = string;
+
+/**
+ * The segment's key.
+ */
+export type SegmentKey = string;
 
 /**
  * The version of the entity this write is based on, as its `ETag`
@@ -3051,6 +3122,373 @@ export type RestoreFlagResponses = {
 };
 
 export type RestoreFlagResponse = RestoreFlagResponses[keyof RestoreFlagResponses];
+
+export type ListSegmentsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/segments";
+};
+
+export type ListSegmentsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListSegmentsError = ListSegmentsErrors[keyof ListSegmentsErrors];
+
+export type ListSegmentsResponses = {
+  /**
+   * The segments, by key.
+   */
+  200: SegmentList;
+};
+
+export type ListSegmentsResponse = ListSegmentsResponses[keyof ListSegmentsResponses];
+
+export type CreateSegmentData = {
+  body: SegmentCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/segments";
+};
+
+export type CreateSegmentErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateSegmentError = CreateSegmentErrors[keyof CreateSegmentErrors];
+
+export type CreateSegmentResponses = {
+  /**
+   * Created.
+   */
+  201: Segment;
+};
+
+export type CreateSegmentResponse = CreateSegmentResponses[keyof CreateSegmentResponses];
+
+export type DeleteSegmentData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The segment's key.
+     */
+    segment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/segments/{segment}";
+};
+
+export type DeleteSegmentErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type DeleteSegmentError = DeleteSegmentErrors[keyof DeleteSegmentErrors];
+
+export type DeleteSegmentResponses = {
+  /**
+   * Deleted.
+   */
+  204: void;
+};
+
+export type DeleteSegmentResponse = DeleteSegmentResponses[keyof DeleteSegmentResponses];
+
+export type GetSegmentData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The segment's key.
+     */
+    segment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/segments/{segment}";
+};
+
+export type GetSegmentErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetSegmentError = GetSegmentErrors[keyof GetSegmentErrors];
+
+export type GetSegmentResponses = {
+  /**
+   * The segment.
+   */
+  200: Segment;
+};
+
+export type GetSegmentResponse = GetSegmentResponses[keyof GetSegmentResponses];
+
+export type UpdateSegmentData = {
+  body: SegmentPatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The segment's key.
+     */
+    segment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/segments/{segment}";
+};
+
+export type UpdateSegmentErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type UpdateSegmentError = UpdateSegmentErrors[keyof UpdateSegmentErrors];
+
+export type UpdateSegmentResponses = {
+  /**
+   * The segment as changed.
+   */
+  200: Segment;
+};
+
+export type UpdateSegmentResponse = UpdateSegmentResponses[keyof UpdateSegmentResponses];
+
+export type ListSegmentUsagesData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The segment's key.
+     */
+    segment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/segments/{segment}/usages";
+};
+
+export type ListSegmentUsagesErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListSegmentUsagesError = ListSegmentUsagesErrors[keyof ListSegmentUsagesErrors];
+
+export type ListSegmentUsagesResponses = {
+  /**
+   * The usages.
+   */
+  200: ReferenceList;
+};
+
+export type ListSegmentUsagesResponse =
+  ListSegmentUsagesResponses[keyof ListSegmentUsagesResponses];
 
 export type ListProjectMembersData = {
   body?: never;

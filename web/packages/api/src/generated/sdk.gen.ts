@@ -30,6 +30,9 @@ import type {
   CreateProjectTokenData,
   CreateProjectTokenErrors,
   CreateProjectTokenResponses,
+  CreateSegmentData,
+  CreateSegmentErrors,
+  CreateSegmentResponses,
   CreateUnitTypeData,
   CreateUnitTypeErrors,
   CreateUnitTypeResponses,
@@ -48,6 +51,9 @@ import type {
   DeleteGrantData,
   DeleteGrantErrors,
   DeleteGrantResponses,
+  DeleteSegmentData,
+  DeleteSegmentErrors,
+  DeleteSegmentResponses,
   DeleteUnitTypeData,
   DeleteUnitTypeErrors,
   DeleteUnitTypeResponses,
@@ -84,6 +90,9 @@ import type {
   GetProjectMeErrors,
   GetProjectMeResponses,
   GetProjectResponses,
+  GetSegmentData,
+  GetSegmentErrors,
+  GetSegmentResponses,
   GetUnitTypeData,
   GetUnitTypeErrors,
   GetUnitTypeResponses,
@@ -135,6 +144,12 @@ import type {
   ListRolesData,
   ListRolesErrors,
   ListRolesResponses,
+  ListSegmentsData,
+  ListSegmentsErrors,
+  ListSegmentsResponses,
+  ListSegmentUsagesData,
+  ListSegmentUsagesErrors,
+  ListSegmentUsagesResponses,
   ListUnitTypesData,
   ListUnitTypesErrors,
   ListUnitTypesResponses,
@@ -189,6 +204,9 @@ import type {
   UpdateProjectData,
   UpdateProjectErrors,
   UpdateProjectResponses,
+  UpdateSegmentData,
+  UpdateSegmentErrors,
+  UpdateSegmentResponses,
   UpdateUnitTypeData,
   UpdateUnitTypeErrors,
   UpdateUnitTypeResponses,
@@ -1128,6 +1146,144 @@ export const restoreFlag = <ThrowOnError extends boolean = false>(
     url: "/projects/{project}/flags/{flag}/restore",
     ...options,
   });
+
+/**
+ * The project's segments
+ */
+export const listSegments = <ThrowOnError extends boolean = false>(
+  options: Options<ListSegmentsData, ThrowOnError>,
+): RequestResult<ListSegmentsResponses, ListSegmentsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListSegmentsResponses, ListSegmentsErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments",
+    ...options,
+  });
+
+/**
+ * Create a segment
+ *
+ * A segment holds at most 20 attribute conditions, each naming an
+ * attribute or unit type the project declares with an operator
+ * defined for its type and a value that operator accepts; segments do
+ * not nest. A key in use is `already_exists`.
+ *
+ */
+export const createSegment = <ThrowOnError extends boolean = false>(
+  options: Options<CreateSegmentData, ThrowOnError>,
+): RequestResult<CreateSegmentResponses, CreateSegmentErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateSegmentResponses, CreateSegmentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a segment
+ */
+export const deleteSegment = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteSegmentData, ThrowOnError>,
+): RequestResult<DeleteSegmentResponses, DeleteSegmentErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteSegmentResponses, DeleteSegmentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments/{segment}",
+    ...options,
+  });
+
+/**
+ * A segment
+ */
+export const getSegment = <ThrowOnError extends boolean = false>(
+  options: Options<GetSegmentData, ThrowOnError>,
+): RequestResult<GetSegmentResponses, GetSegmentErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetSegmentResponses, GetSegmentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments/{segment}",
+    ...options,
+  });
+
+/**
+ * Change a segment
+ *
+ * Changes the name, description, private switch or conditions; the
+ * key never changes (`immutable`). Conditions are replaced as a list.
+ * A change to the values the segment already has changes nothing and
+ * records nothing.
+ *
+ */
+export const updateSegment = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateSegmentData, ThrowOnError>,
+): RequestResult<UpdateSegmentResponses, UpdateSegmentErrors, ThrowOnError> =>
+  (options.client ?? client).patch<UpdateSegmentResponses, UpdateSegmentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/segments/{segment}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Where a segment is used
+ *
+ * Every flag and environment whose rules name the segment, archived flags included, by flag key and then environment order.
+ */
+export const listSegmentUsages = <ThrowOnError extends boolean = false>(
+  options: Options<ListSegmentUsagesData, ThrowOnError>,
+): RequestResult<ListSegmentUsagesResponses, ListSegmentUsagesErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListSegmentUsagesResponses, ListSegmentUsagesErrors, ThrowOnError>(
+    {
+      security: [
+        { scheme: "bearer", type: "http" },
+        {
+          in: "cookie",
+          name: "flagnetic_session",
+          type: "apiKey",
+        },
+      ],
+      url: "/projects/{project}/segments/{segment}/usages",
+      ...options,
+    },
+  );
 
 /**
  * The members holding grants in a project
