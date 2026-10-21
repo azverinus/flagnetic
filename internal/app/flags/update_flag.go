@@ -69,7 +69,7 @@ func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagVie
 			return flagNotFound(err)
 		}
 		change := cmd.Change
-		if change.Owner, err = h.owner(ctx, cmd); err != nil {
+		if change.Owner, err = h.owner(ctx, cmd, before); err != nil {
 			return err
 		}
 		after, changed, err := before.Change(change, now)
@@ -84,7 +84,7 @@ func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagVie
 			return err
 		}
 		out = FlagView{Flag: after, Configurations: configs}
-		if !changed.Changed {
+		if !changed.Any {
 			return nil
 		}
 		if refs := flags.VariationReferences(before, changed.RemovedVariations, configs); len(refs) > 0 {
@@ -107,9 +107,11 @@ func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagVie
 }
 
 // owner returns the new owner cmd names, if any, and whether they may own
-// the flag.
-func (h *UpdateFlag) owner(ctx context.Context, cmd UpdateFlagCommand) (*flags.Owner, error) {
-	if cmd.Owner == nil {
+// the flag. Naming the owner the flag has already is no change: ownership is
+// judged only when it changes, so an owner who has since lost their grants
+// never blocks an edit of their flag.
+func (h *UpdateFlag) owner(ctx context.Context, cmd UpdateFlagCommand, f flags.Flag) (*flags.Owner, error) {
+	if cmd.Owner == nil || *cmd.Owner == f.Owner {
 		return nil, nil
 	}
 	eligible, err := h.d.Owners.MayOwn(ctx, cmd.Project, *cmd.Owner)

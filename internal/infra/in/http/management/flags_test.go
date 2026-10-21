@@ -435,6 +435,9 @@ func TestFlagOwnerAndLifetime(t *testing.T) {
 	if res := updateFlag(t, admin, p.Key, "piped", 1, management.FlagPatch{Owner: uuidOf(dev.ID), Name: ptr("Still piped")}); res.JSON200 == nil {
 		t.Errorf("renaming a flag whose owner left = %d %s", res.StatusCode(), res.Body)
 	}
+	if res := updateFlag(t, admin, p.Key, "piped", 2, management.FlagPatch{Owner: uuidOf(dev.ID)}); res.JSON200 == nil || res.JSON200.Version != 2 {
+		t.Errorf("naming only the owner who left = %d %s, want 200 and no change", res.StatusCode(), res.Body)
+	}
 }
 
 func grantOf(t *testing.T, c *management.ClientWithResponses, project string, m access.MemberID) management.Grant {
