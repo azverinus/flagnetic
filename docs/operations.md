@@ -145,7 +145,7 @@ Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNET
 
 | Metric | Labels | What it tells |
 |---|---|---|
-| `flagnetic_http_requests_total` | `method`, `route`, `code` | Requests served. `route` is the matched route pattern or `unmatched`, `method` an HTTP method or `other`, so the label set stays bounded. |
+| `flagnetic_http_requests_total` | `method`, `route`, `code` | Requests served. `route` is the matched route pattern or `unmatched`, `method` an HTTP method or `other`, so the label set stays bounded. `code` is the status answered, or `499` for a request whose client went away before it was answered, which is not a server failure and answers nothing. |
 | `flagnetic_http_request_duration_seconds` | `method`, `route` | Time to serve a request (histogram). |
 | `flagnetic_db_pool_acquired_conns`, `_idle_conns`, `_total_conns`, `_max_conns` | | The PostgreSQL pool of the replica. |
 | `flagnetic_db_pool_acquires_total`, `_empty_acquires_total`, `_acquire_wait_seconds_total` | | Connections taken from the pool, how many had to wait, and how long they waited in total. |
@@ -164,7 +164,7 @@ Logs go to standard error, one JSON object per line by default (`FLAGNETIC_LOG_F
 
 Every response carries an `X-Request-ID` header: the one the request came with when it is well formed (letters, digits and `._:-`, at most 128 characters), otherwise a new one. Every log line written while serving a request carries it as `request_id`, together with the matched `route`, so one request's lines can be found together.
 
-Each request is logged once when it completes, as a `request` record with `method`, `route` (the matched route pattern, or `unmatched`), `path`, `status`, `duration`, `bytes` and `client_ip` (see [behind a reverse proxy](#behind-a-reverse-proxy)). `/healthz` and `/readyz` are left out. An unexpected error is answered with a bare `internal` problem and logged at error with its cause under the same request ID, so a client can report the ID and you can find the cause.
+Each request is logged once when it completes, as a `request` record with `method`, `route` (the matched route pattern, or `unmatched`), `path`, `status`, `duration`, `bytes` and `client_ip` (see [behind a reverse proxy](#behind-a-reverse-proxy)). `/healthz` and `/readyz` are left out. An unexpected error is answered with a bare `internal` problem and logged at error with its cause under the same request ID, so a client can report the ID and you can find the cause. A request whose client went away before it was answered (a browser navigating away, say) is logged with `status` 499 and its cause only at debug, as `request canceled by the client`: it is not a failure, so it never shows as a 500. A request that ran past a deadline of the server's, or that the replica ended when it stopped (see [stopping](#stopping)), is still a 500 logged at error.
 
 ## Stopping
 
@@ -173,6 +173,8 @@ On SIGTERM or SIGINT a replica stops in three steps:
 1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. This gives load balancers time to notice and route away, so a rolling deploy never refuses a request. `0` skips the drain.
 2. **Grace** (`FLAGNETIC_SHUTDOWN_GRACE`, 15 s by default): the replica stops accepting connections and lets requests in flight finish.
 3. **Cancel**: requests still running when the grace period ends are cancelled, background work is stopped, and the database pool closes.
+
+A second signal skips whatever is left of the drain and the grace and goes straight to the cancel. Either way, a request the replica cancels is logged at error and counted as a 500: its client was still waiting for it.
 
 Give the platform a stop timeout of at least drain plus grace plus a margin before it kills the process: 25 seconds for the defaults (`stop_grace_period` in Compose, `terminationGracePeriodSeconds` in Kubernetes).
 

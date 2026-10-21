@@ -213,7 +213,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	st := &requestState{id: requestID(r), client: resolveClient(r, s.opts.TrustedProxies)}
 	w.Header().Set("X-Request-ID", st.id)
-	r = r.WithContext(context.WithValue(r.Context(), stateKey{}, st))
+	r = withState(r, st)
 	rw := &recorder{ResponseWriter: w}
 
 	defer func() {
@@ -279,7 +279,12 @@ var quietRoutes = map[string]bool{"GET /healthz": true, "GET /readyz": true}
 // the log.
 func (s *Server) accessLog(r *http.Request, st *requestState, rw *recorder, took time.Duration, aborted bool) {
 	status := rw.status
-	if status == 0 && !aborted {
+	switch {
+	case status != 0 || aborted:
+		// The status written, or none for a connection aborted.
+	case st.canceled:
+		status = statusClientClosedRequest
+	default:
 		status = http.StatusOK // a handler that wrote nothing answered 200
 	}
 	// Probes are counted, unlike logged: their rate is what a scrape shows of

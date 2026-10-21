@@ -35,6 +35,9 @@ const workerStopBound = 10 * time.Second
 // connection forever; the bound keeps the stop finite even then.
 const poolCloseBound = 5 * time.Second
 
+// errStopped ends the requests still running when the replica stops.
+var errStopped = errors.New("the replica stopped before the request was served")
+
 // serve runs a replica until stop is cancelled, then stops it within a known
 // bound: it drains, in-flight requests get the grace period, then their
 // contexts are cancelled, and the pool closes last. Cancelling kill skips
@@ -137,7 +140,7 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	// Every request's context derives from base, never from ctx: a request
 	// keeps running after the stop signal until the grace period is over, and
 	// cancelling base is what ends the requests still running then.
-	base, cancelRequests := context.WithCancel(kill)
+	base, cancelRequests := requestBase(kill)
 	defer cancelRequests()
 	srv := edge.HTTPServer()
 	srv.BaseContext = func(net.Listener) context.Context { return base }
@@ -189,6 +192,24 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 	listeners.Stop(workerStopBound)
 	log.Info("stopped")
 	return exitOK
+}
+
+// requestBase returns the context every request of the replica derives from,
+// and the function that ends the requests still running. Both ways the
+// replica ends them, the grace period running out and kill, cancel it with
+// errStopped, so the edge tells these requests from those whose clients went
+// away.
+//
+// The base does not inherit kill's cancellation, which carries no cause and
+// would read as every client going away at once; kill cancels it with
+// errStopped instead.
+func requestBase(kill context.Context) (context.Context, func()) {
+	base, cancel := context.WithCancelCause(context.WithoutCancel(kill))
+	stop := context.AfterFunc(kill, func() { cancel(errStopped) })
+	return base, func() {
+		stop()
+		cancel(errStopped)
+	}
 }
 
 // closePool closes the pool, waiting at most poolCloseBound for connections
