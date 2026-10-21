@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"errors"
+	"io"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -246,6 +247,7 @@ type DeactivationStore interface {
 	// not revoked yet, and returns how many it revoked. The project tokens
 	// the member created belong to their projects and stay.
 	RevokePersonalTokens(ctx context.Context, member access.MemberID, at time.Time) (int, error)
+	InvitationStore
 }
 
 // DeactivateMember offboards a member.
@@ -263,8 +265,9 @@ func NewDeactivateMember(tx Transactor, store DeactivationStore, audit AuditLog,
 }
 
 // Handle deactivates the member and, in the same unit of work, revokes
-// every session and personal access token they hold, recording
-// member.deactivated with how many of each it revoked. A deactivated member
+// every session and personal access token they hold and consumes their open
+// invitations, recording member.deactivated with how many sessions and
+// tokens it revoked. A deactivated member
 // is left as they are; the last active instance admin is refused
 // last_instance_admin.
 func (h *DeactivateMember) Handle(ctx context.Context, member access.MemberID, req governance.Request) (MemberView, error) {
@@ -283,6 +286,9 @@ func (h *DeactivateMember) Handle(ctx context.Context, member access.MemberID, r
 			if err != nil {
 				return access.Member{}, nil, err
 			}
+			if _, err := h.store.ConsumeInvitations(ctx, member, now); err != nil {
+				return access.Member{}, nil, err
+			}
 			return after, []governance.Record{{
 				Action: "member.deactivated", Entity: memberEntity(after),
 				Before: map[string]any{"status": before.Status},
@@ -291,34 +297,57 @@ func (h *DeactivateMember) Handle(ctx context.Context, member access.MemberID, r
 		})
 }
 
+// ReactivationStore is what bringing a member back needs.
+type ReactivationStore interface {
+	MemberChanger
+	InvitationStore
+}
+
 // ReactivateMember brings a deactivated member back.
 type ReactivateMember struct {
-	tx    Transactor
-	store MemberChanger
-	audit AuditLog
-	clock clock.Clock
-	ids   *id.Source
+	tx     Transactor
+	store  ReactivationStore
+	audit  AuditLog
+	clock  clock.Clock
+	ids    *id.Source
+	random io.Reader
 }
 
-// NewReactivateMember returns the handler.
-func NewReactivateMember(tx Transactor, store MemberChanger, audit AuditLog, c clock.Clock, ids *id.Source) *ReactivateMember {
-	return &ReactivateMember{tx: tx, store: store, audit: audit, clock: c, ids: ids}
+// NewReactivateMember returns the handler; random draws invitation secrets.
+func NewReactivateMember(tx Transactor, store ReactivationStore, audit AuditLog, c clock.Clock, ids *id.Source, random io.Reader,
+) *ReactivateMember {
+	return &ReactivateMember{tx: tx, store: store, audit: audit, clock: c, ids: ids, random: random}
 }
 
-// Handle makes a deactivated member active when they hold a password and
-// invited otherwise, recording member.reactivated; what their deactivation
-// revoked stays revoked. A member who is not deactivated is left as they
-// are.
-func (h *ReactivateMember) Handle(ctx context.Context, member access.MemberID, req governance.Request) (MemberView, error) {
-	return changeMember(ctx, h.tx, h.store, h.audit, h.clock, h.ids, req, member,
-		func(_ context.Context, before access.Member, holdsPassword bool, _ time.Time) (access.Member, []governance.Record, error) {
+// Handle makes a deactivated member active when they hold a password,
+// recording member.reactivated. One who never set a password is invited
+// again, with a fresh invitation, since the one they had was consumed when
+// they were deactivated. What their deactivation revoked stays revoked. A
+// member who is not deactivated is left as they are.
+func (h *ReactivateMember) Handle(ctx context.Context, member access.MemberID, req governance.Request) (InvitedMember, error) {
+	var issued *IssuedInvitation
+	view, err := changeMember(ctx, h.tx, h.store, h.audit, h.clock, h.ids, req, member,
+		func(ctx context.Context, before access.Member, holdsPassword bool, now time.Time) (access.Member, []governance.Record, error) {
 			if before.Status != access.MemberDeactivated {
 				return before, nil, nil
 			}
 			after := before.Reactivated(holdsPassword)
-			return after, []governance.Record{{
+			record := governance.Record{
 				Action: "member.reactivated", Entity: memberEntity(after),
 				Before: map[string]any{"status": before.Status}, After: map[string]any{"status": after.Status},
-			}}, nil
+			}
+			if after.Status != access.MemberInvited {
+				return after, []governance.Record{record}, nil
+			}
+			inv, err := issueInvitation(ctx, h.store, h.ids, h.random, member, now)
+			if err != nil {
+				return access.Member{}, nil, err
+			}
+			issued = &inv
+			return after, []governance.Record{record, invitationRecord("member.invitation_reissued", after, inv, nil)}, nil
 		})
+	if err != nil {
+		return InvitedMember{}, err
+	}
+	return InvitedMember{Member: view, Invitation: issued}, nil
 }

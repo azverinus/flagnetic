@@ -42,6 +42,10 @@ type Handlers struct {
 	UpdateMember        *appaccess.UpdateMember
 	DeactivateMember    *appaccess.DeactivateMember
 	ReactivateMember    *appaccess.ReactivateMember
+	InviteMember        *appaccess.InviteMember
+	ReissueInvitation   *appaccess.ReissueInvitation
+	GetInvitation       *appaccess.GetInvitation
+	AcceptInvitation    *appaccess.AcceptInvitation
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
 
@@ -140,6 +144,10 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 	if op.ChecksPassword {
 		opts = append(opts, flaghttp.MaxBodyBytes(operations.PasswordBodyLimit))
 	}
+	// A path parameter called secret holds one, such as an invitation's.
+	if strings.Contains(path, "{secret}") {
+		opts = append(opts, flaghttp.SecretInPath())
+	}
 	rt.a.edge.Handle(pattern, rt.a.seam(op, http.HandlerFunc(h)), opts...)
 }
 
@@ -186,9 +194,11 @@ func requestOf(ctx context.Context) governance.Request {
 // anyone calls it.
 func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		scheme := flaghttp.ClientOf(r.Context()).Scheme
 		ctx := context.WithValue(r.Context(), browserKey{}, browser{
-			secureCookies: a.opts.secureCookies(flaghttp.ClientOf(r.Context()).Scheme, r.Host),
+			secureCookies: a.opts.secureCookies(scheme, r.Host),
 			userAgent:     r.UserAgent(),
+			console:       a.opts.console(scheme, r.Host),
 		})
 		r = r.WithContext(ctx)
 		caller, err := a.authenticate(r, op.Operation)

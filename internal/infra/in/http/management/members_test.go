@@ -244,8 +244,8 @@ func TestDeactivationRevokesEverySessionAndTokenAndReactivationRestoresSignIn(t 
 	if !status(t, "reactivate", res2.StatusCode(), res2.Body, http.StatusOK) {
 		return
 	}
-	if got := res2.JSON200; got.Status != management.MemberStatusActive {
-		t.Errorf("reactivated = %+v, want active: they hold a password", got)
+	if got := res2.JSON200.Member; got.Status != management.MemberStatusActive || res2.JSON200.Invitation != nil {
+		t.Errorf("reactivated = %+v, want active and no invitation: they hold a password", got)
 	}
 	signedIn(t, srv, m)
 	// The browser dropped the cookie it was told had ended; one kept elsewhere

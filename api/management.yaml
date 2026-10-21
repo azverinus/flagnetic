@@ -119,6 +119,89 @@ paths:
                 $ref: "#/components/schemas/AuthMethods"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+  /auth/invitations/{secret}:
+    parameters:
+      - name: secret
+        in: path
+        required: true
+        description: The invitation's secret, the last segment of the link its issuer passed on.
+        schema:
+          type: string
+    get:
+      operationId: getInvitation
+      summary: What an invitation's link opens
+      description: |
+        Read before anyone is signed in, to show the invited person whose
+        invitation it is. An invitation that cannot be accepted, whether it
+        was never issued, has been used or replaced, or has expired, is
+        `invitation_gone`, alike. The secret never reaches a log line.
+      x-permission: public
+      security: []
+      tags: [auth]
+      responses:
+        "200":
+          description: The invitation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitation"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "410":
+          $ref: "#/components/responses/InvitationGone"
+    post:
+      operationId: acceptInvitation
+      summary: Accept an invitation
+      description: |
+        Sets the invited member's first password under the password policy
+        (`weak_password` otherwise), makes them active, uses up the link and
+        opens a session, setting its cookie. The body must be sent as
+        `application/json`; anything else is refused
+        `unsupported_media_type`.
+
+        Each attempt counts as a failure of its address before the secret is
+        looked up, and is taken back once the secret opens an invitation: a
+        hundred failures from one address in fifteen minutes, sign-ins
+        included, throttle the address (`rate_limited`).
+      x-permission: public
+      x-opens-session: true
+      x-checks-password: true
+      security: []
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationAcceptance"
+      responses:
+        "200":
+          description: Accepted and signed in. The body is the caller, as `GET /me` answers it.
+          headers:
+            Set-Cookie:
+              description: The session cookie `flagnetic_session`, as sign-in sets it.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "410":
+          $ref: "#/components/responses/InvitationGone"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "429":
+          $ref: "#/components/responses/TooManyAttempts"
+        "503":
+          $ref: "#/components/responses/Busy"
   /me:
     get:
       operationId: getMe
@@ -794,6 +877,39 @@ paths:
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: inviteMember
+      summary: Invite someone to the instance
+      description: |
+        Creates an invited member and their invitation, and answers the
+        invitation's one-time link, to pass on to them: it is shown this
+        once and never again. The link is `FLAGNETIC_BASE_URL`, or this
+        request's origin when it is not set, followed by
+        `/invitations/<secret>`; it expires after seven days. An email the
+        instance holds, whatever its case, is refused `already_exists`.
+      x-permission: instance_admin
+      tags: [members]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberInvite"
+      responses:
+        "201":
+          description: The member invited, with their invitation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberInvitation"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /members/{member}:
     parameters:
       - $ref: "#/components/parameters/MemberID"
@@ -856,7 +972,8 @@ paths:
       summary: Offboard a member
       description: |
         The member can no longer sign in, and every session and personal
-        access token they hold is revoked with them, at once. Project tokens
+        access token they hold is revoked with them, at once, and every link
+        of theirs stops working. Project tokens
         they created keep working: they belong to their project. Deactivating
         the instance's last active instance admin is refused
         `last_instance_admin`; deactivating a deactivated member changes
@@ -885,25 +1002,51 @@ paths:
       operationId: reactivateMember
       summary: Bring a deactivated member back
       description: |
-        The member becomes active when they hold a password, and invited
-        otherwise. What their deactivation revoked stays revoked: they sign
-        in afresh and create new tokens. Reactivating a member who is not
-        deactivated changes nothing.
+        The member becomes active when they hold a password. One who never
+        set one is invited again, and the answer carries their fresh
+        invitation's one-time link, as on invitation. What their
+        deactivation revoked stays revoked: they sign in afresh and create
+        new tokens. Reactivating a member who is not deactivated changes
+        nothing.
       x-permission: instance_admin
       tags: [members]
       responses:
         "200":
-          description: The member, reactivated.
+          description: The member, reactivated, with the invitation issued to them if one was.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Member"
+                $ref: "#/components/schemas/MemberInvitation"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /members/{member}/invitation:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    post:
+      operationId: reissueInvitation
+      summary: Replace an invited member's link
+      description: Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "201":
+          description: The member with their fresh invitation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberInvitation"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /members/{member}/sessions:
     parameters:
       - $ref: "#/components/parameters/MemberID"
@@ -1237,6 +1380,12 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+    InvitationGone:
+      description: "`invitation_gone`: the link opens no invitation that can be accepted: it was never issued, has been used or replaced, or has expired."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
     Busy:
       description: |
         `busy`: the replica is checking as many passwords as it may at once
@@ -1387,6 +1536,55 @@ components:
           description: Not blank, at most 200 characters.
         instance_admin:
           type: boolean
+    MemberInvite:
+      type: object
+      required: [email, display_name]
+      properties:
+        email:
+          type: string
+          description: One address of the form name@domain, at most 254 characters.
+        display_name:
+          type: string
+          description: Not blank, at most 200 characters.
+    IssuedInvitation:
+      type: object
+      description: An invitation just issued. Its link is shown this once.
+      required: [url, expires_at]
+      properties:
+        url:
+          type: string
+          description: The one-time link to pass on to the invited person.
+        expires_at:
+          type: string
+          format: date-time
+    MemberInvitation:
+      type: object
+      required: [member]
+      properties:
+        member:
+          $ref: "#/components/schemas/Member"
+        invitation:
+          $ref: "#/components/schemas/IssuedInvitation"
+    Invitation:
+      type: object
+      description: What an invitation's link opens.
+      required: [email, display_name, expires_at]
+      properties:
+        email:
+          type: string
+          description: The invited member's email with all but the first character of its local part hidden, such as `g***@example.com`.
+        display_name:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    InvitationAcceptance:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          format: password
     MeMember:
       type: object
       description: The member the credential acts for; absent for a project token, which acts for none.

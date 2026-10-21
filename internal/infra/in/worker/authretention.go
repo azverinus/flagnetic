@@ -14,18 +14,18 @@ import (
 // Tick.
 const AuthRetentionName = "auth_retention"
 
-// AuthRetention returns the worker purging ended sessions and failed
-// sign-ins that no longer count, once an hour: nothing waits on the purge,
+// AuthRetention returns the worker purging ended sessions, failed sign-ins
+// that no longer count and invitations long past use, once an hour: nothing waits on the purge,
 // which only keeps the tables small. Its metric
 // flagnetic_auth_purged_rows_total, registered on reg, counts the rows each
 // kind lost.
 func AuthRetention(h *appaccess.PurgeAuthRecords, reg prometheus.Registerer) Worker {
 	purged := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: metrics.Namespace, Subsystem: "auth", Name: "purged_rows_total",
-		Help: "Rows the auth retention worker deleted: ended sessions, email failures and source failures.",
+		Help: "Rows the auth retention worker deleted: ended sessions, email failures, source failures and invitations.",
 	}, []string{"kind"})
 	reg.MustRegister(purged)
-	for _, kind := range []string{"sessions", "email_failures", "source_failures"} {
+	for _, kind := range []string{"sessions", "email_failures", "source_failures", "invitations"} {
 		purged.WithLabelValues(kind)
 	}
 	return Worker{
@@ -38,6 +38,7 @@ func AuthRetention(h *appaccess.PurgeAuthRecords, reg prometheus.Registerer) Wor
 			purged.WithLabelValues("sessions").Add(float64(n.Sessions))
 			purged.WithLabelValues("email_failures").Add(float64(n.EmailFailures))
 			purged.WithLabelValues("source_failures").Add(float64(n.SourceFailures))
+			purged.WithLabelValues("invitations").Add(float64(n.Invitations))
 			return err
 		},
 	}

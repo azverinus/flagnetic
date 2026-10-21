@@ -86,11 +86,49 @@ func (a *api) ReactivateMember(ctx context.Context, req ReactivateMemberRequestO
 	if err != nil {
 		return nil, err
 	}
-	v, err := a.h.ReactivateMember.Handle(ctx, member, requestOf(ctx))
+	res, err := a.h.ReactivateMember.Handle(ctx, member, requestOf(ctx))
 	if err != nil {
 		return nil, err
 	}
-	return ReactivateMember200JSONResponse(memberOf(v)), nil
+	return ReactivateMember200JSONResponse(memberInvitationOf(ctx, res)), nil
+}
+
+// InviteMember invites someone and answers their one-time link.
+func (a *api) InviteMember(ctx context.Context, req InviteMemberRequestObject) (InviteMemberResponseObject, error) {
+	res, err := a.h.InviteMember.Handle(ctx, appaccess.InviteMemberCommand{
+		Email: req.Body.Email, DisplayName: req.Body.DisplayName, Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return InviteMember201JSONResponse(memberInvitationOf(ctx, res)), nil
+}
+
+// ReissueInvitation replaces an invited member's link and answers the new
+// one.
+func (a *api) ReissueInvitation(ctx context.Context, req ReissueInvitationRequestObject) (ReissueInvitationResponseObject, error) {
+	member, err := memberIDOf(req.Member)
+	if err != nil {
+		return nil, err
+	}
+	res, err := a.h.ReissueInvitation.Handle(ctx, member, requestOf(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return ReissueInvitation201JSONResponse(memberInvitationOf(ctx, res)), nil
+}
+
+// memberInvitationOf answers res to the request ctx belongs to, with the
+// link of the invitation issued, which the console opens at
+// /invitations/<secret>.
+func memberInvitationOf(ctx context.Context, res appaccess.InvitedMember) MemberInvitation {
+	out := MemberInvitation{Member: memberOf(res.Member)}
+	if inv := res.Invitation; inv != nil {
+		out.Invitation = &IssuedInvitation{
+			Url: browserOf(ctx).console + "/invitations/" + inv.Secret.Reveal(), ExpiresAt: inv.ExpiresAt,
+		}
+	}
+	return out
 }
 
 func memberOf(v appaccess.MemberView) Member {
