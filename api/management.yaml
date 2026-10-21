@@ -763,6 +763,147 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /members:
+    get:
+      operationId: listMembers
+      summary: The instance's members
+      description: Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
+      x-permission: instance_admin
+      tags: [members]
+      parameters:
+        - name: status
+          in: query
+          description: Only the members in this status.
+          schema:
+            $ref: "#/components/schemas/MemberStatus"
+        - name: q
+          in: query
+          description: Text found, whatever its case, in the member's email or display name.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The members.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /members/{member}:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    get:
+      operationId: getMember
+      summary: A member
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The member.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateMember
+      summary: Edit a member, or make them instance admin or not
+      description: |
+        Changes the fields sent and leaves the others as they are. An email
+        another member holds, whatever its case, is refused `already_exists`.
+        Demoting the instance's last active instance admin is refused
+        `last_instance_admin`.
+      x-permission: instance_admin
+      tags: [members]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberPatch"
+      responses:
+        "200":
+          description: The member as changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /members/{member}/deactivate:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    post:
+      operationId: deactivateMember
+      summary: Offboard a member
+      description: |
+        The member can no longer sign in, and every session and personal
+        access token they hold is revoked with them, at once. Project tokens
+        they created keep working: they belong to their project. Deactivating
+        the instance's last active instance admin is refused
+        `last_instance_admin`; deactivating a deactivated member changes
+        nothing.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The member, deactivated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /members/{member}/reactivate:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    post:
+      operationId: reactivateMember
+      summary: Bring a deactivated member back
+      description: |
+        The member becomes active when they hold a password, and invited
+        otherwise. What their deactivation revoked stays revoked: they sign
+        in afresh and create new tokens. Reactivating a member who is not
+        deactivated changes nothing.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The member, reactivated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /members/{member}/sessions:
     parameters:
       - $ref: "#/components/parameters/MemberID"
@@ -1200,6 +1341,52 @@ components:
         client_ip:
           type: string
           description: The address the request came from, as the server sees it behind its trusted proxies.
+    Member:
+      type: object
+      description: A member as an instance admin sees them.
+      required: [id, email, display_name, status, instance_admin, created_at, last_sign_in_at, project_count]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        display_name:
+          type: string
+        status:
+          $ref: "#/components/schemas/MemberStatus"
+        instance_admin:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        last_sign_in_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the member last signed in; null until they do.
+        project_count:
+          type: integer
+          description: How many projects the member holds a grant in; none while they are invited.
+    MemberList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
+    MemberPatch:
+      type: object
+      properties:
+        email:
+          type: string
+          description: One address of the form name@domain, at most 254 characters.
+        display_name:
+          type: string
+          description: Not blank, at most 200 characters.
+        instance_admin:
+          type: boolean
     MeMember:
       type: object
       description: The member the credential acts for; absent for a project token, which acts for none.

@@ -37,6 +37,11 @@ type Handlers struct {
 	RevokeSessions      *appaccess.RevokeSessions
 	GetAuthSettings     *appaccess.GetAuthSettings
 	UpdateAuthSettings  *appaccess.UpdateAuthSettings
+	ListMembers         *appaccess.ListMembers
+	GetMember           *appaccess.GetMember
+	UpdateMember        *appaccess.UpdateMember
+	DeactivateMember    *appaccess.DeactivateMember
+	ReactivateMember    *appaccess.ReactivateMember
 	ProjectPermissions  *appaccess.ProjectPermissions
 	WorkingProjects     *appaccess.WorkingProjects
 

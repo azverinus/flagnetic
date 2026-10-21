@@ -387,6 +387,37 @@ type MeMember struct {
 	Status MemberStatus `json:"status"`
 }
 
+// Member A member as an instance admin sees them.
+type Member struct {
+	CreatedAt     time.Time          `json:"created_at"`
+	DisplayName   string             `json:"display_name"`
+	Email         string             `json:"email"`
+	Id            openapi_types.UUID `json:"id"`
+	InstanceAdmin bool               `json:"instance_admin"`
+
+	// LastSignInAt When the member last signed in; null until they do.
+	LastSignInAt *time.Time `json:"last_sign_in_at"`
+
+	// ProjectCount How many projects the member holds a grant in; none while they are invited.
+	ProjectCount int          `json:"project_count"`
+	Status       MemberStatus `json:"status"`
+}
+
+// MemberList defines model for MemberList.
+type MemberList struct {
+	Items []Member `json:"items"`
+}
+
+// MemberPatch defines model for MemberPatch.
+type MemberPatch struct {
+	// DisplayName Not blank, at most 200 characters.
+	DisplayName *string `json:"display_name,omitempty"`
+
+	// Email One address of the form name@domain, at most 254 characters.
+	Email         *string `json:"email,omitempty"`
+	InstanceAdmin *bool   `json:"instance_admin,omitempty"`
+}
+
 // MemberStatus defines model for MemberStatus.
 type MemberStatus string
 
@@ -684,6 +715,15 @@ type RevokeMySessionsParams struct {
 	IncludeCurrent *bool `form:"include_current,omitempty" json:"include_current,omitempty"`
 }
 
+// ListMembersParams defines parameters for ListMembers.
+type ListMembersParams struct {
+	// Status Only the members in this status.
+	Status *MemberStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Q Text found, whatever its case, in the member's email or display name.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
 // ListProjectAuditEntriesParams defines parameters for ListProjectAuditEntries.
 type ListProjectAuditEntriesParams struct {
 	// Actor A member's identifier; their own changes and those of their personal access tokens.
@@ -723,6 +763,9 @@ type SignInJSONRequestBody = SignInRequest
 
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
+
+// UpdateMemberJSONRequestBody defines body for UpdateMember for application/json ContentType.
+type UpdateMemberJSONRequestBody = MemberPatch
 
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectCreate
@@ -954,6 +997,64 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 	RevokeMySession(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMembers The instance's members
+	//
+	// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
+	//
+	// Corresponds with GET /members (the `ListMembers` operationId).
+	ListMembers(ctx context.Context, params *ListMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMember A member
+	//
+	// Corresponds with GET /members/{member} (the `GetMember` operationId).
+	GetMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMemberWithBody Edit a member, or make them instance admin or not
+	//
+	// Changes the fields sent and leaves the others as they are. An email
+	// another member holds, whatever its case, is refused `already_exists`.
+	// Demoting the instance's last active instance admin is refused
+	// `last_instance_admin`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+	UpdateMemberWithBody(ctx context.Context, member MemberID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMember Edit a member, or make them instance admin or not
+	//
+	// Changes the fields sent and leaves the others as they are. An email
+	// another member holds, whatever its case, is refused `already_exists`.
+	// Demoting the instance's last active instance admin is refused
+	// `last_instance_admin`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+	UpdateMember(ctx context.Context, member MemberID, body UpdateMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeactivateMember Offboard a member
+	//
+	// The member can no longer sign in, and every session and personal
+	// access token they hold is revoked with them, at once. Project tokens
+	// they created keep working: they belong to their project. Deactivating
+	// the instance's last active instance admin is refused
+	// `last_instance_admin`; deactivating a deactivated member changes
+	// nothing.
+	//
+	// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
+	DeactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReactivateMember Bring a deactivated member back
+	//
+	// The member becomes active when they hold a password, and invited
+	// otherwise. What their deactivation revoked stays revoked: they sign
+	// in afresh and create new tokens. Reactivating a member who is not
+	// deactivated changes nothing.
+	//
+	// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
+	ReactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RevokeMemberSessions Sign a member out everywhere
 	//
@@ -1428,6 +1529,124 @@ func (c *Client) ListMySessions(ctx context.Context, reqEditors ...RequestEditor
 // Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 func (c *Client) RevokeMySession(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRevokeMySessionRequest(c.Server, session)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMembers The instance's members
+//
+// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
+//
+// Corresponds with GET /members (the `ListMembers` operationId).
+func (c *Client) ListMembers(ctx context.Context, params *ListMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMembersRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetMember A member
+//
+// Corresponds with GET /members/{member} (the `GetMember` operationId).
+func (c *Client) GetMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMemberRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateMemberWithBody Edit a member, or make them instance admin or not
+//
+// Changes the fields sent and leaves the others as they are. An email
+// another member holds, whatever its case, is refused `already_exists`.
+// Demoting the instance's last active instance admin is refused
+// `last_instance_admin`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+func (c *Client) UpdateMemberWithBody(ctx context.Context, member MemberID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMemberRequestWithBody(c.Server, member, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateMember Edit a member, or make them instance admin or not
+//
+// Changes the fields sent and leaves the others as they are. An email
+// another member holds, whatever its case, is refused `already_exists`.
+// Demoting the instance's last active instance admin is refused
+// `last_instance_admin`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+func (c *Client) UpdateMember(ctx context.Context, member MemberID, body UpdateMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMemberRequest(c.Server, member, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeactivateMember Offboard a member
+//
+// The member can no longer sign in, and every session and personal
+// access token they hold is revoked with them, at once. Project tokens
+// they created keep working: they belong to their project. Deactivating
+// the instance's last active instance admin is refused
+// `last_instance_admin`; deactivating a deactivated member changes
+// nothing.
+//
+// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
+func (c *Client) DeactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeactivateMemberRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReactivateMember Bring a deactivated member back
+//
+// The member becomes active when they hold a password, and invited
+// otherwise. What their deactivation revoked stays revoked: they sign
+// in afresh and create new tokens. Reactivating a member who is not
+// deactivated changes nothing.
+//
+// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
+func (c *Client) ReactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReactivateMemberRequest(c.Server, member)
 	if err != nil {
 		return nil, err
 	}
@@ -2479,6 +2698,221 @@ func NewRevokeMySessionRequest(server string, session SessionID) (*http.Request,
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMembersRequest constructs an http.Request for the ListMembers method
+func NewListMembersRequest(server string, params *ListMembersParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetMemberRequest constructs an http.Request for the GetMember method
+func NewGetMemberRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateMemberRequest calls the generic UpdateMember builder with application/json body
+func NewUpdateMemberRequest(server string, member MemberID, body UpdateMemberJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateMemberRequestWithBody(server, member, "application/json", bodyReader)
+}
+
+// NewUpdateMemberRequestWithBody constructs an http.Request for the UpdateMember method, with any body, and a specified content type
+func NewUpdateMemberRequestWithBody(server string, member MemberID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeactivateMemberRequest constructs an http.Request for the DeactivateMember method
+func NewDeactivateMemberRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/deactivate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReactivateMemberRequest constructs an http.Request for the ReactivateMember method
+func NewReactivateMemberRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/reactivate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -3829,6 +4263,72 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 	RevokeMySessionWithResponse(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*RevokeMySessionResponse, error)
 
+	// ListMembersWithResponse The instance's members
+	//
+	// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /members (the `ListMembers` operationId).
+	ListMembersWithResponse(ctx context.Context, params *ListMembersParams, reqEditors ...RequestEditorFn) (*ListMembersResponse, error)
+
+	// GetMemberWithResponse A member
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /members/{member} (the `GetMember` operationId).
+	GetMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*GetMemberResponse, error)
+
+	// UpdateMemberWithBodyWithResponse Edit a member, or make them instance admin or not
+	//
+	// Changes the fields sent and leaves the others as they are. An email
+	// another member holds, whatever its case, is refused `already_exists`.
+	// Demoting the instance's last active instance admin is refused
+	// `last_instance_admin`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+	UpdateMemberWithBodyWithResponse(ctx context.Context, member MemberID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMemberResponse, error)
+
+	// UpdateMemberWithResponse Edit a member, or make them instance admin or not
+	//
+	// Changes the fields sent and leaves the others as they are. An email
+	// another member holds, whatever its case, is refused `already_exists`.
+	// Demoting the instance's last active instance admin is refused
+	// `last_instance_admin`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+	UpdateMemberWithResponse(ctx context.Context, member MemberID, body UpdateMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMemberResponse, error)
+
+	// DeactivateMemberWithResponse Offboard a member
+	//
+	// The member can no longer sign in, and every session and personal
+	// access token they hold is revoked with them, at once. Project tokens
+	// they created keep working: they belong to their project. Deactivating
+	// the instance's last active instance admin is refused
+	// `last_instance_admin`; deactivating a deactivated member changes
+	// nothing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
+	DeactivateMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*DeactivateMemberResponse, error)
+
+	// ReactivateMemberWithResponse Bring a deactivated member back
+	//
+	// The member becomes active when they hold a password, and invited
+	// otherwise. What their deactivation revoked stays revoked: they sign
+	// in afresh and create new tokens. Reactivating a member who is not
+	// deactivated changes nothing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
+	ReactivateMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ReactivateMemberResponse, error)
+
 	// RevokeMemberSessionsWithResponse Sign a member out everywhere
 	//
 	// Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
@@ -4790,6 +5290,372 @@ func (r RevokeMySessionResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RevokeMySessionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListMembersResponse401Headers the declared response headers of an HTTP 401 response for ListMembers
+type ListMembersResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMembersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MemberList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMembersResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMembersResponse) GetJSON200() *MemberList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListMembersResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMembersResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMembersResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMembersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMembersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMembersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMembersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetMemberResponse401Headers the declared response headers of an HTTP 401 response for GetMember
+type GetMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Member
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetMemberResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMemberResponse) GetJSON200() *Member {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateMemberResponse401Headers the declared response headers of an HTTP 401 response for UpdateMember
+type UpdateMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Member
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateMemberResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateMemberResponse) GetJSON200() *Member {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeactivateMemberResponse401Headers the declared response headers of an HTTP 401 response for DeactivateMember
+type DeactivateMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeactivateMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Member
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeactivateMemberResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeactivateMemberResponse) GetJSON200() *Member {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeactivateMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeactivateMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeactivateMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeactivateMemberResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r DeactivateMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeactivateMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeactivateMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeactivateMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ReactivateMemberResponse401Headers the declared response headers of an HTTP 401 response for ReactivateMember
+type ReactivateMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ReactivateMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Member
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ReactivateMemberResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ReactivateMemberResponse) GetJSON200() *Member {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ReactivateMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ReactivateMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ReactivateMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ReactivateMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReactivateMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReactivateMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReactivateMemberResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -6812,6 +7678,108 @@ func (c *ClientWithResponses) RevokeMySessionWithResponse(ctx context.Context, s
 	return ParseRevokeMySessionResponse(rsp)
 }
 
+// ListMembersWithResponse The instance's members
+//
+// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /members (the `ListMembers` operationId).
+func (c *ClientWithResponses) ListMembersWithResponse(ctx context.Context, params *ListMembersParams, reqEditors ...RequestEditorFn) (*ListMembersResponse, error) {
+	rsp, err := c.ListMembers(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMembersResponse(rsp)
+}
+
+// GetMemberWithResponse A member
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /members/{member} (the `GetMember` operationId).
+func (c *ClientWithResponses) GetMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*GetMemberResponse, error) {
+	rsp, err := c.GetMember(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMemberResponse(rsp)
+}
+
+// UpdateMemberWithBodyWithResponse Edit a member, or make them instance admin or not
+//
+// Changes the fields sent and leaves the others as they are. An email
+// another member holds, whatever its case, is refused `already_exists`.
+// Demoting the instance's last active instance admin is refused
+// `last_instance_admin`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+func (c *ClientWithResponses) UpdateMemberWithBodyWithResponse(ctx context.Context, member MemberID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMemberResponse, error) {
+	rsp, err := c.UpdateMemberWithBody(ctx, member, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMemberResponse(rsp)
+}
+
+// UpdateMemberWithResponse Edit a member, or make them instance admin or not
+//
+// Changes the fields sent and leaves the others as they are. An email
+// another member holds, whatever its case, is refused `already_exists`.
+// Demoting the instance's last active instance admin is refused
+// `last_instance_admin`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+func (c *ClientWithResponses) UpdateMemberWithResponse(ctx context.Context, member MemberID, body UpdateMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMemberResponse, error) {
+	rsp, err := c.UpdateMember(ctx, member, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMemberResponse(rsp)
+}
+
+// DeactivateMemberWithResponse Offboard a member
+//
+// The member can no longer sign in, and every session and personal
+// access token they hold is revoked with them, at once. Project tokens
+// they created keep working: they belong to their project. Deactivating
+// the instance's last active instance admin is refused
+// `last_instance_admin`; deactivating a deactivated member changes
+// nothing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
+func (c *ClientWithResponses) DeactivateMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*DeactivateMemberResponse, error) {
+	rsp, err := c.DeactivateMember(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeactivateMemberResponse(rsp)
+}
+
+// ReactivateMemberWithResponse Bring a deactivated member back
+//
+// The member becomes active when they hold a password, and invited
+// otherwise. What their deactivation revoked stays revoked: they sign
+// in afresh and create new tokens. Reactivating a member who is not
+// deactivated changes nothing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
+func (c *ClientWithResponses) ReactivateMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ReactivateMemberResponse, error) {
+	rsp, err := c.ReactivateMember(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReactivateMemberResponse(rsp)
+}
+
 // RevokeMemberSessionsWithResponse Sign a member out everywhere
 //
 // Revokes every live session of the member. When that includes the session this request is signed in to, its cookie is cleared. An instance admin revokes their own sessions only from a session; their API token is refused `session_required`, as on `/me/sessions`.
@@ -7897,6 +8865,327 @@ func ParseRevokeMySessionResponse(rsp *http.Response) (*RevokeMySessionResponse,
 		response.Headers204 = &headers
 	case rsp.StatusCode == 401:
 		var headers RevokeMySessionResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListMembersResponse parses an HTTP response from a ListMembersWithResponse call
+func ParseListMembersResponse(rsp *http.Response) (*ListMembersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMembersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MemberList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMembersResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetMemberResponse parses an HTTP response from a GetMemberWithResponse call
+func ParseGetMemberResponse(rsp *http.Response) (*GetMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Member
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetMemberResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateMemberResponse parses an HTTP response from a UpdateMemberWithResponse call
+func ParseUpdateMemberResponse(rsp *http.Response) (*UpdateMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Member
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers UpdateMemberResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeactivateMemberResponse parses an HTTP response from a DeactivateMemberWithResponse call
+func ParseDeactivateMemberResponse(rsp *http.Response) (*DeactivateMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeactivateMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Member
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeactivateMemberResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseReactivateMemberResponse parses an HTTP response from a ReactivateMemberWithResponse call
+func ParseReactivateMemberResponse(rsp *http.Response) (*ReactivateMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReactivateMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Member
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ReactivateMemberResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -9524,6 +10813,21 @@ type ServerInterface interface {
 	// RevokeMySession Sign out one device
 	// (DELETE /me/sessions/{session})
 	RevokeMySession(w http.ResponseWriter, r *http.Request, session SessionID)
+	// ListMembers The instance's members
+	// (GET /members)
+	ListMembers(w http.ResponseWriter, r *http.Request, params ListMembersParams)
+	// GetMember A member
+	// (GET /members/{member})
+	GetMember(w http.ResponseWriter, r *http.Request, member MemberID)
+	// UpdateMember Edit a member, or make them instance admin or not
+	// (PATCH /members/{member})
+	UpdateMember(w http.ResponseWriter, r *http.Request, member MemberID)
+	// DeactivateMember Offboard a member
+	// (POST /members/{member}/deactivate)
+	DeactivateMember(w http.ResponseWriter, r *http.Request, member MemberID)
+	// ReactivateMember Bring a deactivated member back
+	// (POST /members/{member}/reactivate)
+	ReactivateMember(w http.ResponseWriter, r *http.Request, member MemberID)
 	// RevokeMemberSessions Sign a member out everywhere
 	// (DELETE /members/{member}/sessions)
 	RevokeMemberSessions(w http.ResponseWriter, r *http.Request, member MemberID)
@@ -9934,6 +11238,156 @@ func (siw *ServerInterfaceWrapper) RevokeMySession(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeMySession(w, r, session)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMembers operation middleware
+func (siw *ServerInterfaceWrapper) ListMembers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMembersParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMembers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMember operation middleware
+func (siw *ServerInterfaceWrapper) GetMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMember(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMember operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMember(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeactivateMember operation middleware
+func (siw *ServerInterfaceWrapper) DeactivateMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeactivateMember(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReactivateMember operation middleware
+func (siw *ServerInterfaceWrapper) ReactivateMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReactivateMember(w, r, member)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10943,6 +12397,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.UpdateAttribute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit", wrapper.ListProjectAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit/{entry}", wrapper.GetProjectAuditEntry)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members", wrapper.ListMembers)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}", wrapper.GetMember)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/members/{member}", wrapper.UpdateMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/deactivate", wrapper.DeactivateMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/reactivate", wrapper.ReactivateMember)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/sessions", wrapper.RevokeMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/sessions", wrapper.ListMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-settings", wrapper.GetAuthSettings)
@@ -11689,6 +13148,420 @@ type RevokeMySession404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response RevokeMySession404ApplicationProblemPlusJSONResponse) VisitRevokeMySessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembersRequestObject struct {
+	Params ListMembersParams
+}
+
+type ListMembersResponseObject interface {
+	VisitListMembersResponse(w http.ResponseWriter) error
+}
+
+type ListMembers200JSONResponse MemberList
+
+func (response ListMembers200JSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers400ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers401ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers403ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMemberRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type GetMemberResponseObject interface {
+	VisitGetMemberResponse(w http.ResponseWriter) error
+}
+
+type GetMember200JSONResponse Member
+
+func (response GetMember200JSONResponse) VisitGetMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMember401ApplicationProblemPlusJSONResponse) VisitGetMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetMember403ApplicationProblemPlusJSONResponse) VisitGetMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetMember404ApplicationProblemPlusJSONResponse) VisitGetMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMemberRequestObject struct {
+	Member MemberID `json:"member"`
+	Body   *UpdateMemberJSONRequestBody
+}
+
+type UpdateMemberResponseObject interface {
+	VisitUpdateMemberResponse(w http.ResponseWriter) error
+}
+
+type UpdateMember200JSONResponse Member
+
+func (response UpdateMember200JSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember401ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember403ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember404ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember409ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember422ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMemberRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type DeactivateMemberResponseObject interface {
+	VisitDeactivateMemberResponse(w http.ResponseWriter) error
+}
+
+type DeactivateMember200JSONResponse Member
+
+func (response DeactivateMember200JSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateMember401ApplicationProblemPlusJSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateMember403ApplicationProblemPlusJSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateMember404ApplicationProblemPlusJSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMember409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateMember409ApplicationProblemPlusJSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateMemberRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type ReactivateMemberResponseObject interface {
+	VisitReactivateMemberResponse(w http.ResponseWriter) error
+}
+
+type ReactivateMember200JSONResponse Member
+
+func (response ReactivateMember200JSONResponse) VisitReactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ReactivateMember401ApplicationProblemPlusJSONResponse) VisitReactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReactivateMember403ApplicationProblemPlusJSONResponse) VisitReactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReactivateMember404ApplicationProblemPlusJSONResponse) VisitReactivateMemberResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -13757,6 +15630,21 @@ type StrictServerInterface interface {
 	// RevokeMySession Sign out one device
 	// (DELETE /me/sessions/{session})
 	RevokeMySession(ctx context.Context, request RevokeMySessionRequestObject) (RevokeMySessionResponseObject, error)
+	// ListMembers The instance's members
+	// (GET /members)
+	ListMembers(ctx context.Context, request ListMembersRequestObject) (ListMembersResponseObject, error)
+	// GetMember A member
+	// (GET /members/{member})
+	GetMember(ctx context.Context, request GetMemberRequestObject) (GetMemberResponseObject, error)
+	// UpdateMember Edit a member, or make them instance admin or not
+	// (PATCH /members/{member})
+	UpdateMember(ctx context.Context, request UpdateMemberRequestObject) (UpdateMemberResponseObject, error)
+	// DeactivateMember Offboard a member
+	// (POST /members/{member}/deactivate)
+	DeactivateMember(ctx context.Context, request DeactivateMemberRequestObject) (DeactivateMemberResponseObject, error)
+	// ReactivateMember Bring a deactivated member back
+	// (POST /members/{member}/reactivate)
+	ReactivateMember(ctx context.Context, request ReactivateMemberRequestObject) (ReactivateMemberResponseObject, error)
 	// RevokeMemberSessions Sign a member out everywhere
 	// (DELETE /members/{member}/sessions)
 	RevokeMemberSessions(ctx context.Context, request RevokeMemberSessionsRequestObject) (RevokeMemberSessionsResponseObject, error)
@@ -14126,6 +16014,143 @@ func (sh *strictHandler) RevokeMySession(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeMySessionResponseObject); ok {
 		if err := validResponse.VisitRevokeMySessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMembers operation middleware
+func (sh *strictHandler) ListMembers(w http.ResponseWriter, r *http.Request, params ListMembersParams) {
+	var request ListMembersRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMembers(ctx, request.(ListMembersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMembers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMembersResponseObject); ok {
+		if err := validResponse.VisitListMembersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMember operation middleware
+func (sh *strictHandler) GetMember(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request GetMemberRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMember(ctx, request.(GetMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMemberResponseObject); ok {
+		if err := validResponse.VisitGetMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMember operation middleware
+func (sh *strictHandler) UpdateMember(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request UpdateMemberRequestObject
+
+	request.Member = member
+
+	var body UpdateMemberJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMember(ctx, request.(UpdateMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMemberResponseObject); ok {
+		if err := validResponse.VisitUpdateMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeactivateMember operation middleware
+func (sh *strictHandler) DeactivateMember(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request DeactivateMemberRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeactivateMember(ctx, request.(DeactivateMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeactivateMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeactivateMemberResponseObject); ok {
+		if err := validResponse.VisitDeactivateMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReactivateMember operation middleware
+func (sh *strictHandler) ReactivateMember(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request ReactivateMemberRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReactivateMember(ctx, request.(ReactivateMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReactivateMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReactivateMemberResponseObject); ok {
+		if err := validResponse.VisitReactivateMemberResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

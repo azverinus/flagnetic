@@ -247,16 +247,7 @@ func (h *SignIn) fail(ctx context.Context, cmd SignInCommand, member access.Memb
 		})
 	}
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		for _, r := range records {
-			entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, req, r)
-			if err != nil {
-				return err
-			}
-			if err := h.d.Audit.Record(ctx, entry); err != nil {
-				return err
-			}
-		}
-		return nil
+		return recordAll(ctx, h.d.Audit, h.d.IDs, now, req, records...)
 	})
 	if err != nil {
 		return err

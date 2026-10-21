@@ -93,6 +93,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RevokeSessions:     appaccess.NewRevokeSessions(tx, accessStore, settings, auditLog, d.Clock, d.IDs),
 		GetAuthSettings:    appaccess.NewGetAuthSettings(settings),
 		UpdateAuthSettings: appaccess.NewUpdateAuthSettings(tx, accessStore, settings, auditLog, d.Clock, d.IDs),
+		ListMembers:        appaccess.NewListMembers(accessStore),
+		GetMember:          appaccess.NewGetMember(accessStore),
+		UpdateMember:       appaccess.NewUpdateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
+		DeactivateMember:   appaccess.NewDeactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
+		ReactivateMember:   appaccess.NewReactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
 		ProjectPermissions: appaccess.NewProjectPermissions(),
 		WorkingProjects:    appaccess.NewWorkingProjects(),
 

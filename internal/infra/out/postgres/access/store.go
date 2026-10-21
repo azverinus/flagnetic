@@ -57,6 +57,12 @@ func (s *Store) CreateMember(ctx context.Context, m access.Member, passwordHash 
 		INSERT INTO members (id, email, display_name, status, instance_admin, locale, password_hash, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''), NULLIF($7, ''), $8, $8)`,
 		m.ID.Bytes(), m.Email, m.DisplayName, string(m.Status), m.InstanceAdmin, m.Locale, passwordHash, m.CreatedAt)
+	return emailTaken(err)
+}
+
+// emailTaken returns err as errEmailTaken when it violates the uniqueness
+// of members' emails, and as it is otherwise.
+func emailTaken(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "members_email_key" {
 		return errEmailTaken.WithCause(err)
