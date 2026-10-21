@@ -8,7 +8,6 @@ import (
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
-	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
@@ -98,10 +97,6 @@ func (a *api) DeleteOverride(ctx context.Context, req DeleteOverrideRequestObjec
 	}, nil
 }
 
-// errRuleNotFound answers a rule identifier that is not one: no
-// configuration has a rule by it.
-var errRuleNotFound = apperrors.NotFound("not_found", "the configuration has no rule with this identifier")
-
 // RegenerateRolloutSalt gives a rollout a new salt.
 func (a *api) RegenerateRolloutSalt(ctx context.Context, req RegenerateRolloutSaltRequestObject) (RegenerateRolloutSaltResponseObject, error) {
 	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, req.Params.IfMatch)
@@ -110,7 +105,8 @@ func (a *api) RegenerateRolloutSalt(ctx context.Context, req RegenerateRolloutSa
 	}
 	rule, err := id.Parse[flags.Rule](req.Rule)
 	if err != nil {
-		return nil, errRuleNotFound
+		// What is not an identifier names no rule of any configuration.
+		return nil, flags.ErrNoRule
 	}
 	ec, err := a.h.RegenerateSalt.Handle(ctx, appflags.RegenerateSaltCommand{Configuration: cmd, Rule: rule})
 	if err != nil {

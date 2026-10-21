@@ -316,7 +316,7 @@ func TestRulesAndOverridesKeepWhatTheyReferenceInPlace(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
-	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "employees", Name: "Employees"})
+	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "staff", Name: "Staff"})
 	createSegment(t, admin, p.Key, management.SegmentCreate{Key: "beta_testers", Name: "Beta testers"})
 	stringFlag(t, admin, p.Key, "copy")
 	createFlag(t, admin, p.Key, management.FlagCreate{Key: "banner", Type: management.FlagTypeBoolean, Name: "Banner"})
@@ -324,7 +324,7 @@ func TestRulesAndOverridesKeepWhatTheyReferenceInPlace(t *testing.T) {
 	for _, env := range []string{"production", "staging"} {
 		mustPut(t, admin, p.Key, "banner", env, 1, management.FlagConfigurationPut{OffVariation: "false", Fallthrough: "true",
 			Rules: &[]management.RuleInput{{
-				Conditions: conditions(management.Condition{Kind: "not_in_segment", Segment: ptr("employees")}, requires("copy", "b")),
+				Conditions: conditions(management.Condition{Kind: "not_in_segment", Segment: ptr("staff")}, requires("copy", "b")),
 				Serve:      serves("false"),
 			}}})
 	}
@@ -339,7 +339,7 @@ func TestRulesAndOverridesKeepWhatTheyReferenceInPlace(t *testing.T) {
 		want []string
 	}{
 		{"deleting a segment a rule names", func() (int, []byte) {
-			r := deleteSegment(t, admin, p.Key, "employees", 1)
+			r := deleteSegment(t, admin, p.Key, "staff", 1)
 			return r.StatusCode(), r.Body
 		}, []string{"banner staging", "banner production"}},
 		{"deleting a segment an archived flag's rule names", func() (int, []byte) {
@@ -368,7 +368,7 @@ func TestRulesAndOverridesKeepWhatTheyReferenceInPlace(t *testing.T) {
 	for _, env := range []string{"production", "staging"} {
 		mustPut(t, admin, p.Key, "banner", env, 2, management.FlagConfigurationPut{OffVariation: "false", Fallthrough: "true"})
 	}
-	if r := deleteSegment(t, admin, p.Key, "employees", 1); r.StatusCode() != http.StatusNoContent {
+	if r := deleteSegment(t, admin, p.Key, "staff", 1); r.StatusCode() != http.StatusNoContent {
 		t.Errorf("deleting a segment nothing names = %d %s", r.StatusCode(), r.Body)
 	}
 	if r := archive(t, admin, p.Key, "copy", 1); r.JSON200 == nil {

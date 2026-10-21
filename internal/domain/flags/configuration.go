@@ -111,12 +111,16 @@ func InitialConfiguration(f Flag, environment workspace.EnvironmentID, by *acces
 
 // Bounds of a configuration, which every SDK evaluates on every call.
 const (
-	maxRules              = 50
-	maxOverrides          = 200
-	maxUnitIDBytes        = 256
-	maxNoteLength         = 200
-	maxPercentage         = 10_000
-	maxPrerequisiteDepth  = 5
+	maxRules             = 50
+	maxOverrides         = 200
+	maxUnitIDBytes       = 256
+	maxNoteLength        = 200
+	maxPercentage        = 10_000
+	maxPrerequisiteDepth = 5
+)
+
+// The refusal of an invalid write to a configuration.
+const (
 	invalidConfiguration  = "invalid_configuration"
 	configurationNotValid = "the configuration is not valid"
 )
@@ -207,21 +211,20 @@ func (c Configuration) Replace(f Flag, in ConfigurationInput, r Referents, m Min
 	if err := ck.err(); err != nil {
 		return c, Changed{}, err
 	}
-	return c.changedTo(out, w)
+	after, changed := c.changedTo(out, w)
+	return after, changed, nil
 }
 
 // changedTo returns out stamped by w as the next version of c, and what
 // changed; c itself when nothing did.
-func (c Configuration) changedTo(out Configuration, w Write) (Configuration, Changed, error) {
+func (c Configuration) changedTo(out Configuration, w Write) (Configuration, Changed) {
 	if out.sameDocument(c) {
-		return c, Changed{}, nil
+		return c, Changed{}
 	}
 	out.UpdatedAt, out.UpdatedBy, out.Version = w.Now, w.By, c.Version+1
 	switched := c
 	switched.On = out.On
-	return out, Changed{
-		Any: true, Ruleset: !out.sameRuleset(c), Switched: out.On != c.On && out.sameRuleset(switched),
-	}, nil
+	return out, Changed{Any: true, Ruleset: !out.sameRuleset(c), Switched: out.On != c.On && out.sameRuleset(switched)}
 }
 
 // sameRuleset reports whether c and d carry the same ruleset: everything

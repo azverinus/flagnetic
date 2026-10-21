@@ -10,7 +10,8 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
-// ArchivalDeps are what archiving and restoring a flag run on.
+// ArchivalDeps are what restoring a flag runs on, and archiving one besides
+// finding the flags that require it.
 type ArchivalDeps struct {
 	Tx       Transactor
 	Projects ProjectLocker

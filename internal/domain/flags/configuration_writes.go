@@ -32,8 +32,7 @@ func KillReason(reason *string) (string, error) {
 func (c Configuration) Kill(w Write) (Configuration, Changed) {
 	out := c
 	out.On = false
-	after, changed, _ := c.changedTo(out, w)
-	return after, changed
+	return c.changedTo(out, w)
 }
 
 // SetOverride returns the configuration of f with o set by w, checked
@@ -60,7 +59,8 @@ func (c Configuration) SetOverride(f Flag, o OverrideInput, d Declarations, w Wr
 	if err := ck.err(); err != nil {
 		return c, Changed{}, err
 	}
-	return c.changedTo(out, w)
+	after, changed := c.changedTo(out, w)
+	return after, changed, nil
 }
 
 // errNoOverride answers a unit the configuration has no override for.
@@ -77,11 +77,12 @@ func (c Configuration) RemoveOverride(unitType, unitID string, w Write) (Configu
 	}
 	out := c
 	out.Overrides = slices.Delete(slices.Clone(c.Overrides), i, i+1)
-	return c.changedTo(out, w)
+	after, changed := c.changedTo(out, w)
+	return after, changed, nil
 }
 
-// errNoRule answers a rule the configuration does not have.
-var errNoRule = apperrors.NotFound("not_found", "the configuration has no rule with this identifier")
+// ErrNoRule answers a rule the configuration does not have.
+var ErrNoRule = apperrors.NotFound("not_found", "the configuration has no rule with this identifier")
 
 // errNotARollout refuses to regenerate the salt of a rule serving no
 // rollout: only a rollout has one.
@@ -95,7 +96,7 @@ var errNotARollout = apperrors.Conflict("not_a_rollout", "the rule serves no rol
 func (c Configuration) RegenerateSalt(rule RuleID, m Mint, w Write) (Configuration, Changed, error) {
 	i := slices.IndexFunc(c.Rules, func(r Rule) bool { return r.ID == rule })
 	if i < 0 {
-		return c, Changed{}, errNoRule
+		return c, Changed{}, ErrNoRule
 	}
 	if c.Rules[i].Serve.Kind != ServeRollout {
 		return c, Changed{}, errNotARollout
@@ -103,5 +104,6 @@ func (c Configuration) RegenerateSalt(rule RuleID, m Mint, w Write) (Configurati
 	out := c
 	out.Rules = slices.Clone(c.Rules)
 	out.Rules[i].Serve.Salt = m.Salt()
-	return c.changedTo(out, w)
+	after, changed := c.changedTo(out, w)
+	return after, changed, nil
 }
