@@ -65,17 +65,17 @@ Both are recorded in the audit log with the CLI as their actor.
 
 ## Signing in to the console
 
-Members sign in with their email and password. A sign-in opens a session held by the server and referred to by the cookie `flagnetic_session` (`HttpOnly; SameSite=Lax`), signed under the secret key. A session ends at sign-out, after 24 hours without a request, or 30 days after it opened.
+Members sign in with their email and password. A sign-in opens a session held by the server and referred to by the cookie `flagnetic_session` (`HttpOnly; SameSite=Lax`), signed under the secret key. A session ends at sign-out, after 24 hours without a request, or 30 days after it opened; a request with its cookie is then answered `401 session_expired` and the cookie is cleared.
 
 - The cookie is `Secure` whenever the console is reached over HTTPS, and also over plain HTTP unless the host is `localhost` (or a loopback address), where browsers accept it without TLS. To try Flagnetic over plain HTTP on another host, set `FLAGNETIC_INSECURE_COOKIES=true`; never do so on a network you do not trust.
-- Sign-in accepts only a JSON body (`415 unsupported_media_type` otherwise), which a form on another site cannot send, so no page elsewhere can sign a visitor in to an account of its choosing.
+- Sign-in accepts only a JSON body (`415 unsupported_media_type` otherwise), which a form on another site cannot send, so no page elsewhere can sign a visitor in as a member of its choosing.
 - A request signed in by the cookie, a read as much as a write, is refused (`403 cross_origin`) when the browser says it comes from another site, so a page elsewhere can neither act as a signed-in member nor read what the console shows them. Requests with an API token are not checked: a browser never sends one by itself.
 
 Guessing passwords is slow, and cannot exhaust a replica:
 
 - **Lockout.** Five consecutive failed sign-ins on one email lock it for a minute; each further failure after a lock ends locks it twice as long, up to an hour. A locked email is answered `429 locked` with `retry_after` (and `Retry-After`) in seconds, even with the right password. Unknown emails lock exactly like known ones, so the answer tells nobody which emails exist. A successful sign-in clears the count. Every replica honours a lockout another recorded: the counts live in PostgreSQL.
 - **Throttle.** A hundred failed attempts from one source within fifteen minutes refuse it, `429 rate_limited` with `Retry-After`, until those fifteen minutes end. A source is an IPv4 address, or an IPv6 address with the rest of its /64. Behind a proxy, list it in `FLAGNETIC_TRUSTED_PROXIES`, or every member shares the proxy's address.
-- Each attempt is counted as a failure before its password is checked and taken back when it was right, so attempts made at once cannot all slip past the count.
+- Each attempt is counted as a failure before its password is checked and taken back when it was right, could not be checked, or was refused as locked or throttled, so attempts made at once cannot all slip past the count and only checked passwords count.
 - **Hashing bound.** Checking a password takes 64 MiB of memory for about a tenth of a second. Each replica checks at most `FLAGNETIC_PASSWORD_HASH_CONCURRENCY` (default 4) at once; a sign-in that waits more than 2 seconds for its turn is answered `503 busy` with `Retry-After`, and is not counted as a failure. Locked, throttled and oversized attempts are refused before they wait for a turn, and the request body of an operation that checks a password is limited to 8 KiB (`413 request_too_large`). Raise the bound only with the memory to match: each slot needs 64 MiB on top of the replica's own.
 - Sign-ins, sign-outs, failures (with their reason) and lockouts of members are recorded in the instance audit log; attempts on emails no member has are not.
 

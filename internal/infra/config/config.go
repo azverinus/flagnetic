@@ -148,7 +148,7 @@ func Settings() []Setting {
 			Name: "FLAGNETIC_BASE_URL",
 			Key:  "base_url",
 			Description: "The public URL the console is reached at, such as the address of the reverse proxy in front. " +
-				"Its scheme decides whether the session cookie is `Secure`, and its origin is trusted for writes signed in through the console " +
+				"Its scheme decides whether the session cookie is `Secure`, and its origin is trusted for requests signed in through the console " +
 				"even when the proxy rewrites `Host`. When unset, the scheme and origin of each request are used.",
 			Example: "https://flags.example.com",
 			apply: func(cfg *Config, v string) error {

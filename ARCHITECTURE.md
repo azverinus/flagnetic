@@ -76,9 +76,9 @@ Domain and application code return errors of a fixed set of kinds from `internal
 | `precondition_failed` | 412 |
 | `gone` | 410 |
 | `rate_limited` | 429, with `Retry-After` |
-| `unavailable` | 503 |
+| `unavailable` | 503, with `Retry-After` when the wait is known (such as `busy`) |
 
-Only the HTTP adapter answers problems about the HTTP request itself: 400 `invalid_request` (a request it cannot decode), 404 `not_found` and 405 `method_not_allowed` (no route), 408 `request_timeout` (a body that did not arrive in time), 413 `request_too_large` (a body over its limit) and 428 `precondition_required` (a write without `If-Match`). Any error carrying no kind is 500 `internal`, answered with no detail and logged with its cause and the request ID. Every API answers errors as RFC 9457 problem documents (`application/problem+json`) written in one place in `internal/infra/in/http`; nothing below the adapter knows about HTTP.
+Only the HTTP adapter answers problems about the HTTP request itself: 400 `invalid_request` (a request it cannot decode), 404 `not_found` and 405 `method_not_allowed` (no route), 408 `request_timeout` (a body that did not arrive in time), 413 `request_too_large` (a body over its limit), 415 `unsupported_media_type` (a body sent as a media type the operation does not accept) and 428 `precondition_required` (a write without `If-Match`). Any error carrying no kind is 500 `internal`, answered with no detail and logged with its cause and the request ID. Every API answers errors as RFC 9457 problem documents (`application/problem+json`) written in one place in `internal/infra/in/http`; nothing below the adapter knows about HTTP.
 
 ## Identifiers and time
 

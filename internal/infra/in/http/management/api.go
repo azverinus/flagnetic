@@ -219,7 +219,7 @@ func (a *api) seam(op operations.Entry, next http.Handler) http.Handler {
 // answers is no other page's business. The check is therefore made as if r
 // were a write.
 func (a *api) crossOrigin(r *http.Request) bool {
-	asWrite := r.WithContext(r.Context())
+	asWrite := r.WithContext(r.Context()) // a shallow copy, whose method alone changes
 	asWrite.Method = http.MethodPost
 	return a.origins.Check(asWrite) != nil
 }
