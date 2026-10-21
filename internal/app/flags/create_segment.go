@@ -34,25 +34,21 @@ type SegmentCreator interface {
 	CreateSegment(ctx context.Context, s flags.Segment) error
 }
 
-// SegmentDeps are what the segment writes run on.
-type SegmentDeps struct {
+// CreateSegmentDeps are what CreateSegment runs on.
+type CreateSegmentDeps struct {
 	Tx           Transactor
 	Projects     ProjectLocker
 	Declarations Declarations
+	Store        SegmentCreator
 	Rulesets     Rulesets
 	Recorder     Recorder
 }
 
 // CreateSegment creates a segment.
-type CreateSegment struct {
-	d     SegmentDeps
-	store SegmentCreator
-}
+type CreateSegment struct{ d CreateSegmentDeps }
 
 // NewCreateSegment returns the handler.
-func NewCreateSegment(d SegmentDeps, store SegmentCreator) *CreateSegment {
-	return &CreateSegment{d: d, store: store}
-}
+func NewCreateSegment(d CreateSegmentDeps) *CreateSegment { return &CreateSegment{d: d} }
 
 // CreateSegmentCommand is the segment to create.
 type CreateSegmentCommand struct {
@@ -85,7 +81,7 @@ func (h *CreateSegment) Handle(ctx context.Context, cmd CreateSegmentCommand) (f
 		if err != nil {
 			return err
 		}
-		if err = h.store.CreateSegment(ctx, s); err != nil {
+		if err = h.d.Store.CreateSegment(ctx, s); err != nil {
 			return err
 		}
 		if err = h.d.Rulesets.Project(ctx, cmd.Project); err != nil {

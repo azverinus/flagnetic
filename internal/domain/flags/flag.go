@@ -347,9 +347,9 @@ type FlagChange struct {
 
 // Changed is what a change did.
 type Changed struct {
-	// Changed is false for a change to the values the flag already has,
+	// Any is false for a change to the values the entity already has,
 	// which is stored and recorded nowhere.
-	Changed bool
+	Any bool
 	// Ruleset reports a change to what a ruleset carries of the flag: its
 	// variations' keys, values and order, or automatic exposure.
 	Ruleset bool
@@ -407,24 +407,30 @@ func (f Flag) Change(ch FlagChange, now time.Time) (Flag, Changed, error) {
 		return f, Changed{}, nil
 	}
 	out.UpdatedAt, out.Version = now, f.Version+1
-	return out, Changed{Changed: true, Ruleset: out.rulesetDiffers(f), RemovedVariations: removed(f.Variations, out.Variations)}, nil
+	return out, Changed{Any: true, Ruleset: out.rulesetDiffers(f), RemovedVariations: removed(f.Variations, out.Variations)}, nil
 }
 
 func (f Flag) sameDefinition(g Flag) bool {
 	return f.Name == g.Name && f.Description == g.Description && f.Owner == g.Owner && slices.Equal(f.Tags, g.Tags) &&
 		f.Lifetime == g.Lifetime && sameTime(f.ExpectedRemovalAt, g.ExpectedRemovalAt) &&
-		f.AutomaticExposure == g.AutomaticExposure && slices.EqualFunc(f.Variations, g.Variations, func(a, b Variation) bool {
-		return a.Key == b.Key && bytes.Equal(a.Value, b.Value) && a.Name == b.Name && a.Description == b.Description
-	})
+		f.AutomaticExposure == g.AutomaticExposure && sameServed(f.Variations, g.Variations) &&
+		slices.EqualFunc(f.Variations, g.Variations, func(a, b Variation) bool {
+			return a.Name == b.Name && a.Description == b.Description
+		})
 }
 
 // rulesetDiffers reports whether f and g differ in what a ruleset carries
 // of a flag's definition.
 func (f Flag) rulesetDiffers(g Flag) bool {
 	return f.AutomaticExposure != g.AutomaticExposure || (f.ArchivedAt == nil) != (g.ArchivedAt == nil) ||
-		!slices.EqualFunc(f.Variations, g.Variations, func(a, b Variation) bool {
-			return a.Key == b.Key && bytes.Equal(a.Value, b.Value)
-		})
+		!sameServed(f.Variations, g.Variations)
+}
+
+// sameServed reports whether a and b serve the same variations: the same
+// keys with the same values in the same order, which is what a ruleset
+// carries of them.
+func sameServed(a, b []Variation) bool {
+	return slices.EqualFunc(a, b, func(x, y Variation) bool { return x.Key == y.Key && bytes.Equal(x.Value, y.Value) })
 }
 
 func sameTime(a, b *time.Time) bool {
@@ -443,11 +449,6 @@ func removed(before, after []Variation) []string {
 		}
 	}
 	return out
-}
-
-// HasVariation reports whether the flag has a variation with key.
-func (f Flag) HasVariation(key string) bool {
-	return slices.ContainsFunc(f.Variations, func(v Variation) bool { return v.Key == key })
 }
 
 // Archive returns the flag archived at now, hidden from SDKs in every

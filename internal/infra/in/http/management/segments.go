@@ -63,17 +63,21 @@ func (a *api) UpdateSegment(ctx context.Context, req UpdateSegmentRequestObject)
 
 // DeleteSegment deletes a segment.
 func (a *api) DeleteSegment(ctx context.Context, req DeleteSegmentRequestObject) (DeleteSegmentResponseObject, error) {
-	expected, err := ifMatch(req.Params.IfMatch)
+	cmd, err := segmentCommand(ctx, req.Segment, req.Params.IfMatch)
 	if err != nil {
 		return nil, err
 	}
-	err = a.h.DeleteSegment.Handle(ctx, appflags.SegmentCommand{
-		Project: projectID(ctx), Key: req.Segment, Expected: expected, Request: requestOf(ctx),
-	})
-	if err != nil {
+	if err := a.h.DeleteSegment.Handle(ctx, cmd); err != nil {
 		return nil, err
 	}
 	return DeleteSegment204Response{}, nil
+}
+
+// segmentCommand returns the command naming segment of the request's
+// project, based on the version header names.
+func segmentCommand(ctx context.Context, segment string, header *IfMatch) (appflags.SegmentCommand, error) {
+	expected, err := ifMatch(header)
+	return appflags.SegmentCommand{Project: projectID(ctx), Key: segment, Expected: expected, Request: requestOf(ctx)}, err
 }
 
 // ListSegmentUsages answers where a segment is used.

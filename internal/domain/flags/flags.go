@@ -7,7 +7,6 @@
 package flags
 
 import (
-	"encoding/json"
 	"strings"
 	"unicode/utf8"
 
@@ -72,31 +71,27 @@ func (c *check) err() error {
 // such as a flag's configuration in one environment serving a variation.
 type Reference struct {
 	// Kind is the kind of what names it, such as flag or segment.
-	Kind string `json:"kind"`
+	Kind string
 	// Key is its key.
-	Key string `json:"key"`
+	Key string
 	// Environment is the key of the environment it names it in, "" when it
 	// names it in every environment, as a segment does.
-	Environment string `json:"environment"`
-}
-
-// MarshalJSON writes a reference naming no one environment with environment
-// null, so a client tells "every environment" from an environment's key.
-func (r Reference) MarshalJSON() ([]byte, error) {
-	var env *string
-	if r.Environment != "" {
-		env = &r.Environment
-	}
-	return json.Marshal(struct {
-		Kind        string  `json:"kind"`
-		Key         string  `json:"key"`
-		Environment *string `json:"environment"`
-	}{r.Kind, r.Key, env})
+	Environment string
 }
 
 // ErrInUse refuses a write that would leave refs naming nothing, listing
-// them so the caller knows what to change first.
+// them so the caller knows what to change first. A reference naming no one
+// environment carries environment null, so a client tells "every
+// environment" from an environment's key.
 func ErrInUse(refs []Reference) error {
+	members := make([]map[string]any, len(refs))
+	for i, r := range refs {
+		var env any
+		if r.Environment != "" {
+			env = r.Environment
+		}
+		members[i] = map[string]any{"kind": r.Kind, "key": r.Key, "environment": env}
+	}
 	return apperrors.Conflict("in_use", "something still names what this write would remove").
-		WithExtension("references", refs)
+		WithExtension("references", members)
 }

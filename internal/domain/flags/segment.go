@@ -128,5 +128,5 @@ func (s Segment) Change(ch SegmentChange, d Declarations, now time.Time) (Segmen
 		return s, Changed{}, nil
 	}
 	out.UpdatedAt, out.Version = now, s.Version+1
-	return out, Changed{Changed: true, Ruleset: ruleset}, nil
+	return out, Changed{Any: true, Ruleset: ruleset}, nil
 }

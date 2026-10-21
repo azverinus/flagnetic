@@ -14,29 +14,30 @@ type FlagDeleter interface {
 	DeleteFlag(ctx context.Context, flag flags.FlagID) error
 }
 
-// DeleteFlag deletes an archived flag.
-type DeleteFlag struct {
-	tx       Transactor
-	projects ProjectLocker
-	store    FlagDeleter
-	rec      Recorder
+// DeleteFlagDeps are what DeleteFlag runs on.
+type DeleteFlagDeps struct {
+	Tx       Transactor
+	Projects ProjectLocker
+	Store    FlagDeleter
+	Recorder Recorder
 }
 
+// DeleteFlag deletes an archived flag.
+type DeleteFlag struct{ d DeleteFlagDeps }
+
 // NewDeleteFlag returns the handler.
-func NewDeleteFlag(tx Transactor, projects ProjectLocker, store FlagDeleter, rec Recorder) *DeleteFlag {
-	return &DeleteFlag{tx: tx, projects: projects, store: store, rec: rec}
-}
+func NewDeleteFlag(d DeleteFlagDeps) *DeleteFlag { return &DeleteFlag{d: d} }
 
 // Handle deletes the flag with its configuration in every environment,
 // recording both as they were. An archived flag is in no ruleset already,
 // so deleting it moves none on.
 func (h *DeleteFlag) Handle(ctx context.Context, cmd FlagCommand) error {
-	now := h.rec.now()
-	return h.tx.Within(ctx, func(ctx context.Context) error {
-		if _, err := h.projects.LockProject(ctx, cmd.Project); err != nil {
+	now := h.d.Recorder.now()
+	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		if _, err := h.d.Projects.LockProject(ctx, cmd.Project); err != nil {
 			return err
 		}
-		f, err := h.store.FlagByKey(ctx, cmd.Project, cmd.Key)
+		f, err := h.d.Store.FlagByKey(ctx, cmd.Project, cmd.Key)
 		if err != nil {
 			return flagNotFound(err)
 		}
@@ -46,14 +47,14 @@ func (h *DeleteFlag) Handle(ctx context.Context, cmd FlagCommand) error {
 		if err = f.CanDelete(); err != nil {
 			return err
 		}
-		configs, err := h.store.Configurations(ctx, f.ID)
+		configs, err := h.d.Store.Configurations(ctx, f.ID)
 		if err != nil {
 			return err
 		}
-		if err = h.store.DeleteFlag(ctx, f.ID); err != nil {
+		if err = h.d.Store.DeleteFlag(ctx, f.ID); err != nil {
 			return err
 		}
-		return h.rec.record(ctx, now, cmd.Request, governance.Record{
+		return h.d.Recorder.record(ctx, now, cmd.Request, governance.Record{
 			Project: cmd.Project, Action: "flag.deleted", Entity: flagEntity(f),
 			Before: flagValues(FlagView{Flag: f, Configurations: configs}),
 		})

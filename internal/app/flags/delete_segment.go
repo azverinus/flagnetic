@@ -15,16 +15,20 @@ type SegmentDeleter interface {
 	DeleteSegment(ctx context.Context, segment flags.SegmentID) error
 }
 
-// DeleteSegment deletes a segment.
-type DeleteSegment struct {
-	d     SegmentDeps
-	store SegmentDeleter
+// DeleteSegmentDeps are what DeleteSegment runs on.
+type DeleteSegmentDeps struct {
+	Tx       Transactor
+	Projects ProjectLocker
+	Store    SegmentDeleter
+	Rulesets Rulesets
+	Recorder Recorder
 }
 
+// DeleteSegment deletes a segment.
+type DeleteSegment struct{ d DeleteSegmentDeps }
+
 // NewDeleteSegment returns the handler.
-func NewDeleteSegment(d SegmentDeps, store SegmentDeleter) *DeleteSegment {
-	return &DeleteSegment{d: d, store: store}
-}
+func NewDeleteSegment(d DeleteSegmentDeps) *DeleteSegment { return &DeleteSegment{d: d} }
 
 // SegmentCommand names one segment of a project and the version of it a
 // write is based on.
@@ -42,14 +46,14 @@ func (h *DeleteSegment) Handle(ctx context.Context, cmd SegmentCommand) error {
 		if _, err := h.d.Projects.LockProject(ctx, cmd.Project); err != nil {
 			return err
 		}
-		s, err := h.store.SegmentByKey(ctx, cmd.Project, cmd.Key)
+		s, err := h.d.Store.SegmentByKey(ctx, cmd.Project, cmd.Key)
 		if err != nil {
 			return segmentNotFound(err)
 		}
 		if err = precondition.Check(cmd.Expected, s.Version); err != nil {
 			return err
 		}
-		if err = h.store.DeleteSegment(ctx, s.ID); err != nil {
+		if err = h.d.Store.DeleteSegment(ctx, s.ID); err != nil {
 			return err
 		}
 		if err = h.d.Rulesets.Project(ctx, cmd.Project); err != nil {

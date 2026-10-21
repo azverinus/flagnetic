@@ -16,16 +16,21 @@ type SegmentUpdater interface {
 	UpdateSegment(ctx context.Context, s flags.Segment) error
 }
 
-// UpdateSegment changes a segment.
-type UpdateSegment struct {
-	d     SegmentDeps
-	store SegmentUpdater
+// UpdateSegmentDeps are what UpdateSegment runs on.
+type UpdateSegmentDeps struct {
+	Tx           Transactor
+	Projects     ProjectLocker
+	Declarations Declarations
+	Store        SegmentUpdater
+	Rulesets     Rulesets
+	Recorder     Recorder
 }
 
+// UpdateSegment changes a segment.
+type UpdateSegment struct{ d UpdateSegmentDeps }
+
 // NewUpdateSegment returns the handler.
-func NewUpdateSegment(d SegmentDeps, store SegmentUpdater) *UpdateSegment {
-	return &UpdateSegment{d: d, store: store}
-}
+func NewUpdateSegment(d UpdateSegmentDeps) *UpdateSegment { return &UpdateSegment{d: d} }
 
 // UpdateSegmentCommand is a change to the segment Key of Project, based on
 // the version Expected names.
@@ -48,7 +53,7 @@ func (h *UpdateSegment) Handle(ctx context.Context, cmd UpdateSegmentCommand) (f
 		if _, err := h.d.Projects.LockProject(ctx, cmd.Project); err != nil {
 			return err
 		}
-		before, err := h.store.SegmentByKey(ctx, cmd.Project, cmd.Key)
+		before, err := h.d.Store.SegmentByKey(ctx, cmd.Project, cmd.Key)
 		if err != nil {
 			return segmentNotFound(err)
 		}
@@ -64,10 +69,10 @@ func (h *UpdateSegment) Handle(ctx context.Context, cmd UpdateSegmentCommand) (f
 			return err
 		}
 		out = after
-		if !changed.Changed {
+		if !changed.Any {
 			return nil
 		}
-		if err = h.store.UpdateSegment(ctx, after); err != nil {
+		if err = h.d.Store.UpdateSegment(ctx, after); err != nil {
 			return err
 		}
 		if changed.Ruleset {

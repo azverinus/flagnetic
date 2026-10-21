@@ -216,7 +216,7 @@ func TestAnOwnerMustBeEligible(t *testing.T) {
 		t.Errorf("changing to an ineligible owner: violations = %v", got)
 	}
 	_, ch, err := f.Change(flags.FlagChange{Owner: &flags.Owner{Member: anna}}, now)
-	if err != nil || ch.Changed {
+	if err != nil || ch.Any {
 		t.Errorf("naming the owner it has = %+v, %v, want no change whatever the owner's standing now", ch, err)
 	}
 }
@@ -285,8 +285,8 @@ func TestAChangeSaysWhetherItChangedTheRuleset(t *testing.T) {
 			t.Errorf("%s: %v", name, e)
 			continue
 		}
-		if ch.Changed != tc.changed || ch.Ruleset != tc.ruleset {
-			t.Errorf("%s: changed %t ruleset %t, want %t %t", name, ch.Changed, ch.Ruleset, tc.changed, tc.ruleset)
+		if ch.Any != tc.changed || ch.Ruleset != tc.ruleset {
+			t.Errorf("%s: changed %t ruleset %t, want %t %t", name, ch.Any, ch.Ruleset, tc.changed, tc.ruleset)
 		}
 		wantVersion := int64(1)
 		if tc.changed {
@@ -329,6 +329,17 @@ func TestRemovingAVariationIsRefusedWhileAConfigurationServesIt(t *testing.T) {
 	e, ok := apperrors.From(flags.ErrInUse(refs))
 	if !ok || e.Kind != apperrors.KindConflict || e.Code != "in_use" {
 		t.Errorf("ErrInUse = %v, want in_use", e)
+	}
+}
+
+func TestAReferenceNamingEveryEnvironmentCarriesEnvironmentNull(t *testing.T) {
+	e, _ := apperrors.From(flags.ErrInUse([]flags.Reference{
+		{Kind: "flag", Key: "copy", Environment: "staging"}, {Kind: "segment", Key: "beta_testers"},
+	}))
+	got, err := json.Marshal(e.Extensions["references"])
+	want := `[{"environment":"staging","key":"copy","kind":"flag"},{"environment":null,"key":"beta_testers","kind":"segment"}]`
+	if err != nil || string(got) != want {
+		t.Errorf("references = %s, %v, want %s", got, err, want)
 	}
 }
 

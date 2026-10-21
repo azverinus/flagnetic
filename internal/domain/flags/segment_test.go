@@ -177,8 +177,8 @@ func TestASegmentChangeSaysWhetherItChangedTheRuleset(t *testing.T) {
 			t.Errorf("%s: %v", name, e)
 			continue
 		}
-		if ch.Changed != tc.changed || ch.Ruleset != tc.ruleset {
-			t.Errorf("%s: changed %t ruleset %t, want %t %t", name, ch.Changed, ch.Ruleset, tc.changed, tc.ruleset)
+		if ch.Any != tc.changed || ch.Ruleset != tc.ruleset {
+			t.Errorf("%s: changed %t ruleset %t, want %t %t", name, ch.Any, ch.Ruleset, tc.changed, tc.ruleset)
 		}
 		if tc.changed && (after.Version != 2 || !after.UpdatedAt.Equal(later)) {
 			t.Errorf("%s: version %d at %v, want 2 at %v", name, after.Version, after.UpdatedAt, later)
