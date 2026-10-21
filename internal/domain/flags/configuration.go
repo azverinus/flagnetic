@@ -202,20 +202,82 @@ type Write struct {
 // identifier and, while it stays a rollout, its salt; an override left as it
 // was keeps its author.
 func (c Configuration) Replace(f Flag, in ConfigurationInput, r Referents, m Mint, w Write) (Configuration, Changed, error) {
+	return c.write(c, f, in, r, m, w)
+}
+
+// Revert returns the configuration of f made recorded again by w, the
+// document an earlier version of it was, whole: rule identifiers and salts,
+// so the same units fall in every rollout again, and override notes and
+// authors as they were. It is checked against r as a replace is, since a
+// variation, segment, declaration or flag it names may be gone since.
+func (c Configuration) Revert(f Flag, recorded Configuration, r Referents, w Write) (Configuration, Changed, error) {
+	return c.write(recorded, f, recorded.input(), r, Mint{}, w)
+}
+
+// Copy returns the configuration of f made by w what source, f's
+// configuration in another environment, serves: its rules with their
+// identifiers and salts, so the same units fall in every rollout in both
+// environments, its prerequisites and its off and fallthrough variations.
+// It stays on or off as it is, so a copy never switches a flag on by
+// accident, and keeps its overrides unless overrides asks for source's,
+// notes and authors with them. It is checked against r, the requirements
+// of c's environment, as a replace is. A configuration is not copied from
+// its own environment, which would change nothing on purpose.
+func (c Configuration) Copy(f Flag, source Configuration, overrides bool, r Referents, w Write) (Configuration, Changed, error) {
+	if source.Environment == c.Environment {
+		ck := newCheck(invalidConfiguration, configurationNotValid)
+		ck.add("/from", "invalid_value", "a configuration is copied from another environment", nil)
+		return c, Changed{}, ck.err()
+	}
+	doc := source
+	doc.On = c.On
+	if !overrides {
+		doc.Overrides = c.Overrides
+	}
+	return c.write(doc, f, doc.input(), r, Mint{}, w)
+}
+
+// write returns c replaced by in, checked against r: a rule keeps the
+// identifier and, while it stays a rollout, the salt of the rule of basis
+// it names, and an override left as basis has it keeps its author. A
+// replace's basis is c; a revert's or a copy's is the document it writes,
+// which names every identifier and salt, so m draws nothing for them.
+func (c Configuration) write(basis Configuration, f Flag, in ConfigurationInput, r Referents, m Mint, w Write,
+) (Configuration, Changed, error) {
 	ck := newCheck(invalidConfiguration, configurationNotValid)
 	out := c
 	out.On = in.On
 	out.OffVariation = ck.variationOf("/off_variation", f, in.OffVariation)
 	out.Fallthrough = ck.variationOf("/fallthrough", f, in.Fallthrough)
 	out.Prerequisites = ck.prerequisites(in.Prerequisites, r)
-	out.Overrides = ck.overrides(c.Overrides, in.Overrides, f, r.Declarations, w.By)
-	out.Rules = ck.rules(c.Rules, in.Rules, f, r, m)
+	out.Overrides = ck.overrides(basis.Overrides, in.Overrides, f, r.Declarations, w.By)
+	out.Rules = ck.rules(basis.Rules, in.Rules, f, r, m)
 	ck.chains(f.Key, out, r.Requirements)
 	if err := ck.err(); err != nil {
 		return c, Changed{}, err
 	}
 	after, changed := c.changedTo(out, w)
 	return after, changed, nil
+}
+
+// input returns c as a write gives it whole, every rule with its
+// identifier and every rollout with its salt.
+func (c Configuration) input() ConfigurationInput {
+	in := ConfigurationInput{
+		On: c.On, OffVariation: c.OffVariation, Fallthrough: c.Fallthrough, Prerequisites: c.Prerequisites,
+		Overrides: make([]OverrideInput, len(c.Overrides)), Rules: make([]RuleInput, len(c.Rules)),
+	}
+	for i, o := range c.Overrides {
+		in.Overrides[i] = OverrideInput{UnitType: o.UnitType, UnitID: o.UnitID, Variation: o.Variation, Note: &o.Note}
+	}
+	for i, rule := range c.Rules {
+		serve := ServeInput{Kind: rule.Serve.Kind, Variation: rule.Serve.Variation}
+		if rule.Serve.Kind == ServeRollout {
+			serve.UnitType, serve.Percentage, serve.Salt = rule.Serve.UnitType, &rule.Serve.Percentage, rule.Serve.Salt
+		}
+		in.Rules[i] = RuleInput{ID: &rule.ID, Description: rule.Description, Conditions: rule.Conditions, Serve: serve}
+	}
+	return in
 }
 
 // changedTo returns out stamped by w as the next version of c, and what

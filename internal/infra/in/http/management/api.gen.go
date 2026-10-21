@@ -713,6 +713,15 @@ type FlagConfiguration struct {
 	Version Version `json:"version"`
 }
 
+// FlagConfigurationCopy defines model for FlagConfigurationCopy.
+type FlagConfigurationCopy struct {
+	// From The key of the environment whose configuration is copied, another of the project's.
+	From string `json:"from"`
+
+	// IncludeOverrides Whether the source's overrides replace this environment's; otherwise this environment keeps its own.
+	IncludeOverrides *bool `json:"include_overrides,omitempty"`
+}
+
 // FlagConfigurationPut defines model for FlagConfigurationPut.
 type FlagConfigurationPut struct {
 	Fallthrough   string           `json:"fallthrough"`
@@ -721,6 +730,12 @@ type FlagConfigurationPut struct {
 	Overrides     *[]OverrideInput `json:"overrides,omitempty"`
 	Prerequisites *[]Prerequisite  `json:"prerequisites,omitempty"`
 	Rules         *[]RuleInput     `json:"rules,omitempty"`
+}
+
+// FlagConfigurationRevert defines model for FlagConfigurationRevert.
+type FlagConfigurationRevert struct {
+	// Version The version of this configuration to write again, from its history in this environment.
+	Version int64 `json:"version"`
 }
 
 // FlagCreate defines model for FlagCreate.
@@ -1799,6 +1814,26 @@ type PutFlagConfigurationParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// CopyFlagConfigurationParams defines parameters for CopyFlagConfiguration.
+type CopyFlagConfigurationParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// RevertFlagConfigurationParams defines parameters for RevertFlagConfiguration.
+type RevertFlagConfigurationParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // RegenerateRolloutSaltParams defines parameters for RegenerateRolloutSalt.
 type RegenerateRolloutSaltParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
@@ -1893,11 +1928,17 @@ type UpdateFlagJSONRequestBody = FlagPatch
 // PutFlagConfigurationJSONRequestBody defines body for PutFlagConfiguration for application/json ContentType.
 type PutFlagConfigurationJSONRequestBody = FlagConfigurationPut
 
+// CopyFlagConfigurationJSONRequestBody defines body for CopyFlagConfiguration for application/json ContentType.
+type CopyFlagConfigurationJSONRequestBody = FlagConfigurationCopy
+
 // KillFlagJSONRequestBody defines body for KillFlag for application/json ContentType.
 type KillFlagJSONRequestBody = Kill
 
 // PutOverrideJSONRequestBody defines body for PutOverride for application/json ContentType.
 type PutOverrideJSONRequestBody = OverridePut
+
+// RevertFlagConfigurationJSONRequestBody defines body for RevertFlagConfiguration for application/json ContentType.
+type RevertFlagConfigurationJSONRequestBody = FlagConfigurationRevert
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody = GrantCreate
@@ -2761,6 +2802,46 @@ type ClientInterface interface {
 	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
 	PutFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CopyFlagConfigurationWithBody Copy a flag's configuration from another environment
+	//
+	// Makes the flag's configuration in this environment what it is in
+	// environment `from`: its rules with their identifiers and salts, so
+	// the same units fall in every rollout in both environments, its
+	// prerequisites, and its off and fallthrough variations. This
+	// environment keeps whether the flag is on or off, so a copy never
+	// switches it on by accident, and keeps its overrides unless
+	// `include_overrides` asks for the source's, with their notes and
+	// authors. Validated as replacing the configuration would be
+	// (`invalid_configuration`, its pointers into the configuration the
+	// copy would write); copying from this environment itself is
+	// `invalid_configuration`. `If-Match` names this environment's
+	// version. A copy that changes nothing records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
+	CopyFlagConfigurationWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CopyFlagConfiguration Copy a flag's configuration from another environment
+	//
+	// Makes the flag's configuration in this environment what it is in
+	// environment `from`: its rules with their identifiers and salts, so
+	// the same units fall in every rollout in both environments, its
+	// prerequisites, and its off and fallthrough variations. This
+	// environment keeps whether the flag is on or off, so a copy never
+	// switches it on by accident, and keeps its overrides unless
+	// `include_overrides` asks for the source's, with their notes and
+	// authors. Validated as replacing the configuration would be
+	// (`invalid_configuration`, its pointers into the configuration the
+	// copy would write); copying from this environment itself is
+	// `invalid_configuration`. `If-Match` names this environment's
+	// version. A copy that changes nothing records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
+	CopyFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, body CopyFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// KillFlagWithBody Switch a flag off in one environment at once
 	//
 	// The kill switch: switches the flag off in the environment, so it
@@ -2827,6 +2908,46 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
 	PutOverride(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, body PutOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevertFlagConfigurationWithBody Revert a flag's configuration in one environment to an earlier version
+	//
+	// Writes, whole, the configuration this flag had in this environment
+	// at `version`, as the audit log recorded it: on or off, the off and
+	// fallthrough variations, prerequisites, overrides with their notes
+	// and authors, and rules with their identifiers and salts, so the same
+	// units fall in every rollout again. The version is looked up only in
+	// the history of this flag in this environment (`version_not_found`
+	// otherwise). The configuration is validated as replacing it would be
+	// (`invalid_configuration`, its pointers into the configuration the
+	// revert would write), so a variation, segment, attribute or flag
+	// removed since refuses it. `If-Match` names the current version, not
+	// the one reverted to. Reverting to what the configuration already is
+	// changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/revert (the `RevertFlagConfiguration` operationId).
+	RevertFlagConfigurationWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevertFlagConfiguration Revert a flag's configuration in one environment to an earlier version
+	//
+	// Writes, whole, the configuration this flag had in this environment
+	// at `version`, as the audit log recorded it: on or off, the off and
+	// fallthrough variations, prerequisites, overrides with their notes
+	// and authors, and rules with their identifiers and salts, so the same
+	// units fall in every rollout again. The version is looked up only in
+	// the history of this flag in this environment (`version_not_found`
+	// otherwise). The configuration is validated as replacing it would be
+	// (`invalid_configuration`, its pointers into the configuration the
+	// revert would write), so a variation, segment, attribute or flag
+	// removed since refuses it. `If-Match` names the current version, not
+	// the one reverted to. Reverting to what the configuration already is
+	// changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/revert (the `RevertFlagConfiguration` operationId).
+	RevertFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, body RevertFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RegenerateRolloutSalt Give a rollout a new salt
 	//
@@ -4567,6 +4688,66 @@ func (c *Client) PutFlagConfiguration(ctx context.Context, project ProjectKey, f
 	return c.Client.Do(req)
 }
 
+// CopyFlagConfigurationWithBody Copy a flag's configuration from another environment
+//
+// Makes the flag's configuration in this environment what it is in
+// environment `from`: its rules with their identifiers and salts, so
+// the same units fall in every rollout in both environments, its
+// prerequisites, and its off and fallthrough variations. This
+// environment keeps whether the flag is on or off, so a copy never
+// switches it on by accident, and keeps its overrides unless
+// `include_overrides` asks for the source's, with their notes and
+// authors. Validated as replacing the configuration would be
+// (`invalid_configuration`, its pointers into the configuration the
+// copy would write); copying from this environment itself is
+// `invalid_configuration`. `If-Match` names this environment's
+// version. A copy that changes nothing records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
+func (c *Client) CopyFlagConfigurationWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCopyFlagConfigurationRequestWithBody(c.Server, project, flag, environment, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CopyFlagConfiguration Copy a flag's configuration from another environment
+//
+// Makes the flag's configuration in this environment what it is in
+// environment `from`: its rules with their identifiers and salts, so
+// the same units fall in every rollout in both environments, its
+// prerequisites, and its off and fallthrough variations. This
+// environment keeps whether the flag is on or off, so a copy never
+// switches it on by accident, and keeps its overrides unless
+// `include_overrides` asks for the source's, with their notes and
+// authors. Validated as replacing the configuration would be
+// (`invalid_configuration`, its pointers into the configuration the
+// copy would write); copying from this environment itself is
+// `invalid_configuration`. `If-Match` names this environment's
+// version. A copy that changes nothing records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
+func (c *Client) CopyFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, body CopyFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCopyFlagConfigurationRequest(c.Server, project, flag, environment, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // KillFlagWithBody Switch a flag off in one environment at once
 //
 // The kill switch: switches the flag off in the environment, so it
@@ -4674,6 +4855,66 @@ func (c *Client) PutOverrideWithBody(ctx context.Context, project ProjectKey, fl
 // Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
 func (c *Client) PutOverride(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, body PutOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPutOverrideRequest(c.Server, project, flag, environment, unitType, unitId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevertFlagConfigurationWithBody Revert a flag's configuration in one environment to an earlier version
+//
+// Writes, whole, the configuration this flag had in this environment
+// at `version`, as the audit log recorded it: on or off, the off and
+// fallthrough variations, prerequisites, overrides with their notes
+// and authors, and rules with their identifiers and salts, so the same
+// units fall in every rollout again. The version is looked up only in
+// the history of this flag in this environment (`version_not_found`
+// otherwise). The configuration is validated as replacing it would be
+// (`invalid_configuration`, its pointers into the configuration the
+// revert would write), so a variation, segment, attribute or flag
+// removed since refuses it. `If-Match` names the current version, not
+// the one reverted to. Reverting to what the configuration already is
+// changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/revert (the `RevertFlagConfiguration` operationId).
+func (c *Client) RevertFlagConfigurationWithBody(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevertFlagConfigurationRequestWithBody(c.Server, project, flag, environment, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevertFlagConfiguration Revert a flag's configuration in one environment to an earlier version
+//
+// Writes, whole, the configuration this flag had in this environment
+// at `version`, as the audit log recorded it: on or off, the off and
+// fallthrough variations, prerequisites, overrides with their notes
+// and authors, and rules with their identifiers and salts, so the same
+// units fall in every rollout again. The version is looked up only in
+// the history of this flag in this environment (`version_not_found`
+// otherwise). The configuration is validated as replacing it would be
+// (`invalid_configuration`, its pointers into the configuration the
+// revert would write), so a variation, segment, attribute or flag
+// removed since refuses it. `If-Match` names the current version, not
+// the one reverted to. Reverting to what the configuration already is
+// changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/revert (the `RevertFlagConfiguration` operationId).
+func (c *Client) RevertFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, body RevertFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevertFlagConfigurationRequest(c.Server, project, flag, environment, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7861,6 +8102,82 @@ func NewPutFlagConfigurationRequestWithBody(server string, project ProjectKey, f
 	return req, nil
 }
 
+// NewCopyFlagConfigurationRequest calls the generic CopyFlagConfiguration builder with application/json body
+func NewCopyFlagConfigurationRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, body CopyFlagConfigurationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCopyFlagConfigurationRequestWithBody(server, project, flag, environment, params, "application/json", bodyReader)
+}
+
+// NewCopyFlagConfigurationRequestWithBody constructs an http.Request for the CopyFlagConfiguration method, with any body, and a specified content type
+func NewCopyFlagConfigurationRequestWithBody(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s/copy", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewKillFlagRequest calls the generic KillFlag builder with application/json body
 func NewKillFlagRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, body KillFlagJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -8055,6 +8372,82 @@ func NewPutOverrideRequestWithBody(server string, project ProjectKey, flag FlagK
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevertFlagConfigurationRequest calls the generic RevertFlagConfiguration builder with application/json body
+func NewRevertFlagConfigurationRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, body RevertFlagConfigurationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRevertFlagConfigurationRequestWithBody(server, project, flag, environment, params, "application/json", bodyReader)
+}
+
+// NewRevertFlagConfigurationRequestWithBody constructs an http.Request for the RevertFlagConfiguration method, with any body, and a specified content type
+func NewRevertFlagConfigurationRequestWithBody(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s/revert", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -9917,6 +10310,46 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment} (the `PutFlagConfiguration` operationId).
 	PutFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *PutFlagConfigurationParams, body PutFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*PutFlagConfigurationResponse, error)
 
+	// CopyFlagConfigurationWithBodyWithResponse Copy a flag's configuration from another environment
+	//
+	// Makes the flag's configuration in this environment what it is in
+	// environment `from`: its rules with their identifiers and salts, so
+	// the same units fall in every rollout in both environments, its
+	// prerequisites, and its off and fallthrough variations. This
+	// environment keeps whether the flag is on or off, so a copy never
+	// switches it on by accident, and keeps its overrides unless
+	// `include_overrides` asks for the source's, with their notes and
+	// authors. Validated as replacing the configuration would be
+	// (`invalid_configuration`, its pointers into the configuration the
+	// copy would write); copying from this environment itself is
+	// `invalid_configuration`. `If-Match` names this environment's
+	// version. A copy that changes nothing records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
+	CopyFlagConfigurationWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CopyFlagConfigurationResponse, error)
+
+	// CopyFlagConfigurationWithResponse Copy a flag's configuration from another environment
+	//
+	// Makes the flag's configuration in this environment what it is in
+	// environment `from`: its rules with their identifiers and salts, so
+	// the same units fall in every rollout in both environments, its
+	// prerequisites, and its off and fallthrough variations. This
+	// environment keeps whether the flag is on or off, so a copy never
+	// switches it on by accident, and keeps its overrides unless
+	// `include_overrides` asks for the source's, with their notes and
+	// authors. Validated as replacing the configuration would be
+	// (`invalid_configuration`, its pointers into the configuration the
+	// copy would write); copying from this environment itself is
+	// `invalid_configuration`. `If-Match` names this environment's
+	// version. A copy that changes nothing records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
+	CopyFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, body CopyFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*CopyFlagConfigurationResponse, error)
+
 	// KillFlagWithBodyWithResponse Switch a flag off in one environment at once
 	//
 	// The kill switch: switches the flag off in the environment, so it
@@ -9985,6 +10418,46 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id} (the `PutOverride` operationId).
 	PutOverrideWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string, body PutOverrideJSONRequestBody, reqEditors ...RequestEditorFn) (*PutOverrideResponse, error)
+
+	// RevertFlagConfigurationWithBodyWithResponse Revert a flag's configuration in one environment to an earlier version
+	//
+	// Writes, whole, the configuration this flag had in this environment
+	// at `version`, as the audit log recorded it: on or off, the off and
+	// fallthrough variations, prerequisites, overrides with their notes
+	// and authors, and rules with their identifiers and salts, so the same
+	// units fall in every rollout again. The version is looked up only in
+	// the history of this flag in this environment (`version_not_found`
+	// otherwise). The configuration is validated as replacing it would be
+	// (`invalid_configuration`, its pointers into the configuration the
+	// revert would write), so a variation, segment, attribute or flag
+	// removed since refuses it. `If-Match` names the current version, not
+	// the one reverted to. Reverting to what the configuration already is
+	// changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/revert (the `RevertFlagConfiguration` operationId).
+	RevertFlagConfigurationWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RevertFlagConfigurationResponse, error)
+
+	// RevertFlagConfigurationWithResponse Revert a flag's configuration in one environment to an earlier version
+	//
+	// Writes, whole, the configuration this flag had in this environment
+	// at `version`, as the audit log recorded it: on or off, the off and
+	// fallthrough variations, prerequisites, overrides with their notes
+	// and authors, and rules with their identifiers and salts, so the same
+	// units fall in every rollout again. The version is looked up only in
+	// the history of this flag in this environment (`version_not_found`
+	// otherwise). The configuration is validated as replacing it would be
+	// (`invalid_configuration`, its pointers into the configuration the
+	// revert would write), so a variation, segment, attribute or flag
+	// removed since refuses it. `If-Match` names the current version, not
+	// the one reverted to. Reverting to what the configuration already is
+	// changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/revert (the `RevertFlagConfiguration` operationId).
+	RevertFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, body RevertFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*RevertFlagConfigurationResponse, error)
 
 	// RegenerateRolloutSaltWithResponse Give a rollout a new salt
 	//
@@ -14300,6 +14773,117 @@ func (r PutFlagConfigurationResponse) ContentType() string {
 	return ""
 }
 
+// CopyFlagConfigurationResponse200Headers the declared response headers of an HTTP 200 response for CopyFlagConfiguration
+type CopyFlagConfigurationResponse200Headers struct {
+	ETag *string
+}
+
+// CopyFlagConfigurationResponse401Headers the declared response headers of an HTTP 401 response for CopyFlagConfiguration
+type CopyFlagConfigurationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CopyFlagConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagConfiguration
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *CopyFlagConfigurationResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CopyFlagConfigurationResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CopyFlagConfigurationResponse) GetJSON200() *FlagConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CopyFlagConfigurationResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CopyFlagConfigurationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CopyFlagConfigurationResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CopyFlagConfigurationResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CopyFlagConfigurationResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r CopyFlagConfigurationResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CopyFlagConfigurationResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r CopyFlagConfigurationResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r CopyFlagConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CopyFlagConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CopyFlagConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CopyFlagConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // KillFlagResponse200Headers the declared response headers of an HTTP 200 response for KillFlag
 type KillFlagResponse200Headers struct {
 	ETag *string
@@ -14557,6 +15141,117 @@ func (r PutOverrideResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PutOverrideResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevertFlagConfigurationResponse200Headers the declared response headers of an HTTP 200 response for RevertFlagConfiguration
+type RevertFlagConfigurationResponse200Headers struct {
+	ETag *string
+}
+
+// RevertFlagConfigurationResponse401Headers the declared response headers of an HTTP 401 response for RevertFlagConfiguration
+type RevertFlagConfigurationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevertFlagConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagConfiguration
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RevertFlagConfigurationResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevertFlagConfigurationResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RevertFlagConfigurationResponse) GetJSON200() *FlagConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r RevertFlagConfigurationResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevertFlagConfigurationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevertFlagConfigurationResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevertFlagConfigurationResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RevertFlagConfigurationResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r RevertFlagConfigurationResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RevertFlagConfigurationResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r RevertFlagConfigurationResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r RevertFlagConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevertFlagConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevertFlagConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevertFlagConfigurationResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -17526,6 +18221,58 @@ func (c *ClientWithResponses) PutFlagConfigurationWithResponse(ctx context.Conte
 	return ParsePutFlagConfigurationResponse(rsp)
 }
 
+// CopyFlagConfigurationWithBodyWithResponse Copy a flag's configuration from another environment
+//
+// Makes the flag's configuration in this environment what it is in
+// environment `from`: its rules with their identifiers and salts, so
+// the same units fall in every rollout in both environments, its
+// prerequisites, and its off and fallthrough variations. This
+// environment keeps whether the flag is on or off, so a copy never
+// switches it on by accident, and keeps its overrides unless
+// `include_overrides` asks for the source's, with their notes and
+// authors. Validated as replacing the configuration would be
+// (`invalid_configuration`, its pointers into the configuration the
+// copy would write); copying from this environment itself is
+// `invalid_configuration`. `If-Match` names this environment's
+// version. A copy that changes nothing records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
+func (c *ClientWithResponses) CopyFlagConfigurationWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CopyFlagConfigurationResponse, error) {
+	rsp, err := c.CopyFlagConfigurationWithBody(ctx, project, flag, environment, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCopyFlagConfigurationResponse(rsp)
+}
+
+// CopyFlagConfigurationWithResponse Copy a flag's configuration from another environment
+//
+// Makes the flag's configuration in this environment what it is in
+// environment `from`: its rules with their identifiers and salts, so
+// the same units fall in every rollout in both environments, its
+// prerequisites, and its off and fallthrough variations. This
+// environment keeps whether the flag is on or off, so a copy never
+// switches it on by accident, and keeps its overrides unless
+// `include_overrides` asks for the source's, with their notes and
+// authors. Validated as replacing the configuration would be
+// (`invalid_configuration`, its pointers into the configuration the
+// copy would write); copying from this environment itself is
+// `invalid_configuration`. `If-Match` names this environment's
+// version. A copy that changes nothing records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
+func (c *ClientWithResponses) CopyFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, body CopyFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*CopyFlagConfigurationResponse, error) {
+	rsp, err := c.CopyFlagConfiguration(ctx, project, flag, environment, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCopyFlagConfigurationResponse(rsp)
+}
+
 // KillFlagWithBodyWithResponse Switch a flag off in one environment at once
 //
 // The kill switch: switches the flag off in the environment, so it
@@ -17623,6 +18370,58 @@ func (c *ClientWithResponses) PutOverrideWithResponse(ctx context.Context, proje
 		return nil, err
 	}
 	return ParsePutOverrideResponse(rsp)
+}
+
+// RevertFlagConfigurationWithBodyWithResponse Revert a flag's configuration in one environment to an earlier version
+//
+// Writes, whole, the configuration this flag had in this environment
+// at `version`, as the audit log recorded it: on or off, the off and
+// fallthrough variations, prerequisites, overrides with their notes
+// and authors, and rules with their identifiers and salts, so the same
+// units fall in every rollout again. The version is looked up only in
+// the history of this flag in this environment (`version_not_found`
+// otherwise). The configuration is validated as replacing it would be
+// (`invalid_configuration`, its pointers into the configuration the
+// revert would write), so a variation, segment, attribute or flag
+// removed since refuses it. `If-Match` names the current version, not
+// the one reverted to. Reverting to what the configuration already is
+// changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/revert (the `RevertFlagConfiguration` operationId).
+func (c *ClientWithResponses) RevertFlagConfigurationWithBodyWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RevertFlagConfigurationResponse, error) {
+	rsp, err := c.RevertFlagConfigurationWithBody(ctx, project, flag, environment, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevertFlagConfigurationResponse(rsp)
+}
+
+// RevertFlagConfigurationWithResponse Revert a flag's configuration in one environment to an earlier version
+//
+// Writes, whole, the configuration this flag had in this environment
+// at `version`, as the audit log recorded it: on or off, the off and
+// fallthrough variations, prerequisites, overrides with their notes
+// and authors, and rules with their identifiers and salts, so the same
+// units fall in every rollout again. The version is looked up only in
+// the history of this flag in this environment (`version_not_found`
+// otherwise). The configuration is validated as replacing it would be
+// (`invalid_configuration`, its pointers into the configuration the
+// revert would write), so a variation, segment, attribute or flag
+// removed since refuses it. `If-Match` names the current version, not
+// the one reverted to. Reverting to what the configuration already is
+// changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/revert (the `RevertFlagConfiguration` operationId).
+func (c *ClientWithResponses) RevertFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *RevertFlagConfigurationParams, body RevertFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*RevertFlagConfigurationResponse, error) {
+	rsp, err := c.RevertFlagConfiguration(ctx, project, flag, environment, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevertFlagConfigurationResponse(rsp)
 }
 
 // RegenerateRolloutSaltWithResponse Give a rollout a new salt
@@ -21707,6 +22506,111 @@ func ParsePutFlagConfigurationResponse(rsp *http.Response) (*PutFlagConfiguratio
 	return response, nil
 }
 
+// ParseCopyFlagConfigurationResponse parses an HTTP response from a CopyFlagConfigurationWithResponse call
+func ParseCopyFlagConfigurationResponse(rsp *http.Response) (*CopyFlagConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CopyFlagConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers CopyFlagConfigurationResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers CopyFlagConfigurationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseKillFlagResponse parses an HTTP response from a KillFlagWithResponse call
 func ParseKillFlagResponse(rsp *http.Response) (*KillFlagResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -21939,6 +22843,111 @@ func ParsePutOverrideResponse(rsp *http.Response) (*PutOverrideResponse, error) 
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers PutOverrideResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevertFlagConfigurationResponse parses an HTTP response from a RevertFlagConfigurationWithResponse call
+func ParseRevertFlagConfigurationResponse(rsp *http.Response) (*RevertFlagConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevertFlagConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RevertFlagConfigurationResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RevertFlagConfigurationResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -23635,6 +24644,9 @@ type ServerInterface interface {
 	// PutFlagConfiguration Replace a flag's configuration in one environment
 	// (PUT /projects/{project}/flags/{flag}/environments/{environment})
 	PutFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params PutFlagConfigurationParams)
+	// CopyFlagConfiguration Copy a flag's configuration from another environment
+	// (POST /projects/{project}/flags/{flag}/environments/{environment}/copy)
+	CopyFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params CopyFlagConfigurationParams)
 	// KillFlag Switch a flag off in one environment at once
 	// (POST /projects/{project}/flags/{flag}/environments/{environment}/kill)
 	KillFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey)
@@ -23644,6 +24656,9 @@ type ServerInterface interface {
 	// PutOverride Pin a variation for one unit
 	// (PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
 	PutOverride(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, unitType UnitTypeKey, unitId string)
+	// RevertFlagConfiguration Revert a flag's configuration in one environment to an earlier version
+	// (POST /projects/{project}/flags/{flag}/environments/{environment}/revert)
+	RevertFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params RevertFlagConfigurationParams)
 	// RegenerateRolloutSalt Give a rollout a new salt
 	// (POST /projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt)
 	RegenerateRolloutSalt(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, rule string, params RegenerateRolloutSaltParams)
@@ -25675,6 +26690,74 @@ func (siw *ServerInterfaceWrapper) PutFlagConfiguration(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// CopyFlagConfiguration operation middleware
+func (siw *ServerInterfaceWrapper) CopyFlagConfiguration(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CopyFlagConfigurationParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CopyFlagConfiguration(w, r, project, flag, environment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // KillFlag operation middleware
 func (siw *ServerInterfaceWrapper) KillFlag(w http.ResponseWriter, r *http.Request) {
 
@@ -25834,6 +26917,74 @@ func (siw *ServerInterfaceWrapper) PutOverride(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutOverride(w, r, project, flag, environment, unitType, unitId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevertFlagConfiguration operation middleware
+func (siw *ServerInterfaceWrapper) RevertFlagConfiguration(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RevertFlagConfigurationParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevertFlagConfiguration(w, r, project, flag, environment, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -26782,6 +27933,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}", wrapper.GetFlagConfiguration)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}", wrapper.PutFlagConfiguration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/kill", wrapper.KillFlag)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/revert", wrapper.RevertFlagConfiguration)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/copy", wrapper.CopyFlagConfiguration)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}", wrapper.DeleteOverride)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}", wrapper.PutOverride)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt", wrapper.RegenerateRolloutSalt)
@@ -31519,6 +32672,173 @@ func (response PutFlagConfiguration428ApplicationProblemPlusJSONResponse) VisitP
 	return err
 }
 
+type CopyFlagConfigurationRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+	Params      CopyFlagConfigurationParams
+	Body        *CopyFlagConfigurationJSONRequestBody
+}
+
+type CopyFlagConfigurationResponseObject interface {
+	VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error
+}
+
+type CopyFlagConfiguration200ResponseHeaders struct {
+	ETag *string
+}
+
+type CopyFlagConfiguration200JSONResponse struct {
+	Body    FlagConfiguration
+	Headers CopyFlagConfiguration200ResponseHeaders
+}
+
+func (response CopyFlagConfiguration200JSONResponse) VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyFlagConfiguration400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CopyFlagConfiguration400ApplicationProblemPlusJSONResponse) VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyFlagConfiguration401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CopyFlagConfiguration401ApplicationProblemPlusJSONResponse) VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyFlagConfiguration403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CopyFlagConfiguration403ApplicationProblemPlusJSONResponse) VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyFlagConfiguration404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CopyFlagConfiguration404ApplicationProblemPlusJSONResponse) VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyFlagConfiguration409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CopyFlagConfiguration409ApplicationProblemPlusJSONResponse) VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyFlagConfiguration412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response CopyFlagConfiguration412ApplicationProblemPlusJSONResponse) VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyFlagConfiguration422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CopyFlagConfiguration422ApplicationProblemPlusJSONResponse) VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyFlagConfiguration428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response CopyFlagConfiguration428ApplicationProblemPlusJSONResponse) VisitCopyFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type KillFlagRequestObject struct {
 	Project     ProjectKey     `json:"project"`
 	Flag        FlagKey        `json:"flag"`
@@ -31856,6 +33176,173 @@ func (response PutOverride422ApplicationProblemPlusJSONResponse) VisitPutOverrid
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevertFlagConfigurationRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+	Params      RevertFlagConfigurationParams
+	Body        *RevertFlagConfigurationJSONRequestBody
+}
+
+type RevertFlagConfigurationResponseObject interface {
+	VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error
+}
+
+type RevertFlagConfiguration200ResponseHeaders struct {
+	ETag *string
+}
+
+type RevertFlagConfiguration200JSONResponse struct {
+	Body    FlagConfiguration
+	Headers RevertFlagConfiguration200ResponseHeaders
+}
+
+func (response RevertFlagConfiguration200JSONResponse) VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevertFlagConfiguration400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RevertFlagConfiguration400ApplicationProblemPlusJSONResponse) VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevertFlagConfiguration401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevertFlagConfiguration401ApplicationProblemPlusJSONResponse) VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevertFlagConfiguration403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevertFlagConfiguration403ApplicationProblemPlusJSONResponse) VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevertFlagConfiguration404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevertFlagConfiguration404ApplicationProblemPlusJSONResponse) VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevertFlagConfiguration409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RevertFlagConfiguration409ApplicationProblemPlusJSONResponse) VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevertFlagConfiguration412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response RevertFlagConfiguration412ApplicationProblemPlusJSONResponse) VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevertFlagConfiguration422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response RevertFlagConfiguration422ApplicationProblemPlusJSONResponse) VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevertFlagConfiguration428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response RevertFlagConfiguration428ApplicationProblemPlusJSONResponse) VisitRevertFlagConfigurationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -34059,6 +35546,9 @@ type StrictServerInterface interface {
 	// PutFlagConfiguration Replace a flag's configuration in one environment
 	// (PUT /projects/{project}/flags/{flag}/environments/{environment})
 	PutFlagConfiguration(ctx context.Context, request PutFlagConfigurationRequestObject) (PutFlagConfigurationResponseObject, error)
+	// CopyFlagConfiguration Copy a flag's configuration from another environment
+	// (POST /projects/{project}/flags/{flag}/environments/{environment}/copy)
+	CopyFlagConfiguration(ctx context.Context, request CopyFlagConfigurationRequestObject) (CopyFlagConfigurationResponseObject, error)
 	// KillFlag Switch a flag off in one environment at once
 	// (POST /projects/{project}/flags/{flag}/environments/{environment}/kill)
 	KillFlag(ctx context.Context, request KillFlagRequestObject) (KillFlagResponseObject, error)
@@ -34068,6 +35558,9 @@ type StrictServerInterface interface {
 	// PutOverride Pin a variation for one unit
 	// (PUT /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id})
 	PutOverride(ctx context.Context, request PutOverrideRequestObject) (PutOverrideResponseObject, error)
+	// RevertFlagConfiguration Revert a flag's configuration in one environment to an earlier version
+	// (POST /projects/{project}/flags/{flag}/environments/{environment}/revert)
+	RevertFlagConfiguration(ctx context.Context, request RevertFlagConfigurationRequestObject) (RevertFlagConfigurationResponseObject, error)
 	// RegenerateRolloutSalt Give a rollout a new salt
 	// (POST /projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt)
 	RegenerateRolloutSalt(ctx context.Context, request RegenerateRolloutSaltRequestObject) (RegenerateRolloutSaltResponseObject, error)
@@ -35674,6 +37167,42 @@ func (sh *strictHandler) PutFlagConfiguration(w http.ResponseWriter, r *http.Req
 	}
 }
 
+// CopyFlagConfiguration operation middleware
+func (sh *strictHandler) CopyFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params CopyFlagConfigurationParams) {
+	var request CopyFlagConfigurationRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+	request.Params = params
+
+	var body CopyFlagConfigurationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CopyFlagConfiguration(ctx, request.(CopyFlagConfigurationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CopyFlagConfiguration")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CopyFlagConfigurationResponseObject); ok {
+		if err := validResponse.VisitCopyFlagConfigurationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // KillFlag operation middleware
 func (sh *strictHandler) KillFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey) {
 	var request KillFlagRequestObject
@@ -35772,6 +37301,42 @@ func (sh *strictHandler) PutOverride(w http.ResponseWriter, r *http.Request, pro
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PutOverrideResponseObject); ok {
 		if err := validResponse.VisitPutOverrideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevertFlagConfiguration operation middleware
+func (sh *strictHandler) RevertFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params RevertFlagConfigurationParams) {
+	var request RevertFlagConfigurationRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+	request.Params = params
+
+	var body RevertFlagConfigurationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevertFlagConfiguration(ctx, request.(RevertFlagConfigurationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevertFlagConfiguration")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevertFlagConfigurationResponseObject); ok {
+		if err := validResponse.VisitRevertFlagConfigurationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

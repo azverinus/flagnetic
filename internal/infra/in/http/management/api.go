@@ -102,6 +102,8 @@ type Handlers struct {
 	SetOverride          *appflags.SetOverride
 	RemoveOverride       *appflags.RemoveOverride
 	RegenerateSalt       *appflags.RegenerateSalt
+	RevertConfiguration  *appflags.RevertConfiguration
+	CopyConfiguration    *appflags.CopyConfiguration
 	Evaluate             *appdelivery.Evaluate
 
 	ListSegments      *appflags.ListSegments

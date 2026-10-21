@@ -109,6 +109,40 @@ func (a *api) RegenerateRolloutSalt(ctx context.Context, req RegenerateRolloutSa
 	}, nil
 }
 
+// RevertFlagConfiguration writes a flag's configuration in one environment
+// again as an earlier version of it was.
+func (a *api) RevertFlagConfiguration(ctx context.Context, req RevertFlagConfigurationRequestObject) (RevertFlagConfigurationResponseObject, error) {
+	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	ec, err := a.h.RevertConfiguration.Handle(ctx, appflags.RevertConfigurationCommand{Configuration: cmd, Version: req.Body.Version})
+	if err != nil {
+		return nil, err
+	}
+	return RevertFlagConfiguration200JSONResponse{
+		Body: configurationOut(ec), Headers: RevertFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+	}, nil
+}
+
+// CopyFlagConfiguration makes a flag's configuration in one environment
+// serve what it serves in another.
+func (a *api) CopyFlagConfiguration(ctx context.Context, req CopyFlagConfigurationRequestObject) (CopyFlagConfigurationResponseObject, error) {
+	cmd, err := configurationCommand(ctx, req.Flag, req.Environment, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	ec, err := a.h.CopyConfiguration.Handle(ctx, appflags.CopyConfigurationCommand{
+		Configuration: cmd, From: req.Body.From, Overrides: valueOr(req.Body.IncludeOverrides, false),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return CopyFlagConfiguration200JSONResponse{
+		Body: configurationOut(ec), Headers: CopyFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+	}, nil
+}
+
 // configurationCommand returns the command naming flag's configuration in
 // environment of the request's project, based on the version header names,
 // none when it is nil.

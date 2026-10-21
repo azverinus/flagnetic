@@ -614,6 +614,20 @@ export const zServe = z.object({
   salt: z.string().optional(),
 });
 
+export const zFlagConfigurationRevert = z.object({
+  version: z.coerce
+    .bigint()
+    .gte(BigInt(1))
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zFlagConfigurationCopy = z.object({
+  from: z.string(),
+  include_overrides: z.boolean().optional().default(false),
+});
+
 export const zOverridePut = z.object({
   variation: z.string(),
   note: z.string().nullish(),
@@ -1417,6 +1431,40 @@ export const zKillFlagPath = z.object({
  * Whether the flag was switched off, and the configuration as it is now.
  */
 export const zKillFlagResponse = zKillResult;
+
+export const zRevertFlagConfigurationBody = zFlagConfigurationRevert;
+
+export const zRevertFlagConfigurationHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zRevertFlagConfigurationPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zRevertFlagConfigurationResponse = zFlagConfiguration;
+
+export const zCopyFlagConfigurationBody = zFlagConfigurationCopy;
+
+export const zCopyFlagConfigurationHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zCopyFlagConfigurationPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The configuration as it is now.
+ */
+export const zCopyFlagConfigurationResponse = zFlagConfiguration;
 
 export const zDeleteOverridePath = z.object({
   project: z.string(),

@@ -1428,6 +1428,120 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/flags/{flag}/environments/{environment}/revert:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/FlagKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+    post:
+      operationId: revertFlagConfiguration
+      summary: Revert a flag's configuration in one environment to an earlier version
+      description: |
+        Writes, whole, the configuration this flag had in this environment
+        at `version`, as the audit log recorded it: on or off, the off and
+        fallthrough variations, prerequisites, overrides with their notes
+        and authors, and rules with their identifiers and salts, so the same
+        units fall in every rollout again. The version is looked up only in
+        the history of this flag in this environment (`version_not_found`
+        otherwise). The configuration is validated as replacing it would be
+        (`invalid_configuration`, its pointers into the configuration the
+        revert would write), so a variation, segment, attribute or flag
+        removed since refuses it. `If-Match` names the current version, not
+        the one reverted to. Reverting to what the configuration already is
+        changes nothing and records nothing.
+      x-permission: flag_configuration.revert
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlagConfigurationRevert"
+      responses:
+        "200":
+          description: The configuration as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlagConfiguration"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/flags/{flag}/environments/{environment}/copy:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/FlagKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+    post:
+      operationId: copyFlagConfiguration
+      summary: Copy a flag's configuration from another environment
+      description: |
+        Makes the flag's configuration in this environment what it is in
+        environment `from`: its rules with their identifiers and salts, so
+        the same units fall in every rollout in both environments, its
+        prerequisites, and its off and fallthrough variations. This
+        environment keeps whether the flag is on or off, so a copy never
+        switches it on by accident, and keeps its overrides unless
+        `include_overrides` asks for the source's, with their notes and
+        authors. Validated as replacing the configuration would be
+        (`invalid_configuration`, its pointers into the configuration the
+        copy would write); copying from this environment itself is
+        `invalid_configuration`. `If-Match` names this environment's
+        version. A copy that changes nothing records nothing.
+      x-permission: flag_configuration.update
+      tags: [flags]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlagConfigurationCopy"
+      responses:
+        "200":
+          description: The configuration as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlagConfiguration"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -3841,6 +3955,26 @@ components:
           maxItems: 50
           items:
             $ref: "#/components/schemas/RuleInput"
+    FlagConfigurationRevert:
+      type: object
+      required: [version]
+      properties:
+        version:
+          type: integer
+          format: int64
+          minimum: 1
+          description: The version of this configuration to write again, from its history in this environment.
+    FlagConfigurationCopy:
+      type: object
+      required: [from]
+      properties:
+        from:
+          type: string
+          description: The key of the environment whose configuration is copied, another of the project's.
+        include_overrides:
+          type: boolean
+          default: false
+          description: Whether the source's overrides replace this environment's; otherwise this environment keeps its own.
     OverridePut:
       type: object
       required: [variation]

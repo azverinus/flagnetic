@@ -197,6 +197,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		}),
 		RemoveOverride: appflags.NewRemoveOverride(configuration),
 		RegenerateSalt: appflags.NewRegenerateSalt(configuration),
+		// A revert finds the version it writes again in the audit log.
+		RevertConfiguration: appflags.NewRevertConfiguration(appflags.RevertConfigurationDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, History: auditLog, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		CopyConfiguration: appflags.NewCopyConfiguration(appflags.ReplaceConfigurationDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
 		// The tester evaluates through the delivery context, which asks
 		// the flags context to check a draft as a write would.
 		Evaluate: appdelivery.NewEvaluate(appdelivery.EvaluateDeps{
