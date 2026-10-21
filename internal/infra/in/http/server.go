@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"runtime/debug"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -68,6 +69,7 @@ type RouteOption func(*routeConfig)
 type routeConfig struct {
 	stream       bool
 	maxBodyBytes int64
+	secretInPath bool
 }
 
 // Stream marks a long-lived route, such as server-sent events: its requests
@@ -78,6 +80,11 @@ func Stream() RouteOption { return func(c *routeConfig) { c.stream = true } }
 // large bodies.
 func MaxBodyBytes(n int64) RouteOption { return func(c *routeConfig) { c.maxBodyBytes = n } }
 
+// SecretInPath marks a route whose path carries a secret, such as an
+// invitation's: its requests are logged with the route's pattern in place
+// of their path, so the secret never reaches a log line.
+func SecretInPath() RouteOption { return func(c *routeConfig) { c.secretInPath = true } }
+
 // Server is the public handler of a replica.
 type Server struct {
 	mux *http.ServeMux
@@ -85,20 +92,27 @@ type Server struct {
 	// the log and the metrics besides "unmatched", so their cardinality stays
 	// bounded.
 	patterns map[string]routeConfig
-	log      *slog.Logger
-	db       Pinger
-	opts     Options
-	draining atomic.Bool
+	// secretPaths match, whatever the method, the paths of the routes
+	// carrying a secret, so a request reaching one with a method it does not
+	// serve is not logged with its secret either.
+	secretPaths *http.ServeMux
+	secretSeen  map[string]bool
+	log         *slog.Logger
+	db          Pinger
+	opts        Options
+	draining    atomic.Bool
 }
 
 // New returns the public handler with its probes mounted.
 func New(o Options) *Server {
 	s := &Server{
-		mux:      http.NewServeMux(),
-		patterns: map[string]routeConfig{},
-		log:      slog.New(newLogHandler(o.Logger.Handler())),
-		db:       o.DB,
-		opts:     o,
+		mux:         http.NewServeMux(),
+		patterns:    map[string]routeConfig{},
+		secretPaths: http.NewServeMux(),
+		secretSeen:  map[string]bool{},
+		log:         slog.New(newLogHandler(o.Logger.Handler())),
+		db:          o.DB,
+		opts:        o,
 	}
 	s.Handle("GET /healthz", http.HandlerFunc(s.health))
 	s.Handle("GET /readyz", http.HandlerFunc(s.ready))
@@ -117,6 +131,21 @@ func (s *Server) Handle(pattern string, h http.Handler, opts ...RouteOption) {
 	}
 	s.mux.Handle(pattern, h)
 	s.patterns[pattern] = c
+	if _, path, _ := strings.Cut(pattern, " "); c.secretInPath {
+		s.SecretPath(path)
+	}
+}
+
+// SecretPath marks path, a ServeMux path pattern such as
+// /invitations/{secret}, as one whose requests carry a secret, whatever
+// serves them or does not: they are logged with path in place of their own,
+// so the secret never reaches a log line. A link handed out for a browser to
+// open is such a path even before anything serves it.
+func (s *Server) SecretPath(path string) {
+	if !s.secretSeen[path] {
+		s.secretSeen[path] = true
+		s.secretPaths.Handle(path, http.NotFoundHandler())
+	}
 }
 
 // HTTPServer returns an http.Server serving the edge with its connection
@@ -204,9 +233,13 @@ func (s *Server) accessLog(r *http.Request, st *requestState, rw *recorder, took
 	if quietRoutes[st.route] {
 		return
 	}
+	path := r.URL.Path
+	if _, secret := s.secretPaths.Handler(r); secret != "" {
+		path = secret
+	}
 	attrs := []slog.Attr{
 		slog.String("method", r.Method),
-		slog.String("path", r.URL.Path),
+		slog.String("path", path),
 		slog.Int("status", status),
 		slog.Duration("duration", took),
 		slog.Int64("bytes", rw.bytes),

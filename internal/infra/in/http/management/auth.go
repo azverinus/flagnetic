@@ -47,6 +47,9 @@ func isJSON(r *http.Request) bool {
 type browser struct {
 	secureCookies bool
 	userAgent     string
+	// console is the URL the console is reached at, without a trailing
+	// slash, which links handed out for a browser to open start with.
+	console string
 }
 
 type browserKey struct{}
@@ -71,6 +74,17 @@ func (o Options) secureCookies(scheme, host string) bool {
 		scheme, host = o.BaseURL.Scheme, o.BaseURL.Host
 	}
 	return scheme == "https" || (!o.InsecureCookies && !isLocalhost(host))
+}
+
+// console returns the URL the console is reached at, for a request whose
+// scheme and host are these: the base URL when configured, since a proxy in
+// front may rewrite what the request says, and the request's own origin
+// otherwise.
+func (o Options) console(scheme, host string) string {
+	if o.BaseURL != nil {
+		return strings.TrimSuffix(o.BaseURL.String(), "/")
+	}
+	return scheme + "://" + host
 }
 
 // isLocalhost reports whether host, with or without a port, names this
@@ -129,4 +143,27 @@ func (a *api) SignOut(ctx context.Context, _ SignOutRequestObject) (SignOutRespo
 // password, the only way until identity providers can be configured.
 func (a *api) GetAuthMethods(context.Context, GetAuthMethodsRequestObject) (GetAuthMethodsResponseObject, error) {
 	return GetAuthMethods200JSONResponse{LocalLoginEnabled: true, Providers: []map[string]any{}}, nil
+}
+
+// GetInvitation answers what an invitation's link opens.
+func (a *api) GetInvitation(ctx context.Context, req GetInvitationRequestObject) (GetInvitationResponseObject, error) {
+	v, err := a.h.GetInvitation.Handle(ctx, secret.New(req.Secret))
+	if err != nil {
+		return nil, err
+	}
+	return GetInvitation200JSONResponse{Email: v.MaskedEmail, DisplayName: v.DisplayName, ExpiresAt: v.ExpiresAt}, nil
+}
+
+// AcceptInvitation sets the invited member's first password, opens a
+// session and sets its cookie.
+func (a *api) AcceptInvitation(ctx context.Context, req AcceptInvitationRequestObject) (AcceptInvitationResponseObject, error) {
+	res, err := a.h.AcceptInvitation.Handle(ctx, appaccess.AcceptInvitationCommand{
+		Secret: secret.New(req.Secret), Password: secret.New(req.Body.Password),
+		ClientIP: flaghttp.ClientOf(ctx).IP, UserAgent: browserOf(ctx).userAgent, RequestID: flaghttp.RequestIDOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	cookie := sessionCookie(ctx, res.Cookie.Reveal())
+	return AcceptInvitation200JSONResponse{Body: meOf(ctx, res.Caller), Headers: AcceptInvitation200ResponseHeaders{SetCookie: &cookie}}, nil
 }

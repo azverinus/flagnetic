@@ -362,6 +362,28 @@ type Grant struct {
 // GrantSource defines model for Grant.Source.
 type GrantSource string
 
+// Invitation What an invitation's link opens.
+type Invitation struct {
+	DisplayName string `json:"display_name"`
+
+	// Email The invited member's email with all but the first character of its local part hidden, such as `g***@example.com`.
+	Email     string    `json:"email"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// InvitationAcceptance defines model for InvitationAcceptance.
+type InvitationAcceptance struct {
+	Password string `json:"password"`
+}
+
+// IssuedInvitation An invitation just issued. Its link is shown this once.
+type IssuedInvitation struct {
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// Url The one-time link to pass on to the invited person.
+	Url string `json:"url"`
+}
+
 // Key Names the entity in URLs, SDK calls and rules, and never changes.
 type Key = string
 
@@ -385,6 +407,55 @@ type MeMember struct {
 	// Locale The console language the member chose; null follows the browser.
 	Locale *string      `json:"locale"`
 	Status MemberStatus `json:"status"`
+}
+
+// Member A member as an instance admin sees them.
+type Member struct {
+	CreatedAt     time.Time          `json:"created_at"`
+	DisplayName   string             `json:"display_name"`
+	Email         string             `json:"email"`
+	Id            openapi_types.UUID `json:"id"`
+	InstanceAdmin bool               `json:"instance_admin"`
+
+	// LastSignInAt When the member last signed in; null until they do.
+	LastSignInAt *time.Time `json:"last_sign_in_at"`
+
+	// ProjectCount How many projects the member holds a grant in; none while they are invited.
+	ProjectCount int          `json:"project_count"`
+	Status       MemberStatus `json:"status"`
+}
+
+// MemberInvitation defines model for MemberInvitation.
+type MemberInvitation struct {
+	// Invitation An invitation just issued. Its link is shown this once.
+	Invitation *IssuedInvitation `json:"invitation,omitempty"`
+
+	// Member A member as an instance admin sees them.
+	Member Member `json:"member"`
+}
+
+// MemberInvite defines model for MemberInvite.
+type MemberInvite struct {
+	// DisplayName Not blank, at most 200 characters.
+	DisplayName string `json:"display_name"`
+
+	// Email One address of the form name@domain, at most 254 characters.
+	Email string `json:"email"`
+}
+
+// MemberList defines model for MemberList.
+type MemberList struct {
+	Items []Member `json:"items"`
+}
+
+// MemberPatch defines model for MemberPatch.
+type MemberPatch struct {
+	// DisplayName Not blank, at most 200 characters.
+	DisplayName *string `json:"display_name,omitempty"`
+
+	// Email One address of the form name@domain, at most 254 characters.
+	Email         *string `json:"email,omitempty"`
+	InstanceAdmin *bool   `json:"instance_admin,omitempty"`
 }
 
 // MemberStatus defines model for MemberStatus.
@@ -626,6 +697,9 @@ type Forbidden = Problem
 // Invalid A problem document (RFC 9457). Code-specific values are further members.
 type Invalid = Problem
 
+// InvitationGone A problem document (RFC 9457). Code-specific values are further members.
+type InvitationGone = Problem
+
 // NotFound A problem document (RFC 9457). Code-specific values are further members.
 type NotFound = Problem
 
@@ -684,6 +758,15 @@ type RevokeMySessionsParams struct {
 	IncludeCurrent *bool `form:"include_current,omitempty" json:"include_current,omitempty"`
 }
 
+// ListMembersParams defines parameters for ListMembers.
+type ListMembersParams struct {
+	// Status Only the members in this status.
+	Status *MemberStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Q Text found, whatever its case, in the member's email or display name.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
 // ListProjectAuditEntriesParams defines parameters for ListProjectAuditEntries.
 type ListProjectAuditEntriesParams struct {
 	// Actor A member's identifier; their own changes and those of their personal access tokens.
@@ -718,11 +801,20 @@ type ListProjectAuditEntriesParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
+type AcceptInvitationJSONRequestBody = InvitationAcceptance
+
 // SignInJSONRequestBody defines body for SignIn for application/json ContentType.
 type SignInJSONRequestBody = SignInRequest
 
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
+
+// InviteMemberJSONRequestBody defines body for InviteMember for application/json ContentType.
+type InviteMemberJSONRequestBody = MemberInvite
+
+// UpdateMemberJSONRequestBody defines body for UpdateMember for application/json ContentType.
+type UpdateMemberJSONRequestBody = MemberPatch
 
 // CreateProjectJSONRequestBody defines body for CreateProject for application/json ContentType.
 type CreateProjectJSONRequestBody = ProjectCreate
@@ -830,6 +922,52 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /audit (the `ListAuditEntries` operationId).
 	ListAuditEntries(ctx context.Context, params *ListAuditEntriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetInvitation What an invitation's link opens
+	//
+	// Read before anyone is signed in, to show the invited person whose
+	// invitation it is. An invitation that cannot be accepted, whether it
+	// was never issued, has been used or replaced, or has expired, is
+	// `invitation_gone`, alike. The secret never reaches a log line.
+	//
+	// Corresponds with GET /auth/invitations/{secret} (the `GetInvitation` operationId).
+	GetInvitation(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AcceptInvitationWithBody Accept an invitation
+	//
+	// Sets the invited member's first password under the password policy
+	// (`weak_password` otherwise), makes them active, uses up the link and
+	// opens a session, setting its cookie. The body must be sent as
+	// `application/json`; anything else is refused
+	// `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its address before the secret is
+	// looked up, and is taken back once the secret opens an invitation: a
+	// hundred failures from one address in fifteen minutes, sign-ins
+	// included, throttle the address (`rate_limited`).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /auth/invitations/{secret} (the `AcceptInvitation` operationId).
+	AcceptInvitationWithBody(ctx context.Context, secret string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AcceptInvitation Accept an invitation
+	//
+	// Sets the invited member's first password under the password policy
+	// (`weak_password` otherwise), makes them active, uses up the link and
+	// opens a session, setting its cookie. The body must be sent as
+	// `application/json`; anything else is refused
+	// `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its address before the secret is
+	// looked up, and is taken back once the secret opens an invitation: a
+	// hundred failures from one address in fifteen minutes, sign-ins
+	// included, throttle the address (`rate_limited`).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /auth/invitations/{secret} (the `AcceptInvitation` operationId).
+	AcceptInvitation(ctx context.Context, secret string, body AcceptInvitationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAuthMethods How members sign in
 	//
@@ -954,6 +1092,102 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 	RevokeMySession(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMembers The instance's members
+	//
+	// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
+	//
+	// Corresponds with GET /members (the `ListMembers` operationId).
+	ListMembers(ctx context.Context, params *ListMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InviteMemberWithBody Invite someone to the instance
+	//
+	// Creates an invited member and their invitation, and answers the
+	// invitation's one-time link, to pass on to them: it is shown this
+	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
+	// request's origin when it is not set, followed by
+	// `/invitations/<secret>`; it expires after seven days. An email the
+	// instance holds, whatever its case, is refused `already_exists`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /members (the `InviteMember` operationId).
+	InviteMemberWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// InviteMember Invite someone to the instance
+	//
+	// Creates an invited member and their invitation, and answers the
+	// invitation's one-time link, to pass on to them: it is shown this
+	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
+	// request's origin when it is not set, followed by
+	// `/invitations/<secret>`; it expires after seven days. An email the
+	// instance holds, whatever its case, is refused `already_exists`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /members (the `InviteMember` operationId).
+	InviteMember(ctx context.Context, body InviteMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMember A member
+	//
+	// Corresponds with GET /members/{member} (the `GetMember` operationId).
+	GetMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMemberWithBody Edit a member, or make them instance admin or not
+	//
+	// Changes the fields sent and leaves the others as they are. An email
+	// another member holds, whatever its case, is refused `already_exists`.
+	// Demoting the instance's last active instance admin is refused
+	// `last_instance_admin`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+	UpdateMemberWithBody(ctx context.Context, member MemberID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMember Edit a member, or make them instance admin or not
+	//
+	// Changes the fields sent and leaves the others as they are. An email
+	// another member holds, whatever its case, is refused `already_exists`.
+	// Demoting the instance's last active instance admin is refused
+	// `last_instance_admin`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+	UpdateMember(ctx context.Context, member MemberID, body UpdateMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeactivateMember Offboard a member
+	//
+	// The member can no longer sign in, and every session and personal
+	// access token they hold is revoked with them, at once, and every link
+	// of theirs stops working. Project tokens
+	// they created keep working: they belong to their project. Deactivating
+	// the instance's last active instance admin is refused
+	// `last_instance_admin`; deactivating a deactivated member changes
+	// nothing.
+	//
+	// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
+	DeactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReissueInvitation Replace an invited member's link
+	//
+	// Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+	//
+	// Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
+	ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReactivateMember Bring a deactivated member back
+	//
+	// The member becomes active when they hold a password. One who never
+	// set one is invited again, and the answer carries their fresh
+	// invitation's one-time link, as on invitation. What their
+	// deactivation revoked stays revoked: they sign in afresh and create
+	// new tokens. Reactivating a member who is not deactivated changes
+	// nothing.
+	//
+	// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
+	ReactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RevokeMemberSessions Sign a member out everywhere
 	//
@@ -1204,6 +1438,82 @@ func (c *Client) ListAuditEntries(ctx context.Context, params *ListAuditEntriesP
 	return c.Client.Do(req)
 }
 
+// GetInvitation What an invitation's link opens
+//
+// Read before anyone is signed in, to show the invited person whose
+// invitation it is. An invitation that cannot be accepted, whether it
+// was never issued, has been used or replaced, or has expired, is
+// `invitation_gone`, alike. The secret never reaches a log line.
+//
+// Corresponds with GET /auth/invitations/{secret} (the `GetInvitation` operationId).
+func (c *Client) GetInvitation(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetInvitationRequest(c.Server, secret)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AcceptInvitationWithBody Accept an invitation
+//
+// Sets the invited member's first password under the password policy
+// (`weak_password` otherwise), makes them active, uses up the link and
+// opens a session, setting its cookie. The body must be sent as
+// `application/json`; anything else is refused
+// `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its address before the secret is
+// looked up, and is taken back once the secret opens an invitation: a
+// hundred failures from one address in fifteen minutes, sign-ins
+// included, throttle the address (`rate_limited`).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /auth/invitations/{secret} (the `AcceptInvitation` operationId).
+func (c *Client) AcceptInvitationWithBody(ctx context.Context, secret string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAcceptInvitationRequestWithBody(c.Server, secret, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AcceptInvitation Accept an invitation
+//
+// Sets the invited member's first password under the password policy
+// (`weak_password` otherwise), makes them active, uses up the link and
+// opens a session, setting its cookie. The body must be sent as
+// `application/json`; anything else is refused
+// `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its address before the secret is
+// looked up, and is taken back once the secret opens an invitation: a
+// hundred failures from one address in fifteen minutes, sign-ins
+// included, throttle the address (`rate_limited`).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /auth/invitations/{secret} (the `AcceptInvitation` operationId).
+func (c *Client) AcceptInvitation(ctx context.Context, secret string, body AcceptInvitationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAcceptInvitationRequest(c.Server, secret, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetAuthMethods How members sign in
 //
 // The ways the sign-in page offers, read before anyone is signed in.
@@ -1428,6 +1738,192 @@ func (c *Client) ListMySessions(ctx context.Context, reqEditors ...RequestEditor
 // Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 func (c *Client) RevokeMySession(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRevokeMySessionRequest(c.Server, session)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMembers The instance's members
+//
+// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
+//
+// Corresponds with GET /members (the `ListMembers` operationId).
+func (c *Client) ListMembers(ctx context.Context, params *ListMembersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMembersRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InviteMemberWithBody Invite someone to the instance
+//
+// Creates an invited member and their invitation, and answers the
+// invitation's one-time link, to pass on to them: it is shown this
+// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
+// request's origin when it is not set, followed by
+// `/invitations/<secret>`; it expires after seven days. An email the
+// instance holds, whatever its case, is refused `already_exists`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /members (the `InviteMember` operationId).
+func (c *Client) InviteMemberWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInviteMemberRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// InviteMember Invite someone to the instance
+//
+// Creates an invited member and their invitation, and answers the
+// invitation's one-time link, to pass on to them: it is shown this
+// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
+// request's origin when it is not set, followed by
+// `/invitations/<secret>`; it expires after seven days. An email the
+// instance holds, whatever its case, is refused `already_exists`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /members (the `InviteMember` operationId).
+func (c *Client) InviteMember(ctx context.Context, body InviteMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewInviteMemberRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetMember A member
+//
+// Corresponds with GET /members/{member} (the `GetMember` operationId).
+func (c *Client) GetMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMemberRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateMemberWithBody Edit a member, or make them instance admin or not
+//
+// Changes the fields sent and leaves the others as they are. An email
+// another member holds, whatever its case, is refused `already_exists`.
+// Demoting the instance's last active instance admin is refused
+// `last_instance_admin`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+func (c *Client) UpdateMemberWithBody(ctx context.Context, member MemberID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMemberRequestWithBody(c.Server, member, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateMember Edit a member, or make them instance admin or not
+//
+// Changes the fields sent and leaves the others as they are. An email
+// another member holds, whatever its case, is refused `already_exists`.
+// Demoting the instance's last active instance admin is refused
+// `last_instance_admin`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+func (c *Client) UpdateMember(ctx context.Context, member MemberID, body UpdateMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMemberRequest(c.Server, member, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeactivateMember Offboard a member
+//
+// The member can no longer sign in, and every session and personal
+// access token they hold is revoked with them, at once, and every link
+// of theirs stops working. Project tokens
+// they created keep working: they belong to their project. Deactivating
+// the instance's last active instance admin is refused
+// `last_instance_admin`; deactivating a deactivated member changes
+// nothing.
+//
+// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
+func (c *Client) DeactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeactivateMemberRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReissueInvitation Replace an invited member's link
+//
+// Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+//
+// Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
+func (c *Client) ReissueInvitation(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReissueInvitationRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ReactivateMember Bring a deactivated member back
+//
+// The member becomes active when they hold a password. One who never
+// set one is invited again, and the answer carries their fresh
+// invitation's one-time link, as on invitation. What their
+// deactivation revoked stays revoked: they sign in afresh and create
+// new tokens. Reactivating a member who is not deactivated changes
+// nothing.
+//
+// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
+func (c *Client) ReactivateMember(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReactivateMemberRequest(c.Server, member)
 	if err != nil {
 		return nil, err
 	}
@@ -2183,6 +2679,87 @@ func NewListAuditEntriesRequest(server string, params *ListAuditEntriesParams) (
 	return req, nil
 }
 
+// NewGetInvitationRequest constructs an http.Request for the GetInvitation method
+func NewGetInvitationRequest(server string, secret string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "secret", secret, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/invitations/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewAcceptInvitationRequest calls the generic AcceptInvitation builder with application/json body
+func NewAcceptInvitationRequest(server string, secret string, body AcceptInvitationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAcceptInvitationRequestWithBody(server, secret, "application/json", bodyReader)
+}
+
+// NewAcceptInvitationRequestWithBody constructs an http.Request for the AcceptInvitation method, with any body, and a specified content type
+func NewAcceptInvitationRequestWithBody(server string, secret string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "secret", secret, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/invitations/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetAuthMethodsRequest constructs an http.Request for the GetAuthMethods method
 func NewGetAuthMethodsRequest(server string) (*http.Request, error) {
 	var err error
@@ -2479,6 +3056,295 @@ func NewRevokeMySessionRequest(server string, session SessionID) (*http.Request,
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMembersRequest constructs an http.Request for the ListMembers method
+func NewListMembersRequest(server string, params *ListMembersParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewInviteMemberRequest calls the generic InviteMember builder with application/json body
+func NewInviteMemberRequest(server string, body InviteMemberJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewInviteMemberRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewInviteMemberRequestWithBody constructs an http.Request for the InviteMember method, with any body, and a specified content type
+func NewInviteMemberRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetMemberRequest constructs an http.Request for the GetMember method
+func NewGetMemberRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateMemberRequest calls the generic UpdateMember builder with application/json body
+func NewUpdateMemberRequest(server string, member MemberID, body UpdateMemberJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateMemberRequestWithBody(server, member, "application/json", bodyReader)
+}
+
+// NewUpdateMemberRequestWithBody constructs an http.Request for the UpdateMember method, with any body, and a specified content type
+func NewUpdateMemberRequestWithBody(server string, member MemberID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeactivateMemberRequest constructs an http.Request for the DeactivateMember method
+func NewDeactivateMemberRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/deactivate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReissueInvitationRequest constructs an http.Request for the ReissueInvitation method
+func NewReissueInvitationRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/invitation", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReactivateMemberRequest constructs an http.Request for the ReactivateMember method
+func NewReactivateMemberRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/reactivate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -3691,6 +4557,54 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /audit (the `ListAuditEntries` operationId).
 	ListAuditEntriesWithResponse(ctx context.Context, params *ListAuditEntriesParams, reqEditors ...RequestEditorFn) (*ListAuditEntriesResponse, error)
 
+	// GetInvitationWithResponse What an invitation's link opens
+	//
+	// Read before anyone is signed in, to show the invited person whose
+	// invitation it is. An invitation that cannot be accepted, whether it
+	// was never issued, has been used or replaced, or has expired, is
+	// `invitation_gone`, alike. The secret never reaches a log line.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /auth/invitations/{secret} (the `GetInvitation` operationId).
+	GetInvitationWithResponse(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*GetInvitationResponse, error)
+
+	// AcceptInvitationWithBodyWithResponse Accept an invitation
+	//
+	// Sets the invited member's first password under the password policy
+	// (`weak_password` otherwise), makes them active, uses up the link and
+	// opens a session, setting its cookie. The body must be sent as
+	// `application/json`; anything else is refused
+	// `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its address before the secret is
+	// looked up, and is taken back once the secret opens an invitation: a
+	// hundred failures from one address in fifteen minutes, sign-ins
+	// included, throttle the address (`rate_limited`).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/invitations/{secret} (the `AcceptInvitation` operationId).
+	AcceptInvitationWithBodyWithResponse(ctx context.Context, secret string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AcceptInvitationResponse, error)
+
+	// AcceptInvitationWithResponse Accept an invitation
+	//
+	// Sets the invited member's first password under the password policy
+	// (`weak_password` otherwise), makes them active, uses up the link and
+	// opens a session, setting its cookie. The body must be sent as
+	// `application/json`; anything else is refused
+	// `unsupported_media_type`.
+	//
+	// Each attempt counts as a failure of its address before the secret is
+	// looked up, and is taken back once the secret opens an invitation: a
+	// hundred failures from one address in fifteen minutes, sign-ins
+	// included, throttle the address (`rate_limited`).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /auth/invitations/{secret} (the `AcceptInvitation` operationId).
+	AcceptInvitationWithResponse(ctx context.Context, secret string, body AcceptInvitationJSONRequestBody, reqEditors ...RequestEditorFn) (*AcceptInvitationResponse, error)
+
 	// GetAuthMethodsWithResponse How members sign in
 	//
 	// The ways the sign-in page offers, read before anyone is signed in.
@@ -3828,6 +4742,112 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 	RevokeMySessionWithResponse(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*RevokeMySessionResponse, error)
+
+	// ListMembersWithResponse The instance's members
+	//
+	// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /members (the `ListMembers` operationId).
+	ListMembersWithResponse(ctx context.Context, params *ListMembersParams, reqEditors ...RequestEditorFn) (*ListMembersResponse, error)
+
+	// InviteMemberWithBodyWithResponse Invite someone to the instance
+	//
+	// Creates an invited member and their invitation, and answers the
+	// invitation's one-time link, to pass on to them: it is shown this
+	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
+	// request's origin when it is not set, followed by
+	// `/invitations/<secret>`; it expires after seven days. An email the
+	// instance holds, whatever its case, is refused `already_exists`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /members (the `InviteMember` operationId).
+	InviteMemberWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*InviteMemberResponse, error)
+
+	// InviteMemberWithResponse Invite someone to the instance
+	//
+	// Creates an invited member and their invitation, and answers the
+	// invitation's one-time link, to pass on to them: it is shown this
+	// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
+	// request's origin when it is not set, followed by
+	// `/invitations/<secret>`; it expires after seven days. An email the
+	// instance holds, whatever its case, is refused `already_exists`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /members (the `InviteMember` operationId).
+	InviteMemberWithResponse(ctx context.Context, body InviteMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*InviteMemberResponse, error)
+
+	// GetMemberWithResponse A member
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /members/{member} (the `GetMember` operationId).
+	GetMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*GetMemberResponse, error)
+
+	// UpdateMemberWithBodyWithResponse Edit a member, or make them instance admin or not
+	//
+	// Changes the fields sent and leaves the others as they are. An email
+	// another member holds, whatever its case, is refused `already_exists`.
+	// Demoting the instance's last active instance admin is refused
+	// `last_instance_admin`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+	UpdateMemberWithBodyWithResponse(ctx context.Context, member MemberID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMemberResponse, error)
+
+	// UpdateMemberWithResponse Edit a member, or make them instance admin or not
+	//
+	// Changes the fields sent and leaves the others as they are. An email
+	// another member holds, whatever its case, is refused `already_exists`.
+	// Demoting the instance's last active instance admin is refused
+	// `last_instance_admin`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+	UpdateMemberWithResponse(ctx context.Context, member MemberID, body UpdateMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMemberResponse, error)
+
+	// DeactivateMemberWithResponse Offboard a member
+	//
+	// The member can no longer sign in, and every session and personal
+	// access token they hold is revoked with them, at once, and every link
+	// of theirs stops working. Project tokens
+	// they created keep working: they belong to their project. Deactivating
+	// the instance's last active instance admin is refused
+	// `last_instance_admin`; deactivating a deactivated member changes
+	// nothing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
+	DeactivateMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*DeactivateMemberResponse, error)
+
+	// ReissueInvitationWithResponse Replace an invited member's link
+	//
+	// Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
+	ReissueInvitationWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ReissueInvitationResponse, error)
+
+	// ReactivateMemberWithResponse Bring a deactivated member back
+	//
+	// The member becomes active when they hold a password. One who never
+	// set one is invited again, and the answer carries their fresh
+	// invitation's one-time link, as on invitation. What their
+	// deactivation revoked stays revoked: they sign in afresh and create
+	// new tokens. Reactivating a member who is not deactivated changes
+	// nothing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
+	ReactivateMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ReactivateMemberResponse, error)
 
 	// RevokeMemberSessionsWithResponse Sign a member out everywhere
 	//
@@ -4169,6 +5189,193 @@ func (r ListAuditEntriesResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListAuditEntriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetInvitationResponse401Headers the declared response headers of an HTTP 401 response for GetInvitation
+type GetInvitationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetInvitationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Invitation
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *InvitationGone
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetInvitationResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetInvitationResponse) GetJSON200() *Invitation {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetInvitationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r GetInvitationResponse) GetApplicationproblemJSON410() *InvitationGone {
+	return r.ApplicationproblemJSON410
+}
+
+// GetBody returns the raw response body bytes
+func (r GetInvitationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetInvitationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetInvitationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetInvitationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// AcceptInvitationResponse200Headers the declared response headers of an HTTP 200 response for AcceptInvitation
+type AcceptInvitationResponse200Headers struct {
+	SetCookie *string
+}
+
+// AcceptInvitationResponse401Headers the declared response headers of an HTTP 401 response for AcceptInvitation
+type AcceptInvitationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+// AcceptInvitationResponse429Headers the declared response headers of an HTTP 429 response for AcceptInvitation
+type AcceptInvitationResponse429Headers struct {
+	RetryAfter *int
+}
+
+// AcceptInvitationResponse503Headers the declared response headers of an HTTP 503 response for AcceptInvitation
+type AcceptInvitationResponse503Headers struct {
+	RetryAfter *int
+}
+
+type AcceptInvitationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Me
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
+	ApplicationproblemJSON410 *InvitationGone
+	// ApplicationproblemJSON413 the response for an HTTP 413 `application/problem+json` response
+	ApplicationproblemJSON413 *RequestTooLarge
+	// ApplicationproblemJSON415 the response for an HTTP 415 `application/problem+json` response
+	ApplicationproblemJSON415 *UnsupportedMediaType
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *TooManyAttempts
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *Busy
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *AcceptInvitationResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *AcceptInvitationResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *AcceptInvitationResponse429Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *AcceptInvitationResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r AcceptInvitationResponse) GetJSON200() *Me {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r AcceptInvitationResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r AcceptInvitationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
+func (r AcceptInvitationResponse) GetApplicationproblemJSON410() *InvitationGone {
+	return r.ApplicationproblemJSON410
+}
+
+// GetApplicationproblemJSON413 returns the response for an HTTP 413 `application/problem+json` response
+func (r AcceptInvitationResponse) GetApplicationproblemJSON413() *RequestTooLarge {
+	return r.ApplicationproblemJSON413
+}
+
+// GetApplicationproblemJSON415 returns the response for an HTTP 415 `application/problem+json` response
+func (r AcceptInvitationResponse) GetApplicationproblemJSON415() *UnsupportedMediaType {
+	return r.ApplicationproblemJSON415
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r AcceptInvitationResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r AcceptInvitationResponse) GetApplicationproblemJSON429() *TooManyAttempts {
+	return r.ApplicationproblemJSON429
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r AcceptInvitationResponse) GetApplicationproblemJSON503() *Busy {
+	return r.ApplicationproblemJSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r AcceptInvitationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r AcceptInvitationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AcceptInvitationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AcceptInvitationResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4790,6 +5997,524 @@ func (r RevokeMySessionResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RevokeMySessionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListMembersResponse401Headers the declared response headers of an HTTP 401 response for ListMembers
+type ListMembersResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMembersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MemberList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMembersResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMembersResponse) GetJSON200() *MemberList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListMembersResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMembersResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMembersResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMembersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMembersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMembersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMembersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// InviteMemberResponse401Headers the declared response headers of an HTTP 401 response for InviteMember
+type InviteMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type InviteMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *MemberInvitation
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *InviteMemberResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r InviteMemberResponse) GetJSON201() *MemberInvitation {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r InviteMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r InviteMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r InviteMemberResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r InviteMemberResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r InviteMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r InviteMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r InviteMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r InviteMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetMemberResponse401Headers the declared response headers of an HTTP 401 response for GetMember
+type GetMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Member
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetMemberResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMemberResponse) GetJSON200() *Member {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateMemberResponse401Headers the declared response headers of an HTTP 401 response for UpdateMember
+type UpdateMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Member
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateMemberResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateMemberResponse) GetJSON200() *Member {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateMemberResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeactivateMemberResponse401Headers the declared response headers of an HTTP 401 response for DeactivateMember
+type DeactivateMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeactivateMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Member
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeactivateMemberResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeactivateMemberResponse) GetJSON200() *Member {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeactivateMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeactivateMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeactivateMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeactivateMemberResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r DeactivateMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeactivateMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeactivateMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeactivateMemberResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ReissueInvitationResponse401Headers the declared response headers of an HTTP 401 response for ReissueInvitation
+type ReissueInvitationResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ReissueInvitationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *MemberInvitation
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ReissueInvitationResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r ReissueInvitationResponse) GetJSON201() *MemberInvitation {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ReissueInvitationResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ReissueInvitationResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ReissueInvitationResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ReissueInvitationResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r ReissueInvitationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReissueInvitationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReissueInvitationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReissueInvitationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ReactivateMemberResponse401Headers the declared response headers of an HTTP 401 response for ReactivateMember
+type ReactivateMemberResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ReactivateMemberResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MemberInvitation
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ReactivateMemberResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ReactivateMemberResponse) GetJSON200() *MemberInvitation {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ReactivateMemberResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ReactivateMemberResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ReactivateMemberResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ReactivateMemberResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ReactivateMemberResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReactivateMemberResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ReactivateMemberResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -6608,6 +8333,72 @@ func (c *ClientWithResponses) ListAuditEntriesWithResponse(ctx context.Context, 
 	return ParseListAuditEntriesResponse(rsp)
 }
 
+// GetInvitationWithResponse What an invitation's link opens
+//
+// Read before anyone is signed in, to show the invited person whose
+// invitation it is. An invitation that cannot be accepted, whether it
+// was never issued, has been used or replaced, or has expired, is
+// `invitation_gone`, alike. The secret never reaches a log line.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /auth/invitations/{secret} (the `GetInvitation` operationId).
+func (c *ClientWithResponses) GetInvitationWithResponse(ctx context.Context, secret string, reqEditors ...RequestEditorFn) (*GetInvitationResponse, error) {
+	rsp, err := c.GetInvitation(ctx, secret, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetInvitationResponse(rsp)
+}
+
+// AcceptInvitationWithBodyWithResponse Accept an invitation
+//
+// Sets the invited member's first password under the password policy
+// (`weak_password` otherwise), makes them active, uses up the link and
+// opens a session, setting its cookie. The body must be sent as
+// `application/json`; anything else is refused
+// `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its address before the secret is
+// looked up, and is taken back once the secret opens an invitation: a
+// hundred failures from one address in fifteen minutes, sign-ins
+// included, throttle the address (`rate_limited`).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/invitations/{secret} (the `AcceptInvitation` operationId).
+func (c *ClientWithResponses) AcceptInvitationWithBodyWithResponse(ctx context.Context, secret string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AcceptInvitationResponse, error) {
+	rsp, err := c.AcceptInvitationWithBody(ctx, secret, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAcceptInvitationResponse(rsp)
+}
+
+// AcceptInvitationWithResponse Accept an invitation
+//
+// Sets the invited member's first password under the password policy
+// (`weak_password` otherwise), makes them active, uses up the link and
+// opens a session, setting its cookie. The body must be sent as
+// `application/json`; anything else is refused
+// `unsupported_media_type`.
+//
+// Each attempt counts as a failure of its address before the secret is
+// looked up, and is taken back once the secret opens an invitation: a
+// hundred failures from one address in fifteen minutes, sign-ins
+// included, throttle the address (`rate_limited`).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /auth/invitations/{secret} (the `AcceptInvitation` operationId).
+func (c *ClientWithResponses) AcceptInvitationWithResponse(ctx context.Context, secret string, body AcceptInvitationJSONRequestBody, reqEditors ...RequestEditorFn) (*AcceptInvitationResponse, error) {
+	rsp, err := c.AcceptInvitation(ctx, secret, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAcceptInvitationResponse(rsp)
+}
+
 // GetAuthMethodsWithResponse How members sign in
 //
 // The ways the sign-in page offers, read before anyone is signed in.
@@ -6810,6 +8601,166 @@ func (c *ClientWithResponses) RevokeMySessionWithResponse(ctx context.Context, s
 		return nil, err
 	}
 	return ParseRevokeMySessionResponse(rsp)
+}
+
+// ListMembersWithResponse The instance's members
+//
+// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /members (the `ListMembers` operationId).
+func (c *ClientWithResponses) ListMembersWithResponse(ctx context.Context, params *ListMembersParams, reqEditors ...RequestEditorFn) (*ListMembersResponse, error) {
+	rsp, err := c.ListMembers(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMembersResponse(rsp)
+}
+
+// InviteMemberWithBodyWithResponse Invite someone to the instance
+//
+// Creates an invited member and their invitation, and answers the
+// invitation's one-time link, to pass on to them: it is shown this
+// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
+// request's origin when it is not set, followed by
+// `/invitations/<secret>`; it expires after seven days. An email the
+// instance holds, whatever its case, is refused `already_exists`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /members (the `InviteMember` operationId).
+func (c *ClientWithResponses) InviteMemberWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*InviteMemberResponse, error) {
+	rsp, err := c.InviteMemberWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseInviteMemberResponse(rsp)
+}
+
+// InviteMemberWithResponse Invite someone to the instance
+//
+// Creates an invited member and their invitation, and answers the
+// invitation's one-time link, to pass on to them: it is shown this
+// once and never again. The link is `FLAGNETIC_BASE_URL`, or this
+// request's origin when it is not set, followed by
+// `/invitations/<secret>`; it expires after seven days. An email the
+// instance holds, whatever its case, is refused `already_exists`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /members (the `InviteMember` operationId).
+func (c *ClientWithResponses) InviteMemberWithResponse(ctx context.Context, body InviteMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*InviteMemberResponse, error) {
+	rsp, err := c.InviteMember(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseInviteMemberResponse(rsp)
+}
+
+// GetMemberWithResponse A member
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /members/{member} (the `GetMember` operationId).
+func (c *ClientWithResponses) GetMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*GetMemberResponse, error) {
+	rsp, err := c.GetMember(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMemberResponse(rsp)
+}
+
+// UpdateMemberWithBodyWithResponse Edit a member, or make them instance admin or not
+//
+// Changes the fields sent and leaves the others as they are. An email
+// another member holds, whatever its case, is refused `already_exists`.
+// Demoting the instance's last active instance admin is refused
+// `last_instance_admin`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+func (c *ClientWithResponses) UpdateMemberWithBodyWithResponse(ctx context.Context, member MemberID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMemberResponse, error) {
+	rsp, err := c.UpdateMemberWithBody(ctx, member, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMemberResponse(rsp)
+}
+
+// UpdateMemberWithResponse Edit a member, or make them instance admin or not
+//
+// Changes the fields sent and leaves the others as they are. An email
+// another member holds, whatever its case, is refused `already_exists`.
+// Demoting the instance's last active instance admin is refused
+// `last_instance_admin`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /members/{member} (the `UpdateMember` operationId).
+func (c *ClientWithResponses) UpdateMemberWithResponse(ctx context.Context, member MemberID, body UpdateMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMemberResponse, error) {
+	rsp, err := c.UpdateMember(ctx, member, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMemberResponse(rsp)
+}
+
+// DeactivateMemberWithResponse Offboard a member
+//
+// The member can no longer sign in, and every session and personal
+// access token they hold is revoked with them, at once, and every link
+// of theirs stops working. Project tokens
+// they created keep working: they belong to their project. Deactivating
+// the instance's last active instance admin is refused
+// `last_instance_admin`; deactivating a deactivated member changes
+// nothing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /members/{member}/deactivate (the `DeactivateMember` operationId).
+func (c *ClientWithResponses) DeactivateMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*DeactivateMemberResponse, error) {
+	rsp, err := c.DeactivateMember(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeactivateMemberResponse(rsp)
+}
+
+// ReissueInvitationWithResponse Replace an invited member's link
+//
+// Issues a fresh invitation, answered with its one-time link as on invitation, and kills every earlier link of the member. A member who is not invited is refused `member_not_invited`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /members/{member}/invitation (the `ReissueInvitation` operationId).
+func (c *ClientWithResponses) ReissueInvitationWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ReissueInvitationResponse, error) {
+	rsp, err := c.ReissueInvitation(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReissueInvitationResponse(rsp)
+}
+
+// ReactivateMemberWithResponse Bring a deactivated member back
+//
+// The member becomes active when they hold a password. One who never
+// set one is invited again, and the answer carries their fresh
+// invitation's one-time link, as on invitation. What their
+// deactivation revoked stays revoked: they sign in afresh and create
+// new tokens. Reactivating a member who is not deactivated changes
+// nothing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /members/{member}/reactivate (the `ReactivateMember` operationId).
+func (c *ClientWithResponses) ReactivateMemberWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ReactivateMemberResponse, error) {
+	rsp, err := c.ReactivateMember(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReactivateMemberResponse(rsp)
 }
 
 // RevokeMemberSessionsWithResponse Sign a member out everywhere
@@ -7341,6 +9292,184 @@ func ParseListAuditEntriesResponse(rsp *http.Response) (*ListAuditEntriesRespons
 			headers.WWWAuthenticate = &value
 		}
 		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetInvitationResponse parses an HTTP response from a GetInvitationWithResponse call
+func ParseGetInvitationResponse(rsp *http.Response) (*GetInvitationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetInvitationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Invitation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+		var dest InvitationGone
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON410 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetInvitationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseAcceptInvitationResponse parses an HTTP response from a AcceptInvitationWithResponse call
+func ParseAcceptInvitationResponse(rsp *http.Response) (*AcceptInvitationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AcceptInvitationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Me
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+		var dest InvitationGone
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON410 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 413:
+		var dest RequestTooLarge
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON413 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 415:
+		var dest UnsupportedMediaType
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON415 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest TooManyAttempts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Busy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers AcceptInvitationResponse200Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers AcceptInvitationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers AcceptInvitationResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
+	case rsp.StatusCode == 503:
+		var headers AcceptInvitationResponse503Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -7897,6 +10026,461 @@ func ParseRevokeMySessionResponse(rsp *http.Response) (*RevokeMySessionResponse,
 		response.Headers204 = &headers
 	case rsp.StatusCode == 401:
 		var headers RevokeMySessionResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListMembersResponse parses an HTTP response from a ListMembersWithResponse call
+func ParseListMembersResponse(rsp *http.Response) (*ListMembersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMembersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MemberList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMembersResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseInviteMemberResponse parses an HTTP response from a InviteMemberWithResponse call
+func ParseInviteMemberResponse(rsp *http.Response) (*InviteMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &InviteMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest MemberInvitation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers InviteMemberResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetMemberResponse parses an HTTP response from a GetMemberWithResponse call
+func ParseGetMemberResponse(rsp *http.Response) (*GetMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Member
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetMemberResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateMemberResponse parses an HTTP response from a UpdateMemberWithResponse call
+func ParseUpdateMemberResponse(rsp *http.Response) (*UpdateMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Member
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers UpdateMemberResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeactivateMemberResponse parses an HTTP response from a DeactivateMemberWithResponse call
+func ParseDeactivateMemberResponse(rsp *http.Response) (*DeactivateMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeactivateMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Member
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeactivateMemberResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseReissueInvitationResponse parses an HTTP response from a ReissueInvitationWithResponse call
+func ParseReissueInvitationResponse(rsp *http.Response) (*ReissueInvitationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReissueInvitationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest MemberInvitation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ReissueInvitationResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseReactivateMemberResponse parses an HTTP response from a ReactivateMemberWithResponse call
+func ParseReactivateMemberResponse(rsp *http.Response) (*ReactivateMemberResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReactivateMemberResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MemberInvitation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ReactivateMemberResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -9497,6 +12081,12 @@ type ServerInterface interface {
 	// ListAuditEntries The instance's audit log
 	// (GET /audit)
 	ListAuditEntries(w http.ResponseWriter, r *http.Request, params ListAuditEntriesParams)
+	// GetInvitation What an invitation's link opens
+	// (GET /auth/invitations/{secret})
+	GetInvitation(w http.ResponseWriter, r *http.Request, secret string)
+	// AcceptInvitation Accept an invitation
+	// (POST /auth/invitations/{secret})
+	AcceptInvitation(w http.ResponseWriter, r *http.Request, secret string)
 	// GetAuthMethods How members sign in
 	// (GET /auth/methods)
 	GetAuthMethods(w http.ResponseWriter, r *http.Request)
@@ -9524,6 +12114,27 @@ type ServerInterface interface {
 	// RevokeMySession Sign out one device
 	// (DELETE /me/sessions/{session})
 	RevokeMySession(w http.ResponseWriter, r *http.Request, session SessionID)
+	// ListMembers The instance's members
+	// (GET /members)
+	ListMembers(w http.ResponseWriter, r *http.Request, params ListMembersParams)
+	// InviteMember Invite someone to the instance
+	// (POST /members)
+	InviteMember(w http.ResponseWriter, r *http.Request)
+	// GetMember A member
+	// (GET /members/{member})
+	GetMember(w http.ResponseWriter, r *http.Request, member MemberID)
+	// UpdateMember Edit a member, or make them instance admin or not
+	// (PATCH /members/{member})
+	UpdateMember(w http.ResponseWriter, r *http.Request, member MemberID)
+	// DeactivateMember Offboard a member
+	// (POST /members/{member}/deactivate)
+	DeactivateMember(w http.ResponseWriter, r *http.Request, member MemberID)
+	// ReissueInvitation Replace an invited member's link
+	// (POST /members/{member}/invitation)
+	ReissueInvitation(w http.ResponseWriter, r *http.Request, member MemberID)
+	// ReactivateMember Bring a deactivated member back
+	// (POST /members/{member}/reactivate)
+	ReactivateMember(w http.ResponseWriter, r *http.Request, member MemberID)
 	// RevokeMemberSessions Sign a member out everywhere
 	// (DELETE /members/{member}/sessions)
 	RevokeMemberSessions(w http.ResponseWriter, r *http.Request, member MemberID)
@@ -9786,6 +12397,58 @@ func (siw *ServerInterfaceWrapper) ListAuditEntries(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetInvitation operation middleware
+func (siw *ServerInterfaceWrapper) GetInvitation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "secret" -------------
+	var secret string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "secret", r.PathValue("secret"), &secret, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "secret", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInvitation(w, r, secret)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcceptInvitation operation middleware
+func (siw *ServerInterfaceWrapper) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "secret" -------------
+	var secret string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "secret", r.PathValue("secret"), &secret, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "secret", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcceptInvitation(w, r, secret)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetAuthMethods operation middleware
 func (siw *ServerInterfaceWrapper) GetAuthMethods(w http.ResponseWriter, r *http.Request) {
 
@@ -9934,6 +12597,196 @@ func (siw *ServerInterfaceWrapper) RevokeMySession(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RevokeMySession(w, r, session)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMembers operation middleware
+func (siw *ServerInterfaceWrapper) ListMembers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMembersParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMembers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InviteMember operation middleware
+func (siw *ServerInterfaceWrapper) InviteMember(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InviteMember(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMember operation middleware
+func (siw *ServerInterfaceWrapper) GetMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMember(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMember operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMember(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeactivateMember operation middleware
+func (siw *ServerInterfaceWrapper) DeactivateMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeactivateMember(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReissueInvitation operation middleware
+func (siw *ServerInterfaceWrapper) ReissueInvitation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReissueInvitation(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReactivateMember operation middleware
+func (siw *ServerInterfaceWrapper) ReactivateMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReactivateMember(w, r, member)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -10916,6 +13769,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/sign-in", wrapper.SignIn)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/sign-out", wrapper.SignOut)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/methods", wrapper.GetAuthMethods)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/auth/invitations/{secret}", wrapper.GetInvitation)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/invitations/{secret}", wrapper.AcceptInvitation)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions", wrapper.RevokeMySessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sessions", wrapper.ListMySessions)
@@ -10943,6 +13798,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.UpdateAttribute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit", wrapper.ListProjectAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit/{entry}", wrapper.GetProjectAuditEntry)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members", wrapper.ListMembers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members", wrapper.InviteMember)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}", wrapper.GetMember)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/members/{member}", wrapper.UpdateMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/deactivate", wrapper.DeactivateMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/reactivate", wrapper.ReactivateMember)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/invitation", wrapper.ReissueInvitation)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/sessions", wrapper.RevokeMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/sessions", wrapper.ListMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-settings", wrapper.GetAuthSettings)
@@ -10968,6 +13830,8 @@ type ConflictApplicationProblemPlusJSONResponse Problem
 type ForbiddenApplicationProblemPlusJSONResponse Problem
 
 type InvalidApplicationProblemPlusJSONResponse Problem
+
+type InvitationGoneApplicationProblemPlusJSONResponse Problem
 
 type NotFoundApplicationProblemPlusJSONResponse Problem
 
@@ -11078,6 +13942,233 @@ func (response ListAuditEntries404ApplicationProblemPlusJSONResponse) VisitListA
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInvitationRequestObject struct {
+	Secret string `json:"secret"`
+}
+
+type GetInvitationResponseObject interface {
+	VisitGetInvitationResponse(w http.ResponseWriter) error
+}
+
+type GetInvitation200JSONResponse Invitation
+
+func (response GetInvitation200JSONResponse) VisitGetInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInvitation401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetInvitation401ApplicationProblemPlusJSONResponse) VisitGetInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInvitation410ApplicationProblemPlusJSONResponse struct {
+	InvitationGoneApplicationProblemPlusJSONResponse
+}
+
+func (response GetInvitation410ApplicationProblemPlusJSONResponse) VisitGetInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitationRequestObject struct {
+	Secret string `json:"secret"`
+	Body   *AcceptInvitationJSONRequestBody
+}
+
+type AcceptInvitationResponseObject interface {
+	VisitAcceptInvitationResponse(w http.ResponseWriter) error
+}
+
+type AcceptInvitation200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type AcceptInvitation200JSONResponse struct {
+	Body    Me
+	Headers AcceptInvitation200ResponseHeaders
+}
+
+func (response AcceptInvitation200JSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitation400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation400ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitation401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation401ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitation410ApplicationProblemPlusJSONResponse struct {
+	InvitationGoneApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation410ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(410)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitation413ApplicationProblemPlusJSONResponse struct {
+	RequestTooLargeApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation413ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitation415ApplicationProblemPlusJSONResponse struct {
+	UnsupportedMediaTypeApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation415ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(415)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitation422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation422ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitation429ApplicationProblemPlusJSONResponse struct {
+	TooManyAttemptsApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation429ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcceptInvitation503ApplicationProblemPlusJSONResponse struct {
+	BusyApplicationProblemPlusJSONResponse
+}
+
+func (response AcceptInvitation503ApplicationProblemPlusJSONResponse) VisitAcceptInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -11689,6 +14780,598 @@ type RevokeMySession404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response RevokeMySession404ApplicationProblemPlusJSONResponse) VisitRevokeMySessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembersRequestObject struct {
+	Params ListMembersParams
+}
+
+type ListMembersResponseObject interface {
+	VisitListMembersResponse(w http.ResponseWriter) error
+}
+
+type ListMembers200JSONResponse MemberList
+
+func (response ListMembers200JSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers400ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers401ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMembers403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMembers403ApplicationProblemPlusJSONResponse) VisitListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteMemberRequestObject struct {
+	Body *InviteMemberJSONRequestBody
+}
+
+type InviteMemberResponseObject interface {
+	VisitInviteMemberResponse(w http.ResponseWriter) error
+}
+
+type InviteMember201JSONResponse MemberInvitation
+
+func (response InviteMember201JSONResponse) VisitInviteMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response InviteMember401ApplicationProblemPlusJSONResponse) VisitInviteMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response InviteMember403ApplicationProblemPlusJSONResponse) VisitInviteMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteMember409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response InviteMember409ApplicationProblemPlusJSONResponse) VisitInviteMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type InviteMember422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response InviteMember422ApplicationProblemPlusJSONResponse) VisitInviteMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMemberRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type GetMemberResponseObject interface {
+	VisitGetMemberResponse(w http.ResponseWriter) error
+}
+
+type GetMember200JSONResponse Member
+
+func (response GetMember200JSONResponse) VisitGetMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMember401ApplicationProblemPlusJSONResponse) VisitGetMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetMember403ApplicationProblemPlusJSONResponse) VisitGetMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetMember404ApplicationProblemPlusJSONResponse) VisitGetMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMemberRequestObject struct {
+	Member MemberID `json:"member"`
+	Body   *UpdateMemberJSONRequestBody
+}
+
+type UpdateMemberResponseObject interface {
+	VisitUpdateMemberResponse(w http.ResponseWriter) error
+}
+
+type UpdateMember200JSONResponse Member
+
+func (response UpdateMember200JSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember401ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember403ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember404ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember409ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMember422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateMember422ApplicationProblemPlusJSONResponse) VisitUpdateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMemberRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type DeactivateMemberResponseObject interface {
+	VisitDeactivateMemberResponse(w http.ResponseWriter) error
+}
+
+type DeactivateMember200JSONResponse Member
+
+func (response DeactivateMember200JSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateMember401ApplicationProblemPlusJSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateMember403ApplicationProblemPlusJSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateMember404ApplicationProblemPlusJSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeactivateMember409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeactivateMember409ApplicationProblemPlusJSONResponse) VisitDeactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReissueInvitationRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type ReissueInvitationResponseObject interface {
+	VisitReissueInvitationResponse(w http.ResponseWriter) error
+}
+
+type ReissueInvitation201JSONResponse MemberInvitation
+
+func (response ReissueInvitation201JSONResponse) VisitReissueInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReissueInvitation401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ReissueInvitation401ApplicationProblemPlusJSONResponse) VisitReissueInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReissueInvitation403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReissueInvitation403ApplicationProblemPlusJSONResponse) VisitReissueInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReissueInvitation404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReissueInvitation404ApplicationProblemPlusJSONResponse) VisitReissueInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReissueInvitation409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ReissueInvitation409ApplicationProblemPlusJSONResponse) VisitReissueInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateMemberRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type ReactivateMemberResponseObject interface {
+	VisitReactivateMemberResponse(w http.ResponseWriter) error
+}
+
+type ReactivateMember200JSONResponse MemberInvitation
+
+func (response ReactivateMember200JSONResponse) VisitReactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateMember401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ReactivateMember401ApplicationProblemPlusJSONResponse) VisitReactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateMember403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ReactivateMember403ApplicationProblemPlusJSONResponse) VisitReactivateMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReactivateMember404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ReactivateMember404ApplicationProblemPlusJSONResponse) VisitReactivateMemberResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -13730,6 +17413,12 @@ type StrictServerInterface interface {
 	// ListAuditEntries The instance's audit log
 	// (GET /audit)
 	ListAuditEntries(ctx context.Context, request ListAuditEntriesRequestObject) (ListAuditEntriesResponseObject, error)
+	// GetInvitation What an invitation's link opens
+	// (GET /auth/invitations/{secret})
+	GetInvitation(ctx context.Context, request GetInvitationRequestObject) (GetInvitationResponseObject, error)
+	// AcceptInvitation Accept an invitation
+	// (POST /auth/invitations/{secret})
+	AcceptInvitation(ctx context.Context, request AcceptInvitationRequestObject) (AcceptInvitationResponseObject, error)
 	// GetAuthMethods How members sign in
 	// (GET /auth/methods)
 	GetAuthMethods(ctx context.Context, request GetAuthMethodsRequestObject) (GetAuthMethodsResponseObject, error)
@@ -13757,6 +17446,27 @@ type StrictServerInterface interface {
 	// RevokeMySession Sign out one device
 	// (DELETE /me/sessions/{session})
 	RevokeMySession(ctx context.Context, request RevokeMySessionRequestObject) (RevokeMySessionResponseObject, error)
+	// ListMembers The instance's members
+	// (GET /members)
+	ListMembers(ctx context.Context, request ListMembersRequestObject) (ListMembersResponseObject, error)
+	// InviteMember Invite someone to the instance
+	// (POST /members)
+	InviteMember(ctx context.Context, request InviteMemberRequestObject) (InviteMemberResponseObject, error)
+	// GetMember A member
+	// (GET /members/{member})
+	GetMember(ctx context.Context, request GetMemberRequestObject) (GetMemberResponseObject, error)
+	// UpdateMember Edit a member, or make them instance admin or not
+	// (PATCH /members/{member})
+	UpdateMember(ctx context.Context, request UpdateMemberRequestObject) (UpdateMemberResponseObject, error)
+	// DeactivateMember Offboard a member
+	// (POST /members/{member}/deactivate)
+	DeactivateMember(ctx context.Context, request DeactivateMemberRequestObject) (DeactivateMemberResponseObject, error)
+	// ReissueInvitation Replace an invited member's link
+	// (POST /members/{member}/invitation)
+	ReissueInvitation(ctx context.Context, request ReissueInvitationRequestObject) (ReissueInvitationResponseObject, error)
+	// ReactivateMember Bring a deactivated member back
+	// (POST /members/{member}/reactivate)
+	ReactivateMember(ctx context.Context, request ReactivateMemberRequestObject) (ReactivateMemberResponseObject, error)
 	// RevokeMemberSessions Sign a member out everywhere
 	// (DELETE /members/{member}/sessions)
 	RevokeMemberSessions(ctx context.Context, request RevokeMemberSessionsRequestObject) (RevokeMemberSessionsResponseObject, error)
@@ -13892,6 +17602,65 @@ func (sh *strictHandler) ListAuditEntries(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListAuditEntriesResponseObject); ok {
 		if err := validResponse.VisitListAuditEntriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetInvitation operation middleware
+func (sh *strictHandler) GetInvitation(w http.ResponseWriter, r *http.Request, secret string) {
+	var request GetInvitationRequestObject
+
+	request.Secret = secret
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInvitation(ctx, request.(GetInvitationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInvitation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInvitationResponseObject); ok {
+		if err := validResponse.VisitGetInvitationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AcceptInvitation operation middleware
+func (sh *strictHandler) AcceptInvitation(w http.ResponseWriter, r *http.Request, secret string) {
+	var request AcceptInvitationRequestObject
+
+	request.Secret = secret
+
+	var body AcceptInvitationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AcceptInvitation(ctx, request.(AcceptInvitationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcceptInvitation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AcceptInvitationResponseObject); ok {
+		if err := validResponse.VisitAcceptInvitationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -14126,6 +17895,200 @@ func (sh *strictHandler) RevokeMySession(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RevokeMySessionResponseObject); ok {
 		if err := validResponse.VisitRevokeMySessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMembers operation middleware
+func (sh *strictHandler) ListMembers(w http.ResponseWriter, r *http.Request, params ListMembersParams) {
+	var request ListMembersRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMembers(ctx, request.(ListMembersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMembers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMembersResponseObject); ok {
+		if err := validResponse.VisitListMembersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// InviteMember operation middleware
+func (sh *strictHandler) InviteMember(w http.ResponseWriter, r *http.Request) {
+	var request InviteMemberRequestObject
+
+	var body InviteMemberJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.InviteMember(ctx, request.(InviteMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "InviteMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(InviteMemberResponseObject); ok {
+		if err := validResponse.VisitInviteMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMember operation middleware
+func (sh *strictHandler) GetMember(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request GetMemberRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMember(ctx, request.(GetMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMemberResponseObject); ok {
+		if err := validResponse.VisitGetMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMember operation middleware
+func (sh *strictHandler) UpdateMember(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request UpdateMemberRequestObject
+
+	request.Member = member
+
+	var body UpdateMemberJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMember(ctx, request.(UpdateMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMemberResponseObject); ok {
+		if err := validResponse.VisitUpdateMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeactivateMember operation middleware
+func (sh *strictHandler) DeactivateMember(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request DeactivateMemberRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeactivateMember(ctx, request.(DeactivateMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeactivateMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeactivateMemberResponseObject); ok {
+		if err := validResponse.VisitDeactivateMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReissueInvitation operation middleware
+func (sh *strictHandler) ReissueInvitation(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request ReissueInvitationRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReissueInvitation(ctx, request.(ReissueInvitationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReissueInvitation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReissueInvitationResponseObject); ok {
+		if err := validResponse.VisitReissueInvitationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReactivateMember operation middleware
+func (sh *strictHandler) ReactivateMember(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request ReactivateMemberRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReactivateMember(ctx, request.(ReactivateMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReactivateMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReactivateMemberResponseObject); ok {
+		if err := validResponse.VisitReactivateMemberResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -24,6 +24,15 @@ const (
 	MemberDeactivated MemberStatus = "deactivated"
 )
 
+// ParseMemberStatus returns the status s names; false for none.
+func ParseMemberStatus(s string) (MemberStatus, bool) {
+	switch st := MemberStatus(s); st {
+	case MemberInvited, MemberActive, MemberDeactivated:
+		return st, true
+	}
+	return "", false
+}
+
 // Member is a person who uses the management API or the console.
 type Member struct {
 	ID MemberID
@@ -57,10 +66,8 @@ func NewInstanceAdmin(memberID MemberID, email, displayName string, now time.Tim
 	if displayName == "" {
 		displayName = local
 	}
-	if utf8.RuneCountInString(displayName) > maxDisplayNameLength {
-		return Member{}, apperrors.Invalid("invalid_member", "the member is not valid", apperrors.Violation{
-			Pointer: "/display_name", Code: "too_long", Detail: "a display name has at most 200 characters",
-		})
+	if err := checkDisplayName(displayName); err != nil {
+		return Member{}, err
 	}
 	return Member{
 		ID: memberID, Email: email, DisplayName: displayName,
@@ -75,9 +82,98 @@ func checkEmail(email string) (string, error) {
 	local, domain, ok := strings.Cut(email, "@")
 	if !ok || local == "" || domain == "" || strings.Contains(domain, "@") ||
 		len(email) > maxEmailLength || strings.ContainsFunc(email, unicode.IsSpace) {
-		return "", apperrors.Invalid("invalid_member", "the member is not valid", apperrors.Violation{
+		return "", invalidMember(apperrors.Violation{
 			Pointer: "/email", Code: "invalid_email", Detail: "an email is one address of the form name@domain, at most 254 characters",
 		})
 	}
 	return local, nil
+}
+
+// checkDisplayName accepts a trimmed display name of 1 to 200 characters.
+func checkDisplayName(name string) error {
+	switch {
+	case name == "":
+		return invalidMember(apperrors.Violation{Pointer: "/display_name", Code: "invalid_name", Detail: "a display name is not blank"})
+	case utf8.RuneCountInString(name) > maxDisplayNameLength:
+		return invalidMember(apperrors.Violation{
+			Pointer: "/display_name", Code: "too_long", Detail: "a display name has at most 200 characters",
+			Params: map[string]any{"max": maxDisplayNameLength},
+		})
+	}
+	return nil
+}
+
+func invalidMember(v apperrors.Violation) error {
+	return apperrors.Invalid("invalid_member", "the member is not valid", v)
+}
+
+// MemberChange is an edit of a member by an instance admin; a nil field is
+// left as it is.
+type MemberChange struct {
+	Email         *string
+	DisplayName   *string
+	InstanceAdmin *bool
+}
+
+// Edited returns m with change applied, the email and display name trimmed
+// and held to the bounds of a new member's. Whether another member holds the
+// email is the store's to judge.
+func (m Member) Edited(change MemberChange) (Member, error) {
+	if change.Email != nil {
+		email := strings.TrimSpace(*change.Email)
+		if _, err := checkEmail(email); err != nil {
+			return Member{}, err
+		}
+		m.Email = email
+	}
+	if change.DisplayName != nil {
+		name := strings.TrimSpace(*change.DisplayName)
+		if err := checkDisplayName(name); err != nil {
+			return Member{}, err
+		}
+		m.DisplayName = name
+	}
+	if change.InstanceAdmin != nil {
+		m.InstanceAdmin = *change.InstanceAdmin
+	}
+	return m, nil
+}
+
+// Deactivated returns m offboarded: they can no longer sign in, and every
+// credential they held is revoked with them.
+func (m Member) Deactivated() Member {
+	m.Status = MemberDeactivated
+	return m
+}
+
+// Reactivated returns m back on the instance: active when they hold a
+// password to sign in with, invited otherwise, to set one through an
+// invitation. Nothing revoked at their deactivation comes back.
+func (m Member) Reactivated(holdsPassword bool) Member {
+	m.Status = MemberInvited
+	if holdsPassword {
+		m.Status = MemberActive
+	}
+	return m
+}
+
+// IsActiveInstanceAdmin reports whether m can administer the instance now.
+func (m Member) IsActiveInstanceAdmin() bool { return m.Status == MemberActive && m.InstanceAdmin }
+
+// ErrLastInstanceAdmin refuses a change that would leave the instance
+// without an active instance admin, whom nobody could replace through the
+// API.
+var ErrLastInstanceAdmin = apperrors.Conflict("last_instance_admin",
+	"the instance's last active instance admin can be neither deactivated nor demoted")
+
+// KeepAnInstanceAdmin refuses changing before into after when before is an
+// active instance admin, after is not, and the instance has no other active
+// instance admin, others counting them. The count must be read under the lock that
+// serializes such changes, or two admins demoting each other at once would
+// both pass.
+func KeepAnInstanceAdmin(before, after Member, others int) error {
+	if before.IsActiveInstanceAdmin() && !after.IsActiveInstanceAdmin() && others == 0 {
+		return ErrLastInstanceAdmin
+	}
+	return nil
 }

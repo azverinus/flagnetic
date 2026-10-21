@@ -93,6 +93,18 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RevokeSessions:     appaccess.NewRevokeSessions(tx, accessStore, settings, auditLog, d.Clock, d.IDs),
 		GetAuthSettings:    appaccess.NewGetAuthSettings(settings),
 		UpdateAuthSettings: appaccess.NewUpdateAuthSettings(tx, accessStore, settings, auditLog, d.Clock, d.IDs),
+		ListMembers:        appaccess.NewListMembers(accessStore),
+		GetMember:          appaccess.NewGetMember(accessStore),
+		UpdateMember:       appaccess.NewUpdateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
+		DeactivateMember:   appaccess.NewDeactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
+		ReactivateMember:   appaccess.NewReactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
+		InviteMember:       appaccess.NewInviteMember(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
+		ReissueInvitation:  appaccess.NewReissueInvitation(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
+		GetInvitation:      appaccess.NewGetInvitation(accessStore, d.Clock),
+		AcceptInvitation: appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{
+			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
+			Random: rand.Reader, Key: sessionKey,
+		}),
 		ProjectPermissions: appaccess.NewProjectPermissions(),
 		WorkingProjects:    appaccess.NewWorkingProjects(),
 

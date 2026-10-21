@@ -42,6 +42,11 @@ func WithStatus(s access.MemberStatus) MemberOption { return func(m *access.Memb
 // WithEmail gives the member email instead of a random one.
 func WithEmail(email string) MemberOption { return func(m *access.Member) { m.Email = email } }
 
+// WithDisplayName gives the member name instead of "Test Member".
+func WithDisplayName(name string) MemberOption {
+	return func(m *access.Member) { m.DisplayName = name }
+}
+
 // NewMember creates an active member on pool, who holds no grant and signs
 // in with MemberPassword. An invited member holds no password, as one who
 // has not accepted their invitation.
