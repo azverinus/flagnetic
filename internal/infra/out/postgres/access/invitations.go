@@ -29,10 +29,11 @@ func (s *Store) InvitationByHash(ctx context.Context, hash access.InvitationHash
 }
 
 // LockInvitationByHash returns the invitation whose secret hashes to hash,
-// with its member, both locked until the transaction ends; ErrNotFound when
-// there is none.
+// locked until the transaction ends, with its member; ErrNotFound when there
+// is none. Its member is to be locked first, as every change to a member's
+// invitations locks them.
 func (s *Store) LockInvitationByHash(ctx context.Context, hash access.InvitationHash) (access.Invitation, access.Member, error) {
-	return s.invitationByHash(ctx, hash, " FOR UPDATE OF i, m")
+	return s.invitationByHash(ctx, hash, " FOR UPDATE OF i")
 }
 
 func (s *Store) invitationByHash(ctx context.Context, hash access.InvitationHash, lock string,

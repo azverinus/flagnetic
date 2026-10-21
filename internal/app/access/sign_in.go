@@ -165,12 +165,23 @@ func (h *SignIn) Handle(ctx context.Context, cmd SignInCommand) (SignInResult, e
 
 // release takes back the failure reserved for an attempt that guessed
 // nothing, and returns why the attempt ended, err, with any error taking it
-// back. It runs even when the request was cancelled, so an abandoned attempt
-// leaves no failure behind, and in a unit of work of its own, so the source
-// and the email are taken back together.
+// back.
 func (h *SignIn) release(ctx context.Context, reserved access.Reservation, err error) error {
-	return errors.Join(err, h.d.Tx.Within(context.WithoutCancel(ctx), func(ctx context.Context) error {
-		return h.d.Store.ReleaseAttempt(ctx, reserved)
+	return releaseAttempt(ctx, h.d.Tx, h.d.Store, reserved, err)
+}
+
+// attemptReleaser takes back a reserved failure.
+type attemptReleaser interface {
+	ReleaseAttempt(ctx context.Context, r access.Reservation) error
+}
+
+// releaseAttempt takes back the failure reserved, and returns err, with any
+// error taking it back. It runs even when the request was cancelled, so an
+// abandoned attempt leaves no failure behind, and in a unit of work of its
+// own, so the source and the email are taken back together.
+func releaseAttempt(ctx context.Context, tx Transactor, store attemptReleaser, reserved access.Reservation, err error) error {
+	return errors.Join(err, tx.Within(context.WithoutCancel(ctx), func(ctx context.Context) error {
+		return store.ReleaseAttempt(ctx, reserved)
 	}))
 }
 

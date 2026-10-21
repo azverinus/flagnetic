@@ -243,9 +243,11 @@ func openInvitation(ctx context.Context, store InvitationReader, s secret.String
 type AcceptStore interface {
 	InvitationReader
 	InvitationStore
-	// LockInvitationByHash returns the invitation and its member, both
-	// locked until the unit of work ends; ErrNotFound when none has the
-	// hash.
+	// LockMember returns the member, locked until the unit of work ends;
+	// ErrNotFound when none has the identifier.
+	LockMember(ctx context.Context, member access.MemberID) (access.Member, bool, error)
+	// LockInvitationByHash returns the invitation, locked until the unit of
+	// work ends, and its member; ErrNotFound when none has the hash.
 	LockInvitationByHash(ctx context.Context, hash access.InvitationHash) (access.Invitation, access.Member, error)
 	SaveMember(ctx context.Context, m access.Member, at time.Time) error
 	SetPasswordHash(ctx context.Context, member access.MemberID, hash string, at time.Time) error
@@ -328,9 +330,7 @@ func (h *AcceptInvitation) Handle(ctx context.Context, cmd AcceptInvitationComma
 // release takes back the source's failure reserved for an attempt that
 // guessed nothing, and returns err, with any error taking it back.
 func (h *AcceptInvitation) release(ctx context.Context, reserved access.Reservation, err error) error {
-	return errors.Join(err, h.d.Tx.Within(context.WithoutCancel(ctx), func(ctx context.Context) error {
-		return h.d.Store.ReleaseAttempt(ctx, reserved)
-	}))
+	return releaseAttempt(ctx, h.d.Tx, h.d.Store, reserved, err)
 }
 
 // accept sets the password of m, whose invitation opened checks, and signs
@@ -352,7 +352,7 @@ func (h *AcceptInvitation) accept(ctx context.Context, cmd AcceptInvitationComma
 	now := h.d.Clock.Now()
 	var res SignInResult
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		res, err = h.join(ctx, cmd, opened.Hash, hash, settings, reserved, now)
+		res, err = h.join(ctx, cmd, opened, hash, settings, reserved, now)
 		return err
 	})
 	if err != nil {
@@ -361,14 +361,19 @@ func (h *AcceptInvitation) accept(ctx context.Context, cmd AcceptInvitationComma
 	return res, nil
 }
 
-// join makes the member whose invitation hash names active with the
-// password hash stored for them, consumes their invitations and opens their
-// session, in the unit of work ctx carries; invitation_gone when the
-// invitation was accepted, replaced or consumed since it was read.
-func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand, invitation access.InvitationHash, hash string,
+// join makes the member of opened active with the password hash stored for
+// them, consumes their invitations and opens their session, in the unit of
+// work ctx carries; invitation_gone when the invitation was accepted,
+// replaced or consumed since it was read. The member is locked before their
+// invitation, the order deactivating them and reissuing their link take, so
+// none of them waits on another in a deadlock.
+func (h *AcceptInvitation) join(ctx context.Context, cmd AcceptInvitationCommand, opened access.Invitation, hash string,
 	settings access.AuthSettings, reserved access.Reservation, now time.Time,
 ) (SignInResult, error) {
-	inv, m, err := h.d.Store.LockInvitationByHash(ctx, invitation)
+	if _, _, err := h.d.Store.LockMember(ctx, opened.Member); err != nil {
+		return SignInResult{}, err
+	}
+	inv, m, err := h.d.Store.LockInvitationByHash(ctx, opened.Hash)
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return SignInResult{}, err
 	}
