@@ -98,6 +98,9 @@ func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Op
 		RequestErrorHandlerFunc:  invalidRequest,
 		ResponseErrorHandlerFunc: edge.WriteError,
 	})
+	// The links invitations hand out carry their secret in the path the
+	// browser opens.
+	edge.SecretPath(invitationLinkPath + "{secret}")
 	HandlerWithOptions(strict, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},

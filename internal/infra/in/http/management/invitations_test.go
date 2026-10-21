@@ -279,6 +279,7 @@ func TestAnInvitationSecretNeverReachesALogLine(t *testing.T) {
 	opened(t, srv, mi.Invitation.Url)
 	b := testkit.NewBrowser(t, srv.URL)
 	b.Do(t, http.MethodPut, management.BaseURL+"/auth/invitations/"+secret, "application/json", `{}`)
+	b.Do(t, http.MethodGet, strings.TrimPrefix(mi.Invitation.Url, srv.URL), "", "") // the link itself, as the invitee opens it
 	accept(t, b, mi.Invitation.Url, newPassword)
 
 	paths := map[string]bool{}
@@ -294,7 +295,7 @@ func TestAnInvitationSecretNeverReachesALogLine(t *testing.T) {
 			paths[p] = true
 		}
 	}
-	if !paths[management.BaseURL+"/auth/invitations/{secret}"] {
+	if !paths[management.BaseURL+"/auth/invitations/{secret}"] || !paths["/invitations/{secret}"] {
 		t.Errorf("logged paths = %v, want the route's pattern in place of the secret", paths)
 	}
 }

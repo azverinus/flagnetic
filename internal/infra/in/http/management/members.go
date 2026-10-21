@@ -118,6 +118,10 @@ func (a *api) ReissueInvitation(ctx context.Context, req ReissueInvitationReques
 	return ReissueInvitation201JSONResponse(memberInvitationOf(ctx, res)), nil
 }
 
+// invitationLinkPath is where the console opens an invitation, followed by
+// its secret.
+const invitationLinkPath = "/invitations/"
+
 // memberInvitationOf answers res to the request ctx belongs to, with the
 // link of the invitation issued, which the console opens at
 // /invitations/<secret>.
@@ -125,7 +129,7 @@ func memberInvitationOf(ctx context.Context, res appaccess.InvitedMember) Member
 	out := MemberInvitation{Member: memberOf(res.Member)}
 	if inv := res.Invitation; inv != nil {
 		out.Invitation = &IssuedInvitation{
-			Url: browserOf(ctx).console + "/invitations/" + inv.Secret.Reveal(), ExpiresAt: inv.ExpiresAt,
+			Url: browserOf(ctx).console + invitationLinkPath + inv.Secret.Reveal(), ExpiresAt: inv.ExpiresAt,
 		}
 	}
 	return out

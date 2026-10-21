@@ -131,7 +131,18 @@ func (s *Server) Handle(pattern string, h http.Handler, opts ...RouteOption) {
 	}
 	s.mux.Handle(pattern, h)
 	s.patterns[pattern] = c
-	if _, path, _ := strings.Cut(pattern, " "); c.secretInPath && !s.secretSeen[path] {
+	if _, path, _ := strings.Cut(pattern, " "); c.secretInPath {
+		s.SecretPath(path)
+	}
+}
+
+// SecretPath marks path, a ServeMux path pattern such as
+// /invitations/{secret}, as one whose requests carry a secret, whatever
+// serves them or does not: they are logged with path in place of their own,
+// so the secret never reaches a log line. A link handed out for a browser to
+// open is such a path even before anything serves it.
+func (s *Server) SecretPath(path string) {
+	if !s.secretSeen[path] {
 		s.secretSeen[path] = true
 		s.secretPaths.Handle(path, http.NotFoundHandler())
 	}
