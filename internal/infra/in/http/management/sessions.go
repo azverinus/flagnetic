@@ -83,10 +83,11 @@ func (a *api) RevokeMemberSessions(ctx context.Context, req RevokeMemberSessions
 }
 
 // memberIDOf reads a member's identifier from a path; one that is not an
-// identifier names no member.
+// identifier names no member, and neither does the zero one, which the use
+// cases read as the caller's own.
 func memberIDOf(s string) (access.MemberID, error) {
 	member, err := id.Parse[access.Member](s)
-	if err != nil {
+	if err != nil || member.IsZero() {
 		return access.MemberID{}, appaccess.ErrMemberNotFound
 	}
 	return member, nil

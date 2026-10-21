@@ -155,3 +155,36 @@ func ProjectToken(t testing.TB, pool *pgxpool.Pool, project workspace.ProjectID,
 	RecordSecret(v.Value.Reveal())
 	return v.Value.Reveal()
 }
+
+// Grant grants member each of roles in project on pool, made by nobody, as
+// if an owner had.
+func Grant(t testing.TB, pool *pgxpool.Pool, project workspace.ProjectID, member access.MemberID, roles ...access.RoleName) {
+	t.Helper()
+	store := pgaccess.NewStore(pool)
+	m, err := store.MemberByID(t.Context(), member)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range roles {
+		g, err := access.NewGrant(id.New[access.Grant](id.NewSource(Clock())), access.NewGrantInput{
+			Project: project, Member: m, Role: r, Now: Clock().Now(),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.CreateGrant(t.Context(), g); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// GrantedToken returns the value of a personal access token, carrying every
+// scope a member who is no instance admin holds, of a new active member of
+// the instance on pool who holds roles in project.
+func GrantedToken(t testing.TB, pool *pgxpool.Pool, project workspace.ProjectID, roles ...access.RoleName) string {
+	t.Helper()
+	m := NewMember(t, pool)
+	Grant(t, pool, project, m.ID, roles...)
+	return PersonalToken(t, pool, m.ID, "granted", access.ScopeRead, access.ScopeFlagsWrite, access.ScopeExperimentsWrite,
+		access.ScopeProjectAdmin)
+}

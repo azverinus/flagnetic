@@ -1,6 +1,7 @@
 # Flagnetic documentation
 
 - [Glossary](glossary.md): the vocabulary the code, the API, the docs and the console use.
+- [Access](access.md): permissions, roles, grants, scopes and API tokens.
 - [Operations](operations.md) and the [configuration reference](configuration.md): running the server.
 
 ## SDKs

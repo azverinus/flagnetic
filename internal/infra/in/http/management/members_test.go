@@ -286,37 +286,92 @@ func TestTheLastActiveInstanceAdminCannotBeDeactivated(t *testing.T) {
 	assertProblem(t, "deactivating the one left", res.StatusCode(), res.Body, http.StatusConflict, "last_instance_admin")
 }
 
-func TestAMemberCountsNoProjectBeforeHoldingAGrant(t *testing.T) {
+func TestAMemberCountsTheProjectsTheyHoldAGrantIn(t *testing.T) {
 	srv := testkit.StartServer(t)
 	pool := testkit.Pool(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	m := testkit.NewMember(t, pool)
-	createProject(t, admin, projectKey())
-
+	a, b := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
 	if got := memberOf(t, admin, m.ID); got.ProjectCount != 0 {
-		t.Errorf("read: project count = %d, want 0", got.ProjectCount)
+		t.Errorf("before any grant: project count = %d, want 0", got.ProjectCount)
 	}
+
+	grant(t, admin, a.Key, m.ID, "developer")
+	grant(t, admin, a.Key, m.ID, "viewer")
+	second := grant(t, admin, b.Key, m.ID, "viewer")
 	q := m.Email
 	listed := do(admin.ListMembersWithResponse(t.Context(), &management.ListMembersParams{Q: &q}))
-	if listed.JSON200 == nil || len(listed.JSON200.Items) != 1 || listed.JSON200.Items[0].ProjectCount != 0 {
-		t.Errorf("listed = %d %s, want the member counting 0", listed.StatusCode(), listed.Body)
+	if listed.JSON200 == nil || len(listed.JSON200.Items) != 1 || listed.JSON200.Items[0].ProjectCount != 2 {
+		t.Errorf("listed = %d %s, want two projects, however many grants", listed.StatusCode(), listed.Body)
 	}
+	do(admin.DeleteGrantWithResponse(t.Context(), b.Key, second.Id.String()))
 	updated := do(admin.UpdateMemberWithResponse(t.Context(), m.ID.String(), management.MemberPatch{DisplayName: ptr("Counted")}))
-	if updated.JSON200 == nil || updated.JSON200.ProjectCount != 0 {
-		t.Errorf("updated = %d %s, want the member counting 0", updated.StatusCode(), updated.Body)
+	if updated.JSON200 == nil || updated.JSON200.ProjectCount != 1 {
+		t.Errorf("after a removal = %d %s, want one project", updated.StatusCode(), updated.Body)
 	}
+	// A deactivated member keeps their grants, so their count, but no longer
+	// counts among the project's members.
 	deactivated := do(admin.DeactivateMemberWithResponse(t.Context(), m.ID.String()))
-	if deactivated.JSON200 == nil || deactivated.JSON200.ProjectCount != 0 {
-		t.Errorf("deactivated = %d %s, want the member counting 0", deactivated.StatusCode(), deactivated.Body)
+	if deactivated.JSON200 == nil || deactivated.JSON200.ProjectCount != 1 {
+		t.Errorf("deactivated = %d %s, want one project", deactivated.StatusCode(), deactivated.Body)
+	}
+	if got := do(admin.GetProjectWithResponse(t.Context(), a.Key)); got.JSON200 == nil || got.JSON200.MemberCount != 0 {
+		t.Errorf("the project = %d %s, want no member counted", got.StatusCode(), got.Body)
 	}
 }
 
-func TestTheMemberCountsCostOneQueryPerPage(t *testing.T) {
+func TestAProjectCountsItsMembers(t *testing.T) {
+	srv := testkit.StartServer(t)
+	pool := testkit.Pool(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	if p.MemberCount != 0 {
+		t.Errorf("a new project counts %d members, want 0", p.MemberCount)
+	}
+	other := createProject(t, admin, projectKey())
+	members := []testkit.Member{testkit.NewMember(t, pool), testkit.NewMember(t, pool), testkit.NewMember(t, pool)}
+	for _, m := range members {
+		grant(t, admin, p.Key, m.ID, "developer")
+	}
+	grant(t, admin, p.Key, members[0].ID, "owner")
+	do(admin.DeactivateMemberWithResponse(t.Context(), members[2].ID.String()))
+
+	if got := do(admin.UpdateProjectWithResponse(t.Context(), p.Key, management.ProjectPatch{Name: ptr("Counted")})); got.JSON200 == nil ||
+		got.JSON200.MemberCount != 2 {
+		t.Errorf("updated = %d %s, want two active members", got.StatusCode(), got.Body)
+	}
+	mine := do(testkit.Client(t, srv, testkit.PersonalToken(t, pool, members[0].ID, "lister")).ListProjectsWithResponse(t.Context()))
+	if mine.JSON200 == nil || len(mine.JSON200.Items) != 1 || mine.JSON200.Items[0].MemberCount != 2 {
+		t.Errorf("the member's projects = %d %s, want theirs alone, counting two", mine.StatusCode(), mine.Body)
+	}
+	if got := do(admin.GetProjectWithResponse(t.Context(), other.Key)); got.JSON200 == nil || got.JSON200.MemberCount != 0 {
+		t.Errorf("another project = %d %s, want no member", got.StatusCode(), got.Body)
+	}
+}
+
+func TestAnInvitedMemberCountsNothing(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	invited := invite(t, admin, "Invited")
+	m := id.FromBytes[access.Member](invited.Member.Id)
+	grant(t, admin, p.Key, m, "developer")
+
+	if got := memberOf(t, admin, m); got.ProjectCount != 0 {
+		t.Errorf("an invited member with a grant counts %d projects, want 0", got.ProjectCount)
+	}
+	if got := do(admin.GetProjectWithResponse(t.Context(), p.Key)); got.JSON200 == nil || got.JSON200.MemberCount != 0 {
+		t.Errorf("the project = %d %s, want the invited member not counted", got.StatusCode(), got.Body)
+	}
+}
+
+func TestTheCountsCostOneQueryPerPage(t *testing.T) {
 	pool, queries := testkit.TracedPool(t)
 	srv := testkit.StartServer(t, testkit.WithPool(pool))
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	for range 20 {
-		testkit.NewMember(t, pool)
+		m := testkit.NewMember(t, pool)
+		testkit.Grant(t, pool, projectIDOf(createProject(t, admin, projectKey())), m.ID, access.RoleDeveloper)
 	}
 	queries.Reset()
 	listed := do(admin.ListMembersWithResponse(t.Context(), nil))
@@ -325,5 +380,13 @@ func TestTheMemberCountsCostOneQueryPerPage(t *testing.T) {
 	}
 	if n := queries.Containing("project_count"); n != 1 {
 		t.Errorf("queries counting projects = %d, want 1 for the page", n)
+	}
+	queries.Reset()
+	projects := do(admin.ListProjectsWithResponse(t.Context()))
+	if projects.JSON200 == nil || len(projects.JSON200.Items) < 20 {
+		t.Fatalf("GET /projects = %d: %s", projects.StatusCode(), projects.Body)
+	}
+	if n := queries.Containing("member_count"); n != 1 {
+		t.Errorf("queries counting members = %d, want 1 for the page", n)
 	}
 }

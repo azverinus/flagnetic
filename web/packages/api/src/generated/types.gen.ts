@@ -25,7 +25,7 @@ export type Problem = {
    */
   retry_after?: number;
   /**
-   * The permission the caller lacks, for `forbidden`.
+   * The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
    */
   permission?: string;
   errors?: Array<Violation>;
@@ -176,6 +176,11 @@ export type Credential = {
    */
   token_id?: string;
   token_name?: string;
+  /**
+   * The key of the project a project token belongs to; absent for any other credential.
+   */
+  project?: string;
+  role?: RoleName;
 };
 
 /**
@@ -192,6 +197,10 @@ export type Project = {
   key: Key;
   name: Name;
   description: Description;
+  /**
+   * How many active members hold a grant in the project.
+   */
+  member_count: number;
 };
 
 export type ProjectList = {
@@ -301,6 +310,141 @@ export type AuthSettings = {
 };
 
 /**
+ * What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
+ */
+export type Scope =
+  "read" | "flags:write" | "experiments:write" | "project:admin" | "instance:admin";
+
+/**
+ * A personal access token, by its hint; its value is shown only when it is created.
+ */
+export type ApiToken = {
+  id: string;
+  name: string;
+  /**
+   * The value's prefix and its first four characters, such as `fn_pat_Ab3d`.
+   */
+  hint: string;
+  /**
+   * The scopes the token carries, `read` first.
+   */
+  scopes: Array<Scope>;
+  /**
+   * When the token stops working; null for a token that never expires.
+   */
+  expires_at: string | null;
+  created_at: string;
+  /**
+   * When the token was last presented, recorded at most once a minute; null until it is used.
+   */
+  last_used_at: string | null;
+  /**
+   * The address the token was last presented from.
+   */
+  last_used_ip: string | null;
+  revoked_at: string | null;
+};
+
+export type ApiTokenList = {
+  items: Array<ApiToken>;
+};
+
+export type ApiTokenCreate = {
+  /**
+   * 1 to 200 characters, not blank, to tell the token apart.
+   */
+  name: string;
+  /**
+   * The scopes the token carries; `read` alone when absent, and `read` is added to any write scope.
+   */
+  scopes?: Array<Scope>;
+  /**
+   * When the token stops working; absent or null for a token that never expires, unless the instance requires an expiry.
+   */
+  expires_at?: string | null;
+};
+
+/**
+ * A personal access token just created, with its value.
+ */
+export type CreatedApiToken = {
+  token: ApiToken;
+  /**
+   * The token's value, `fn_pat_` and 40 characters, shown this once.
+   */
+  value: string;
+};
+
+/**
+ * A token belonging to a project, by its hint; its value is shown only when it is created.
+ */
+export type ProjectToken = {
+  id: string;
+  name: string;
+  /**
+   * The value's prefix and its first four characters, such as `fn_prj_Ab3d`.
+   */
+  hint: string;
+  role: RoleName;
+  /**
+   * The scopes the token carries, `read` first.
+   */
+  scopes: Array<Scope>;
+  /**
+   * When the token stops working; null for a token that never expires.
+   */
+  expires_at: string | null;
+  created_at: string;
+  /**
+   * The member who created the token; it keeps working when they leave.
+   */
+  created_by: string | null;
+  /**
+   * When the token was last presented, recorded at most once a minute; null until it is used.
+   */
+  last_used_at: string | null;
+  /**
+   * The address the token was last presented from.
+   */
+  last_used_ip: string | null;
+  revoked_at: string | null;
+};
+
+export type ProjectTokenList = {
+  items: Array<ProjectToken>;
+};
+
+export type ProjectTokenCreate = {
+  /**
+   * 1 to 200 characters, not blank, to tell the token apart.
+   */
+  name: string;
+  /**
+   * One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, which the token holds in the project.
+   */
+  role: string;
+  /**
+   * The scopes the token carries; `read` alone when absent, and `read` is added to any write scope. Never `instance:admin`.
+   */
+  scopes?: Array<Scope>;
+  /**
+   * When the token stops working; absent or null for a token that never expires, unless the instance requires an expiry.
+   */
+  expires_at?: string | null;
+};
+
+/**
+ * A project token just created, with its value.
+ */
+export type CreatedProjectToken = {
+  token: ProjectToken;
+  /**
+   * The token's value, `fn_prj_` and 40 characters, shown this once.
+   */
+  value: string;
+};
+
+/**
  * One role held by one member in one project.
  */
 export type Grant = {
@@ -311,8 +455,41 @@ export type Grant = {
   /**
    * The member who made the grant.
    */
-  created_by?: string | null;
+  created_by: string | null;
   created_at: string;
+};
+
+export type GrantList = {
+  items: Array<Grant>;
+};
+
+export type GrantCreate = {
+  /**
+   * The member to grant the role to.
+   */
+  member: string;
+  /**
+   * One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+   */
+  role: string;
+};
+
+/**
+ * A member holding grants in a project, with those grants.
+ */
+export type ProjectMember = {
+  member: string;
+  email: string;
+  display_name: string;
+  status: MemberStatus;
+  /**
+   * The member's grants in the project, oldest first.
+   */
+  grants: Array<Grant>;
+};
+
+export type ProjectMemberList = {
+  items: Array<ProjectMember>;
 };
 
 export type ProjectMe = {
@@ -565,6 +742,16 @@ export type SessionId = string;
  * The member's identifier.
  */
 export type MemberId = string;
+
+/**
+ * The grant's identifier.
+ */
+export type GrantId = string;
+
+/**
+ * The API token's identifier.
+ */
+export type TokenId = string;
 
 /**
  * The project's key.
@@ -979,6 +1166,136 @@ export type RevokeMySessionResponses = {
 };
 
 export type RevokeMySessionResponse = RevokeMySessionResponses[keyof RevokeMySessionResponses];
+
+export type ListMyTokensData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/me/tokens";
+};
+
+export type ListMyTokensErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+};
+
+export type ListMyTokensError = ListMyTokensErrors[keyof ListMyTokensErrors];
+
+export type ListMyTokensResponses = {
+  /**
+   * The tokens.
+   */
+  200: ApiTokenList;
+};
+
+export type ListMyTokensResponse = ListMyTokensResponses[keyof ListMyTokensResponses];
+
+export type CreateMyTokenData = {
+  body: ApiTokenCreate;
+  path?: never;
+  query?: never;
+  url: "/me/tokens";
+};
+
+export type CreateMyTokenErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateMyTokenError = CreateMyTokenErrors[keyof CreateMyTokenErrors];
+
+export type CreateMyTokenResponses = {
+  /**
+   * The token, with its value.
+   */
+  201: CreatedApiToken;
+};
+
+export type CreateMyTokenResponse = CreateMyTokenResponses[keyof CreateMyTokenResponses];
+
+export type RevokeMyTokenData = {
+  body?: never;
+  path: {
+    /**
+     * The API token's identifier.
+     */
+    token: string;
+  };
+  query?: never;
+  url: "/me/tokens/{token}";
+};
+
+export type RevokeMyTokenErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type RevokeMyTokenError = RevokeMyTokenErrors[keyof RevokeMyTokenErrors];
+
+export type RevokeMyTokenResponses = {
+  /**
+   * Revoked.
+   */
+  204: void;
+};
+
+export type RevokeMyTokenResponse = RevokeMyTokenResponses[keyof RevokeMyTokenResponses];
 
 export type ListRolesData = {
   body?: never;
@@ -2056,6 +2373,370 @@ export type UpdateAttributeResponses = {
 
 export type UpdateAttributeResponse = UpdateAttributeResponses[keyof UpdateAttributeResponses];
 
+export type ListProjectMembersData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/members";
+};
+
+export type ListProjectMembersErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListProjectMembersError = ListProjectMembersErrors[keyof ListProjectMembersErrors];
+
+export type ListProjectMembersResponses = {
+  /**
+   * The members and their grants.
+   */
+  200: ProjectMemberList;
+};
+
+export type ListProjectMembersResponse =
+  ListProjectMembersResponses[keyof ListProjectMembersResponses];
+
+export type ListGrantsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/grants";
+};
+
+export type ListGrantsErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListGrantsError = ListGrantsErrors[keyof ListGrantsErrors];
+
+export type ListGrantsResponses = {
+  /**
+   * The grants.
+   */
+  200: GrantList;
+};
+
+export type ListGrantsResponse = ListGrantsResponses[keyof ListGrantsResponses];
+
+export type CreateGrantData = {
+  body: GrantCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/grants";
+};
+
+export type CreateGrantErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateGrantError = CreateGrantErrors[keyof CreateGrantErrors];
+
+export type CreateGrantResponses = {
+  /**
+   * The grant.
+   */
+  201: Grant;
+};
+
+export type CreateGrantResponse = CreateGrantResponses[keyof CreateGrantResponses];
+
+export type DeleteGrantData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The grant's identifier.
+     */
+    grant: string;
+  };
+  query?: never;
+  url: "/projects/{project}/grants/{grant}";
+};
+
+export type DeleteGrantErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type DeleteGrantError = DeleteGrantErrors[keyof DeleteGrantErrors];
+
+export type DeleteGrantResponses = {
+  /**
+   * Removed.
+   */
+  204: void;
+};
+
+export type DeleteGrantResponse = DeleteGrantResponses[keyof DeleteGrantResponses];
+
+export type ListProjectTokensData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/tokens";
+};
+
+export type ListProjectTokensErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListProjectTokensError = ListProjectTokensErrors[keyof ListProjectTokensErrors];
+
+export type ListProjectTokensResponses = {
+  /**
+   * The tokens.
+   */
+  200: ProjectTokenList;
+};
+
+export type ListProjectTokensResponse =
+  ListProjectTokensResponses[keyof ListProjectTokensResponses];
+
+export type CreateProjectTokenData = {
+  body: ProjectTokenCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/tokens";
+};
+
+export type CreateProjectTokenErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateProjectTokenError = CreateProjectTokenErrors[keyof CreateProjectTokenErrors];
+
+export type CreateProjectTokenResponses = {
+  /**
+   * The token, with its value.
+   */
+  201: CreatedProjectToken;
+};
+
+export type CreateProjectTokenResponse =
+  CreateProjectTokenResponses[keyof CreateProjectTokenResponses];
+
+export type RevokeProjectTokenData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The API token's identifier.
+     */
+    token: string;
+  };
+  query?: never;
+  url: "/projects/{project}/tokens/{token}";
+};
+
+export type RevokeProjectTokenErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type RevokeProjectTokenError = RevokeProjectTokenErrors[keyof RevokeProjectTokenErrors];
+
+export type RevokeProjectTokenResponses = {
+  /**
+   * Revoked.
+   */
+  204: void;
+};
+
+export type RevokeProjectTokenResponse =
+  RevokeProjectTokenResponses[keyof RevokeProjectTokenResponses];
+
 export type ListProjectAuditEntriesData = {
   body?: never;
   path: {
@@ -2660,6 +3341,107 @@ export type ListMemberSessionsResponses = {
 
 export type ListMemberSessionsResponse =
   ListMemberSessionsResponses[keyof ListMemberSessionsResponses];
+
+export type ListMemberTokensData = {
+  body?: never;
+  path: {
+    /**
+     * The member's identifier.
+     */
+    member: string;
+  };
+  query?: never;
+  url: "/members/{member}/tokens";
+};
+
+export type ListMemberTokensErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListMemberTokensError = ListMemberTokensErrors[keyof ListMemberTokensErrors];
+
+export type ListMemberTokensResponses = {
+  /**
+   * The tokens.
+   */
+  200: ApiTokenList;
+};
+
+export type ListMemberTokensResponse = ListMemberTokensResponses[keyof ListMemberTokensResponses];
+
+export type RevokeMemberTokenData = {
+  body?: never;
+  path: {
+    /**
+     * The member's identifier.
+     */
+    member: string;
+    /**
+     * The API token's identifier.
+     */
+    token: string;
+  };
+  query?: never;
+  url: "/members/{member}/tokens/{token}";
+};
+
+export type RevokeMemberTokenErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type RevokeMemberTokenError = RevokeMemberTokenErrors[keyof RevokeMemberTokenErrors];
+
+export type RevokeMemberTokenResponses = {
+  /**
+   * Revoked.
+   */
+  204: void;
+};
+
+export type RevokeMemberTokenResponse =
+  RevokeMemberTokenResponses[keyof RevokeMemberTokenResponses];
 
 export type GetAuthSettingsData = {
   body?: never;

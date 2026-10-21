@@ -153,6 +153,33 @@ func (e RoleName) Valid() bool {
 	}
 }
 
+// Defines values for Scope.
+const (
+	ScopeExperimentsWrite Scope = "experiments:write"
+	ScopeFlagsWrite       Scope = "flags:write"
+	ScopeInstanceAdmin    Scope = "instance:admin"
+	ScopeProjectAdmin     Scope = "project:admin"
+	ScopeRead             Scope = "read"
+)
+
+// Valid indicates whether the value is a known member of the Scope enum.
+func (e Scope) Valid() bool {
+	switch e {
+	case ScopeExperimentsWrite:
+		return true
+	case ScopeFlagsWrite:
+		return true
+	case ScopeInstanceAdmin:
+		return true
+	case ScopeProjectAdmin:
+		return true
+	case ScopeRead:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SessionMethod.
 const (
 	SessionMethodLocal SessionMethod = "local"
@@ -183,6 +210,46 @@ type Actor struct {
 
 // ActorKind defines model for ActorKind.
 type ActorKind string
+
+// ApiToken A personal access token, by its hint; its value is shown only when it is created.
+type ApiToken struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// ExpiresAt When the token stops working; null for a token that never expires.
+	ExpiresAt *time.Time `json:"expires_at"`
+
+	// Hint The value's prefix and its first four characters, such as `fn_pat_Ab3d`.
+	Hint string             `json:"hint"`
+	Id   openapi_types.UUID `json:"id"`
+
+	// LastUsedAt When the token was last presented, recorded at most once a minute; null until it is used.
+	LastUsedAt *time.Time `json:"last_used_at"`
+
+	// LastUsedIp The address the token was last presented from.
+	LastUsedIp *string    `json:"last_used_ip"`
+	Name       string     `json:"name"`
+	RevokedAt  *time.Time `json:"revoked_at"`
+
+	// Scopes The scopes the token carries, `read` first.
+	Scopes []Scope `json:"scopes"`
+}
+
+// ApiTokenCreate defines model for ApiTokenCreate.
+type ApiTokenCreate struct {
+	// ExpiresAt When the token stops working; absent or null for a token that never expires, unless the instance requires an expiry.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// Name 1 to 200 characters, not blank, to tell the token apart.
+	Name string `json:"name"`
+
+	// Scopes The scopes the token carries; `read` alone when absent, and `read` is added to any write scope.
+	Scopes *[]Scope `json:"scopes,omitempty"`
+}
+
+// ApiTokenList defines model for ApiTokenList.
+type ApiTokenList struct {
+	Items []ApiToken `json:"items"`
+}
 
 // Attribute defines model for Attribute.
 type Attribute struct {
@@ -301,9 +368,31 @@ type AuthSettings struct {
 	TokenMaxLifetimeSeconds int64 `json:"token_max_lifetime_seconds"`
 }
 
+// CreatedApiToken A personal access token just created, with its value.
+type CreatedApiToken struct {
+	// Token A personal access token, by its hint; its value is shown only when it is created.
+	Token ApiToken `json:"token"`
+
+	// Value The token's value, `fn_pat_` and 40 characters, shown this once.
+	Value string `json:"value"`
+}
+
+// CreatedProjectToken A project token just created, with its value.
+type CreatedProjectToken struct {
+	// Token A token belonging to a project, by its hint; its value is shown only when it is created.
+	Token ProjectToken `json:"token"`
+
+	// Value The token's value, `fn_prj_` and 40 characters, shown this once.
+	Value string `json:"value"`
+}
+
 // Credential defines model for Credential.
 type Credential struct {
 	Method CredentialMethod `json:"method"`
+
+	// Project The key of the project a project token belongs to; absent for any other credential.
+	Project *string   `json:"project,omitempty"`
+	Role    *RoleName `json:"role,omitempty"`
 
 	// TokenId The API token in use, for the token method.
 	TokenId   *openapi_types.UUID `json:"token_id,omitempty"`
@@ -352,7 +441,7 @@ type Grant struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	// CreatedBy The member who made the grant.
-	CreatedBy *openapi_types.UUID `json:"created_by,omitempty"`
+	CreatedBy *openapi_types.UUID `json:"created_by"`
 	Id        openapi_types.UUID  `json:"id"`
 	Member    openapi_types.UUID  `json:"member"`
 	Role      RoleName            `json:"role"`
@@ -361,6 +450,20 @@ type Grant struct {
 
 // GrantSource defines model for Grant.Source.
 type GrantSource string
+
+// GrantCreate defines model for GrantCreate.
+type GrantCreate struct {
+	// Member The member to grant the role to.
+	Member openapi_types.UUID `json:"member"`
+
+	// Role One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+	Role string `json:"role"`
+}
+
+// GrantList defines model for GrantList.
+type GrantList struct {
+	Items []Grant `json:"items"`
+}
 
 // Invitation What an invitation's link opens.
 type Invitation struct {
@@ -476,7 +579,7 @@ type Problem struct {
 	Detail *string      `json:"detail,omitempty"`
 	Errors *[]Violation `json:"errors,omitempty"`
 
-	// Permission The permission the caller lacks, for `forbidden`.
+	// Permission The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
 	Permission *string `json:"permission,omitempty"`
 	RequestId  string  `json:"request_id"`
 
@@ -493,8 +596,11 @@ type Project struct {
 	Id          openapi_types.UUID `json:"id"`
 
 	// Key Names the entity in URLs, SDK calls and rules, and never changes.
-	Key  Key  `json:"key"`
-	Name Name `json:"name"`
+	Key Key `json:"key"`
+
+	// MemberCount How many active members hold a grant in the project.
+	MemberCount int  `json:"member_count"`
+	Name        Name `json:"name"`
 }
 
 // ProjectCreate defines model for ProjectCreate.
@@ -520,6 +626,22 @@ type ProjectMe struct {
 	Permissions []Permission `json:"permissions"`
 }
 
+// ProjectMember A member holding grants in a project, with those grants.
+type ProjectMember struct {
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+
+	// Grants The member's grants in the project, oldest first.
+	Grants []Grant            `json:"grants"`
+	Member openapi_types.UUID `json:"member"`
+	Status MemberStatus       `json:"status"`
+}
+
+// ProjectMemberList defines model for ProjectMemberList.
+type ProjectMemberList struct {
+	Items []ProjectMember `json:"items"`
+}
+
 // ProjectPatch defines model for ProjectPatch.
 type ProjectPatch struct {
 	Description *Description `json:"description,omitempty"`
@@ -527,6 +649,53 @@ type ProjectPatch struct {
 	// Key Refused with `key_immutable` whatever its value.
 	Key  *string `json:"key,omitempty"`
 	Name *Name   `json:"name,omitempty"`
+}
+
+// ProjectToken A token belonging to a project, by its hint; its value is shown only when it is created.
+type ProjectToken struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// CreatedBy The member who created the token; it keeps working when they leave.
+	CreatedBy *openapi_types.UUID `json:"created_by"`
+
+	// ExpiresAt When the token stops working; null for a token that never expires.
+	ExpiresAt *time.Time `json:"expires_at"`
+
+	// Hint The value's prefix and its first four characters, such as `fn_prj_Ab3d`.
+	Hint string             `json:"hint"`
+	Id   openapi_types.UUID `json:"id"`
+
+	// LastUsedAt When the token was last presented, recorded at most once a minute; null until it is used.
+	LastUsedAt *time.Time `json:"last_used_at"`
+
+	// LastUsedIp The address the token was last presented from.
+	LastUsedIp *string    `json:"last_used_ip"`
+	Name       string     `json:"name"`
+	RevokedAt  *time.Time `json:"revoked_at"`
+	Role       RoleName   `json:"role"`
+
+	// Scopes The scopes the token carries, `read` first.
+	Scopes []Scope `json:"scopes"`
+}
+
+// ProjectTokenCreate defines model for ProjectTokenCreate.
+type ProjectTokenCreate struct {
+	// ExpiresAt When the token stops working; absent or null for a token that never expires, unless the instance requires an expiry.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// Name 1 to 200 characters, not blank, to tell the token apart.
+	Name string `json:"name"`
+
+	// Role One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, which the token holds in the project.
+	Role string `json:"role"`
+
+	// Scopes The scopes the token carries; `read` alone when absent, and `read` is added to any write scope. Never `instance:admin`.
+	Scopes *[]Scope `json:"scopes,omitempty"`
+}
+
+// ProjectTokenList defines model for ProjectTokenList.
+type ProjectTokenList struct {
+	Items []ProjectToken `json:"items"`
 }
 
 // Role defines model for Role.
@@ -542,6 +711,9 @@ type RoleList struct {
 
 // RoleName defines model for RoleName.
 type RoleName string
+
+// Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
+type Scope string
 
 // Session One device a member is signed in on.
 type Session struct {
@@ -667,6 +839,9 @@ type Cursor = string
 // EnvironmentKey defines model for EnvironmentKey.
 type EnvironmentKey = string
 
+// GrantID defines model for GrantID.
+type GrantID = string
+
 // Limit defines model for Limit.
 type Limit = int
 
@@ -678,6 +853,9 @@ type ProjectKey = string
 
 // SessionID defines model for SessionID.
 type SessionID = string
+
+// TokenID defines model for TokenID.
+type TokenID = string
 
 // UnitTypeKey defines model for UnitTypeKey.
 type UnitTypeKey = string
@@ -810,6 +988,9 @@ type SignInJSONRequestBody = SignInRequest
 // UpdateAuthSettingsJSONRequestBody defines body for UpdateAuthSettings for application/json ContentType.
 type UpdateAuthSettingsJSONRequestBody = AuthSettings
 
+// CreateMyTokenJSONRequestBody defines body for CreateMyToken for application/json ContentType.
+type CreateMyTokenJSONRequestBody = ApiTokenCreate
+
 // InviteMemberJSONRequestBody defines body for InviteMember for application/json ContentType.
 type InviteMemberJSONRequestBody = MemberInvite
 
@@ -833,6 +1014,12 @@ type CreateEnvironmentJSONRequestBody = EnvironmentCreate
 
 // UpdateEnvironmentJSONRequestBody defines body for UpdateEnvironment for application/json ContentType.
 type UpdateEnvironmentJSONRequestBody = EnvironmentPatch
+
+// CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
+type CreateGrantJSONRequestBody = GrantCreate
+
+// CreateProjectTokenJSONRequestBody defines body for CreateProjectToken for application/json ContentType.
+type CreateProjectTokenJSONRequestBody = ProjectTokenCreate
 
 // CreateUnitTypeJSONRequestBody defines body for CreateUnitType for application/json ContentType.
 type CreateUnitTypeJSONRequestBody = UnitTypeCreate
@@ -1093,6 +1280,59 @@ type ClientInterface interface {
 	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 	RevokeMySession(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListMyTokens The caller's personal access tokens
+	//
+	// Every personal access token of the caller, the newest first, revoked
+	// and expired ones included, by their hint: a token's value is shown
+	// only when it is created.
+	//
+	// Corresponds with GET /me/tokens (the `ListMyTokens` operationId).
+	ListMyTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateMyTokenWithBody Create a personal access token
+	//
+	// Creates a personal access token acting for the caller and answers its
+	// value, shown this once and never again. It carries `read` alone
+	// unless asked for more, and `read` beside every write scope; a scope
+	// the caller does not hold, `instance:admin` for a member who is no
+	// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+	// the future and at most the instance's maximum token lifetime ahead,
+	// and is required when the instance requires one; without one the
+	// token never expires. Only a session creates a token, so a leaked
+	// token can never multiply itself or outlive its revocation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+	CreateMyTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateMyToken Create a personal access token
+	//
+	// Creates a personal access token acting for the caller and answers its
+	// value, shown this once and never again. It carries `read` alone
+	// unless asked for more, and `read` beside every write scope; a scope
+	// the caller does not hold, `instance:admin` for a member who is no
+	// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+	// the future and at most the instance's maximum token lifetime ahead,
+	// and is required when the instance requires one; without one the
+	// token never expires. Only a session creates a token, so a leaked
+	// token can never multiply itself or outlive its revocation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+	CreateMyToken(ctx context.Context, body CreateMyTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeMyToken Revoke a personal access token
+	//
+	// Revokes one of the caller's tokens, which is refused `token_revoked`
+	// from then on. A token of another member, one already revoked or an
+	// identifier that names none is not found. Only a session may do this,
+	// so a leaked token cannot hide its siblings.
+	//
+	// Corresponds with DELETE /me/tokens/{token} (the `RevokeMyToken` operationId).
+	RevokeMyToken(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListMembers The instance's members
 	//
 	// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
@@ -1202,6 +1442,20 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
 	ListMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMemberTokens A member's personal access tokens
+	//
+	// Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+	//
+	// Corresponds with GET /members/{member}/tokens (the `ListMemberTokens` operationId).
+	ListMemberTokens(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeMemberToken Revoke a member's personal access token
+	//
+	// Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+	//
+	// Corresponds with DELETE /members/{member}/tokens/{token} (the `RevokeMemberToken` operationId).
+	RevokeMemberToken(ctx context.Context, member MemberID, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProjects The projects the caller works in
 	//
@@ -1359,6 +1613,57 @@ type ClientInterface interface {
 	// Renames the environment; the key never changes (`key_immutable`).
 	UpdateEnvironment(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListGrants The grants of a project
+	//
+	// Every grant of the project, oldest first.
+	//
+	// Corresponds with GET /projects/{project}/grants (the `ListGrants` operationId).
+	ListGrants(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGrantWithBody Grant a member a role in a project
+	//
+	// Grants the member one of the built-in roles in the project, beside
+	// any grants they hold already; they act with the union of their
+	// grants' permissions. An invited member may be granted roles before
+	// they join. A role holding a permission the caller lacks in the
+	// project is refused `role_not_allowed`, naming it in `permission`;
+	// the same member and role twice `already_granted`; a deactivated
+	// member `member_deactivated`; an unknown member or role
+	// `invalid_grant`. Only a member grants: a project token never changes
+	// who has access.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/grants (the `CreateGrant` operationId).
+	CreateGrantWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateGrant Grant a member a role in a project
+	//
+	// Grants the member one of the built-in roles in the project, beside
+	// any grants they hold already; they act with the union of their
+	// grants' permissions. An invited member may be granted roles before
+	// they join. A role holding a permission the caller lacks in the
+	// project is refused `role_not_allowed`, naming it in `permission`;
+	// the same member and role twice `already_granted`; a deactivated
+	// member `member_deactivated`; an unknown member or role
+	// `invalid_grant`. Only a member grants: a project token never changes
+	// who has access.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/grants (the `CreateGrant` operationId).
+	CreateGrant(ctx context.Context, project ProjectKey, body CreateGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteGrant Remove one grant
+	//
+	// Removes one grant, leaving the member's others. The grant of a role
+	// holding a permission the caller lacks in the project is refused
+	// `role_not_allowed`. Removing the last owner's grant is allowed: an
+	// instance admin holds every permission in every project.
+	//
+	// Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
+	DeleteGrant(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetProjectMe What the caller holds in a project
 	//
 	// The caller's grants in the project and their effective permissions
@@ -1367,6 +1672,65 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/me (the `GetProjectMe` operationId).
 	GetProjectMe(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListProjectMembers The members holding grants in a project
+	//
+	// Every member holding a grant in the project, ordered by email, with their grants side by side, oldest first.
+	//
+	// Corresponds with GET /projects/{project}/members (the `ListProjectMembers` operationId).
+	ListProjectMembers(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListProjectTokens The tokens of a project
+	//
+	// Every token of the project, the newest first, revoked and expired ones included, by their hint.
+	//
+	// Corresponds with GET /projects/{project}/tokens (the `ListProjectTokens` operationId).
+	ListProjectTokens(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateProjectTokenWithBody Create a project token
+	//
+	// Creates a token belonging to the project, for a pipeline, and
+	// answers its value, shown this once and never again. It holds one
+	// built-in role in the project, fixed for its life, narrowed by its
+	// scopes; it never manages grants or project tokens, whatever its
+	// role, so it never changes who has access. It reaches its project and
+	// `GET /me` alone, acts for no member and survives its creator. A role
+	// holding a permission the caller lacks in the project is refused
+	// `role_not_allowed`; `instance:admin` or a scope the caller does not
+	// hold `scope_not_allowed`. Its expiry follows the rules of a personal
+	// access token's. Only a session creates one, so no token mints
+	// another.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/tokens (the `CreateProjectToken` operationId).
+	CreateProjectTokenWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateProjectToken Create a project token
+	//
+	// Creates a token belonging to the project, for a pipeline, and
+	// answers its value, shown this once and never again. It holds one
+	// built-in role in the project, fixed for its life, narrowed by its
+	// scopes; it never manages grants or project tokens, whatever its
+	// role, so it never changes who has access. It reaches its project and
+	// `GET /me` alone, acts for no member and survives its creator. A role
+	// holding a permission the caller lacks in the project is refused
+	// `role_not_allowed`; `instance:admin` or a scope the caller does not
+	// hold `scope_not_allowed`. Its expiry follows the rules of a personal
+	// access token's. Only a session creates one, so no token mints
+	// another.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/tokens (the `CreateProjectToken` operationId).
+	CreateProjectToken(ctx context.Context, project ProjectKey, body CreateProjectTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeProjectToken Revoke a project token
+	//
+	// Revokes one of the project's tokens, which is refused `token_revoked` from then on. A token of another project, one already revoked or an identifier that names none is not found.
+	//
+	// Corresponds with DELETE /projects/{project}/tokens/{token} (the `RevokeProjectToken` operationId).
+	RevokeProjectToken(ctx context.Context, project ProjectKey, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListUnitTypes The project's unit types
 	//
@@ -1748,6 +2112,99 @@ func (c *Client) RevokeMySession(ctx context.Context, session SessionID, reqEdit
 	return c.Client.Do(req)
 }
 
+// ListMyTokens The caller's personal access tokens
+//
+// Every personal access token of the caller, the newest first, revoked
+// and expired ones included, by their hint: a token's value is shown
+// only when it is created.
+//
+// Corresponds with GET /me/tokens (the `ListMyTokens` operationId).
+func (c *Client) ListMyTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMyTokensRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateMyTokenWithBody Create a personal access token
+//
+// Creates a personal access token acting for the caller and answers its
+// value, shown this once and never again. It carries `read` alone
+// unless asked for more, and `read` beside every write scope; a scope
+// the caller does not hold, `instance:admin` for a member who is no
+// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+// the future and at most the instance's maximum token lifetime ahead,
+// and is required when the instance requires one; without one the
+// token never expires. Only a session creates a token, so a leaked
+// token can never multiply itself or outlive its revocation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+func (c *Client) CreateMyTokenWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateMyTokenRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateMyToken Create a personal access token
+//
+// Creates a personal access token acting for the caller and answers its
+// value, shown this once and never again. It carries `read` alone
+// unless asked for more, and `read` beside every write scope; a scope
+// the caller does not hold, `instance:admin` for a member who is no
+// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+// the future and at most the instance's maximum token lifetime ahead,
+// and is required when the instance requires one; without one the
+// token never expires. Only a session creates a token, so a leaked
+// token can never multiply itself or outlive its revocation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+func (c *Client) CreateMyToken(ctx context.Context, body CreateMyTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateMyTokenRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeMyToken Revoke a personal access token
+//
+// Revokes one of the caller's tokens, which is refused `token_revoked`
+// from then on. A token of another member, one already revoked or an
+// identifier that names none is not found. Only a session may do this,
+// so a leaked token cannot hide its siblings.
+//
+// Corresponds with DELETE /me/tokens/{token} (the `RevokeMyToken` operationId).
+func (c *Client) RevokeMyToken(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeMyTokenRequest(c.Server, token)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListMembers The instance's members
 //
 // Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
@@ -1958,6 +2415,40 @@ func (c *Client) RevokeMemberSessions(ctx context.Context, member MemberID, reqE
 // Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
 func (c *Client) ListMemberSessions(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListMemberSessionsRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMemberTokens A member's personal access tokens
+//
+// Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+//
+// Corresponds with GET /members/{member}/tokens (the `ListMemberTokens` operationId).
+func (c *Client) ListMemberTokens(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMemberTokensRequest(c.Server, member)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeMemberToken Revoke a member's personal access token
+//
+// Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+//
+// Corresponds with DELETE /members/{member}/tokens/{token} (the `RevokeMemberToken` operationId).
+func (c *Client) RevokeMemberToken(ctx context.Context, member MemberID, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeMemberTokenRequest(c.Server, member, token)
 	if err != nil {
 		return nil, err
 	}
@@ -2344,6 +2835,97 @@ func (c *Client) UpdateEnvironment(ctx context.Context, project ProjectKey, envi
 	return c.Client.Do(req)
 }
 
+// ListGrants The grants of a project
+//
+// Every grant of the project, oldest first.
+//
+// Corresponds with GET /projects/{project}/grants (the `ListGrants` operationId).
+func (c *Client) ListGrants(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListGrantsRequest(c.Server, project)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateGrantWithBody Grant a member a role in a project
+//
+// Grants the member one of the built-in roles in the project, beside
+// any grants they hold already; they act with the union of their
+// grants' permissions. An invited member may be granted roles before
+// they join. A role holding a permission the caller lacks in the
+// project is refused `role_not_allowed`, naming it in `permission`;
+// the same member and role twice `already_granted`; a deactivated
+// member `member_deactivated`; an unknown member or role
+// `invalid_grant`. Only a member grants: a project token never changes
+// who has access.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/grants (the `CreateGrant` operationId).
+func (c *Client) CreateGrantWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGrantRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateGrant Grant a member a role in a project
+//
+// Grants the member one of the built-in roles in the project, beside
+// any grants they hold already; they act with the union of their
+// grants' permissions. An invited member may be granted roles before
+// they join. A role holding a permission the caller lacks in the
+// project is refused `role_not_allowed`, naming it in `permission`;
+// the same member and role twice `already_granted`; a deactivated
+// member `member_deactivated`; an unknown member or role
+// `invalid_grant`. Only a member grants: a project token never changes
+// who has access.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/grants (the `CreateGrant` operationId).
+func (c *Client) CreateGrant(ctx context.Context, project ProjectKey, body CreateGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateGrantRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteGrant Remove one grant
+//
+// Removes one grant, leaving the member's others. The grant of a role
+// holding a permission the caller lacks in the project is refused
+// `role_not_allowed`. Removing the last owner's grant is allowed: an
+// instance admin holds every permission in every project.
+//
+// Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
+func (c *Client) DeleteGrant(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteGrantRequest(c.Server, project, grant)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetProjectMe What the caller holds in a project
 //
 // The caller's grants in the project and their effective permissions
@@ -2353,6 +2935,115 @@ func (c *Client) UpdateEnvironment(ctx context.Context, project ProjectKey, envi
 // Corresponds with GET /projects/{project}/me (the `GetProjectMe` operationId).
 func (c *Client) GetProjectMe(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetProjectMeRequest(c.Server, project)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListProjectMembers The members holding grants in a project
+//
+// Every member holding a grant in the project, ordered by email, with their grants side by side, oldest first.
+//
+// Corresponds with GET /projects/{project}/members (the `ListProjectMembers` operationId).
+func (c *Client) ListProjectMembers(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListProjectMembersRequest(c.Server, project)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListProjectTokens The tokens of a project
+//
+// Every token of the project, the newest first, revoked and expired ones included, by their hint.
+//
+// Corresponds with GET /projects/{project}/tokens (the `ListProjectTokens` operationId).
+func (c *Client) ListProjectTokens(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListProjectTokensRequest(c.Server, project)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateProjectTokenWithBody Create a project token
+//
+// Creates a token belonging to the project, for a pipeline, and
+// answers its value, shown this once and never again. It holds one
+// built-in role in the project, fixed for its life, narrowed by its
+// scopes; it never manages grants or project tokens, whatever its
+// role, so it never changes who has access. It reaches its project and
+// `GET /me` alone, acts for no member and survives its creator. A role
+// holding a permission the caller lacks in the project is refused
+// `role_not_allowed`; `instance:admin` or a scope the caller does not
+// hold `scope_not_allowed`. Its expiry follows the rules of a personal
+// access token's. Only a session creates one, so no token mints
+// another.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/tokens (the `CreateProjectToken` operationId).
+func (c *Client) CreateProjectTokenWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateProjectTokenRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateProjectToken Create a project token
+//
+// Creates a token belonging to the project, for a pipeline, and
+// answers its value, shown this once and never again. It holds one
+// built-in role in the project, fixed for its life, narrowed by its
+// scopes; it never manages grants or project tokens, whatever its
+// role, so it never changes who has access. It reaches its project and
+// `GET /me` alone, acts for no member and survives its creator. A role
+// holding a permission the caller lacks in the project is refused
+// `role_not_allowed`; `instance:admin` or a scope the caller does not
+// hold `scope_not_allowed`. Its expiry follows the rules of a personal
+// access token's. Only a session creates one, so no token mints
+// another.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/tokens (the `CreateProjectToken` operationId).
+func (c *Client) CreateProjectToken(ctx context.Context, project ProjectKey, body CreateProjectTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateProjectTokenRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeProjectToken Revoke a project token
+//
+// Revokes one of the project's tokens, which is refused `token_revoked` from then on. A token of another project, one already revoked or an identifier that names none is not found.
+//
+// Corresponds with DELETE /projects/{project}/tokens/{token} (the `RevokeProjectToken` operationId).
+func (c *Client) RevokeProjectToken(ctx context.Context, project ProjectKey, token TokenID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeProjectTokenRequest(c.Server, project, token)
 	if err != nil {
 		return nil, err
 	}
@@ -3063,6 +3754,107 @@ func NewRevokeMySessionRequest(server string, session SessionID) (*http.Request,
 	return req, nil
 }
 
+// NewListMyTokensRequest constructs an http.Request for the ListMyTokens method
+func NewListMyTokensRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateMyTokenRequest calls the generic CreateMyToken builder with application/json body
+func NewCreateMyTokenRequest(server string, body CreateMyTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateMyTokenRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateMyTokenRequestWithBody constructs an http.Request for the CreateMyToken method, with any body, and a specified content type
+func NewCreateMyTokenRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/tokens")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeMyTokenRequest constructs an http.Request for the RevokeMyToken method
+func NewRevokeMyTokenRequest(server string, token TokenID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "token", token, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/me/tokens/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListMembersRequest constructs an http.Request for the ListMembers method
 func NewListMembersRequest(server string, params *ListMembersParams) (*http.Request, error) {
 	var err error
@@ -3413,6 +4205,81 @@ func NewListMemberSessionsRequest(server string, member MemberID) (*http.Request
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMemberTokensRequest constructs an http.Request for the ListMemberTokens method
+func NewListMemberTokensRequest(server string, member MemberID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/tokens", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRevokeMemberTokenRequest constructs an http.Request for the RevokeMemberToken method
+func NewRevokeMemberTokenRequest(server string, member MemberID, token TokenID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "member", member, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "token", token, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/members/%s/tokens/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -4224,6 +5091,128 @@ func NewUpdateEnvironmentRequestWithBody(server string, project ProjectKey, envi
 	return req, nil
 }
 
+// NewListGrantsRequest constructs an http.Request for the ListGrants method
+func NewListGrantsRequest(server string, project ProjectKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/grants", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateGrantRequest calls the generic CreateGrant builder with application/json body
+func NewCreateGrantRequest(server string, project ProjectKey, body CreateGrantJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateGrantRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewCreateGrantRequestWithBody constructs an http.Request for the CreateGrant method, with any body, and a specified content type
+func NewCreateGrantRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/grants", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteGrantRequest constructs an http.Request for the DeleteGrant method
+func NewDeleteGrantRequest(server string, project ProjectKey, grant GrantID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "grant", grant, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/grants/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetProjectMeRequest constructs an http.Request for the GetProjectMe method
 func NewGetProjectMeRequest(server string, project ProjectKey) (*http.Request, error) {
 	var err error
@@ -4251,6 +5240,162 @@ func NewGetProjectMeRequest(server string, project ProjectKey) (*http.Request, e
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListProjectMembersRequest constructs an http.Request for the ListProjectMembers method
+func NewListProjectMembersRequest(server string, project ProjectKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/members", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListProjectTokensRequest constructs an http.Request for the ListProjectTokens method
+func NewListProjectTokensRequest(server string, project ProjectKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/tokens", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateProjectTokenRequest calls the generic CreateProjectToken builder with application/json body
+func NewCreateProjectTokenRequest(server string, project ProjectKey, body CreateProjectTokenJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateProjectTokenRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewCreateProjectTokenRequestWithBody constructs an http.Request for the CreateProjectToken method, with any body, and a specified content type
+func NewCreateProjectTokenRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/tokens", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeProjectTokenRequest constructs an http.Request for the RevokeProjectToken method
+func NewRevokeProjectTokenRequest(server string, project ProjectKey, token TokenID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "token", token, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/tokens/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -4743,6 +5888,63 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /me/sessions/{session} (the `RevokeMySession` operationId).
 	RevokeMySessionWithResponse(ctx context.Context, session SessionID, reqEditors ...RequestEditorFn) (*RevokeMySessionResponse, error)
 
+	// ListMyTokensWithResponse The caller's personal access tokens
+	//
+	// Every personal access token of the caller, the newest first, revoked
+	// and expired ones included, by their hint: a token's value is shown
+	// only when it is created.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /me/tokens (the `ListMyTokens` operationId).
+	ListMyTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyTokensResponse, error)
+
+	// CreateMyTokenWithBodyWithResponse Create a personal access token
+	//
+	// Creates a personal access token acting for the caller and answers its
+	// value, shown this once and never again. It carries `read` alone
+	// unless asked for more, and `read` beside every write scope; a scope
+	// the caller does not hold, `instance:admin` for a member who is no
+	// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+	// the future and at most the instance's maximum token lifetime ahead,
+	// and is required when the instance requires one; without one the
+	// token never expires. Only a session creates a token, so a leaked
+	// token can never multiply itself or outlive its revocation.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+	CreateMyTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateMyTokenResponse, error)
+
+	// CreateMyTokenWithResponse Create a personal access token
+	//
+	// Creates a personal access token acting for the caller and answers its
+	// value, shown this once and never again. It carries `read` alone
+	// unless asked for more, and `read` beside every write scope; a scope
+	// the caller does not hold, `instance:admin` for a member who is no
+	// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+	// the future and at most the instance's maximum token lifetime ahead,
+	// and is required when the instance requires one; without one the
+	// token never expires. Only a session creates a token, so a leaked
+	// token can never multiply itself or outlive its revocation.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+	CreateMyTokenWithResponse(ctx context.Context, body CreateMyTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateMyTokenResponse, error)
+
+	// RevokeMyTokenWithResponse Revoke a personal access token
+	//
+	// Revokes one of the caller's tokens, which is refused `token_revoked`
+	// from then on. A token of another member, one already revoked or an
+	// identifier that names none is not found. Only a session may do this,
+	// so a leaked token cannot hide its siblings.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /me/tokens/{token} (the `RevokeMyToken` operationId).
+	RevokeMyTokenWithResponse(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*RevokeMyTokenResponse, error)
+
 	// ListMembersWithResponse The instance's members
 	//
 	// Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
@@ -4866,6 +6068,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /members/{member}/sessions (the `ListMemberSessions` operationId).
 	ListMemberSessionsWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberSessionsResponse, error)
+
+	// ListMemberTokensWithResponse A member's personal access tokens
+	//
+	// Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /members/{member}/tokens (the `ListMemberTokens` operationId).
+	ListMemberTokensWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberTokensResponse, error)
+
+	// RevokeMemberTokenWithResponse Revoke a member's personal access token
+	//
+	// Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /members/{member}/tokens/{token} (the `RevokeMemberToken` operationId).
+	RevokeMemberTokenWithResponse(ctx context.Context, member MemberID, token TokenID, reqEditors ...RequestEditorFn) (*RevokeMemberTokenResponse, error)
 
 	// ListProjectsWithResponse The projects the caller works in
 	//
@@ -5047,6 +6267,61 @@ type ClientWithResponsesInterface interface {
 	// Renames the environment; the key never changes (`key_immutable`).
 	UpdateEnvironmentWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body UpdateEnvironmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEnvironmentResponse, error)
 
+	// ListGrantsWithResponse The grants of a project
+	//
+	// Every grant of the project, oldest first.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/grants (the `ListGrants` operationId).
+	ListGrantsWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListGrantsResponse, error)
+
+	// CreateGrantWithBodyWithResponse Grant a member a role in a project
+	//
+	// Grants the member one of the built-in roles in the project, beside
+	// any grants they hold already; they act with the union of their
+	// grants' permissions. An invited member may be granted roles before
+	// they join. A role holding a permission the caller lacks in the
+	// project is refused `role_not_allowed`, naming it in `permission`;
+	// the same member and role twice `already_granted`; a deactivated
+	// member `member_deactivated`; an unknown member or role
+	// `invalid_grant`. Only a member grants: a project token never changes
+	// who has access.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/grants (the `CreateGrant` operationId).
+	CreateGrantWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGrantResponse, error)
+
+	// CreateGrantWithResponse Grant a member a role in a project
+	//
+	// Grants the member one of the built-in roles in the project, beside
+	// any grants they hold already; they act with the union of their
+	// grants' permissions. An invited member may be granted roles before
+	// they join. A role holding a permission the caller lacks in the
+	// project is refused `role_not_allowed`, naming it in `permission`;
+	// the same member and role twice `already_granted`; a deactivated
+	// member `member_deactivated`; an unknown member or role
+	// `invalid_grant`. Only a member grants: a project token never changes
+	// who has access.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/grants (the `CreateGrant` operationId).
+	CreateGrantWithResponse(ctx context.Context, project ProjectKey, body CreateGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGrantResponse, error)
+
+	// DeleteGrantWithResponse Remove one grant
+	//
+	// Removes one grant, leaving the member's others. The grant of a role
+	// holding a permission the caller lacks in the project is refused
+	// `role_not_allowed`. Removing the last owner's grant is allowed: an
+	// instance admin holds every permission in every project.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
+	DeleteGrantWithResponse(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*DeleteGrantResponse, error)
+
 	// GetProjectMeWithResponse What the caller holds in a project
 	//
 	// The caller's grants in the project and their effective permissions
@@ -5057,6 +6332,71 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/me (the `GetProjectMe` operationId).
 	GetProjectMeWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*GetProjectMeResponse, error)
+
+	// ListProjectMembersWithResponse The members holding grants in a project
+	//
+	// Every member holding a grant in the project, ordered by email, with their grants side by side, oldest first.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/members (the `ListProjectMembers` operationId).
+	ListProjectMembersWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListProjectMembersResponse, error)
+
+	// ListProjectTokensWithResponse The tokens of a project
+	//
+	// Every token of the project, the newest first, revoked and expired ones included, by their hint.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/tokens (the `ListProjectTokens` operationId).
+	ListProjectTokensWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListProjectTokensResponse, error)
+
+	// CreateProjectTokenWithBodyWithResponse Create a project token
+	//
+	// Creates a token belonging to the project, for a pipeline, and
+	// answers its value, shown this once and never again. It holds one
+	// built-in role in the project, fixed for its life, narrowed by its
+	// scopes; it never manages grants or project tokens, whatever its
+	// role, so it never changes who has access. It reaches its project and
+	// `GET /me` alone, acts for no member and survives its creator. A role
+	// holding a permission the caller lacks in the project is refused
+	// `role_not_allowed`; `instance:admin` or a scope the caller does not
+	// hold `scope_not_allowed`. Its expiry follows the rules of a personal
+	// access token's. Only a session creates one, so no token mints
+	// another.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/tokens (the `CreateProjectToken` operationId).
+	CreateProjectTokenWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateProjectTokenResponse, error)
+
+	// CreateProjectTokenWithResponse Create a project token
+	//
+	// Creates a token belonging to the project, for a pipeline, and
+	// answers its value, shown this once and never again. It holds one
+	// built-in role in the project, fixed for its life, narrowed by its
+	// scopes; it never manages grants or project tokens, whatever its
+	// role, so it never changes who has access. It reaches its project and
+	// `GET /me` alone, acts for no member and survives its creator. A role
+	// holding a permission the caller lacks in the project is refused
+	// `role_not_allowed`; `instance:admin` or a scope the caller does not
+	// hold `scope_not_allowed`. Its expiry follows the rules of a personal
+	// access token's. Only a session creates one, so no token mints
+	// another.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/tokens (the `CreateProjectToken` operationId).
+	CreateProjectTokenWithResponse(ctx context.Context, project ProjectKey, body CreateProjectTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateProjectTokenResponse, error)
+
+	// RevokeProjectTokenWithResponse Revoke a project token
+	//
+	// Revokes one of the project's tokens, which is refused `token_revoked` from then on. A token of another project, one already revoked or an identifier that names none is not found.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/tokens/{token} (the `RevokeProjectToken` operationId).
+	RevokeProjectTokenWithResponse(ctx context.Context, project ProjectKey, token TokenID, reqEditors ...RequestEditorFn) (*RevokeProjectTokenResponse, error)
 
 	// ListUnitTypesWithResponse The project's unit types
 	//
@@ -6003,6 +7343,199 @@ func (r RevokeMySessionResponse) ContentType() string {
 	return ""
 }
 
+// ListMyTokensResponse401Headers the declared response headers of an HTTP 401 response for ListMyTokens
+type ListMyTokensResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMyTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ApiTokenList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMyTokensResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMyTokensResponse) GetJSON200() *ApiTokenList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMyTokensResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMyTokensResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMyTokensResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMyTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMyTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMyTokensResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateMyTokenResponse401Headers the declared response headers of an HTTP 401 response for CreateMyToken
+type CreateMyTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateMyTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CreatedApiToken
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateMyTokenResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateMyTokenResponse) GetJSON201() *CreatedApiToken {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateMyTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateMyTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateMyTokenResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateMyTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateMyTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateMyTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateMyTokenResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeMyTokenResponse401Headers the declared response headers of an HTTP 401 response for RevokeMyToken
+type RevokeMyTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeMyTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeMyTokenResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeMyTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeMyTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevokeMyTokenResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeMyTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeMyTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeMyTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeMyTokenResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListMembersResponse401Headers the declared response headers of an HTTP 401 response for ListMembers
 type ListMembersResponse401Headers struct {
 	WWWAuthenticate *string
@@ -6660,6 +8193,137 @@ func (r ListMemberSessionsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListMemberSessionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListMemberTokensResponse401Headers the declared response headers of an HTTP 401 response for ListMemberTokens
+type ListMemberTokensResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListMemberTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ApiTokenList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListMemberTokensResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMemberTokensResponse) GetJSON200() *ApiTokenList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListMemberTokensResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListMemberTokensResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListMemberTokensResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMemberTokensResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMemberTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMemberTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMemberTokensResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeMemberTokenResponse401Headers the declared response headers of an HTTP 401 response for RevokeMemberToken
+type RevokeMemberTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeMemberTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeMemberTokenResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeMemberTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeMemberTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevokeMemberTokenResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeMemberTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeMemberTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeMemberTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeMemberTokenResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -7826,6 +9490,227 @@ func (r UpdateEnvironmentResponse) ContentType() string {
 	return ""
 }
 
+// ListGrantsResponse401Headers the declared response headers of an HTTP 401 response for ListGrants
+type ListGrantsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListGrantsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GrantList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListGrantsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListGrantsResponse) GetJSON200() *GrantList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListGrantsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListGrantsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListGrantsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListGrantsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListGrantsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListGrantsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListGrantsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateGrantResponse401Headers the declared response headers of an HTTP 401 response for CreateGrant
+type CreateGrantResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateGrantResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Grant
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateGrantResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateGrantResponse) GetJSON201() *Grant {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateGrantResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateGrantResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateGrantResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateGrantResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateGrantResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateGrantResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateGrantResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateGrantResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateGrantResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteGrantResponse401Headers the declared response headers of an HTTP 401 response for DeleteGrant
+type DeleteGrantResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteGrantResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteGrantResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteGrantResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteGrantResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteGrantResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r DeleteGrantResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteGrantResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteGrantResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteGrantResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteGrantResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetProjectMeResponse401Headers the declared response headers of an HTTP 401 response for GetProjectMe
 type GetProjectMeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -7889,6 +9774,282 @@ func (r GetProjectMeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetProjectMeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListProjectMembersResponse401Headers the declared response headers of an HTTP 401 response for ListProjectMembers
+type ListProjectMembersResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListProjectMembersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ProjectMemberList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListProjectMembersResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListProjectMembersResponse) GetJSON200() *ProjectMemberList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListProjectMembersResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListProjectMembersResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListProjectMembersResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListProjectMembersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListProjectMembersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListProjectMembersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListProjectMembersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListProjectTokensResponse401Headers the declared response headers of an HTTP 401 response for ListProjectTokens
+type ListProjectTokensResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListProjectTokensResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ProjectTokenList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListProjectTokensResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListProjectTokensResponse) GetJSON200() *ProjectTokenList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListProjectTokensResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListProjectTokensResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListProjectTokensResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListProjectTokensResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListProjectTokensResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListProjectTokensResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListProjectTokensResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateProjectTokenResponse401Headers the declared response headers of an HTTP 401 response for CreateProjectToken
+type CreateProjectTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateProjectTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CreatedProjectToken
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateProjectTokenResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateProjectTokenResponse) GetJSON201() *CreatedProjectToken {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateProjectTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateProjectTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateProjectTokenResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateProjectTokenResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateProjectTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateProjectTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateProjectTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateProjectTokenResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeProjectTokenResponse401Headers the declared response headers of an HTTP 401 response for RevokeProjectToken
+type RevokeProjectTokenResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeProjectTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeProjectTokenResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeProjectTokenResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeProjectTokenResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevokeProjectTokenResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeProjectTokenResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeProjectTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeProjectTokenResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeProjectTokenResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8603,6 +10764,87 @@ func (c *ClientWithResponses) RevokeMySessionWithResponse(ctx context.Context, s
 	return ParseRevokeMySessionResponse(rsp)
 }
 
+// ListMyTokensWithResponse The caller's personal access tokens
+//
+// Every personal access token of the caller, the newest first, revoked
+// and expired ones included, by their hint: a token's value is shown
+// only when it is created.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /me/tokens (the `ListMyTokens` operationId).
+func (c *ClientWithResponses) ListMyTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMyTokensResponse, error) {
+	rsp, err := c.ListMyTokens(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMyTokensResponse(rsp)
+}
+
+// CreateMyTokenWithBodyWithResponse Create a personal access token
+//
+// Creates a personal access token acting for the caller and answers its
+// value, shown this once and never again. It carries `read` alone
+// unless asked for more, and `read` beside every write scope; a scope
+// the caller does not hold, `instance:admin` for a member who is no
+// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+// the future and at most the instance's maximum token lifetime ahead,
+// and is required when the instance requires one; without one the
+// token never expires. Only a session creates a token, so a leaked
+// token can never multiply itself or outlive its revocation.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+func (c *ClientWithResponses) CreateMyTokenWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateMyTokenResponse, error) {
+	rsp, err := c.CreateMyTokenWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateMyTokenResponse(rsp)
+}
+
+// CreateMyTokenWithResponse Create a personal access token
+//
+// Creates a personal access token acting for the caller and answers its
+// value, shown this once and never again. It carries `read` alone
+// unless asked for more, and `read` beside every write scope; a scope
+// the caller does not hold, `instance:admin` for a member who is no
+// instance admin, is refused `scope_not_allowed`. Its expiry lies in
+// the future and at most the instance's maximum token lifetime ahead,
+// and is required when the instance requires one; without one the
+// token never expires. Only a session creates a token, so a leaked
+// token can never multiply itself or outlive its revocation.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /me/tokens (the `CreateMyToken` operationId).
+func (c *ClientWithResponses) CreateMyTokenWithResponse(ctx context.Context, body CreateMyTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateMyTokenResponse, error) {
+	rsp, err := c.CreateMyToken(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateMyTokenResponse(rsp)
+}
+
+// RevokeMyTokenWithResponse Revoke a personal access token
+//
+// Revokes one of the caller's tokens, which is refused `token_revoked`
+// from then on. A token of another member, one already revoked or an
+// identifier that names none is not found. Only a session may do this,
+// so a leaked token cannot hide its siblings.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /me/tokens/{token} (the `RevokeMyToken` operationId).
+func (c *ClientWithResponses) RevokeMyTokenWithResponse(ctx context.Context, token TokenID, reqEditors ...RequestEditorFn) (*RevokeMyTokenResponse, error) {
+	rsp, err := c.RevokeMyToken(ctx, token, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeMyTokenResponse(rsp)
+}
+
 // ListMembersWithResponse The instance's members
 //
 // Every member of the instance, ordered by email, with how many projects each holds a grant in and when they last signed in.
@@ -8791,6 +11033,36 @@ func (c *ClientWithResponses) ListMemberSessionsWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseListMemberSessionsResponse(rsp)
+}
+
+// ListMemberTokensWithResponse A member's personal access tokens
+//
+// Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /members/{member}/tokens (the `ListMemberTokens` operationId).
+func (c *ClientWithResponses) ListMemberTokensWithResponse(ctx context.Context, member MemberID, reqEditors ...RequestEditorFn) (*ListMemberTokensResponse, error) {
+	rsp, err := c.ListMemberTokens(ctx, member, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMemberTokensResponse(rsp)
+}
+
+// RevokeMemberTokenWithResponse Revoke a member's personal access token
+//
+// Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /members/{member}/tokens/{token} (the `RevokeMemberToken` operationId).
+func (c *ClientWithResponses) RevokeMemberTokenWithResponse(ctx context.Context, member MemberID, token TokenID, reqEditors ...RequestEditorFn) (*RevokeMemberTokenResponse, error) {
+	rsp, err := c.RevokeMemberToken(ctx, member, token, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeMemberTokenResponse(rsp)
 }
 
 // ListProjectsWithResponse The projects the caller works in
@@ -9105,6 +11377,85 @@ func (c *ClientWithResponses) UpdateEnvironmentWithResponse(ctx context.Context,
 	return ParseUpdateEnvironmentResponse(rsp)
 }
 
+// ListGrantsWithResponse The grants of a project
+//
+// Every grant of the project, oldest first.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/grants (the `ListGrants` operationId).
+func (c *ClientWithResponses) ListGrantsWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListGrantsResponse, error) {
+	rsp, err := c.ListGrants(ctx, project, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListGrantsResponse(rsp)
+}
+
+// CreateGrantWithBodyWithResponse Grant a member a role in a project
+//
+// Grants the member one of the built-in roles in the project, beside
+// any grants they hold already; they act with the union of their
+// grants' permissions. An invited member may be granted roles before
+// they join. A role holding a permission the caller lacks in the
+// project is refused `role_not_allowed`, naming it in `permission`;
+// the same member and role twice `already_granted`; a deactivated
+// member `member_deactivated`; an unknown member or role
+// `invalid_grant`. Only a member grants: a project token never changes
+// who has access.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/grants (the `CreateGrant` operationId).
+func (c *ClientWithResponses) CreateGrantWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateGrantResponse, error) {
+	rsp, err := c.CreateGrantWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGrantResponse(rsp)
+}
+
+// CreateGrantWithResponse Grant a member a role in a project
+//
+// Grants the member one of the built-in roles in the project, beside
+// any grants they hold already; they act with the union of their
+// grants' permissions. An invited member may be granted roles before
+// they join. A role holding a permission the caller lacks in the
+// project is refused `role_not_allowed`, naming it in `permission`;
+// the same member and role twice `already_granted`; a deactivated
+// member `member_deactivated`; an unknown member or role
+// `invalid_grant`. Only a member grants: a project token never changes
+// who has access.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/grants (the `CreateGrant` operationId).
+func (c *ClientWithResponses) CreateGrantWithResponse(ctx context.Context, project ProjectKey, body CreateGrantJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateGrantResponse, error) {
+	rsp, err := c.CreateGrant(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateGrantResponse(rsp)
+}
+
+// DeleteGrantWithResponse Remove one grant
+//
+// Removes one grant, leaving the member's others. The grant of a role
+// holding a permission the caller lacks in the project is refused
+// `role_not_allowed`. Removing the last owner's grant is allowed: an
+// instance admin holds every permission in every project.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
+func (c *ClientWithResponses) DeleteGrantWithResponse(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*DeleteGrantResponse, error) {
+	rsp, err := c.DeleteGrant(ctx, project, grant, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteGrantResponse(rsp)
+}
+
 // GetProjectMeWithResponse What the caller holds in a project
 //
 // The caller's grants in the project and their effective permissions
@@ -9120,6 +11471,101 @@ func (c *ClientWithResponses) GetProjectMeWithResponse(ctx context.Context, proj
 		return nil, err
 	}
 	return ParseGetProjectMeResponse(rsp)
+}
+
+// ListProjectMembersWithResponse The members holding grants in a project
+//
+// Every member holding a grant in the project, ordered by email, with their grants side by side, oldest first.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/members (the `ListProjectMembers` operationId).
+func (c *ClientWithResponses) ListProjectMembersWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListProjectMembersResponse, error) {
+	rsp, err := c.ListProjectMembers(ctx, project, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListProjectMembersResponse(rsp)
+}
+
+// ListProjectTokensWithResponse The tokens of a project
+//
+// Every token of the project, the newest first, revoked and expired ones included, by their hint.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/tokens (the `ListProjectTokens` operationId).
+func (c *ClientWithResponses) ListProjectTokensWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListProjectTokensResponse, error) {
+	rsp, err := c.ListProjectTokens(ctx, project, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListProjectTokensResponse(rsp)
+}
+
+// CreateProjectTokenWithBodyWithResponse Create a project token
+//
+// Creates a token belonging to the project, for a pipeline, and
+// answers its value, shown this once and never again. It holds one
+// built-in role in the project, fixed for its life, narrowed by its
+// scopes; it never manages grants or project tokens, whatever its
+// role, so it never changes who has access. It reaches its project and
+// `GET /me` alone, acts for no member and survives its creator. A role
+// holding a permission the caller lacks in the project is refused
+// `role_not_allowed`; `instance:admin` or a scope the caller does not
+// hold `scope_not_allowed`. Its expiry follows the rules of a personal
+// access token's. Only a session creates one, so no token mints
+// another.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/tokens (the `CreateProjectToken` operationId).
+func (c *ClientWithResponses) CreateProjectTokenWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateProjectTokenResponse, error) {
+	rsp, err := c.CreateProjectTokenWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateProjectTokenResponse(rsp)
+}
+
+// CreateProjectTokenWithResponse Create a project token
+//
+// Creates a token belonging to the project, for a pipeline, and
+// answers its value, shown this once and never again. It holds one
+// built-in role in the project, fixed for its life, narrowed by its
+// scopes; it never manages grants or project tokens, whatever its
+// role, so it never changes who has access. It reaches its project and
+// `GET /me` alone, acts for no member and survives its creator. A role
+// holding a permission the caller lacks in the project is refused
+// `role_not_allowed`; `instance:admin` or a scope the caller does not
+// hold `scope_not_allowed`. Its expiry follows the rules of a personal
+// access token's. Only a session creates one, so no token mints
+// another.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/tokens (the `CreateProjectToken` operationId).
+func (c *ClientWithResponses) CreateProjectTokenWithResponse(ctx context.Context, project ProjectKey, body CreateProjectTokenJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateProjectTokenResponse, error) {
+	rsp, err := c.CreateProjectToken(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateProjectTokenResponse(rsp)
+}
+
+// RevokeProjectTokenWithResponse Revoke a project token
+//
+// Revokes one of the project's tokens, which is refused `token_revoked` from then on. A token of another project, one already revoked or an identifier that names none is not found.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/tokens/{token} (the `RevokeProjectToken` operationId).
+func (c *ClientWithResponses) RevokeProjectTokenWithResponse(ctx context.Context, project ProjectKey, token TokenID, reqEditors ...RequestEditorFn) (*RevokeProjectTokenResponse, error) {
+	rsp, err := c.RevokeProjectToken(ctx, project, token, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeProjectTokenResponse(rsp)
 }
 
 // ListUnitTypesWithResponse The project's unit types
@@ -10039,6 +12485,175 @@ func ParseRevokeMySessionResponse(rsp *http.Response) (*RevokeMySessionResponse,
 	return response, nil
 }
 
+// ParseListMyTokensResponse parses an HTTP response from a ListMyTokensWithResponse call
+func ParseListMyTokensResponse(rsp *http.Response) (*ListMyTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMyTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiTokenList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMyTokensResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateMyTokenResponse parses an HTTP response from a CreateMyTokenWithResponse call
+func ParseCreateMyTokenResponse(rsp *http.Response) (*CreateMyTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateMyTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CreatedApiToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers CreateMyTokenResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeMyTokenResponse parses an HTTP response from a RevokeMyTokenWithResponse call
+func ParseRevokeMyTokenResponse(rsp *http.Response) (*RevokeMyTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeMyTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RevokeMyTokenResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListMembersResponse parses an HTTP response from a ListMembersWithResponse call
 func ParseListMembersResponse(rsp *http.Response) (*ListMembersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -10611,6 +13226,122 @@ func ParseListMemberSessionsResponse(rsp *http.Response) (*ListMemberSessionsRes
 	switch {
 	case rsp.StatusCode == 401:
 		var headers ListMemberSessionsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListMemberTokensResponse parses an HTTP response from a ListMemberTokensWithResponse call
+func ParseListMemberTokensResponse(rsp *http.Response) (*ListMemberTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMemberTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiTokenList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListMemberTokensResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeMemberTokenResponse parses an HTTP response from a RevokeMemberTokenWithResponse call
+func ParseRevokeMemberTokenResponse(rsp *http.Response) (*RevokeMemberTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeMemberTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RevokeMemberTokenResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -11646,6 +14377,203 @@ func ParseUpdateEnvironmentResponse(rsp *http.Response) (*UpdateEnvironmentRespo
 	return response, nil
 }
 
+// ParseListGrantsResponse parses an HTTP response from a ListGrantsWithResponse call
+func ParseListGrantsResponse(rsp *http.Response) (*ListGrantsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListGrantsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GrantList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListGrantsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateGrantResponse parses an HTTP response from a CreateGrantWithResponse call
+func ParseCreateGrantResponse(rsp *http.Response) (*CreateGrantResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateGrantResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Grant
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers CreateGrantResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteGrantResponse parses an HTTP response from a DeleteGrantWithResponse call
+func ParseDeleteGrantResponse(rsp *http.Response) (*DeleteGrantResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteGrantResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteGrantResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetProjectMeResponse parses an HTTP response from a GetProjectMeWithResponse call
 func ParseGetProjectMeResponse(rsp *http.Response) (*GetProjectMeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -11693,6 +14621,249 @@ func ParseGetProjectMeResponse(rsp *http.Response) (*GetProjectMeResponse, error
 	switch {
 	case rsp.StatusCode == 401:
 		var headers GetProjectMeResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListProjectMembersResponse parses an HTTP response from a ListProjectMembersWithResponse call
+func ParseListProjectMembersResponse(rsp *http.Response) (*ListProjectMembersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListProjectMembersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ProjectMemberList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListProjectMembersResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListProjectTokensResponse parses an HTTP response from a ListProjectTokensWithResponse call
+func ParseListProjectTokensResponse(rsp *http.Response) (*ListProjectTokensResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListProjectTokensResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ProjectTokenList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListProjectTokensResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateProjectTokenResponse parses an HTTP response from a CreateProjectTokenWithResponse call
+func ParseCreateProjectTokenResponse(rsp *http.Response) (*CreateProjectTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateProjectTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CreatedProjectToken
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers CreateProjectTokenResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeProjectTokenResponse parses an HTTP response from a RevokeProjectTokenWithResponse call
+func ParseRevokeProjectTokenResponse(rsp *http.Response) (*RevokeProjectTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeProjectTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RevokeProjectTokenResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -12114,6 +15285,15 @@ type ServerInterface interface {
 	// RevokeMySession Sign out one device
 	// (DELETE /me/sessions/{session})
 	RevokeMySession(w http.ResponseWriter, r *http.Request, session SessionID)
+	// ListMyTokens The caller's personal access tokens
+	// (GET /me/tokens)
+	ListMyTokens(w http.ResponseWriter, r *http.Request)
+	// CreateMyToken Create a personal access token
+	// (POST /me/tokens)
+	CreateMyToken(w http.ResponseWriter, r *http.Request)
+	// RevokeMyToken Revoke a personal access token
+	// (DELETE /me/tokens/{token})
+	RevokeMyToken(w http.ResponseWriter, r *http.Request, token TokenID)
 	// ListMembers The instance's members
 	// (GET /members)
 	ListMembers(w http.ResponseWriter, r *http.Request, params ListMembersParams)
@@ -12141,6 +15321,12 @@ type ServerInterface interface {
 	// ListMemberSessions A member's sessions
 	// (GET /members/{member}/sessions)
 	ListMemberSessions(w http.ResponseWriter, r *http.Request, member MemberID)
+	// ListMemberTokens A member's personal access tokens
+	// (GET /members/{member}/tokens)
+	ListMemberTokens(w http.ResponseWriter, r *http.Request, member MemberID)
+	// RevokeMemberToken Revoke a member's personal access token
+	// (DELETE /members/{member}/tokens/{token})
+	RevokeMemberToken(w http.ResponseWriter, r *http.Request, member MemberID, token TokenID)
 	// ListProjects The projects the caller works in
 	// (GET /projects)
 	ListProjects(w http.ResponseWriter, r *http.Request)
@@ -12189,9 +15375,30 @@ type ServerInterface interface {
 
 	// (PATCH /projects/{project}/environments/{environment})
 	UpdateEnvironment(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	// ListGrants The grants of a project
+	// (GET /projects/{project}/grants)
+	ListGrants(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// CreateGrant Grant a member a role in a project
+	// (POST /projects/{project}/grants)
+	CreateGrant(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// DeleteGrant Remove one grant
+	// (DELETE /projects/{project}/grants/{grant})
+	DeleteGrant(w http.ResponseWriter, r *http.Request, project ProjectKey, grant GrantID)
 	// GetProjectMe What the caller holds in a project
 	// (GET /projects/{project}/me)
 	GetProjectMe(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// ListProjectMembers The members holding grants in a project
+	// (GET /projects/{project}/members)
+	ListProjectMembers(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// ListProjectTokens The tokens of a project
+	// (GET /projects/{project}/tokens)
+	ListProjectTokens(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// CreateProjectToken Create a project token
+	// (POST /projects/{project}/tokens)
+	CreateProjectToken(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// RevokeProjectToken Revoke a project token
+	// (DELETE /projects/{project}/tokens/{token})
+	RevokeProjectToken(w http.ResponseWriter, r *http.Request, project ProjectKey, token TokenID)
 	// ListUnitTypes The project's unit types
 	// (GET /projects/{project}/unit-types)
 	ListUnitTypes(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -12606,6 +15813,60 @@ func (siw *ServerInterfaceWrapper) RevokeMySession(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListMyTokens operation middleware
+func (siw *ServerInterfaceWrapper) ListMyTokens(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyTokens(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMyToken operation middleware
+func (siw *ServerInterfaceWrapper) CreateMyToken(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMyToken(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeMyToken operation middleware
+func (siw *ServerInterfaceWrapper) RevokeMyToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "token" -------------
+	var token TokenID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeMyToken(w, r, token)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMembers operation middleware
 func (siw *ServerInterfaceWrapper) ListMembers(w http.ResponseWriter, r *http.Request) {
 
@@ -12839,6 +16100,67 @@ func (siw *ServerInterfaceWrapper) ListMemberSessions(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListMemberSessions(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMemberTokens operation middleware
+func (siw *ServerInterfaceWrapper) ListMemberTokens(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMemberTokens(w, r, member)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeMemberToken operation middleware
+func (siw *ServerInterfaceWrapper) RevokeMemberToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "member" -------------
+	var member MemberID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "member", r.PathValue("member"), &member, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "member", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "token" -------------
+	var token TokenID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeMemberToken(w, r, member, token)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13449,6 +16771,93 @@ func (siw *ServerInterfaceWrapper) UpdateEnvironment(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListGrants operation middleware
+func (siw *ServerInterfaceWrapper) ListGrants(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGrants(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateGrant operation middleware
+func (siw *ServerInterfaceWrapper) CreateGrant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGrant(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteGrant operation middleware
+func (siw *ServerInterfaceWrapper) DeleteGrant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "grant" -------------
+	var grant GrantID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "grant", r.PathValue("grant"), &grant, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "grant", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteGrant(w, r, project, grant)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetProjectMe operation middleware
 func (siw *ServerInterfaceWrapper) GetProjectMe(w http.ResponseWriter, r *http.Request) {
 
@@ -13466,6 +16875,119 @@ func (siw *ServerInterfaceWrapper) GetProjectMe(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetProjectMe(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListProjectMembers operation middleware
+func (siw *ServerInterfaceWrapper) ListProjectMembers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListProjectMembers(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListProjectTokens operation middleware
+func (siw *ServerInterfaceWrapper) ListProjectTokens(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListProjectTokens(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateProjectToken operation middleware
+func (siw *ServerInterfaceWrapper) CreateProjectToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateProjectToken(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeProjectToken operation middleware
+func (siw *ServerInterfaceWrapper) RevokeProjectToken(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "token" -------------
+	var token TokenID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", r.PathValue("token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeProjectToken(w, r, project, token)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13775,6 +17297,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions", wrapper.RevokeMySessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sessions", wrapper.ListMySessions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/sessions/{session}", wrapper.RevokeMySession)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/tokens", wrapper.ListMyTokens)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/tokens", wrapper.CreateMyToken)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/tokens/{token}", wrapper.RevokeMyToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/roles", wrapper.ListRoles)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects", wrapper.ListProjects)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects", wrapper.CreateProject)
@@ -13796,6 +17321,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.DeleteAttribute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.GetAttribute)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.UpdateAttribute)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/members", wrapper.ListProjectMembers)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/grants", wrapper.ListGrants)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/grants", wrapper.CreateGrant)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/grants/{grant}", wrapper.DeleteGrant)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/tokens", wrapper.ListProjectTokens)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/tokens", wrapper.CreateProjectToken)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/tokens/{token}", wrapper.RevokeProjectToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit", wrapper.ListProjectAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit/{entry}", wrapper.GetProjectAuditEntry)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members", wrapper.ListMembers)
@@ -13807,6 +17339,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members/{member}/invitation", wrapper.ReissueInvitation)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/sessions", wrapper.RevokeMemberSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/sessions", wrapper.ListMemberSessions)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}/tokens", wrapper.ListMemberTokens)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/members/{member}/tokens/{token}", wrapper.RevokeMemberToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/auth-settings", wrapper.GetAuthSettings)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/auth-settings", wrapper.UpdateAuthSettings)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/audit", wrapper.ListAuditEntries)
@@ -14791,6 +18325,202 @@ func (response RevokeMySession404ApplicationProblemPlusJSONResponse) VisitRevoke
 	return err
 }
 
+type ListMyTokensRequestObject struct {
+}
+
+type ListMyTokensResponseObject interface {
+	VisitListMyTokensResponse(w http.ResponseWriter) error
+}
+
+type ListMyTokens200JSONResponse ApiTokenList
+
+func (response ListMyTokens200JSONResponse) VisitListMyTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyTokens401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMyTokens401ApplicationProblemPlusJSONResponse) VisitListMyTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMyTokens403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMyTokens403ApplicationProblemPlusJSONResponse) VisitListMyTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMyTokenRequestObject struct {
+	Body *CreateMyTokenJSONRequestBody
+}
+
+type CreateMyTokenResponseObject interface {
+	VisitCreateMyTokenResponse(w http.ResponseWriter) error
+}
+
+type CreateMyToken201JSONResponse CreatedApiToken
+
+func (response CreateMyToken201JSONResponse) VisitCreateMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMyToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateMyToken401ApplicationProblemPlusJSONResponse) VisitCreateMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMyToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateMyToken403ApplicationProblemPlusJSONResponse) VisitCreateMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateMyToken422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateMyToken422ApplicationProblemPlusJSONResponse) VisitCreateMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMyTokenRequestObject struct {
+	Token TokenID `json:"token"`
+}
+
+type RevokeMyTokenResponseObject interface {
+	VisitRevokeMyTokenResponse(w http.ResponseWriter) error
+}
+
+type RevokeMyToken204Response struct {
+}
+
+func (response RevokeMyToken204Response) VisitRevokeMyTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeMyToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMyToken401ApplicationProblemPlusJSONResponse) VisitRevokeMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMyToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMyToken403ApplicationProblemPlusJSONResponse) VisitRevokeMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMyToken404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMyToken404ApplicationProblemPlusJSONResponse) VisitRevokeMyTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListMembersRequestObject struct {
 	Params ListMembersParams
 }
@@ -15528,6 +19258,147 @@ type ListMemberSessions404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ListMemberSessions404ApplicationProblemPlusJSONResponse) VisitListMemberSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberTokensRequestObject struct {
+	Member MemberID `json:"member"`
+}
+
+type ListMemberTokensResponseObject interface {
+	VisitListMemberTokensResponse(w http.ResponseWriter) error
+}
+
+type ListMemberTokens200JSONResponse ApiTokenList
+
+func (response ListMemberTokens200JSONResponse) VisitListMemberTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberTokens401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberTokens401ApplicationProblemPlusJSONResponse) VisitListMemberTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberTokens403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberTokens403ApplicationProblemPlusJSONResponse) VisitListMemberTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListMemberTokens404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListMemberTokens404ApplicationProblemPlusJSONResponse) VisitListMemberTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberTokenRequestObject struct {
+	Member MemberID `json:"member"`
+	Token  TokenID  `json:"token"`
+}
+
+type RevokeMemberTokenResponseObject interface {
+	VisitRevokeMemberTokenResponse(w http.ResponseWriter) error
+}
+
+type RevokeMemberToken204Response struct {
+}
+
+func (response RevokeMemberToken204Response) VisitRevokeMemberTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeMemberToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMemberToken401ApplicationProblemPlusJSONResponse) VisitRevokeMemberTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMemberToken403ApplicationProblemPlusJSONResponse) VisitRevokeMemberTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeMemberToken404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeMemberToken404ApplicationProblemPlusJSONResponse) VisitRevokeMemberTokenResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -16867,6 +20738,269 @@ func (response UpdateEnvironment422ApplicationProblemPlusJSONResponse) VisitUpda
 	return err
 }
 
+type ListGrantsRequestObject struct {
+	Project ProjectKey `json:"project"`
+}
+
+type ListGrantsResponseObject interface {
+	VisitListGrantsResponse(w http.ResponseWriter) error
+}
+
+type ListGrants200JSONResponse GrantList
+
+func (response ListGrants200JSONResponse) VisitListGrantsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGrants401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListGrants401ApplicationProblemPlusJSONResponse) VisitListGrantsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGrants403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListGrants403ApplicationProblemPlusJSONResponse) VisitListGrantsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGrants404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListGrants404ApplicationProblemPlusJSONResponse) VisitListGrantsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGrantRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *CreateGrantJSONRequestBody
+}
+
+type CreateGrantResponseObject interface {
+	VisitCreateGrantResponse(w http.ResponseWriter) error
+}
+
+type CreateGrant201JSONResponse Grant
+
+func (response CreateGrant201JSONResponse) VisitCreateGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGrant401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGrant401ApplicationProblemPlusJSONResponse) VisitCreateGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGrant403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGrant403ApplicationProblemPlusJSONResponse) VisitCreateGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGrant404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGrant404ApplicationProblemPlusJSONResponse) VisitCreateGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGrant409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGrant409ApplicationProblemPlusJSONResponse) VisitCreateGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGrant422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateGrant422ApplicationProblemPlusJSONResponse) VisitCreateGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGrantRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Grant   GrantID    `json:"grant"`
+}
+
+type DeleteGrantResponseObject interface {
+	VisitDeleteGrantResponse(w http.ResponseWriter) error
+}
+
+type DeleteGrant204Response struct {
+}
+
+func (response DeleteGrant204Response) VisitDeleteGrantResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteGrant401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteGrant401ApplicationProblemPlusJSONResponse) VisitDeleteGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGrant403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteGrant403ApplicationProblemPlusJSONResponse) VisitDeleteGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGrant404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteGrant404ApplicationProblemPlusJSONResponse) VisitDeleteGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGrant422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteGrant422ApplicationProblemPlusJSONResponse) VisitDeleteGrantResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetProjectMeRequestObject struct {
 	Project ProjectKey `json:"project"`
 }
@@ -16929,6 +21063,310 @@ type GetProjectMe404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetProjectMe404ApplicationProblemPlusJSONResponse) VisitGetProjectMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectMembersRequestObject struct {
+	Project ProjectKey `json:"project"`
+}
+
+type ListProjectMembersResponseObject interface {
+	VisitListProjectMembersResponse(w http.ResponseWriter) error
+}
+
+type ListProjectMembers200JSONResponse ProjectMemberList
+
+func (response ListProjectMembers200JSONResponse) VisitListProjectMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectMembers401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListProjectMembers401ApplicationProblemPlusJSONResponse) VisitListProjectMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectMembers403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListProjectMembers403ApplicationProblemPlusJSONResponse) VisitListProjectMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectMembers404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListProjectMembers404ApplicationProblemPlusJSONResponse) VisitListProjectMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectTokensRequestObject struct {
+	Project ProjectKey `json:"project"`
+}
+
+type ListProjectTokensResponseObject interface {
+	VisitListProjectTokensResponse(w http.ResponseWriter) error
+}
+
+type ListProjectTokens200JSONResponse ProjectTokenList
+
+func (response ListProjectTokens200JSONResponse) VisitListProjectTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectTokens401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListProjectTokens401ApplicationProblemPlusJSONResponse) VisitListProjectTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectTokens403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListProjectTokens403ApplicationProblemPlusJSONResponse) VisitListProjectTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListProjectTokens404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListProjectTokens404ApplicationProblemPlusJSONResponse) VisitListProjectTokensResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateProjectTokenRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *CreateProjectTokenJSONRequestBody
+}
+
+type CreateProjectTokenResponseObject interface {
+	VisitCreateProjectTokenResponse(w http.ResponseWriter) error
+}
+
+type CreateProjectToken201JSONResponse CreatedProjectToken
+
+func (response CreateProjectToken201JSONResponse) VisitCreateProjectTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateProjectToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateProjectToken401ApplicationProblemPlusJSONResponse) VisitCreateProjectTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateProjectToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateProjectToken403ApplicationProblemPlusJSONResponse) VisitCreateProjectTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateProjectToken404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateProjectToken404ApplicationProblemPlusJSONResponse) VisitCreateProjectTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateProjectToken422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateProjectToken422ApplicationProblemPlusJSONResponse) VisitCreateProjectTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeProjectTokenRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Token   TokenID    `json:"token"`
+}
+
+type RevokeProjectTokenResponseObject interface {
+	VisitRevokeProjectTokenResponse(w http.ResponseWriter) error
+}
+
+type RevokeProjectToken204Response struct {
+}
+
+func (response RevokeProjectToken204Response) VisitRevokeProjectTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RevokeProjectToken401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeProjectToken401ApplicationProblemPlusJSONResponse) VisitRevokeProjectTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeProjectToken403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeProjectToken403ApplicationProblemPlusJSONResponse) VisitRevokeProjectTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeProjectToken404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeProjectToken404ApplicationProblemPlusJSONResponse) VisitRevokeProjectTokenResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -17446,6 +21884,15 @@ type StrictServerInterface interface {
 	// RevokeMySession Sign out one device
 	// (DELETE /me/sessions/{session})
 	RevokeMySession(ctx context.Context, request RevokeMySessionRequestObject) (RevokeMySessionResponseObject, error)
+	// ListMyTokens The caller's personal access tokens
+	// (GET /me/tokens)
+	ListMyTokens(ctx context.Context, request ListMyTokensRequestObject) (ListMyTokensResponseObject, error)
+	// CreateMyToken Create a personal access token
+	// (POST /me/tokens)
+	CreateMyToken(ctx context.Context, request CreateMyTokenRequestObject) (CreateMyTokenResponseObject, error)
+	// RevokeMyToken Revoke a personal access token
+	// (DELETE /me/tokens/{token})
+	RevokeMyToken(ctx context.Context, request RevokeMyTokenRequestObject) (RevokeMyTokenResponseObject, error)
 	// ListMembers The instance's members
 	// (GET /members)
 	ListMembers(ctx context.Context, request ListMembersRequestObject) (ListMembersResponseObject, error)
@@ -17473,6 +21920,12 @@ type StrictServerInterface interface {
 	// ListMemberSessions A member's sessions
 	// (GET /members/{member}/sessions)
 	ListMemberSessions(ctx context.Context, request ListMemberSessionsRequestObject) (ListMemberSessionsResponseObject, error)
+	// ListMemberTokens A member's personal access tokens
+	// (GET /members/{member}/tokens)
+	ListMemberTokens(ctx context.Context, request ListMemberTokensRequestObject) (ListMemberTokensResponseObject, error)
+	// RevokeMemberToken Revoke a member's personal access token
+	// (DELETE /members/{member}/tokens/{token})
+	RevokeMemberToken(ctx context.Context, request RevokeMemberTokenRequestObject) (RevokeMemberTokenResponseObject, error)
 	// ListProjects The projects the caller works in
 	// (GET /projects)
 	ListProjects(ctx context.Context, request ListProjectsRequestObject) (ListProjectsResponseObject, error)
@@ -17521,9 +21974,30 @@ type StrictServerInterface interface {
 
 	// (PATCH /projects/{project}/environments/{environment})
 	UpdateEnvironment(ctx context.Context, request UpdateEnvironmentRequestObject) (UpdateEnvironmentResponseObject, error)
+	// ListGrants The grants of a project
+	// (GET /projects/{project}/grants)
+	ListGrants(ctx context.Context, request ListGrantsRequestObject) (ListGrantsResponseObject, error)
+	// CreateGrant Grant a member a role in a project
+	// (POST /projects/{project}/grants)
+	CreateGrant(ctx context.Context, request CreateGrantRequestObject) (CreateGrantResponseObject, error)
+	// DeleteGrant Remove one grant
+	// (DELETE /projects/{project}/grants/{grant})
+	DeleteGrant(ctx context.Context, request DeleteGrantRequestObject) (DeleteGrantResponseObject, error)
 	// GetProjectMe What the caller holds in a project
 	// (GET /projects/{project}/me)
 	GetProjectMe(ctx context.Context, request GetProjectMeRequestObject) (GetProjectMeResponseObject, error)
+	// ListProjectMembers The members holding grants in a project
+	// (GET /projects/{project}/members)
+	ListProjectMembers(ctx context.Context, request ListProjectMembersRequestObject) (ListProjectMembersResponseObject, error)
+	// ListProjectTokens The tokens of a project
+	// (GET /projects/{project}/tokens)
+	ListProjectTokens(ctx context.Context, request ListProjectTokensRequestObject) (ListProjectTokensResponseObject, error)
+	// CreateProjectToken Create a project token
+	// (POST /projects/{project}/tokens)
+	CreateProjectToken(ctx context.Context, request CreateProjectTokenRequestObject) (CreateProjectTokenResponseObject, error)
+	// RevokeProjectToken Revoke a project token
+	// (DELETE /projects/{project}/tokens/{token})
+	RevokeProjectToken(ctx context.Context, request RevokeProjectTokenRequestObject) (RevokeProjectTokenResponseObject, error)
 	// ListUnitTypes The project's unit types
 	// (GET /projects/{project}/unit-types)
 	ListUnitTypes(ctx context.Context, request ListUnitTypesRequestObject) (ListUnitTypesResponseObject, error)
@@ -17902,6 +22376,87 @@ func (sh *strictHandler) RevokeMySession(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// ListMyTokens operation middleware
+func (sh *strictHandler) ListMyTokens(w http.ResponseWriter, r *http.Request) {
+	var request ListMyTokensRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMyTokens(ctx, request.(ListMyTokensRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMyTokens")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMyTokensResponseObject); ok {
+		if err := validResponse.VisitListMyTokensResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateMyToken operation middleware
+func (sh *strictHandler) CreateMyToken(w http.ResponseWriter, r *http.Request) {
+	var request CreateMyTokenRequestObject
+
+	var body CreateMyTokenJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateMyToken(ctx, request.(CreateMyTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateMyToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateMyTokenResponseObject); ok {
+		if err := validResponse.VisitCreateMyTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeMyToken operation middleware
+func (sh *strictHandler) RevokeMyToken(w http.ResponseWriter, r *http.Request, token TokenID) {
+	var request RevokeMyTokenRequestObject
+
+	request.Token = token
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeMyToken(ctx, request.(RevokeMyTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeMyToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeMyTokenResponseObject); ok {
+		if err := validResponse.VisitRevokeMyTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListMembers operation middleware
 func (sh *strictHandler) ListMembers(w http.ResponseWriter, r *http.Request, params ListMembersParams) {
 	var request ListMembersRequestObject
@@ -18141,6 +22696,59 @@ func (sh *strictHandler) ListMemberSessions(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListMemberSessionsResponseObject); ok {
 		if err := validResponse.VisitListMemberSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListMemberTokens operation middleware
+func (sh *strictHandler) ListMemberTokens(w http.ResponseWriter, r *http.Request, member MemberID) {
+	var request ListMemberTokensRequestObject
+
+	request.Member = member
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListMemberTokens(ctx, request.(ListMemberTokensRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListMemberTokens")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListMemberTokensResponseObject); ok {
+		if err := validResponse.VisitListMemberTokensResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeMemberToken operation middleware
+func (sh *strictHandler) RevokeMemberToken(w http.ResponseWriter, r *http.Request, member MemberID, token TokenID) {
+	var request RevokeMemberTokenRequestObject
+
+	request.Member = member
+	request.Token = token
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeMemberToken(ctx, request.(RevokeMemberTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeMemberToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeMemberTokenResponseObject); ok {
+		if err := validResponse.VisitRevokeMemberTokenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -18610,6 +23218,92 @@ func (sh *strictHandler) UpdateEnvironment(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// ListGrants operation middleware
+func (sh *strictHandler) ListGrants(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request ListGrantsRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListGrants(ctx, request.(ListGrantsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListGrants")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListGrantsResponseObject); ok {
+		if err := validResponse.VisitListGrantsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateGrant operation middleware
+func (sh *strictHandler) CreateGrant(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request CreateGrantRequestObject
+
+	request.Project = project
+
+	var body CreateGrantJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateGrant(ctx, request.(CreateGrantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateGrant")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateGrantResponseObject); ok {
+		if err := validResponse.VisitCreateGrantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteGrant operation middleware
+func (sh *strictHandler) DeleteGrant(w http.ResponseWriter, r *http.Request, project ProjectKey, grant GrantID) {
+	var request DeleteGrantRequestObject
+
+	request.Project = project
+	request.Grant = grant
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteGrant(ctx, request.(DeleteGrantRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteGrant")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteGrantResponseObject); ok {
+		if err := validResponse.VisitDeleteGrantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetProjectMe operation middleware
 func (sh *strictHandler) GetProjectMe(w http.ResponseWriter, r *http.Request, project ProjectKey) {
 	var request GetProjectMeRequestObject
@@ -18629,6 +23323,118 @@ func (sh *strictHandler) GetProjectMe(w http.ResponseWriter, r *http.Request, pr
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetProjectMeResponseObject); ok {
 		if err := validResponse.VisitGetProjectMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListProjectMembers operation middleware
+func (sh *strictHandler) ListProjectMembers(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request ListProjectMembersRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListProjectMembers(ctx, request.(ListProjectMembersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListProjectMembers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListProjectMembersResponseObject); ok {
+		if err := validResponse.VisitListProjectMembersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListProjectTokens operation middleware
+func (sh *strictHandler) ListProjectTokens(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request ListProjectTokensRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListProjectTokens(ctx, request.(ListProjectTokensRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListProjectTokens")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListProjectTokensResponseObject); ok {
+		if err := validResponse.VisitListProjectTokensResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateProjectToken operation middleware
+func (sh *strictHandler) CreateProjectToken(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request CreateProjectTokenRequestObject
+
+	request.Project = project
+
+	var body CreateProjectTokenJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateProjectToken(ctx, request.(CreateProjectTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateProjectToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateProjectTokenResponseObject); ok {
+		if err := validResponse.VisitCreateProjectTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeProjectToken operation middleware
+func (sh *strictHandler) RevokeProjectToken(w http.ResponseWriter, r *http.Request, project ProjectKey, token TokenID) {
+	var request RevokeProjectTokenRequestObject
+
+	request.Project = project
+	request.Token = token
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeProjectToken(ctx, request.(RevokeProjectTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeProjectToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeProjectTokenResponseObject); ok {
+		if err := validResponse.VisitRevokeProjectTokenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

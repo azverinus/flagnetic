@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -165,6 +166,129 @@ func TestATokenNeedsANameAndKnownScopes(t *testing.T) {
 	} {
 		in.Member, in.Now = id.New[access.Member](ids), now
 		_, _, err := access.NewPersonalToken(id.New[access.APIToken](ids), in, rand.Reader)
+		if !apperrors.IsKind(err, apperrors.KindInvalid) {
+			t.Errorf("%s: err = %v, want invalid", name, err)
+		}
+	}
+}
+
+// violationOf returns the code of a refusal and of its one violation.
+func violationOf(err error) (code, pointer, violation string) {
+	e, ok := apperrors.From(err)
+	if !ok {
+		return "", "", ""
+	}
+	if len(e.Violations) != 1 {
+		return e.Code, "", ""
+	}
+	return e.Code, e.Violations[0].Pointer, e.Violations[0].Code
+}
+
+func TestATokensExpiryLiesInTheFutureWithinTheMaximumLifetime(t *testing.T) {
+	settings := access.DefaultAuthSettings
+	required := settings
+	required.TokenExpiryRequired = true
+	at := func(d time.Duration) *time.Time { e := now.Add(d); return &e }
+	for name, tc := range map[string]struct {
+		expiresAt *time.Time
+		settings  access.AuthSettings
+		want      string
+	}{
+		"none":                            {nil, settings, ""},
+		"an hour ahead":                   {at(time.Hour), settings, ""},
+		"exactly the maximum lifetime":    {at(settings.TokenMaxLifetime), settings, ""},
+		"a second beyond it":              {at(settings.TokenMaxLifetime + time.Second), settings, "beyond_max_lifetime"},
+		"now":                             {at(0), settings, "in_past"},
+		"an hour ago":                     {at(-time.Hour), settings, "in_past"},
+		"none when the setting wants one": {nil, required, "required"},
+		"one when the setting wants one":  {at(time.Hour), required, ""},
+	} {
+		code, pointer, violation := violationOf(access.CheckTokenExpiry(tc.expiresAt, now, tc.settings))
+		if tc.want == "" {
+			if code != "" {
+				t.Errorf("%s: refused %s %s", name, code, violation)
+			}
+			continue
+		}
+		if code != "invalid_token_request" || pointer != "/expires_at" || violation != tc.want {
+			t.Errorf("%s: refusal = %s %s %s, want invalid_token_request /expires_at %s", name, code, pointer, violation, tc.want)
+		}
+	}
+}
+
+func TestAMaximumLifetimeViolationNamesTheMaximum(t *testing.T) {
+	far := now.Add(access.DefaultAuthSettings.TokenMaxLifetime + time.Hour)
+	e, _ := apperrors.From(access.CheckTokenExpiry(&far, now, access.DefaultAuthSettings))
+	if e == nil || len(e.Violations) != 1 || e.Violations[0].Params["max_lifetime_seconds"] != int64(365*24*3600) {
+		t.Errorf("refusal = %+v, want the maximum lifetime in seconds", e)
+	}
+}
+
+func TestACredentialHandsOutNoScopeItDoesNotHold(t *testing.T) {
+	admin := access.Member{Status: access.MemberActive, InstanceAdmin: true}
+	member := access.Member{Status: access.MemberActive}
+	all := access.AllScopes()
+	readOnly := personalToken(t, nil)
+	for name, tc := range map[string]struct {
+		caller access.Caller
+		asked  []access.Scope
+		want   bool
+	}{
+		"a member's session, every scope but instance:admin": {access.SessionCaller(access.Session{}, member), all[:4], true},
+		"a member's session, instance:admin":                 {access.SessionCaller(access.Session{}, member), all, false},
+		"an instance admin's session, every scope":           {access.SessionCaller(access.Session{}, admin), all, true},
+		"a read-only token, read":                            {access.TokenCaller(readOnly, &admin), all[:1], true},
+		"a read-only token, a write scope":                   {access.TokenCaller(readOnly, &admin), all[:2], false},
+	} {
+		err := access.CheckScopesHeld(tc.caller, tc.asked)
+		if got := err == nil; got != tc.want {
+			t.Errorf("%s: allowed = %v (%v), want %v", name, got, err, tc.want)
+			continue
+		}
+		if code, pointer, _ := violationOf(err); !tc.want && (code != "scope_not_allowed" || !strings.HasPrefix(pointer, "/scopes/")) {
+			t.Errorf("%s: refusal = %s at %q, want scope_not_allowed at a scope", name, code, pointer)
+		}
+	}
+}
+
+func TestATokensUseIsRecordedAtMostOnceAMinute(t *testing.T) {
+	tok := personalToken(t, nil)
+	if !tok.UseToRecord(now) {
+		t.Error("a token never used has no use to record")
+	}
+	tok.LastUsedAt = &now
+	for d, want := range map[time.Duration]bool{0: false, 59 * time.Second: false, time.Minute: true, time.Hour: true} {
+		if got := tok.UseToRecord(now.Add(d)); got != want {
+			t.Errorf("%v after its last use: recorded = %v, want %v", d, got, want)
+		}
+	}
+}
+
+func TestAProjectTokenHoldsOneBuiltInRoleAndNeverInstanceAdmin(t *testing.T) {
+	ids := newIDs()
+	project := id.New[workspace.Project](ids)
+	creator := id.New[access.Member](ids)
+	in := access.NewProjectTokenInput{
+		Project: project, Role: access.RoleMaintainer, Name: " pipeline ", Scopes: []access.Scope{access.ScopeFlagsWrite},
+		CreatedBy: creator, Now: now,
+	}
+	tok, v, err := access.NewProjectToken(id.New[access.APIToken](ids), in, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tok.Kind != access.TokenProject || tok.Project != project || tok.Role != access.RoleMaintainer || tok.Name != "pipeline" ||
+		!tok.Member.IsZero() || tok.CreatedBy != creator || !strings.HasPrefix(v.Value.Reveal(), "fn_prj_") ||
+		len(tok.Scopes) != 2 || !tok.HasScope(access.ScopeRead) {
+		t.Errorf("token = %+v, want a project token of maintainer with read and flags:write", tok)
+	}
+	for name, change := range map[string]func(*access.NewProjectTokenInput){
+		"instance:admin": func(in *access.NewProjectTokenInput) { in.Scopes = []access.Scope{access.ScopeInstanceAdmin} },
+		"no role":        func(in *access.NewProjectTokenInput) { in.Role = "admin" },
+		"a blank name":   func(in *access.NewProjectTokenInput) { in.Name = "" },
+	} {
+		bad := in
+		change(&bad)
+		_, _, err := access.NewProjectToken(id.New[access.APIToken](ids), bad, rand.Reader)
 		if !apperrors.IsKind(err, apperrors.KindInvalid) {
 			t.Errorf("%s: err = %v, want invalid", name, err)
 		}

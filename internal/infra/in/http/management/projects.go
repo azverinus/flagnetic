@@ -22,7 +22,11 @@ func (a *api) ListProjects(ctx context.Context, _ ListProjectsRequestObject) (Li
 	if err != nil {
 		return nil, err
 	}
-	return ListProjects200JSONResponse{Items: each(projects, projectOut)}, nil
+	items, err := a.projectsOut(ctx, projects...)
+	if err != nil {
+		return nil, err
+	}
+	return ListProjects200JSONResponse{Items: items}, nil
 }
 
 // CreateProject creates a project with its defaults.
@@ -35,12 +39,18 @@ func (a *api) CreateProject(ctx context.Context, req CreateProjectRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	return CreateProject201JSONResponse(projectOut(p)), nil
+	// A project is created with no grant, so nobody but the instance
+	// admins works in it yet.
+	return CreateProject201JSONResponse(projectOut(p, 0)), nil
 }
 
 // GetProject answers the project the seam found.
 func (a *api) GetProject(ctx context.Context, _ GetProjectRequestObject) (GetProjectResponseObject, error) {
-	return GetProject200JSONResponse(projectOut(projectOf(ctx).project)), nil
+	out, err := a.projectsOut(ctx, projectOf(ctx).project)
+	if err != nil {
+		return nil, err
+	}
+	return GetProject200JSONResponse(out[0]), nil
 }
 
 // UpdateProject renames the project or changes its description.
@@ -53,14 +63,19 @@ func (a *api) UpdateProject(ctx context.Context, req UpdateProjectRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	return UpdateProject200JSONResponse(projectOut(p)), nil
+	out, err := a.projectsOut(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	return UpdateProject200JSONResponse(out[0]), nil
 }
 
 // GetProjectMe answers what the caller holds in the project: their grants
 // and their effective permissions there.
 func (a *api) GetProjectMe(ctx context.Context, _ GetProjectMeRequestObject) (GetProjectMeResponseObject, error) {
-	perms := each(projectOf(ctx).permissions, func(p access.Permission) Permission { return string(p) })
-	return GetProjectMe200JSONResponse{Grants: []Grant{}, Permissions: perms}, nil
+	in := projectOf(ctx)
+	perms := each(in.permissions, func(p access.Permission) Permission { return string(p) })
+	return GetProjectMe200JSONResponse{Grants: each(in.grants, grantOf), Permissions: perms}, nil
 }
 
 // ListRoles answers every role with its permissions.
@@ -73,6 +88,16 @@ func (a *api) ListRoles(context.Context, ListRolesRequestObject) (ListRolesRespo
 	return out, nil
 }
 
-func projectOut(p workspace.Project) Project {
-	return Project{Id: openapi_types.UUID(p.ID.Bytes()), Key: p.Key, Name: p.Name, Description: p.Description}
+// projectsOut answers projects with how many members work in each, counted
+// in one query whatever their number.
+func (a *api) projectsOut(ctx context.Context, projects ...workspace.Project) ([]Project, error) {
+	counts, err := a.h.CountProjectMembers.Handle(ctx, each(projects, func(p workspace.Project) workspace.ProjectID { return p.ID }))
+	if err != nil {
+		return nil, err
+	}
+	return each(projects, func(p workspace.Project) Project { return projectOut(p, counts[p.ID]) }), nil
+}
+
+func projectOut(p workspace.Project, members int) Project {
+	return Project{Id: openapi_types.UUID(p.ID.Bytes()), Key: p.Key, Name: p.Name, Description: p.Description, MemberCount: members}
 }

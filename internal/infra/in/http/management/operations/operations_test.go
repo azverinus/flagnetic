@@ -128,3 +128,17 @@ func TestTheOperationsOpeningASessionAndCheckingAPasswordAreRead(t *testing.T) {
 		}
 	}
 }
+
+// A leaked token must neither mint another credential nor change its own
+// member's account, so every write under /me and every operation creating a
+// token needs a session.
+func TestEveryWriteToMeAndEveryTokenCreationNeedsASession(t *testing.T) {
+	for pattern, e := range Table {
+		method, path, _ := strings.Cut(pattern, " ")
+		createsToken := method == "POST" && strings.HasSuffix(path, "/tokens")
+		writesMe := method != "GET" && (path == "/me" || strings.HasPrefix(path, "/me/"))
+		if (createsToken || writesMe) && !e.SessionRequired {
+			t.Errorf("%s (%s) does not require a session", pattern, e.Name)
+		}
+	}
+}

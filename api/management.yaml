@@ -302,6 +302,85 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /me/tokens:
+    get:
+      operationId: listMyTokens
+      summary: The caller's personal access tokens
+      description: |
+        Every personal access token of the caller, the newest first, revoked
+        and expired ones included, by their hint: a token's value is shown
+        only when it is created.
+      x-permission: member
+      tags: [me]
+      responses:
+        "200":
+          description: The tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiTokenList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createMyToken
+      summary: Create a personal access token
+      description: |
+        Creates a personal access token acting for the caller and answers its
+        value, shown this once and never again. It carries `read` alone
+        unless asked for more, and `read` beside every write scope; a scope
+        the caller does not hold, `instance:admin` for a member who is no
+        instance admin, is refused `scope_not_allowed`. Its expiry lies in
+        the future and at most the instance's maximum token lifetime ahead,
+        and is required when the instance requires one; without one the
+        token never expires. Only a session creates a token, so a leaked
+        token can never multiply itself or outlive its revocation.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiTokenCreate"
+      responses:
+        "201":
+          description: The token, with its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedApiToken"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /me/tokens/{token}:
+    parameters:
+      - $ref: "#/components/parameters/TokenID"
+    delete:
+      operationId: revokeMyToken
+      summary: Revoke a personal access token
+      description: |
+        Revokes one of the caller's tokens, which is refused `token_revoked`
+        from then on. A token of another member, one already revoked or an
+        identifier that names none is not found. Only a session may do this,
+        so a leaked token cannot hide its siblings.
+      x-permission: member
+      x-session-required: true
+      tags: [me]
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /roles:
     get:
       operationId: listRoles
@@ -779,6 +858,193 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /projects/{project}/members:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listProjectMembers
+      summary: The members holding grants in a project
+      description: Every member holding a grant in the project, ordered by email, with their grants side by side, oldest first.
+      x-permission: project.read
+      tags: [grants]
+      responses:
+        "200":
+          description: The members and their grants.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectMemberList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/grants:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listGrants
+      summary: The grants of a project
+      description: Every grant of the project, oldest first.
+      x-permission: project.read
+      tags: [grants]
+      responses:
+        "200":
+          description: The grants.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GrantList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createGrant
+      summary: Grant a member a role in a project
+      description: |
+        Grants the member one of the built-in roles in the project, beside
+        any grants they hold already; they act with the union of their
+        grants' permissions. An invited member may be granted roles before
+        they join. A role holding a permission the caller lacks in the
+        project is refused `role_not_allowed`, naming it in `permission`;
+        the same member and role twice `already_granted`; a deactivated
+        member `member_deactivated`; an unknown member or role
+        `invalid_grant`. Only a member grants: a project token never changes
+        who has access.
+      x-permission: grant.manage
+      tags: [grants]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantCreate"
+      responses:
+        "201":
+          description: The grant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Grant"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/grants/{grant}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/GrantID"
+    delete:
+      operationId: deleteGrant
+      summary: Remove one grant
+      description: |
+        Removes one grant, leaving the member's others. The grant of a role
+        holding a permission the caller lacks in the project is refused
+        `role_not_allowed`. Removing the last owner's grant is allowed: an
+        instance admin holds every permission in every project.
+      x-permission: grant.manage
+      tags: [grants]
+      responses:
+        "204":
+          description: Removed.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/tokens:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listProjectTokens
+      summary: The tokens of a project
+      description: Every token of the project, the newest first, revoked and expired ones included, by their hint.
+      x-permission: project_token.manage
+      tags: [project-tokens]
+      responses:
+        "200":
+          description: The tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectTokenList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createProjectToken
+      summary: Create a project token
+      description: |
+        Creates a token belonging to the project, for a pipeline, and
+        answers its value, shown this once and never again. It holds one
+        built-in role in the project, fixed for its life, narrowed by its
+        scopes; it never manages grants or project tokens, whatever its
+        role, so it never changes who has access. It reaches its project and
+        `GET /me` alone, acts for no member and survives its creator. A role
+        holding a permission the caller lacks in the project is refused
+        `role_not_allowed`; `instance:admin` or a scope the caller does not
+        hold `scope_not_allowed`. Its expiry follows the rules of a personal
+        access token's. Only a session creates one, so no token mints
+        another.
+      x-permission: project_token.manage
+      x-session-required: true
+      tags: [project-tokens]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectTokenCreate"
+      responses:
+        "201":
+          description: The token, with its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedProjectToken"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/tokens/{token}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/TokenID"
+    delete:
+      operationId: revokeProjectToken
+      summary: Revoke a project token
+      description: Revokes one of the project's tokens, which is refused `token_revoked` from then on. A token of another project, one already revoked or an identifier that names none is not found.
+      x-permission: project_token.manage
+      tags: [project-tokens]
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/audit:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -1093,6 +1359,47 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /members/{member}/tokens:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+    get:
+      operationId: listMemberTokens
+      summary: A member's personal access tokens
+      description: Every personal access token of the member, the newest first, revoked and expired ones included, for an instance admin answering an incident.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "200":
+          description: The tokens.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiTokenList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /members/{member}/tokens/{token}:
+    parameters:
+      - $ref: "#/components/parameters/MemberID"
+      - $ref: "#/components/parameters/TokenID"
+    delete:
+      operationId: revokeMemberToken
+      summary: Revoke a member's personal access token
+      description: Revokes one of the member's tokens. A token of another member, one already revoked or an identifier that names none is not found. An instance admin revokes their own tokens only from a session; their API token is refused `session_required`, as on `/me/tokens`.
+      x-permission: instance_admin
+      tags: [members]
+      responses:
+        "204":
+          description: Revoked.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /instance/auth-settings:
     get:
       operationId: getAuthSettings
@@ -1295,6 +1602,20 @@ components:
       description: The member's identifier.
       schema:
         type: string
+    GrantID:
+      name: grant
+      in: path
+      required: true
+      description: The grant's identifier.
+      schema:
+        type: string
+    TokenID:
+      name: token
+      in: path
+      required: true
+      description: The API token's identifier.
+      schema:
+        type: string
     ProjectKey:
       name: project
       in: path
@@ -1435,7 +1756,7 @@ components:
           description: Seconds to wait before retrying, for a rate limit.
         permission:
           type: string
-          description: The permission the caller lacks, for `forbidden`.
+          description: The permission the caller lacks, for `forbidden`, or the role's permission the caller lacks, for `role_not_allowed`.
         errors:
           type: array
           items:
@@ -1618,6 +1939,11 @@ components:
           description: The API token in use, for the token method.
         token_name:
           type: string
+        project:
+          type: string
+          description: The key of the project a project token belongs to; absent for any other credential.
+        role:
+          $ref: "#/components/schemas/RoleName"
     Key:
       type: string
       pattern: "^[a-z][a-z0-9_-]{0,63}$"
@@ -1631,7 +1957,7 @@ components:
       maxLength: 2000
     Project:
       type: object
-      required: [id, key, name, description]
+      required: [id, key, name, description, member_count]
       properties:
         id:
           type: string
@@ -1642,6 +1968,9 @@ components:
           $ref: "#/components/schemas/Name"
         description:
           $ref: "#/components/schemas/Description"
+        member_count:
+          type: integer
+          description: How many active members hold a grant in the project.
     ProjectList:
       type: object
       required: [items]
@@ -1767,10 +2096,174 @@ components:
         password_min_length:
           type: integer
           description: The fewest characters a password chosen from now on has, never below 12. 12 on a fresh instance.
+    Scope:
+      type: string
+      enum: [read, "flags:write", "experiments:write", "project:admin", "instance:admin"]
+      description: What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
+    ApiToken:
+      type: object
+      description: A personal access token, by its hint; its value is shown only when it is created.
+      required: [id, name, hint, scopes, expires_at, created_at, last_used_at, last_used_ip, revoked_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        hint:
+          type: string
+          description: The value's prefix and its first four characters, such as `fn_pat_Ab3d`.
+        scopes:
+          type: array
+          description: The scopes the token carries, `read` first.
+          items:
+            $ref: "#/components/schemas/Scope"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; null for a token that never expires.
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token was last presented, recorded at most once a minute; null until it is used.
+        last_used_ip:
+          type: string
+          nullable: true
+          description: The address the token was last presented from.
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+    ApiTokenList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiToken"
+    ApiTokenCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: 1 to 200 characters, not blank, to tell the token apart.
+        scopes:
+          type: array
+          description: The scopes the token carries; `read` alone when absent, and `read` is added to any write scope.
+          items:
+            $ref: "#/components/schemas/Scope"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; absent or null for a token that never expires, unless the instance requires an expiry.
+    CreatedApiToken:
+      type: object
+      description: A personal access token just created, with its value.
+      required: [token, value]
+      properties:
+        token:
+          $ref: "#/components/schemas/ApiToken"
+        value:
+          type: string
+          format: password
+          description: The token's value, `fn_pat_` and 40 characters, shown this once.
+    ProjectToken:
+      type: object
+      description: A token belonging to a project, by its hint; its value is shown only when it is created.
+      required: [id, name, hint, role, scopes, expires_at, created_at, created_by, last_used_at, last_used_ip, revoked_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        hint:
+          type: string
+          description: The value's prefix and its first four characters, such as `fn_prj_Ab3d`.
+        role:
+          $ref: "#/components/schemas/RoleName"
+        scopes:
+          type: array
+          description: The scopes the token carries, `read` first.
+          items:
+            $ref: "#/components/schemas/Scope"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; null for a token that never expires.
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member who created the token; it keeps working when they leave.
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token was last presented, recorded at most once a minute; null until it is used.
+        last_used_ip:
+          type: string
+          nullable: true
+          description: The address the token was last presented from.
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+    ProjectTokenList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectToken"
+    ProjectTokenCreate:
+      type: object
+      required: [name, role]
+      properties:
+        name:
+          type: string
+          description: 1 to 200 characters, not blank, to tell the token apart.
+        role:
+          type: string
+          description: One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`, which the token holds in the project.
+        scopes:
+          type: array
+          description: The scopes the token carries; `read` alone when absent, and `read` is added to any write scope. Never `instance:admin`.
+          items:
+            $ref: "#/components/schemas/Scope"
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the token stops working; absent or null for a token that never expires, unless the instance requires an expiry.
+    CreatedProjectToken:
+      type: object
+      description: A project token just created, with its value.
+      required: [token, value]
+      properties:
+        token:
+          $ref: "#/components/schemas/ProjectToken"
+        value:
+          type: string
+          format: password
+          description: The token's value, `fn_prj_` and 40 characters, shown this once.
     Grant:
       type: object
       description: One role held by one member in one project.
-      required: [id, member, role, source, created_at]
+      required: [id, member, role, source, created_by, created_at]
       properties:
         id:
           type: string
@@ -1791,6 +2284,52 @@ components:
         created_at:
           type: string
           format: date-time
+    GrantList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Grant"
+    GrantCreate:
+      type: object
+      required: [member, role]
+      properties:
+        member:
+          type: string
+          format: uuid
+          description: The member to grant the role to.
+        role:
+          type: string
+          description: One of the built-in roles `owner`, `maintainer`, `developer` and `viewer`.
+    ProjectMember:
+      type: object
+      description: A member holding grants in a project, with those grants.
+      required: [member, email, display_name, status, grants]
+      properties:
+        member:
+          type: string
+          format: uuid
+        email:
+          type: string
+        display_name:
+          type: string
+        status:
+          $ref: "#/components/schemas/MemberStatus"
+        grants:
+          type: array
+          description: The member's grants in the project, oldest first.
+          items:
+            $ref: "#/components/schemas/Grant"
+    ProjectMemberList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectMember"
     ProjectMe:
       type: object
       required: [grants, permissions]
