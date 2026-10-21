@@ -1,6 +1,7 @@
 package management_test
 
 import (
+	"crypto/rand"
 	"net/http"
 	"net/netip"
 	"regexp"
@@ -10,10 +11,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -439,5 +442,41 @@ func TestASessionHoldsEveryScope(t *testing.T) {
 	res, err := b.CreateProjectWithResponse(t.Context(), management.ProjectCreate{Key: projectKey(), Name: "By session"})
 	if err != nil || res.StatusCode() != http.StatusCreated {
 		t.Errorf("a write signed in by a session = %d %s, want 201: a session is as wide as its member", res.StatusCode(), res.Body)
+	}
+}
+
+func TestSigningOutWithATokenEndsNoSession(t *testing.T) {
+	srv := testkit.StartServer(t)
+	m := testkit.NewMember(t, testkit.Pool(t))
+	b := testkit.NewBrowser(t, srv.URL)
+	b.SignIn(t, m.Email, m.Password)
+	res, err := testkit.Client(t, srv, testkit.PersonalToken(t, testkit.Pool(t), m.ID, "script")).SignOutWithResponse(t.Context())
+	if err != nil || res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("sign-out with a token = %d %s, want 204", res.StatusCode(), res.Body)
+	}
+	if me, _ := b.GetMeWithResponse(t.Context()); me.StatusCode() != http.StatusOK {
+		t.Errorf("GET /me with the session after a token signed out = %d, want 200: a token has no session to end", me.StatusCode())
+	}
+	if n := len(auditOf(t, srv, "auth.signed_out", m.ID.String())); n != 0 {
+		t.Errorf("%d signed_out entries, want none", n)
+	}
+}
+
+func TestACookieOfASessionTheServerNoLongerHoldsHasExpired(t *testing.T) {
+	srv := testkit.StartServer(t)
+	m := testkit.NewMember(t, testkit.Pool(t))
+	// Signed under the instance's key, so its tag holds, for a session
+	// never stored, as one purged after it ended.
+	_, value := access.NewSession(id.New[access.Session](testkit.IDs(testkit.Clock())), access.NewSessionInput{
+		Member: m.ID, Method: access.SignInLocal, Timeouts: access.DefaultSessionTimeouts, Now: testkit.Start,
+	}, rand.Reader, secret.NewKeyring(secret.New(testkit.SecretKey)).Key(secret.UseSessionCookie))
+	b := testkit.NewBrowser(t, srv.URL)
+	b.SetCookie(management.SessionCookie, value.Reveal())
+	res, err := b.GetMeWithResponse(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := res.ApplicationproblemJSON401; p == nil || p.Code != "session_expired" || res.HTTPResponse.Header.Get("Set-Cookie") != clearedCookie {
+		t.Errorf("GET /me = %d %s, want 401 session_expired clearing the cookie", res.StatusCode(), res.Body)
 	}
 }
