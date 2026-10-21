@@ -389,7 +389,7 @@ func TestCrossOriginProtectionGuardsCookieRequests(t *testing.T) {
 	}
 	for name, h := range map[string]map[string]string{
 		"same-origin":                  {"Sec-Fetch-Site": "same-origin"},
-		"typed in the address bar":            {"Sec-Fetch-Site": "none"},
+		"typed in the address bar":     {"Sec-Fetch-Site": "none"},
 		"no fetch metadata":            {},
 		"the base URL's origin":        {"Origin": "https://flags.example.com"},
 		"the request's own host":       {"Origin": srv.URL},
