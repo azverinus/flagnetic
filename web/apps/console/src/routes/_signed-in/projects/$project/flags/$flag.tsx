@@ -12,7 +12,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArchiveIcon, FlaskConicalIcon, GitCompareArrowsIcon, OctagonXIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/can";
@@ -138,6 +138,12 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
   const nameOf = useNameOf(project);
   const [editing, setEditing] = useState(false);
   const [comparing, setComparing] = useState(false);
+  const testerButton = useRef<HTMLButtonElement>(null);
+  // Closing the tester returns the keyboard to the button that opens it.
+  const closeTester = () => {
+    setTester(false);
+    testerButton.current?.focus();
+  };
 
   const first = flag.environments[0]?.environment;
   const environment =
@@ -191,7 +197,7 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
             environment={known}
             unitTypes={unitTypes.data ?? []}
             nameOf={nameOf}
-            tester={testerOpen ? { onClose: () => setTester(false) } : undefined}
+            tester={testerOpen ? { onClose: closeTester } : undefined}
           />
         ),
       };
@@ -241,6 +247,7 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
           <>
             <Button
               variant="outline"
+              ref={testerButton}
               aria-keyshortcuts="t"
               aria-pressed={testerOpen}
               onClick={() => setTester(!testerOpen)}

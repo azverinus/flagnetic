@@ -40,6 +40,7 @@ import {
   type MatchedRule,
   matchedRuleOf,
   recentContexts,
+  rowKey,
   rememberContext,
 } from "@/lib/tester";
 
@@ -65,12 +66,25 @@ export type TesterPanelProps = {
 
 type Outcome = { result: EvaluationResult; withDraft: boolean; rule: MatchedRule | undefined };
 
+/**
+ * One evaluation as it was asked: the context, the draft sent if any,
+ * the cards of the configuration evaluated, and the cards the editor
+ * showed, all taken when the member asked, since either may change
+ * while the answer is on its way.
+ */
+type Evaluating = {
+  context: EvaluationContext;
+  sent: { configuration: FlagConfigurationPut } | undefined;
+  evaluated: readonly RuleDraft[];
+  shown: readonly RuleDraft[];
+};
+
 /** Rows to start from: the context evaluated last in the project, else one unit to fill in. */
 function startingDraft(project: string, unitTypes: readonly UnitType[], types: AttributeTypes) {
   const recent = recentContexts(project)[0];
   return recent
     ? contextDraftOf(recent, types)
-    : { units: [{ unitType: unitTypes[0]?.key ?? "", unitId: "" }], attributes: [] };
+    : { units: [{ unitType: unitTypes[0]?.key ?? "", unitId: "", key: rowKey() }], attributes: [] };
 }
 
 /**
@@ -112,25 +126,27 @@ export function TesterPanel({
   useEffect(() => heading.current?.focus(), []);
 
   const run = useMutation({
-    mutationFn: ({ context, withDraft }: { context: EvaluationContext; withDraft: boolean }) =>
+    mutationFn: ({ context, sent }: Evaluating) =>
       unwrap(
         evaluate({
           path: { project, environment: environment.key },
           body: {
             context,
             flags: [flagKey],
-            ...(withDraft && draft
-              ? { draft: { flag: flagKey, configuration: draft.configuration } }
-              : {}),
+            ...(sent ? { draft: { flag: flagKey, configuration: sent.configuration } } : {}),
           },
         }),
       ),
     meta: { toast: false },
-    onSuccess: (evaluation, { context, withDraft }) => {
+    onSuccess: (evaluation, { context, sent, evaluated, shown }) => {
       const result = evaluation.flags[flagKey];
       if (!result) return;
-      const rule = matchedRuleOf(result.rule_id, withDraft && draft ? draft.rules : savedRules);
-      setOutcome({ result, withDraft, rule });
+      // The rule is found among the cards evaluated, and numbered as the
+      // editor showed it when asked, which a draft may have reordered.
+      const matched = matchedRuleOf(result.rule_id, evaluated);
+      const at = matched ? shown.findIndex((card) => card.key === matched.key) : -1;
+      const rule = matched && at >= 0 ? { ...matched, position: at + 1 } : matched;
+      setOutcome({ result, withDraft: sent !== undefined, rule });
       onMatch(rule?.key);
       rememberContext(project, context);
       setRecent(recentContexts(project));
@@ -173,7 +189,12 @@ export function TesterPanel({
       setRefusal({ draft: true, messages: [...draftIssues] });
       return;
     }
-    run.mutate({ context: built.context, withDraft });
+    run.mutate({
+      context: built.context,
+      sent: withDraft ? draft : undefined,
+      evaluated: withDraft && draft ? draft.rules : savedRules,
+      shown: draft?.rules ?? savedRules,
+    });
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -232,7 +253,7 @@ export function TesterPanel({
             const n = index + 1;
             const issue = issues.get(`unit-${index}`);
             return (
-              <div key={index} className="flex flex-col gap-1">
+              <div key={row.key ?? index} className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <Select
                     aria-label={t`Unit type (unit ${n})`}
@@ -281,7 +302,10 @@ export function TesterPanel({
             onClick={() =>
               setRows((current) => ({
                 ...current,
-                units: [...current.units, { unitType: unitTypes[0]?.key ?? "", unitId: "" }],
+                units: [
+                  ...current.units,
+                  { unitType: unitTypes[0]?.key ?? "", unitId: "", key: rowKey() },
+                ],
               }))
             }
           >
@@ -298,7 +322,7 @@ export function TesterPanel({
             const issue = issues.get(`attribute-${index}`);
             const type = types.get(row.attribute) ?? "string";
             return (
-              <div key={index} className="flex flex-col gap-1">
+              <div key={row.key ?? index} className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <Select
                     aria-label={t`Attribute ${n}`}
@@ -363,7 +387,10 @@ export function TesterPanel({
             onClick={() =>
               setRows((current) => ({
                 ...current,
-                attributes: [...current.attributes, { attribute: "", text: "", list: [] }],
+                attributes: [
+                  ...current.attributes,
+                  { attribute: "", text: "", list: [], key: rowKey() },
+                ],
               }))
             }
           >
@@ -453,7 +480,7 @@ function useReason(reason: string): { label: string; meaning: string } {
     case "off":
       return { label: t`Off`, meaning: t`The flag is off here: the off variation is served.` };
     case "override":
-      return { label: t`Override`, meaning: t`The unit is pinned to a variation.` };
+      return { label: t`Override`, meaning: t`An override serves the unit its variation.` };
     case "rule":
       return {
         label: t`Matched rule`,

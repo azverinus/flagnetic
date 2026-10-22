@@ -11,17 +11,28 @@ import { readStored, writeStored } from "./storage";
 import { fingerprint } from "./structural-diff";
 
 /** A unit of the tester's context as typed: its type and ID. */
-export type UnitRow = { unitType: string; unitId: string };
+export type UnitRow = { unitType: string; unitId: string; key?: string };
 
 /**
  * An attribute of the tester's context as typed: a single value as text,
  * a list attribute's values one by one, read by the attribute's type only
  * when the context is built.
  */
-export type AttributeRow = { attribute: string; text: string; list: string[] };
+export type AttributeRow = { attribute: string; text: string; list: string[]; key?: string };
 
 /** The context the tester evaluates, as its rows hold it. */
 export type ContextDraft = { units: UnitRow[]; attributes: AttributeRow[] };
+
+let rowsMade = 0;
+
+/**
+ * A row's own identity on the screen, so removing one row leaves what is
+ * half typed in the others where it is.
+ */
+export function rowKey(): string {
+  rowsMade += 1;
+  return `row-${rowsMade}`;
+}
 
 /** One value of an attribute's type, or nothing when the text is not one. */
 function typedValue(type: string, row: AttributeRow): { value: unknown } | undefined {
@@ -94,11 +105,20 @@ export function buildContext(
 /** A context as the tester's rows hold it again, to edit it once more. */
 export function contextDraftOf(context: EvaluationContext, types: AttributeTypes): ContextDraft {
   return {
-    units: Object.entries(context.units ?? {}).map(([unitType, unitId]) => ({ unitType, unitId })),
+    units: Object.entries(context.units ?? {}).map(([unitType, unitId]) => ({
+      unitType,
+      unitId,
+      key: rowKey(),
+    })),
     attributes: Object.entries(context.attributes ?? {}).map(([attribute, value]) =>
       types.get(attribute) === "list" && Array.isArray(value)
-        ? { attribute, text: "", list: value.map(String) }
-        : { attribute, text: typeof value === "string" ? value : JSON.stringify(value), list: [] },
+        ? { attribute, text: "", list: value.map(String), key: rowKey() }
+        : {
+            attribute,
+            text: typeof value === "string" ? value : JSON.stringify(value),
+            list: [],
+            key: rowKey(),
+          },
     ),
   };
 }

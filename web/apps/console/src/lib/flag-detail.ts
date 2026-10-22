@@ -11,6 +11,7 @@ import { msg } from "@lingui/core/macro";
 import { formatNumber } from "@/i18n/format";
 
 import { flagViolationMessage } from "./flags";
+import { fingerprint } from "./structural-diff";
 
 /**
  * The flag detail's search parameters: the environment whose tab is open,
@@ -50,7 +51,7 @@ export function onlyTesterToggled(
 ): boolean {
   const { tester: _was, ...before } = from.search as Record<string, unknown>;
   const { tester: _is, ...after } = to.search as Record<string, unknown>;
-  return from.pathname === to.pathname && JSON.stringify(before) === JSON.stringify(after);
+  return from.pathname === to.pathname && fingerprint(before) === fingerprint(after);
 }
 
 /** The flag with one environment's configuration replaced by a newer one the server answered. */

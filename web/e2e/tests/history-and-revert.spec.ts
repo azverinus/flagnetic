@@ -103,6 +103,27 @@ test.describe("a flag's history", () => {
     await expect(history(page).getByRole("row").nth(1)).toContainText("Configuration reverted");
   });
 
+  test("reverts a configuration to the version it started at", async ({ page }) => {
+    const project = await seedProject("revert-first");
+    await seed(project);
+    await openFlag(page, project, flagKey);
+    await openHistory(page);
+
+    await history(page).getByRole("row").nth(2).getByRole("link").click();
+    await drawer(page).getByRole("button", { name: "Revert to the version before" }).click();
+    await page
+      .getByRole("dialog", { name: "Revert to version 1" })
+      .getByRole("button", { name: "Revert", exact: true })
+      .click();
+
+    await expect(
+      page.getByText("The configuration in Staging is back to version 1."),
+    ).toBeVisible();
+    const reverted = await readConfiguration(project, flagKey, "staging");
+    expect(reverted.on).toBe(false);
+    expect(reverted.rules).toEqual([]);
+  });
+
   test("refuses a revert based on a version someone changed meanwhile, and reverts on it", async ({
     page,
   }) => {

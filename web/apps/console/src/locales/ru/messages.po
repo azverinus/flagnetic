@@ -453,6 +453,10 @@ msgid "An override of a required flag decided this result."
 msgstr "Результат решило переопределение требуемого флага."
 
 #: src/components/tester-panel.tsx
+msgid "An override serves the unit its variation."
+msgstr "Переопределение отдаёт единице её вариант."
+
+#: src/components/tester-panel.tsx
 msgid "An override serves this unit ID; rules are not consulted."
 msgstr "Для этого ID единицы действует переопределение; правила не проверяются."
 
@@ -2693,6 +2697,10 @@ msgid "revert flag configurations to earlier versions"
 msgstr "возвращать конфигурации флагов к прежним версиям"
 
 #: src/components/flag-history.tsx
+msgid "Revert to the version before"
+msgstr "Вернуть предыдущую версию"
+
+#: src/components/flag-history.tsx
 msgid "Revert to this version"
 msgstr "Вернуть эту версию"
 
@@ -3505,10 +3513,6 @@ msgstr "Токен отозван."
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The type of every value the flag serves. It never changes."
 msgstr "Тип всех значений, которые отдаёт флаг. Не меняется."
-
-#: src/components/tester-panel.tsx
-msgid "The unit is pinned to a variation."
-msgstr "Единица закреплена за вариантом."
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The unit type {key} is no longer declared, and its key can be declared again."

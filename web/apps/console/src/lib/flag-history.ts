@@ -74,3 +74,15 @@ export function revertVersion(entry: AuditEntry, current: number): number | unde
   const version = configurationSides(entry)?.after?.version;
   return version !== undefined && version !== current ? version : undefined;
 }
+
+/**
+ * The version of its environment's configuration from before a history
+ * entry's change, unless the configuration is at it now. The version a
+ * configuration started at is made by creating its flag or environment,
+ * whose entries record no configuration of their own, so the entry after
+ * it is the only one offering a way back to it.
+ */
+export function versionBefore(entry: AuditEntry, current: number): number | undefined {
+  const version = configurationSides(entry)?.before?.version;
+  return version !== undefined && version !== current ? version : undefined;
+}

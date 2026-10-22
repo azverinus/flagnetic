@@ -185,7 +185,12 @@ function FlagFilters({
       return { value: `${a.key},${b.key}`, label: t`${first} and ${second}` };
     }),
   );
-  const compared = comparedEnvironments(search)?.join(",");
+  // The pair the address names, in whichever order, as the select offers it.
+  const named = comparedEnvironments(search);
+  const compared = named
+    ? (pairs.find((pair) => named.every((key) => pair.value.split(",").includes(key)))?.value ??
+      named.join(","))
+    : undefined;
 
   return (
     <div role="search" aria-label={t`Filter the flags`} className="flex flex-wrap items-end gap-4">

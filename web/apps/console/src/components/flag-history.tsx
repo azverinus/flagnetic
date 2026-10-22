@@ -22,7 +22,12 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ApiError, unwrap } from "@/lib/errors";
-import { configurationSides, definitionSides, revertVersion } from "@/lib/flag-history";
+import {
+  configurationSides,
+  definitionSides,
+  revertVersion,
+  versionBefore,
+} from "@/lib/flag-history";
 import { ifMatch } from "@/lib/http";
 import {
   auditQueryKey,
@@ -154,7 +159,7 @@ function HistoryEntrySheet({
       error={entry.error}
       onRetry={() => void entry.refetch()}
       place={environment ? { label: t`Environment`, value: environment.name } : undefined}
-      changes={entry.data ? <EntryChanges entry={entry.data} nameOf={nameOf} /> : undefined}
+      changes={entry.data ? <HistoryEntryChanges entry={entry.data} nameOf={nameOf} /> : undefined}
       actions={
         entry.data && environment && current ? (
           <RevertAction
@@ -171,7 +176,7 @@ function HistoryEntrySheet({
 }
 
 /** What a history entry changed, item by item, when it changed a configuration or the definition. */
-function EntryChanges({
+function HistoryEntryChanges({
   entry,
   nameOf,
 }: {
@@ -197,9 +202,9 @@ function EntryChanges({
 }
 
 /**
- * Writing again, whole, the configuration a history entry made, rule
- * identifiers and salts included, so a rollout's units stay where they
- * were. It is based on the version the page shows; a configuration
+ * Writing again, whole, the configuration a history entry made, or the
+ * one from before its change, rule identifiers and salts included, so a
+ * rollout's units stay where they were. It is based on the version the page shows; a configuration
  * changed since is refused and read again, so confirming again is based
  * on the newer one.
  */
@@ -219,8 +224,10 @@ function RevertAction({
   const { t } = useLingui();
   const queryClient = useQueryClient();
   const answered = useConfigurationAnswer(project, flag.key);
-  const [asking, setAsking] = useState(false);
-  const version = revertVersion(entry, current.version);
+  // The version the member asked to revert to, while confirming.
+  const [asking, setAsking] = useState<number>();
+  const made = revertVersion(entry, current.version);
+  const earlier = versionBefore(entry, current.version);
   const now = current.version;
   const name = environment.name;
 
@@ -237,7 +244,7 @@ function RevertAction({
     onSuccess: (configuration, to) => {
       answered(configuration);
       void queryClient.invalidateQueries({ queryKey: auditQueryKey });
-      setAsking(false);
+      setAsking(undefined);
       toast.success(t`The configuration in ${name} is back to version ${to}.`);
     },
     onError: (error) => {
@@ -247,13 +254,13 @@ function RevertAction({
     },
   });
 
-  if (version === undefined) {
-    return configurationSides(entry)?.after?.version === current.version ? (
+  const atThisVersion =
+    configurationSides(entry)?.after?.version === current.version ? (
       <p className="text-sm text-muted-foreground">
         <Trans>The configuration in {name} is at this version now.</Trans>
       </p>
     ) : null;
-  }
+  if (made === undefined && earlier === undefined) return atThisVersion;
   if (flag.archived_at !== null) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -261,28 +268,38 @@ function RevertAction({
       </p>
     );
   }
+  const ask = (version: number) => {
+    revert.reset();
+    setAsking(version);
+  };
+  const version = asking;
   return (
     <>
-      <Can permission="flag_configuration.revert" whenMissing="disable">
-        <Button
-          variant="outline"
-          onClick={() => {
-            revert.reset();
-            setAsking(true);
-          }}
-        >
-          <Undo2Icon aria-hidden />
-          <Trans>Revert to this version</Trans>
-        </Button>
-      </Can>
+      {atThisVersion}
+      {made !== undefined ? (
+        <Can permission="flag_configuration.revert" whenMissing="disable">
+          <Button variant="outline" onClick={() => ask(made)}>
+            <Undo2Icon aria-hidden />
+            <Trans>Revert to this version</Trans>
+          </Button>
+        </Can>
+      ) : null}
+      {earlier !== undefined ? (
+        <Can permission="flag_configuration.revert" whenMissing="disable">
+          <Button variant="outline" onClick={() => ask(earlier)}>
+            <Undo2Icon aria-hidden />
+            <Trans>Revert to the version before</Trans>
+          </Button>
+        </Can>
+      ) : null}
       <ConfirmDialog
-        open={asking}
-        onOpenChange={setAsking}
+        open={version !== undefined}
+        onOpenChange={(open) => !open && setAsking(undefined)}
         title={t`Revert to version ${version}`}
         confirmLabel={<Trans>Revert</Trans>}
         pending={revert.isPending}
         refusal={revert.error}
-        onConfirm={() => revert.mutate(version)}
+        onConfirm={() => version !== undefined && revert.mutate(version)}
       >
         <p>
           <Trans>

@@ -453,6 +453,10 @@ msgid "An override of a required flag decided this result."
 msgstr "An override of a required flag decided this result."
 
 #: src/components/tester-panel.tsx
+msgid "An override serves the unit its variation."
+msgstr "An override serves the unit its variation."
+
+#: src/components/tester-panel.tsx
 msgid "An override serves this unit ID; rules are not consulted."
 msgstr "An override serves this unit ID; rules are not consulted."
 
@@ -2693,6 +2697,10 @@ msgid "revert flag configurations to earlier versions"
 msgstr "revert flag configurations to earlier versions"
 
 #: src/components/flag-history.tsx
+msgid "Revert to the version before"
+msgstr "Revert to the version before"
+
+#: src/components/flag-history.tsx
 msgid "Revert to this version"
 msgstr "Revert to this version"
 
@@ -3505,10 +3513,6 @@ msgstr "The token is revoked."
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The type of every value the flag serves. It never changes."
 msgstr "The type of every value the flag serves. It never changes."
-
-#: src/components/tester-panel.tsx
-msgid "The unit is pinned to a variation."
-msgstr "The unit is pinned to a variation."
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The unit type {key} is no longer declared, and its key can be declared again."

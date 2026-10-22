@@ -1,7 +1,7 @@
 import type { AuditEntry } from "@flagnetic/api";
 import { describe, expect, it } from "vitest";
 
-import { configurationSides, definitionSides, revertVersion } from "./flag-history";
+import { configurationSides, definitionSides, revertVersion, versionBefore } from "./flag-history";
 
 function entry(over: Partial<AuditEntry>): AuditEntry {
   return {
@@ -91,6 +91,12 @@ describe("the version a history entry reverts to", () => {
 
   it("is none while the configuration is still at that version", () => {
     expect(revertVersion(written, 4)).toBeUndefined();
+  });
+
+  it("or the version before the change, the first version included", () => {
+    const first = entry({ before: document(1), after: document(2) });
+    expect(versionBefore(first, 5)).toBe(1);
+    expect(versionBefore(first, 1)).toBeUndefined();
   });
 
   it("is none for an entry of the definition", () => {
