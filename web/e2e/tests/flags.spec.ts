@@ -20,7 +20,7 @@ async function openFlags(page: Page, projectKey: string, who: Credentials = admi
 
 async function openNewFlag(page: Page, projectKey: string) {
   await signIn(page);
-  await page.goto(`/projects/${projectKey}/flags/new`);
+  await page.goto(`/projects/${projectKey}/flags/-/new`);
   await expect(page.getByRole("heading", { name: "New flag", level: 1 })).toBeVisible();
 }
 
@@ -188,6 +188,22 @@ test.describe("creating a flag", () => {
     expect(flag.tags).toEqual(["web", "ranking"]);
     expect(flag.lifetime).toBe("permanent");
     expect(flag.expected_removal_at).toBeNull();
+  });
+
+  test("opens a flag keyed new at flags/new, the new flag page being at flags/-/new", async ({
+    page,
+  }) => {
+    const projectKey = await seedProject("flags-key-new");
+    await seedFlags(projectKey, [{ key: "new", type: "boolean", name: "New checkout" }]);
+    await signIn(page);
+
+    await page.goto(`/projects/${projectKey}/flags/new`);
+    await expectFlagPage(page, projectKey, "new", "New checkout");
+
+    await page.goto(`/projects/${projectKey}/flags`);
+    await page.getByRole("link", { name: "New flag" }).first().click();
+    await expect(page.getByRole("heading", { name: "New flag", level: 1 })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/projects/${projectKey}/flags/-/new$`));
   });
 
   test("shows a key the project already has on the key field", async ({ page }) => {

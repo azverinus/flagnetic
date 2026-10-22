@@ -258,7 +258,7 @@ msgstr ""
 msgid "A tag has at most 64 characters."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "A temporary flag is meant to be removed once its change is released; a permanent one stays."
 msgstr ""
 
@@ -805,7 +805,7 @@ msgstr ""
 msgid "Create environment"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Create flag"
 msgstr ""
 
@@ -906,8 +906,8 @@ msgstr ""
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Description"
@@ -1189,7 +1189,7 @@ msgid "Expand the sidebar"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Expected removal"
 msgstr ""
 
@@ -1331,7 +1331,7 @@ msgstr ""
 msgid "History"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
 msgstr ""
 
@@ -1502,7 +1502,7 @@ msgstr ""
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Key"
@@ -1559,7 +1559,7 @@ msgid "Leave without saving?"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Left empty, 90 days from today."
 msgstr ""
 
@@ -1576,8 +1576,8 @@ msgid "Letters, digits, ., - and _, at most 64."
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Lifetime"
 msgstr ""
 
@@ -1665,7 +1665,7 @@ msgstr ""
 msgid "Maximum token lifetime"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Me ({myName})"
 msgstr ""
 
@@ -1740,7 +1740,7 @@ msgstr ""
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Name"
@@ -1785,8 +1785,8 @@ msgstr ""
 msgid "New environment"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "New flag"
 msgstr ""
 
@@ -2020,9 +2020,9 @@ msgstr ""
 #. The name of a built-in role.
 #: src/components/flag-definition-sheet.tsx
 #: src/lib/access-names.ts
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Owner"
 msgstr ""
 
@@ -2065,8 +2065,8 @@ msgid "permanent"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Permanent"
 msgstr ""
 
@@ -2096,7 +2096,7 @@ msgid "Prerequisites"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Press Enter after each tag."
 msgstr ""
 
@@ -2643,9 +2643,9 @@ msgid "Tag removed: <0>{tag}</0>."
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Tags"
 msgstr ""
 
@@ -2654,8 +2654,8 @@ msgid "temporary"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Temporary"
 msgstr ""
 
@@ -2731,7 +2731,7 @@ msgstr ""
 msgid "The flag {key} is archived."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The flag {key} is created."
 msgstr ""
 
@@ -2759,7 +2759,7 @@ msgstr ""
 msgid "The flag is archived. Restore it to change its configurations."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The flag is created off in every environment, serving its off variation until it is switched on."
 msgstr ""
 
@@ -2784,7 +2784,7 @@ msgid "The kinds of unit a flag is served to, such as a user or a device. A key 
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The member accountable for the flag."
 msgstr ""
 
@@ -2945,7 +2945,7 @@ msgstr ""
 msgid "The token is revoked."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The type of every value the flag serves. It never changes."
 msgstr ""
 
@@ -3068,7 +3068,7 @@ msgstr ""
 msgid "This password is too common. Choose another."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "This project already has a flag with that key."
 msgstr ""
 
@@ -3157,8 +3157,8 @@ msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Type"
 msgstr ""
 

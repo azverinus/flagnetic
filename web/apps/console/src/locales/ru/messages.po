@@ -258,7 +258,7 @@ msgstr "Через столько времени после последнего
 msgid "A tag has at most 64 characters."
 msgstr "Тег — не более 64 символов."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "A temporary flag is meant to be removed once its change is released; a permanent one stays."
 msgstr "Временный флаг удаляют, когда изменение выпущено; постоянный остаётся."
 
@@ -805,7 +805,7 @@ msgstr "Создать атрибут"
 msgid "Create environment"
 msgstr "Создать окружение"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Create flag"
 msgstr "Создать флаг"
 
@@ -906,8 +906,8 @@ msgstr "Удалить тип единицы"
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Description"
@@ -1189,7 +1189,7 @@ msgid "Expand the sidebar"
 msgstr "Развернуть боковую панель"
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Expected removal"
 msgstr "Ожидаемое удаление"
 
@@ -1331,7 +1331,7 @@ msgstr "Роли"
 msgid "History"
 msgstr "История"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
 msgstr "Имя флага в коде, например checkout.newFlow: буквы, цифры, ., - и _. Не меняется."
 
@@ -1502,7 +1502,7 @@ msgstr "Хранится в этом браузере и применяется 
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Key"
@@ -1559,7 +1559,7 @@ msgid "Leave without saving?"
 msgstr "Уйти без сохранения?"
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Left empty, 90 days from today."
 msgstr "Если оставить пустым — через 90 дней."
 
@@ -1576,8 +1576,8 @@ msgid "Letters, digits, ., - and _, at most 64."
 msgstr "Буквы, цифры, ., - и _, не более 64."
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Lifetime"
 msgstr "Срок жизни"
 
@@ -1665,7 +1665,7 @@ msgstr "соответствует шаблону"
 msgid "Maximum token lifetime"
 msgstr "Наибольший срок действия токена"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Me ({myName})"
 msgstr "Я ({myName})"
 
@@ -1740,7 +1740,7 @@ msgstr "Переместить правило {position} выше"
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Name"
@@ -1785,8 +1785,8 @@ msgstr "Новый атрибут"
 msgid "New environment"
 msgstr "Новое окружение"
 
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "New flag"
 msgstr "Новый флаг"
 
@@ -2020,9 +2020,9 @@ msgstr "Обзор"
 #. The name of a built-in role.
 #: src/components/flag-definition-sheet.tsx
 #: src/lib/access-names.ts
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Owner"
 msgstr "Владелец"
 
@@ -2065,8 +2065,8 @@ msgid "permanent"
 msgstr "постоянный"
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Permanent"
 msgstr "Постоянный"
 
@@ -2096,7 +2096,7 @@ msgid "Prerequisites"
 msgstr "Предусловия"
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Press Enter after each tag."
 msgstr "Нажимайте Enter после каждого тега."
 
@@ -2643,9 +2643,9 @@ msgid "Tag removed: <0>{tag}</0>."
 msgstr "Удалён тег <0>{tag}</0>."
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Tags"
 msgstr "Теги"
 
@@ -2654,8 +2654,8 @@ msgid "temporary"
 msgstr "временный"
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Temporary"
 msgstr "Временный"
 
@@ -2731,7 +2731,7 @@ msgstr "флаг {key}"
 msgid "The flag {key} is archived."
 msgstr "Флаг {key} отправлен в архив."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The flag {key} is created."
 msgstr "Флаг {key} создан."
 
@@ -2759,7 +2759,7 @@ msgstr "У флага нет такого варианта."
 msgid "The flag is archived. Restore it to change its configurations."
 msgstr "Флаг в архиве. Восстановите его, чтобы менять конфигурации."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The flag is created off in every environment, serving its off variation until it is switched on."
 msgstr "Флаг создаётся выключенным во всех окружениях и отдаёт вариант для выключенного состояния, пока его не включат."
 
@@ -2784,7 +2784,7 @@ msgid "The kinds of unit a flag is served to, such as a user or a device. A key 
 msgstr "Виды единиц, которым отдаётся флаг, например пользователь или устройство. Ключ не должен совпадать с ключами атрибутов и никогда не меняется."
 
 #: src/components/flag-definition-sheet.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The member accountable for the flag."
 msgstr "Участник, отвечающий за флаг."
 
@@ -2945,7 +2945,7 @@ msgstr "У используемого токена нет нужной для э
 msgid "The token is revoked."
 msgstr "Токен отозван."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The type of every value the flag serves. It never changes."
 msgstr "Тип всех значений, которые отдаёт флаг. Не меняется."
 
@@ -3068,7 +3068,7 @@ msgstr "Этот оператор не подходит к типу атрибу
 msgid "This password is too common. Choose another."
 msgstr "Этот пароль слишком распространён. Выберите другой."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "This project already has a flag with that key."
 msgstr "В этом проекте уже есть флаг с таким ключом."
 
@@ -3157,8 +3157,8 @@ msgstr "Попробовать ещё раз"
 
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Type"
 msgstr "Тип"
 

@@ -37,7 +37,13 @@ import {
   variationIssues,
 } from "@/lib/variations";
 
-export const Route = createFileRoute("/_signed-in/projects/$project/flags/new")({
+/**
+ * The page that creates a flag lives under `flags/-/` rather than at
+ * `flags/new`, because `new` is a key a flag may have and that flag's page is
+ * `flags/new`. A flag key starts with a letter, so no flag's address passes
+ * through `flags/-`.
+ */
+export const Route = createFileRoute("/_signed-in/projects/$project/flags/-/new")({
   staticData: { crumb: msg`New flag` },
   component: NewFlag,
 });

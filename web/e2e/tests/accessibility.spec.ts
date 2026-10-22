@@ -79,7 +79,7 @@ const signedIn: Route[] = [
   { name: "overview", route: "/projects/$project", path: (s) => `/projects/${s.project}` },
   ...[
     "flags",
-    "flags/new",
+    "flags/-/new",
     "environments",
     "unit-types",
     "attributes",
