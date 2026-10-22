@@ -35,7 +35,9 @@ type ObservedAttribute struct {
 // key (an attribute is never declared under one), not null (which carries
 // no type), and a key the workspace accepts.
 func ObserveUndeclared(rs *eval.Ruleset, attributes map[string]any) []ObservedAttribute {
-	declared := make(map[string]bool, len(rs.Attributes)+len(rs.UnitTypes))
+	// No size hint: a sum of two lengths taken from a ruleset can overflow
+	// an int, and the map grows as needed anyway.
+	declared := map[string]bool{}
 	for _, a := range rs.Attributes {
 		declared[a.Key] = true
 	}
