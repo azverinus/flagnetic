@@ -15,6 +15,8 @@ func TestDecodeRefusesWhatItCannotRead(t *testing.T) {
 		"missing schema_version":       `{"version":1,"scope":"server"}`,
 		"future schema_version":        `{"schema_version":2,"version":1,"scope":"server"}`,
 		"unknown scope":                `{"schema_version":1,"version":1,"scope":"edge"}`,
+		"client scope":                 `{"schema_version":1,"version":1,"scope":"client"}`,
+		"no scope":                     `{"schema_version":1,"version":1}`,
 		"flags of the wrong JSON type": `{"schema_version":1,"version":1,"scope":"server","flags":{}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -77,12 +79,13 @@ func TestContextAcceptsGoValues(t *testing.T) {
 }
 
 func TestEvaluateAllCoversEveryFlag(t *testing.T) {
-	rs := decode(t, []byte(`{"schema_version":1,"version":1,"scope":"client","unit_types":[],
+	rs := decode(t, []byte(`{"schema_version":1,"version":1,"scope":"server","unit_types":[],
 		"flags":[{"key":"a","type":"boolean","on":false,"off_variation":"false",
 		  "variations":[{"key":"true","value":true},{"key":"false","value":false}]},
-		  {"key":"private","type":"boolean","server_only":true}]}`))
+		  {"key":"b","type":"boolean","on":true,"off_variation":"false","fallthrough":"true",
+		  "variations":[{"key":"true","value":true},{"key":"false","value":false}]}]}`))
 	all := rs.EvaluateAll(eval.Context{})
-	if len(all) != 2 || all["a"].Reason != eval.ReasonOff || all["private"].ErrorCode != eval.ErrorServerOnly {
+	if len(all) != 2 || all["a"].Reason != eval.ReasonOff || all["b"].Reason != eval.ReasonFallthrough {
 		t.Fatalf("got %+v", all)
 	}
 }
@@ -119,25 +122,18 @@ func TestCheckOperatorFollowsTheOperatorTable(t *testing.T) {
 	}
 }
 
-// TestServerOnlyFlagEncodesWithoutConfiguration: a client document carries
-// a server_only flag's key, type and automatic_exposure and nothing else.
-func TestServerOnlyFlagEncodesWithoutConfiguration(t *testing.T) {
-	f := eval.Flag{Key: "employee_feature", Type: "boolean", AutomaticExposure: true, ServerOnly: true, On: true,
+// TestAConfiguredFlagRoundTrips: a flag encodes field by field and decodes
+// back to the same configuration.
+func TestAConfiguredFlagRoundTrips(t *testing.T) {
+	f := eval.Flag{Key: "employee_feature", Type: "boolean", AutomaticExposure: true, On: true,
 		OffVariation: "false", Fallthrough: "true", Variations: []eval.Variation{{Key: "true", Value: json.RawMessage("true")}},
 		Rules: []eval.Rule{{ID: "r1", Serve: eval.Serve{Kind: eval.ServeVariation, Variation: "true"}}}}
 	got, err := json.Marshal(f)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := `{"key":"employee_feature","type":"boolean","automatic_exposure":true,"server_only":true}`; string(got) != want {
-		t.Errorf("server_only flag = %s, want %s", got, want)
-	}
-	f.ServerOnly = false
-	if got, err = json.Marshal(f); err != nil {
-		t.Fatal(err)
-	}
 	var back eval.Flag
-	if err := json.Unmarshal(got, &back); err != nil || !back.On || back.Rules[0].ID != "r1" {
+	if err := json.Unmarshal(got, &back); err != nil || !reflect.DeepEqual(back, f) {
 		t.Errorf("configured flag does not round-trip: %s, %v", got, err)
 	}
 }

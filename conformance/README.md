@@ -39,7 +39,7 @@ A runner decodes `ruleset`, evaluates `flag` for `context`, and compares its res
 | `experiment` | reason `experiment`, and reason `override` when the shadow evaluation lands in a running experiment: `key`, `variation`, `unit_type`, `unit_id`, `inclusion_salt`, `variation_salt`, `inclusion_bucket`, `variation_bucket`, `override` |
 | `prerequisite` | reason `prerequisite_failed`: the flag-level prerequisite that failed |
 | `bucket` | reason `rollout` |
-| `error_code` | reason `error`: `flag_not_found`, `server_only`, `prerequisite_cycle`, `inconsistent_ruleset` |
+| `error_code` | reason `error`: `flag_not_found`, `prerequisite_cycle`, `inconsistent_ruleset` |
 | `override_influenced` | always |
 
 Values compare as JSON (the number `5` equals `5.0`). Fixtures carry the ruleset's `schema_version`; when it is bumped, old fixtures stay.
@@ -86,6 +86,8 @@ Where prose leaves a choice, the fixture decides, and every implementation must 
 - An override's shadow experiment detail carries the served (override's) variation, the shadow's buckets and `override: true`.
 - `type` and `automatic_exposure` are the flag's, not the evaluation's: they are the same for every reason a known flag can carry, `off`, `prerequisite_failed` and an `error` other than `flag_not_found` included. An unknown flag has neither.
 - Growing traffic allocation never moves a unit that was already included: inclusion is a prefix test on a bucket that does not depend on the allocation, and the variation bucket is independent of inclusion. `experiments/allocation-growth` runs the same 200 unit IDs against one experiment at allocations 2000, 5000 and 10000; every unit the fixture includes at one allocation is included with the same variation at every higher one.
+- An experiment serve holds an experiment key, a unit type and both salts; a traffic allocation within 0 to 10000; and at least two weights, none negative, naming distinct variations of the flag and summing to exactly 10000. A serve breaking any of these is found when the ruleset is decoded and is `inconsistent_ruleset` where evaluation reaches it (its rule matches), like an unsupported rule; `experiments/invalid-*` holds one fixture per invariant.
+- A ruleset has the single scope `server`; an evaluator refuses to decode any other.
 
 ## Running
 

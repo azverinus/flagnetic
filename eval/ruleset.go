@@ -10,13 +10,11 @@ import (
 // SchemaVersion is the ruleset schema version this evaluator reads.
 const SchemaVersion = 1
 
-// Scopes of a ruleset document. A client document omits private segments
-// and overrides, and marks every flag depending on a private segment
-// server_only with no configuration.
-const (
-	ScopeServer = "server"
-	ScopeClient = "client"
-)
+// ScopeServer is the one scope of a ruleset document: the whole
+// configuration of an environment, private segments and overrides included,
+// which only a server SDK holding a server key receives. A client SDK never
+// receives a ruleset; it asks the server to evaluate for it.
+const ScopeServer = "server"
 
 // Ruleset is the complete evaluable configuration of one environment at one
 // moment. Decode it with Decode; the zero value is not usable.
@@ -134,12 +132,10 @@ type Condition struct {
 }
 
 // Flag is one flag with its configuration in the ruleset's environment.
-// A server_only flag in a client document carries no configuration.
 type Flag struct {
 	Key               string         `json:"key"`
 	Type              string         `json:"type"`
 	AutomaticExposure bool           `json:"automatic_exposure"`
-	ServerOnly        bool           `json:"server_only,omitempty"`
 	Variations        []Variation    `json:"variations,omitempty"`
 	On                bool           `json:"on"`
 	OffVariation      string         `json:"off_variation,omitempty"`
@@ -147,22 +143,6 @@ type Flag struct {
 	Prerequisites     []Prerequisite `json:"prerequisites,omitempty"`
 	Overrides         []Override     `json:"overrides,omitempty"`
 	Rules             []Rule         `json:"rules,omitempty"`
-}
-
-// MarshalJSON encodes a server_only flag with its key, type and
-// automatic_exposure only: a client document carries no configuration for
-// it. Any other flag encodes field by field.
-func (f Flag) MarshalJSON() ([]byte, error) {
-	if f.ServerOnly {
-		return json.Marshal(struct {
-			Key               string `json:"key"`
-			Type              string `json:"type"`
-			AutomaticExposure bool   `json:"automatic_exposure"`
-			ServerOnly        bool   `json:"server_only"`
-		}{f.Key, f.Type, f.AutomaticExposure, true})
-	}
-	type fields Flag
-	return json.Marshal(fields(f))
 }
 
 // Variation is one named value a flag can serve.
@@ -225,10 +205,11 @@ type Weight struct {
 
 // Decode reads a ruleset document. It fails only when the document is not
 // a ruleset this evaluator can read: malformed JSON, an unsupported
-// schema_version or an unknown scope. Dangling references and invalid
-// conditions do not fail decoding; evaluating a flag that reaches one
-// returns reason error with inconsistent_ruleset, so one defective flag
-// never takes the others down.
+// schema_version or a scope other than server. Dangling references, invalid
+// conditions and invalid experiment serves do not fail decoding; Decode
+// finds an invalid experiment serve once, and evaluating a flag that
+// reaches any of them returns reason error with inconsistent_ruleset, so
+// one defective flag never takes the others down.
 func Decode(data []byte) (*Ruleset, error) {
 	var rs Ruleset
 	if err := json.Unmarshal(data, &rs); err != nil {
@@ -237,10 +218,8 @@ func Decode(data []byte) (*Ruleset, error) {
 	if rs.SchemaVersion != SchemaVersion {
 		return nil, fmt.Errorf("decode ruleset: unsupported schema_version %d, this evaluator reads %d", rs.SchemaVersion, SchemaVersion)
 	}
-	switch rs.Scope {
-	case ScopeServer, ScopeClient:
-	default:
-		return nil, fmt.Errorf("decode ruleset: unknown scope %q", rs.Scope)
+	if rs.Scope != ScopeServer {
+		return nil, fmt.Errorf("decode ruleset: scope %q, this evaluator reads %q only", rs.Scope, ScopeServer)
 	}
 	rs.index = buildIndex(&rs)
 	return &rs, nil
@@ -263,6 +242,11 @@ type compiledFlag struct {
 	*Flag
 	variations map[string]json.RawMessage
 	rules      [][]compiledCondition
+	// invalidServes marks, by rule index, the experiment serves that break
+	// the invariants every experiment serve holds (see validExperiment), so
+	// evaluation reaching one answers inconsistent_ruleset without checking
+	// them again.
+	invalidServes []bool
 }
 
 type compiledSegment struct {
@@ -324,9 +308,10 @@ func buildIndex(rs *Ruleset) *index {
 	for i := range rs.Flags {
 		f := &rs.Flags[i]
 		cf := &compiledFlag{
-			Flag:       f,
-			variations: make(map[string]json.RawMessage, len(f.Variations)),
-			rules:      make([][]compiledCondition, len(f.Rules)),
+			Flag:          f,
+			variations:    make(map[string]json.RawMessage, len(f.Variations)),
+			rules:         make([][]compiledCondition, len(f.Rules)),
+			invalidServes: make([]bool, len(f.Rules)),
 		}
 		for _, v := range f.Variations {
 			cf.variations[v.Key] = v.Value
@@ -344,6 +329,7 @@ func buildIndex(rs *Ruleset) *index {
 				}
 			}
 			cf.rules[j] = conds
+			cf.invalidServes[j] = r.Serve.Kind == ServeExperiment && !validExperiment(r.Serve, cf.variations)
 			if !serveKinds[r.Serve.Kind] {
 				found = addConstruct(found, unsupported(ConstructServeKind, r.Serve.Kind))
 			}
@@ -354,4 +340,28 @@ func buildIndex(rs *Ruleset) *index {
 		idx.flags[f.Key] = cf
 	}
 	return idx
+}
+
+// validExperiment reports whether an experiment serve holds what assigning
+// a unit to a variation relies on: an experiment key, a unit type and both
+// salts; a traffic allocation within 0 to 10000; and at least two weights,
+// none negative, each naming a distinct variation of the flag, summing to
+// exactly 10000. Any other serve would assign units to variations the
+// experiment does not compare, or to none, so every evaluator refuses it
+// the same way instead of each assigning its own way.
+func validExperiment(s Serve, variations map[string]json.RawMessage) bool {
+	if s.Experiment == "" || s.UnitType == "" || s.InclusionSalt == "" || s.VariationSalt == "" ||
+		s.TrafficAllocation < 0 || s.TrafficAllocation > Buckets || len(s.Weights) < 2 {
+		return false
+	}
+	seen := make(map[string]bool, len(s.Weights))
+	sum := 0
+	for _, w := range s.Weights {
+		if _, ok := variations[w.Variation]; !ok || seen[w.Variation] || w.Weight < 0 {
+			return false
+		}
+		seen[w.Variation] = true
+		sum += w.Weight
+	}
+	return sum == Buckets
 }

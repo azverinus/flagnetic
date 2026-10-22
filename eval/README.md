@@ -15,6 +15,12 @@ r := rs.Evaluate(eval.Context{
 all := rs.EvaluateAll(ctx) // every flag, prerequisites memoized within the call
 ```
 
+## One scope
+
+A ruleset document has one scope, `server`: the whole configuration of an environment, private segments and overrides included. Only a server SDK holding a server key receives it, and `Decode` refuses any other scope. A client SDK (a browser or a mobile app) never receives a ruleset: it posts its context to the server's remote evaluation and receives the served values, so private segments never leave the server.
+
+`Decode` checks every experiment serve once: an experiment key, a unit type and both salts present; a traffic allocation within 0 to 10000; at least two weights, none negative, naming distinct variations of the flag and summing to exactly 10000. A flag whose evaluation reaches a serve breaking one of them is an `error` with `inconsistent_ruleset`, as an unsupported rule is, and an SDK serves the caller's default for it.
+
 ## The result shape
 
 Every implementation produces the same result, key for key; [`../conformance/README.md`](../conformance/README.md) lists every key and when it is present. Two of them are the flag's rather than the evaluation's, and travel with every result of a known flag:

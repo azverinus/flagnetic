@@ -43,8 +43,8 @@ func reasonOf(r flagnetic.Reason) of.Reason {
 
 // resolutionError maps a fallback's error code to an OpenFeature
 // ResolutionError: FLAG_NOT_FOUND and TYPE_MISMATCH keep their identity,
-// everything else (server_only, prerequisite_cycle, inconsistent_ruleset,
-// no_ruleset, general) is GENERAL.
+// everything else (prerequisite_cycle, inconsistent_ruleset, no_ruleset,
+// general) is GENERAL.
 func resolutionError(code flagnetic.ErrorCode) of.ResolutionError {
 	switch code {
 	case flagnetic.ErrorFlagNotFound:

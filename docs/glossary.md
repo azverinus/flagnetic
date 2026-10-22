@@ -303,7 +303,7 @@ _Avoid_: namespace, mutex group, exclusion group
 ## Delivery
 
 **Ruleset**:
-The complete evaluable configuration of one environment at one moment, carrying a version. It is what SDKs download.
+The complete evaluable configuration of one environment at one moment, carrying a version. It is what server SDKs download. Its version only grows and is never given to two different rulesets of the same environment, even after the database loses recent writes.
 _Avoid_: config, snapshot, bundle, payload, manifest
 
 **SDK key**:
