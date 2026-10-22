@@ -316,6 +316,39 @@ export const zSdkKeyKind = z.enum(["server", "client"]);
 export const zSdkKeyStatus = z.enum(["active", "rotating", "expired", "revoked"]);
 
 /**
+ * The SDK key the requests presented.
+ */
+export const zSdkInventoryKey = z.object({
+  id: z.uuid(),
+  kind: zSdkKeyKind,
+  name: z.string(),
+  key_id: z.string(),
+});
+
+export const zSdkInventoryItem = z.object({
+  sdk_name: z.string(),
+  sdk_version: z.string(),
+  platform: z.string().nullable(),
+  app_version: z.string().nullable(),
+  sdk_key: zSdkInventoryKey,
+  first_seen: z.iso.datetime(),
+  last_seen: z.iso.datetime(),
+  last_ruleset_version: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    })
+    .nullable(),
+});
+
+export const zSdkInventory = z.object({
+  items: z.array(zSdkInventoryItem),
+});
+
+/**
  * An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.
  */
 export const zSdkKey = z.object({
@@ -1308,6 +1341,16 @@ export const zGetEnvironmentRulesetPath = z.object({
  * The ruleset document (schema 1), as described by the SDK API's `Ruleset`.
  */
 export const zGetEnvironmentRulesetResponse = z.record(z.string(), z.unknown());
+
+export const zListSdkInventoryPath = z.object({
+  project: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The SDKs, most recently seen first.
+ */
+export const zListSdkInventoryResponse = zSdkInventory;
 
 export const zListSdkKeysPath = z.object({
   project: z.string(),

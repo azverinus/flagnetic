@@ -26,7 +26,7 @@ Either kind of key may ask. The server evaluates its environment's whole ruleset
 }
 ```
 
-The answer carries `Cache-Control: no-store`: one context's values are never cached for another. Evaluating records no exposure; an exposure is the SDK's explicit call.
+The answer carries `Cache-Control: no-store`: one context's values are never cached for another. Evaluating records no exposure; an exposure is the SDK's explicit call. The server counts each evaluation it answers by its true reason, as an [evaluation summary](events.md#evaluations-answered-remotely) of its own.
 
 ## What each key learns
 

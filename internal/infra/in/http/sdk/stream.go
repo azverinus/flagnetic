@@ -11,6 +11,7 @@ import (
 	"time"
 
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
@@ -46,6 +47,7 @@ func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params Strea
 		return
 	}
 	defer sub.Close()
+	a.h.Inventory.Note(p.key, delivery.ParseUserAgent(r.UserAgent()), "", current)
 
 	// Armed before the first frame, so a client that has read it knows
 	// the stream's time runs.

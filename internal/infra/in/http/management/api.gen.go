@@ -1391,6 +1391,44 @@ type RuleInput struct {
 // Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
 type Scope string
 
+// SdkInventory defines model for SdkInventory.
+type SdkInventory struct {
+	Items []SdkInventoryItem `json:"items"`
+}
+
+// SdkInventoryItem defines model for SdkInventoryItem.
+type SdkInventoryItem struct {
+	AppVersion *string   `json:"app_version"`
+	FirstSeen  time.Time `json:"first_seen"`
+
+	// LastRulesetVersion The ruleset version the SDK last fetched or was sent; null when it never was.
+	LastRulesetVersion *int64    `json:"last_ruleset_version"`
+	LastSeen           time.Time `json:"last_seen"`
+	Platform           *string   `json:"platform"`
+
+	// SdkKey The SDK key the requests presented.
+	SdkKey SdkInventoryKey `json:"sdk_key"`
+
+	// SdkName The SDK's name, such as `flagnetic-go`, or `unknown` for a client whose `User-Agent` names no Flagnetic SDK.
+	SdkName string `json:"sdk_name"`
+
+	// SdkVersion Empty for `unknown`.
+	SdkVersion string `json:"sdk_version"`
+}
+
+// SdkInventoryKey The SDK key the requests presented.
+type SdkInventoryKey struct {
+	Id    openapi_types.UUID `json:"id"`
+	KeyId string             `json:"key_id"`
+
+	// Kind `server` downloads the environment's ruleset, private segments
+	// included, and belongs on a server; `client` never receives a
+	// ruleset, only the values remote evaluation serves it, and may be
+	// shipped in a browser or an app.
+	Kind SdkKeyKind `json:"kind"`
+	Name string     `json:"name"`
+}
+
 // SdkKey An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.
 type SdkKey struct {
 	// AllowedOrigins The browser origins a client key is accepted from, normalized; empty allows any origin. Always empty on a server key.
@@ -2964,6 +3002,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
 	GetEnvironmentRuleset(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSdkInventory The SDKs that use the environment
+	//
+	// One row per SDK name and version, platform, app version and SDK key
+	// seen in a request to the SDK API for the environment (a ruleset
+	// fetch, a stream connect, a remote evaluation or an events batch),
+	// polling included, most recently seen first. The SDK and its platform
+	// are those its `User-Agent` names (`flagnetic-<sdk>/<version>
+	// (<platform>)`), or `unknown`; the app version is the context's
+	// `app_version` attribute, which only a remote evaluation carries. A
+	// row is written at most once a minute, so it may lag a minute behind,
+	// and is forgotten once its SDK has not been seen for
+	// `FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS` (90 by default). Whether an
+	// SDK holds a stream open right now is not shown: each replica knows
+	// only its own streams.
+	//
+	// Corresponds with GET /projects/{project}/environments/{environment}/sdk-inventory (the `ListSdkInventory` operationId).
+	ListSdkInventory(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListSdkKeys The environment's SDK keys
 	//
@@ -4950,6 +5006,34 @@ func (c *Client) Evaluate(ctx context.Context, project ProjectKey, environment E
 // Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
 func (c *Client) GetEnvironmentRuleset(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetEnvironmentRulesetRequest(c.Server, project, environment)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSdkInventory The SDKs that use the environment
+//
+// One row per SDK name and version, platform, app version and SDK key
+// seen in a request to the SDK API for the environment (a ruleset
+// fetch, a stream connect, a remote evaluation or an events batch),
+// polling included, most recently seen first. The SDK and its platform
+// are those its `User-Agent` names (`flagnetic-<sdk>/<version>
+// (<platform>)`), or `unknown`; the app version is the context's
+// `app_version` attribute, which only a remote evaluation carries. A
+// row is written at most once a minute, so it may lag a minute behind,
+// and is forgotten once its SDK has not been seen for
+// `FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS` (90 by default). Whether an
+// SDK holds a stream open right now is not shown: each replica knows
+// only its own streams.
+//
+// Corresponds with GET /projects/{project}/environments/{environment}/sdk-inventory (the `ListSdkInventory` operationId).
+func (c *Client) ListSdkInventory(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSdkInventoryRequest(c.Server, project, environment)
 	if err != nil {
 		return nil, err
 	}
@@ -8494,6 +8578,47 @@ func NewGetEnvironmentRulesetRequest(server string, project ProjectKey, environm
 	return req, nil
 }
 
+// NewListSdkInventoryRequest constructs an http.Request for the ListSdkInventory method
+func NewListSdkInventoryRequest(server string, project ProjectKey, environment EnvironmentKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/sdk-inventory", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListSdkKeysRequest constructs an http.Request for the ListSdkKeys method
 func NewListSdkKeysRequest(server string, project ProjectKey, environment EnvironmentKey) (*http.Request, error) {
 	var err error
@@ -11476,6 +11601,26 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
 	GetEnvironmentRulesetWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*GetEnvironmentRulesetResponse, error)
+
+	// ListSdkInventoryWithResponse The SDKs that use the environment
+	//
+	// One row per SDK name and version, platform, app version and SDK key
+	// seen in a request to the SDK API for the environment (a ruleset
+	// fetch, a stream connect, a remote evaluation or an events batch),
+	// polling included, most recently seen first. The SDK and its platform
+	// are those its `User-Agent` names (`flagnetic-<sdk>/<version>
+	// (<platform>)`), or `unknown`; the app version is the context's
+	// `app_version` attribute, which only a remote evaluation carries. A
+	// row is written at most once a minute, so it may lag a minute behind,
+	// and is forgotten once its SDK has not been seen for
+	// `FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS` (90 by default). Whether an
+	// SDK holds a stream open right now is not shown: each replica knows
+	// only its own streams.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/environments/{environment}/sdk-inventory (the `ListSdkInventory` operationId).
+	ListSdkInventoryWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*ListSdkInventoryResponse, error)
 
 	// ListSdkKeysWithResponse The environment's SDK keys
 	//
@@ -15966,6 +16111,75 @@ func (r GetEnvironmentRulesetResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetEnvironmentRulesetResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListSdkInventoryResponse401Headers the declared response headers of an HTTP 401 response for ListSdkInventory
+type ListSdkInventoryResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListSdkInventoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SdkInventory
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListSdkInventoryResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSdkInventoryResponse) GetJSON200() *SdkInventory {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListSdkInventoryResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListSdkInventoryResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListSdkInventoryResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSdkInventoryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSdkInventoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSdkInventoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSdkInventoryResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -20481,6 +20695,32 @@ func (c *ClientWithResponses) GetEnvironmentRulesetWithResponse(ctx context.Cont
 	return ParseGetEnvironmentRulesetResponse(rsp)
 }
 
+// ListSdkInventoryWithResponse The SDKs that use the environment
+//
+// One row per SDK name and version, platform, app version and SDK key
+// seen in a request to the SDK API for the environment (a ruleset
+// fetch, a stream connect, a remote evaluation or an events batch),
+// polling included, most recently seen first. The SDK and its platform
+// are those its `User-Agent` names (`flagnetic-<sdk>/<version>
+// (<platform>)`), or `unknown`; the app version is the context's
+// `app_version` attribute, which only a remote evaluation carries. A
+// row is written at most once a minute, so it may lag a minute behind,
+// and is forgotten once its SDK has not been seen for
+// `FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS` (90 by default). Whether an
+// SDK holds a stream open right now is not shown: each replica knows
+// only its own streams.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/environments/{environment}/sdk-inventory (the `ListSdkInventory` operationId).
+func (c *ClientWithResponses) ListSdkInventoryWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*ListSdkInventoryResponse, error) {
+	rsp, err := c.ListSdkInventory(ctx, project, environment, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSdkInventoryResponse(rsp)
+}
+
 // ListSdkKeysWithResponse The environment's SDK keys
 //
 // Every SDK key of the environment, the oldest first, revoked and
@@ -24966,6 +25206,66 @@ func ParseGetEnvironmentRulesetResponse(rsp *http.Response) (*GetEnvironmentRule
 	return response, nil
 }
 
+// ParseListSdkInventoryResponse parses an HTTP response from a ListSdkInventoryWithResponse call
+func ParseListSdkInventoryResponse(rsp *http.Response) (*ListSdkInventoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSdkInventoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SdkInventory
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListSdkInventoryResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListSdkKeysResponse parses an HTTP response from a ListSdkKeysWithResponse call
 func ParseListSdkKeysResponse(rsp *http.Response) (*ListSdkKeysResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -28196,6 +28496,9 @@ type ServerInterface interface {
 	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
 	// (GET /projects/{project}/environments/{environment}/ruleset)
 	GetEnvironmentRuleset(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	// ListSdkInventory The SDKs that use the environment
+	// (GET /projects/{project}/environments/{environment}/sdk-inventory)
+	ListSdkInventory(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
 	// ListSdkKeys The environment's SDK keys
 	// (GET /projects/{project}/environments/{environment}/sdk-keys)
 	ListSdkKeys(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
@@ -30001,6 +30304,41 @@ func (siw *ServerInterfaceWrapper) GetEnvironmentRuleset(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetEnvironmentRuleset(w, r, project, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSdkInventory operation middleware
+func (siw *ServerInterfaceWrapper) ListSdkInventory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSdkInventory(w, r, project, environment)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -32006,6 +32344,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.UpdateEnvironment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/evaluate", wrapper.Evaluate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/ruleset", wrapper.GetEnvironmentRuleset)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-inventory", wrapper.ListSdkInventory)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys", wrapper.ListSdkKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys", wrapper.CreateSdkKey)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}", wrapper.RevokeSdkKey)
@@ -36516,6 +36855,80 @@ func (response GetEnvironmentRuleset503ApplicationProblemPlusJSONResponse) Visit
 	return err
 }
 
+type ListSdkInventoryRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+}
+
+type ListSdkInventoryResponseObject interface {
+	VisitListSdkInventoryResponse(w http.ResponseWriter) error
+}
+
+type ListSdkInventory200JSONResponse SdkInventory
+
+func (response ListSdkInventory200JSONResponse) VisitListSdkInventoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSdkInventory401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSdkInventory401ApplicationProblemPlusJSONResponse) VisitListSdkInventoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSdkInventory403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSdkInventory403ApplicationProblemPlusJSONResponse) VisitListSdkInventoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSdkInventory404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSdkInventory404ApplicationProblemPlusJSONResponse) VisitListSdkInventoryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListSdkKeysRequestObject struct {
 	Project     ProjectKey     `json:"project"`
 	Environment EnvironmentKey `json:"environment"`
@@ -40984,6 +41397,9 @@ type StrictServerInterface interface {
 	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
 	// (GET /projects/{project}/environments/{environment}/ruleset)
 	GetEnvironmentRuleset(ctx context.Context, request GetEnvironmentRulesetRequestObject) (GetEnvironmentRulesetResponseObject, error)
+	// ListSdkInventory The SDKs that use the environment
+	// (GET /projects/{project}/environments/{environment}/sdk-inventory)
+	ListSdkInventory(ctx context.Context, request ListSdkInventoryRequestObject) (ListSdkInventoryResponseObject, error)
 	// ListSdkKeys The environment's SDK keys
 	// (GET /projects/{project}/environments/{environment}/sdk-keys)
 	ListSdkKeys(ctx context.Context, request ListSdkKeysRequestObject) (ListSdkKeysResponseObject, error)
@@ -42514,6 +42930,33 @@ func (sh *strictHandler) GetEnvironmentRuleset(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetEnvironmentRulesetResponseObject); ok {
 		if err := validResponse.VisitGetEnvironmentRulesetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSdkInventory operation middleware
+func (sh *strictHandler) ListSdkInventory(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey) {
+	var request ListSdkInventoryRequestObject
+
+	request.Project = project
+	request.Environment = environment
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSdkInventory(ctx, request.(ListSdkInventoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSdkInventory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSdkInventoryResponseObject); ok {
+		if err := validResponse.VisitListSdkInventoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

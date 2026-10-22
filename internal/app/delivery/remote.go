@@ -14,14 +14,15 @@ import (
 type EvaluateRemotely struct {
 	rulesets    Rulesets
 	discoveries *Discoveries
+	counts      *RemoteEvaluationCounts
 	clock       clock.Clock
 }
 
 // NewEvaluateRemotely returns the handler, evaluating the rulesets this
-// replica holds and noting the undeclared attributes of each context in
-// discoveries.
-func NewEvaluateRemotely(rulesets Rulesets, discoveries *Discoveries, c clock.Clock) *EvaluateRemotely {
-	return &EvaluateRemotely{rulesets: rulesets, discoveries: discoveries, clock: c}
+// replica holds, noting the undeclared attributes of each context in
+// discoveries and counting each evaluation in counts.
+func NewEvaluateRemotely(rulesets Rulesets, discoveries *Discoveries, counts *RemoteEvaluationCounts, c clock.Clock) *EvaluateRemotely {
+	return &EvaluateRemotely{rulesets: rulesets, discoveries: discoveries, counts: counts, clock: c}
 }
 
 // RemoteQuery is a context posted for remote evaluation, and the flags to
@@ -29,7 +30,13 @@ func NewEvaluateRemotely(rulesets Rulesets, discoveries *Discoveries, c clock.Cl
 type RemoteQuery struct {
 	Context delivery.RemoteContext
 	Flags   []string
+	// SDK is the SDK asking, as its User-Agent names it.
+	SDK delivery.SDKIdentity
 }
+
+// appVersionAttribute is the standard attribute naming the version of the
+// app a context comes from.
+const appVersionAttribute = "app_version"
 
 // RemoteEvaluation is what a remote evaluation answers.
 type RemoteEvaluation struct {
@@ -50,7 +57,8 @@ type RemoteEvaluation struct {
 // and not how they were reached; a server key's carry the true reason. It
 // records no exposure, an exposure being the SDK's explicit call; the
 // context's undeclared attributes, key and type only, are noted as
-// discovered.
+// discovered, and the evaluations counted by their true reason, before the
+// mask.
 func (h *EvaluateRemotely) Handle(ctx context.Context, key delivery.SDKKey, q RemoteQuery) (RemoteEvaluation, error) {
 	if err := delivery.CheckRemoteContext(q.Context); err != nil {
 		return RemoteEvaluation{}, err
@@ -86,12 +94,16 @@ func (h *EvaluateRemotely) Handle(ctx context.Context, key delivery.SDKKey, q Re
 	if evaluable.Environment != nil {
 		out.Environment = evaluable.Environment.Key
 	}
+	counted := make(map[string]eval.Result)
 	for k, r := range delivery.Evaluate(evaluable, eval.Context{Units: units, Attributes: attributes}, keys) {
+		counted[k] = r.Result
 		if key.Kind == delivery.SDKKeyClient {
 			r.Result = delivery.MaskForClient(r.Result)
 		}
 		out.Results[k] = r.Result
 	}
+	appVersion, _ := q.Context.Attributes[appVersionAttribute].(string)
+	h.counts.Add(delivery.RemoteEvaluator{Key: key, SDK: q.SDK, AppVersion: appVersion}, rs.Version, counted)
 	h.discoveries.Note(key.Project, h.clock.Now(), delivery.ObserveUndeclared(evaluable, q.Context.Attributes))
 	return out, nil
 }

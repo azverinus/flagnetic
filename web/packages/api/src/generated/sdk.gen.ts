@@ -177,6 +177,9 @@ import type {
   ListRolesData,
   ListRolesErrors,
   ListRolesResponses,
+  ListSdkInventoryData,
+  ListSdkInventoryErrors,
+  ListSdkInventoryResponses,
   ListSdkKeysData,
   ListSdkKeysErrors,
   ListSdkKeysResponses,
@@ -964,6 +967,39 @@ export const getEnvironmentRuleset = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/environments/{environment}/ruleset",
+    ...options,
+  });
+
+/**
+ * The SDKs that use the environment
+ *
+ * One row per SDK name and version, platform, app version and SDK key
+ * seen in a request to the SDK API for the environment (a ruleset
+ * fetch, a stream connect, a remote evaluation or an events batch),
+ * polling included, most recently seen first. The SDK and its platform
+ * are those its `User-Agent` names (`flagnetic-<sdk>/<version>
+ * (<platform>)`), or `unknown`; the app version is the context's
+ * `app_version` attribute, which only a remote evaluation carries. A
+ * row is written at most once a minute, so it may lag a minute behind,
+ * and is forgotten once its SDK has not been seen for
+ * `FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS` (90 by default). Whether an
+ * SDK holds a stream open right now is not shown: each replica knows
+ * only its own streams.
+ *
+ */
+export const listSdkInventory = <ThrowOnError extends boolean = false>(
+  options: Options<ListSdkInventoryData, ThrowOnError>,
+): RequestResult<ListSdkInventoryResponses, ListSdkInventoryErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListSdkInventoryResponses, ListSdkInventoryErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/sdk-inventory",
     ...options,
   });
 

@@ -161,6 +161,10 @@ A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`; a stream's
 
 Each replica counts on its own, in memory: an instance of three replicas behind a load balancer lets up to three times each limit through. Size the limits for the replica count. A limit set to `off` is switched off; `0` or a negative value is refused at start, so a typo never lifts a limit silently. The client IP is the one `FLAGNETIC_TRUSTED_PROXIES` resolves, so behind a proxy list it there, or every client counts as the proxy.
 
+## Raw events
+
+The [events](sdks/events.md) SDKs post are stored as received in tables partitioned by the UTC day they were received. Every replica creates the partitions of today and the `FLAGNETIC_EVENTS_PARTITIONS_AHEAD` days after it (3 by default) once an hour, so events arriving after midnight never wait for one; replicas doing it at once take turns. `FLAGNETIC_EVENTS_RETENTION_DAYS` (30 by default) is the window within which an event ID is recognised as a retry and an event's time is accepted.
+
 ## Metrics
 
 Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNETIC_METRICS_LISTEN_ADDR` (`:9090` by default), and never on the public listener. Keep the port inside your network. Setting the address empty switches metrics off and opens no port.
@@ -179,6 +183,9 @@ Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNET
 | `flagnetic_ruleset_materializations_total` | | Rulesets the replica built from PostgreSQL. It grows by one per environment change the replica serves, and by one per request while the `rulesets` listener is down. |
 | `flagnetic_ruleset_propagation_seconds` | `environment` (its identifier) | Time from a change to an environment's ruleset to this replica's first answer carrying it (histogram, 0.01 s to 60 s). A version nobody asks for is not observed. The series of a deleted environment is dropped. |
 | `flagnetic_sdk_rate_limited_total` | `endpoint`, `kind` | SDK API requests refused `429 rate_limited`, by endpoint (`ruleset`, `evaluate`, `events`, `stream`) and key kind (`server`, `client`, or `none` for a client IP refused for its failed authentications before its key is known). See [Rate limits on the SDK API](#rate-limits-on-the-sdk-api). |
+| `flagnetic_events_ingested_total` | `kind` | [Events](sdks/events.md) SDKs posted that were stored, by kind (`evaluation_summary`, `alias`). |
+| `flagnetic_events_dropped_total` | `reason` | Events SDKs posted that were not stored, by reason: a rejection code, `duplicate` for an event received before, or `unknown_flag` for a summary row naming a flag the project does not have. |
+| `flagnetic_sdk_inventory_dropped_total` | `reason` | Sightings of SDKs the [SDK inventory](sdks/keys.md#which-sdks-use-an-environment) did not record, by reason: `key_full` for a new row of a key that holds 200 rows already, `queue_full` for a new row while the replica held 1,024 rows waiting for its round, `write_failed` for sightings lost because writing them failed. Each round that drops any also logs one warning, `SDK inventory sightings dropped`, with the counts. |
 | `go_*`, `process_*` | | The Go runtime and the process. |
 
 Worth an alert: `flagnetic_listener_up` at 0 for more than a minute, which leaves that replica unable to trust what it caches and serving from PostgreSQL directly, often because something between the replica and PostgreSQL (a connection pooler in transaction mode, say) does not carry `LISTEN`; any increase of `flagnetic_worker_panics_total`, which is a bug to report with the stack from the log; `flagnetic_worker_failures_total` growing round after round for one worker, which is work not getting done; and `flagnetic_db_pool_acquired_conns` close to `flagnetic_db_pool_max_conns` for minutes, or a growing rate of `flagnetic_db_pool_acquire_wait_seconds_total`: the pool is saturated and requests will start to time out. Raise `FLAGNETIC_DB_MAX_CONNS` within what PostgreSQL's `max_connections` allows across all replicas, or add replicas.

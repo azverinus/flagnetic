@@ -106,6 +106,7 @@ type Handlers struct {
 	CopyConfiguration    *appflags.CopyConfiguration
 	Evaluate             *appdelivery.Evaluate
 	ReadRuleset          *appdelivery.ReadRuleset
+	ListSDKInventory     *appdelivery.ListSDKInventory
 
 	ListDiscoveredAttributes   *appdelivery.ListDiscoveredAttributes
 	DismissDiscoveredAttribute *appdelivery.DismissDiscoveredAttribute

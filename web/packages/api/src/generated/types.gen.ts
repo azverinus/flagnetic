@@ -497,6 +497,40 @@ export type SdkKeyKind = "server" | "client";
  */
 export type SdkKeyStatus = "active" | "rotating" | "expired" | "revoked";
 
+export type SdkInventory = {
+  items: Array<SdkInventoryItem>;
+};
+
+export type SdkInventoryItem = {
+  /**
+   * The SDK's name, such as `flagnetic-go`, or `unknown` for a client whose `User-Agent` names no Flagnetic SDK.
+   */
+  sdk_name: string;
+  /**
+   * Empty for `unknown`.
+   */
+  sdk_version: string;
+  platform: string | null;
+  app_version: string | null;
+  sdk_key: SdkInventoryKey;
+  first_seen: string;
+  last_seen: string;
+  /**
+   * The ruleset version the SDK last fetched or was sent; null when it never was.
+   */
+  last_ruleset_version: number | null;
+};
+
+/**
+ * The SDK key the requests presented.
+ */
+export type SdkInventoryKey = {
+  id: string;
+  kind: SdkKeyKind;
+  name: string;
+  key_id: string;
+};
+
 /**
  * An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.
  */
@@ -2863,6 +2897,58 @@ export type GetEnvironmentRulesetResponses = {
 
 export type GetEnvironmentRulesetResponse =
   GetEnvironmentRulesetResponses[keyof GetEnvironmentRulesetResponses];
+
+export type ListSdkInventoryData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/environments/{environment}/sdk-inventory";
+};
+
+export type ListSdkInventoryErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListSdkInventoryError = ListSdkInventoryErrors[keyof ListSdkInventoryErrors];
+
+export type ListSdkInventoryResponses = {
+  /**
+   * The SDKs, most recently seen first.
+   */
+  200: SdkInventory;
+};
+
+export type ListSdkInventoryResponse = ListSdkInventoryResponses[keyof ListSdkInventoryResponses];
 
 export type ListSdkKeysData = {
   body?: never;

@@ -7,6 +7,7 @@ package compose
 import (
 	"context"
 	"crypto/rand"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
@@ -63,8 +64,21 @@ type Options struct {
 	RulesetLoadFault *pgdelivery.RulesetLoadFault
 	// RateLimits are the limits of the SDK API.
 	RateLimits config.RateLimits
+	// EventsRetention is how long raw events are kept.
+	EventsRetention time.Duration
+	// EventsPartitionsAhead is how many days after today the raw event
+	// tables' partitions are created ahead of time.
+	EventsPartitionsAhead int
+	// SDKInventoryRetention is how long the SDK inventory keeps an SDK
+	// after it was last seen.
+	SDKInventoryRetention time.Duration
 	management.Options
 }
+
+// finalFlushBound bounds the writes a stopping replica makes of what it
+// gathered since its last round, so a database that does not answer never
+// holds the stop.
+const finalFlushBound = 5 * time.Second
 
 // Background is the work a replica does besides answering requests, which
 // whoever runs the replica starts.
@@ -240,7 +254,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Drafts:      appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
 			Discoveries: discoveries, Clock: d.Clock,
 		}),
-		ReadRuleset: appdelivery.NewReadRuleset(deliveryStore, rulesetCache.Unmeasured()),
+		ReadRuleset:      appdelivery.NewReadRuleset(deliveryStore, rulesetCache.Unmeasured()),
+		ListSDKInventory: appdelivery.NewListSDKInventory(deliveryStore, deliveryStore),
 
 		ListDiscoveredAttributes:   appdelivery.NewListDiscoveredAttributes(deliveryStore),
 		DismissDiscoveredAttribute: appdelivery.NewDismissDiscoveredAttribute(tx, deliveryStore),
@@ -282,11 +297,19 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Every replica offers each new ruleset version to the streams it holds
 	// once it has loaded it, woken by the notification of each bump.
 	rulesetStream := pgdelivery.NewRulesetStream(rulesetCache, edge.Logger())
+	// Every replica counts the remote evaluations it answers and writes the
+	// counts in rounds, and once more when it stops.
+	remoteCounts := appdelivery.NewRemoteEvaluationCounts(deliveryStore, d.Clock)
+	// Every replica gathers the SDKs its requests come from and writes them
+	// in rounds.
+	inventory := appdelivery.NewSDKInventory(tx, deliveryStore, d.Clock)
 	sdk.Mount(edge, sdk.Handlers{
 		Authenticate: appdelivery.NewAuthenticateSDKKey(sdkKeyCache, sdkKeyUses, d.Clock),
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
 		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
-		Evaluate:     appdelivery.NewEvaluateRemotely(rulesetCache, discoveries, d.Clock),
+		Evaluate:     appdelivery.NewEvaluateRemotely(rulesetCache, discoveries, remoteCounts, d.Clock),
+		Ingest:       appdelivery.NewIngestEvents(tx, deliveryStore, d.Clock, o.EventsRetention),
+		Inventory:    inventory,
 	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
 		Workers: []worker.Worker{
@@ -294,6 +317,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.TokenLastUse(tokenUses),
 			worker.SDKKeyLastUse(sdkKeyUses),
 			worker.DiscoveredAttributes(discoveries, edge.Logger()),
+			worker.RemoteEvaluationCounts(remoteCounts, edge.Logger()),
+			worker.SDKInventory(inventory, edge.Logger(), reg),
+			worker.SDKInventoryRetention(appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention)),
+			worker.EventPartitions(func(ctx context.Context) error {
+				return deliveryStore.CreateEventPartitions(ctx, d.Clock.Now(), o.EventsPartitionsAhead)
+			}),
 		},
 		Listeners: []Listener{
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},
@@ -303,6 +332,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Close: func() {
 			rulesetStream.Close()
 			rulesetCache.Close()
+			// The requests are done: what they counted since the last round
+			// is written now rather than lost with the replica.
+			ctx, cancel := context.WithTimeout(context.Background(), finalFlushBound)
+			defer cancel()
+			if _, err := remoteCounts.Flush(ctx); err != nil {
+				edge.Logger().Warn("remote evaluation counts lost on stop", "error", err.Error())
+			}
+			if err := inventory.Flush(ctx); err != nil {
+				edge.Logger().Warn("SDK inventory lost on stop", "error", err.Error())
+			}
 		},
 	}
 }

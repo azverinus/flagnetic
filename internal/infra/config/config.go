@@ -89,6 +89,16 @@ type Config struct {
 
 	// RateLimits are the limits of the SDK API.
 	RateLimits RateLimits
+	// EventsRetentionDays is how many days the raw events window spans: the window
+	// within which an event ID is recognised as a retry and an event's
+	// time is accepted.
+	EventsRetentionDays int
+	// EventsPartitionsAhead is how many days after today the raw event
+	// tables' partitions are created ahead of time.
+	EventsPartitionsAhead int
+	// SDKInventoryRetentionDays is how many days a row of the SDK
+	// inventory is kept after its SDK was last seen.
+	SDKInventoryRetentionDays int
 }
 
 // RateLimits are the limits of the SDK API, each counted by every replica on
@@ -443,6 +453,36 @@ func Settings() []Setting {
 				return nil
 			},
 		},
+		{
+			Name:    "FLAGNETIC_EVENTS_RETENTION_DAYS",
+			Key:     "events_retention_days",
+			Default: "30",
+			Unit:    "days",
+			Description: "The window of the raw events SDKs post. An event whose ID was received within it is recognised as a retry and stored once; " +
+				"an event whose time is older is rejected `out_of_window`.",
+			Example: "30",
+			apply:   wholeNumber(func(c *Config, n int) { c.EventsRetentionDays = n }),
+		},
+		{
+			Name:    "FLAGNETIC_EVENTS_PARTITIONS_AHEAD",
+			Key:     "events_partitions_ahead",
+			Default: "3",
+			Unit:    "days",
+			Description: "How many days after today the raw event tables' daily partitions are created ahead of time, " +
+				"so that events received after midnight never wait for one.",
+			Example: "3",
+			apply:   wholeNumber(func(c *Config, n int) { c.EventsPartitionsAhead = n }),
+		},
+		{
+			Name:    "FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS",
+			Key:     "sdk_inventory_retention_days",
+			Default: "90",
+			Unit:    "days",
+			Description: "How long an environment's SDK inventory keeps an SDK after it was last seen. " +
+				"An SDK seen again afterwards appears again, with a new first-seen time.",
+			Example: "90",
+			apply:   wholeNumber(func(c *Config, n int) { c.SDKInventoryRetentionDays = n }),
+		},
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "120", "requests per minute",
 			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP.",
 			func(l *RateLimits) *int { return &l.ClientEvaluate }),
@@ -498,6 +538,18 @@ func rateLimit(name, def, unit, description string, field func(*RateLimits) *int
 			*field(&cfg.RateLimits) = n
 			return nil
 		},
+	}
+}
+
+// wholeNumber parses a whole number of at least 1 into the field set picks.
+func wholeNumber(set func(*Config, int)) func(*Config, string) error {
+	return func(cfg *Config, v string) error {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			return errors.New("not a whole number of at least 1")
+		}
+		set(cfg, n)
+		return nil
 	}
 }
 

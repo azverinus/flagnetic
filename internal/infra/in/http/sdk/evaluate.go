@@ -121,6 +121,7 @@ func (a *api) Evaluate(w http.ResponseWriter, r *http.Request, params EvaluatePa
 		a.writeError(w, r, err)
 		return
 	}
+	q.SDK = delivery.ParseUserAgent(r.UserAgent())
 	ctx, cancel := context.WithTimeout(r.Context(), appdelivery.RulesetWait)
 	defer cancel()
 	ev, err := a.h.Evaluate.Handle(ctx, keyOf(r.Context()), q)
@@ -131,6 +132,8 @@ func (a *api) Evaluate(w http.ResponseWriter, r *http.Request, params EvaluatePa
 		a.writeError(w, r, err)
 		return
 	}
+	appVersion, _ := q.Context.Attributes["app_version"].(string)
+	a.h.Inventory.Note(keyOf(r.Context()), q.SDK, appVersion, ev.RulesetVersion)
 	out := Evaluation{
 		SchemaVersion: 1, RulesetVersion: ev.RulesetVersion,
 		Environment:       RulesetEnvironment{Key: ev.Environment, Protected: ev.Protected},
