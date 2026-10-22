@@ -76,3 +76,9 @@ A server key sent with an `Origin` header is refused `403 server_key_from_browse
 ## Audit
 
 Every change is in the project's audit log, by the key's key ID and never with its value: `sdk_key.created`, `sdk_key.rotated` (with the replacement's identifier and key ID and the overlap), `sdk_key.updated` and `sdk_key.revoked`. A change that changes nothing, such as revoking a revoked key, records nothing. Deleting an environment or a project deletes its keys.
+
+## Which SDKs use an environment
+
+`GET /api/v1/projects/{project}/environments/{environment}/sdk-inventory` (`project.read`) lists the SDKs that use the environment, most recently seen first: one row per SDK name and version, platform, app version and key, with when it was first and last seen and the ruleset version it last fetched or was sent. Check it before rotating or revoking a key, or before changing a flag an old SDK version still evaluates.
+
+Every kind of SDK request feeds it: a ruleset fetch (so an SDK that only polls appears too), a stream connect, a remote evaluation and an events batch. The SDK and its platform are those its `User-Agent` names (`flagnetic-<sdk>/<version> (<platform>)`), and any other client is listed as `unknown`; the app version is the context's `app_version` attribute, which only a remote evaluation carries. A row is written at most once a minute, so it may lag a minute behind, and is forgotten once its SDK has not been seen for `FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS` (90 days by default). The inventory does not tell whether an SDK holds a stream open right now: each replica knows only its own streams.

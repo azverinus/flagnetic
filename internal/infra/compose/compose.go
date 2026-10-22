@@ -69,6 +69,9 @@ type Options struct {
 	// EventsPartitionsAhead is how many days after today the raw event
 	// tables' partitions are created ahead of time.
 	EventsPartitionsAhead int
+	// SDKInventoryRetention is how long the SDK inventory keeps an SDK
+	// after it was last seen.
+	SDKInventoryRetention time.Duration
 	management.Options
 }
 
@@ -251,7 +254,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Drafts:      appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
 			Discoveries: discoveries, Clock: d.Clock,
 		}),
-		ReadRuleset: appdelivery.NewReadRuleset(deliveryStore, rulesetCache.Unmeasured()),
+		ReadRuleset:      appdelivery.NewReadRuleset(deliveryStore, rulesetCache.Unmeasured()),
+		ListSDKInventory: appdelivery.NewListSDKInventory(deliveryStore, deliveryStore),
 
 		ListDiscoveredAttributes:   appdelivery.NewListDiscoveredAttributes(deliveryStore),
 		DismissDiscoveredAttribute: appdelivery.NewDismissDiscoveredAttribute(tx, deliveryStore),
@@ -296,12 +300,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Every replica counts the remote evaluations it answers and writes the
 	// counts in rounds, and once more when it stops.
 	remoteCounts := appdelivery.NewRemoteEvaluationCounts(deliveryStore, d.Clock)
+	// Every replica gathers the SDKs its requests come from and writes them
+	// in rounds.
+	inventory := appdelivery.NewSDKInventory(deliveryStore, d.Clock)
 	sdk.Mount(edge, sdk.Handlers{
 		Authenticate: appdelivery.NewAuthenticateSDKKey(sdkKeyCache, sdkKeyUses, d.Clock),
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
 		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
 		Evaluate:     appdelivery.NewEvaluateRemotely(rulesetCache, discoveries, remoteCounts, d.Clock),
 		Ingest:       appdelivery.NewIngestEvents(tx, deliveryStore, d.Clock, o.EventsRetention),
+		Inventory:    inventory,
 	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
 		Workers: []worker.Worker{
@@ -310,6 +318,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.SDKKeyLastUse(sdkKeyUses),
 			worker.DiscoveredAttributes(discoveries, edge.Logger()),
 			worker.RemoteEvaluationCounts(remoteCounts, edge.Logger()),
+			worker.SDKInventory(inventory),
+			worker.SDKInventoryRetention(appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention)),
 			worker.EventPartitions(func(ctx context.Context) error {
 				return deliveryStore.CreateEventPartitions(ctx, d.Clock.Now(), o.EventsPartitionsAhead)
 			}),
@@ -328,6 +338,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			defer cancel()
 			if _, err := remoteCounts.Flush(ctx); err != nil {
 				edge.Logger().Warn("remote evaluation counts lost on stop", "error", err.Error())
+			}
+			if err := inventory.Flush(ctx); err != nil {
+				edge.Logger().Warn("SDK inventory lost on stop", "error", err.Error())
 			}
 		},
 	}

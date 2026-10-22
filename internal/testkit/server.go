@@ -230,6 +230,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		RulesetLoadFault: o.fault, RateLimits: limits,
 		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
+		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
 	})
 	// Registered first, so it runs once the server below has stopped.
 	t.Cleanup(background.Close)

@@ -9,7 +9,7 @@
 ## SDKs
 
 - [Go SDK](../sdks/go/README.md), its [OpenFeature provider](../sdks/go-openfeature/README.md), and the [evaluator](../eval/README.md) every Go program shares.
-- [SDK keys](sdks/keys.md): server and client keys, rotation with an overlap, revocation, allowed origins and calls from browsers.
+- [SDK keys](sdks/keys.md): server and client keys, rotation with an overlap, revocation, allowed origins, calls from browsers, and which SDKs use an environment.
 - [Downloading the ruleset](sdks/ruleset.md): the server SDK's ruleset, its versions, conditional requests, compression and schema versions.
 - [Remote evaluation](sdks/evaluate.md): served values for a context posted by an SDK that holds no ruleset, what each key learns, and the context's limits.
 - [Events](sdks/events.md): evaluation summaries, aliases and exposures an SDK posts, each judged on its own and stored once.

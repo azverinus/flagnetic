@@ -96,6 +96,9 @@ type Config struct {
 	// EventsPartitionsAhead is how many days after today the raw event
 	// tables' partitions are created ahead of time.
 	EventsPartitionsAhead int
+	// SDKInventoryRetentionDays is how many days a row of the SDK
+	// inventory is kept after its SDK was last seen.
+	SDKInventoryRetentionDays int
 }
 
 // RateLimits are the limits of the SDK API, each counted by every replica on
@@ -469,6 +472,16 @@ func Settings() []Setting {
 				"so that events received after midnight never wait for one.",
 			Example: "3",
 			apply:   wholeNumber(func(c *Config, n int) { c.EventsPartitionsAhead = n }),
+		},
+		{
+			Name:    "FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS",
+			Key:     "sdk_inventory_retention_days",
+			Default: "90",
+			Unit:    "days",
+			Description: "How long an environment's SDK inventory keeps an SDK after it was last seen. " +
+				"An SDK seen again afterwards appears again, with a new first-seen time.",
+			Example: "90",
+			apply:   wholeNumber(func(c *Config, n int) { c.SDKInventoryRetentionDays = n }),
 		},
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "120", "requests per minute",
 			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP.",

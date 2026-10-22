@@ -861,6 +861,41 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /projects/{project}/environments/{environment}/sdk-inventory:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+    get:
+      operationId: listSdkInventory
+      summary: The SDKs that use the environment
+      description: |
+        One row per SDK name and version, platform, app version and SDK key
+        seen in a request to the SDK API for the environment (a ruleset
+        fetch, a stream connect, a remote evaluation or an events batch),
+        polling included, most recently seen first. The SDK and its platform
+        are those its `User-Agent` names (`flagnetic-<sdk>/<version>
+        (<platform>)`), or `unknown`; the app version is the context's
+        `app_version` attribute, which only a remote evaluation carries. A
+        row is written at most once a minute, so it may lag a minute behind,
+        and is forgotten once its SDK has not been seen for
+        `FLAGNETIC_SDK_INVENTORY_RETENTION_DAYS` (90 by default). Whether an
+        SDK holds a stream open right now is not shown: each replica knows
+        only its own streams.
+      x-permission: project.read
+      tags: [sdk-keys]
+      responses:
+        "200":
+          description: The SDKs, most recently seen first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdkInventory"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/environments/{environment}/sdk-keys:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -3772,6 +3807,57 @@ components:
         What the key is now: `revoked` once revoked, whatever its expiry;
         `expired` once the overlap of its rotation has ended; `rotating`
         within it; `active` otherwise.
+    SdkInventory:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SdkInventoryItem"
+    SdkInventoryItem:
+      type: object
+      required: [sdk_name, sdk_version, platform, app_version, sdk_key, first_seen, last_seen, last_ruleset_version]
+      properties:
+        sdk_name:
+          type: string
+          description: The SDK's name, such as `flagnetic-go`, or `unknown` for a client whose `User-Agent` names no Flagnetic SDK.
+        sdk_version:
+          type: string
+          description: Empty for `unknown`.
+        platform:
+          type: string
+          nullable: true
+        app_version:
+          type: string
+          nullable: true
+        sdk_key:
+          $ref: "#/components/schemas/SdkInventoryKey"
+        first_seen:
+          type: string
+          format: date-time
+        last_seen:
+          type: string
+          format: date-time
+        last_ruleset_version:
+          type: integer
+          format: int64
+          nullable: true
+          description: The ruleset version the SDK last fetched or was sent; null when it never was.
+    SdkInventoryKey:
+      type: object
+      description: The SDK key the requests presented.
+      required: [id, kind, name, key_id]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/SdkKeyKind"
+        name:
+          type: string
+        key_id:
+          type: string
     SdkKey:
       type: object
       description: An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.

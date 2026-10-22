@@ -28,6 +28,8 @@ type Handlers struct {
 	WatchRuleset *appdelivery.WatchRuleset
 	Evaluate     *appdelivery.EvaluateRemotely
 	Ingest       *appdelivery.IngestEvents
+	// Inventory gathers the SDKs each request comes from.
+	Inventory *appdelivery.SDKInventory
 }
 
 // Options are what the SDK API runs on besides its use cases.
@@ -286,6 +288,7 @@ func (a *api) GetRuleset(w http.ResponseWriter, r *http.Request, params GetRules
 		a.writeError(w, r, err)
 		return
 	}
+	a.h.Inventory.Note(keyOf(r.Context()), delivery.ParseUserAgent(r.UserAgent()), "", rs.Version)
 	writeRuleset(w, r, rs)
 }
 
