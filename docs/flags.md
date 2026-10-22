@@ -164,6 +164,8 @@ The History tab lists every change to the flag, its definition and its configura
 
 A unit ID over 256 bytes is refused `422 invalid_context`.
 
+In the console, **Tester** on a flag's page (or the `t` key) opens a panel beside the environment's tab that evaluates the flag there for a context of units and typed attributes: against the saved configuration, or with **Use unsaved draft** against the draft being edited, which is never saved. It shows the value, the variation, the reason, the rule that served (marked in the editor), for a rollout the unit's bucket and the salt, and whether an override decided. The last 10 contexts evaluated in a project are kept in this browser to pick again. The tester needs only read access, so a viewer can answer why a user sees what they see.
+
 ## Editing at the same time
 
 Every flag definition and every flag configuration carries a `version`, which counts its accepted changes from 1 and is answered as an `ETag` (`"7"`) on every read of it and every write. Every update, replace, delete, archive, restore, revert, copy and salt regeneration names the version it was based on in `If-Match` (`"7"` or `7`); the kill switch and the writes of a single override need none. A write without it is refused `428 precondition_required`, and one based on a version that moved on `412 version_mismatch`, whose `current_version` is the version now: two people editing the same flag never overwrite each other unseen. Both are judged after the request is validated, so a write that is invalid as well says what to fix first. A write that changes nothing stores nothing, keeps the version and records nothing, and answers the entity as it is. Segments, projects, environments, unit types and attributes behave the same way.

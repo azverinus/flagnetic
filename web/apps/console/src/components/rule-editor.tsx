@@ -4,6 +4,7 @@ import { ArrowDownIcon, ArrowUpIcon, GripVerticalIcon, Trash2Icon } from "lucide
 import {
   type DragEvent,
   type KeyboardEvent,
+  useEffect,
   useId,
   useLayoutEffect,
   useRef,
@@ -53,6 +54,8 @@ export type RuleEditorProps = {
   onRegenerateSalt?: (rule: RuleDraft) => void;
   /** The identifiers of the saved rules serving a rollout, whose salt can be regenerated. */
   saltedRules: ReadonlySet<string>;
+  /** The card of the rule that served the tester's last result, by its key. */
+  matchedRule?: string;
   disabled?: boolean;
 };
 
@@ -74,6 +77,7 @@ export function RuleEditor({
   errors,
   onRegenerateSalt,
   saltedRules,
+  matchedRule,
   disabled = false,
 }: RuleEditorProps) {
   const { i18n, t } = useLingui();
@@ -177,6 +181,7 @@ export function RuleEditor({
                   ? () => onRegenerateSalt(rule)
                   : undefined
               }
+              matched={matchedRule === rule.key}
               disabled={disabled}
             />
           ))}
@@ -213,8 +218,10 @@ const dragType = "application/x-flagnetic-rule";
 
 type RuleCardProps = Omit<
   RuleEditorProps,
-  "rules" | "onChange" | "onRegenerateSalt" | "saltedRules"
+  "rules" | "onChange" | "onRegenerateSalt" | "saltedRules" | "matchedRule"
 > & {
+  /** Whether this rule served the tester's last result. */
+  matched: boolean;
   rule: RuleDraft;
   position: number;
   last: boolean;
@@ -247,6 +254,7 @@ function RuleCard({
   flags,
   errors,
   onRegenerateSalt,
+  matched,
   disabled = false,
 }: RuleCardProps) {
   const { i18n, t } = useLingui();
@@ -256,6 +264,14 @@ function RuleCard({
   const ruleError = errors.get(rule.key) ?? errors.get(`${rule.key}/conditions`);
   const full = rule.conditions.length >= maxConditions;
   const [over, setOver] = useState(false);
+  const card = useRef<HTMLElement>(null);
+  // The rule that served the tester's result is brought into view, so a
+  // long configuration shows which rule decided without a search.
+  useEffect(() => {
+    if (!matched) return;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    card.current?.scrollIntoView?.({ block: "center", behavior: still ? "auto" : "smooth" });
+  }, [matched]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLLIElement>) => {
     if (disabled || !event.altKey) return;
@@ -287,10 +303,11 @@ function RuleCard({
   return (
     <li onKeyDown={onKeyDown} {...dropTarget}>
       <section
+        ref={card}
         aria-labelledby={heading}
         className={cn(
           "flex flex-col gap-4 rounded-lg border bg-card p-4",
-          rule.reapplied && "border-primary ring-1 ring-primary",
+          (rule.reapplied || matched) && "border-primary ring-1 ring-primary",
           dragging && "opacity-50",
           over && "border-primary",
         )}
@@ -324,6 +341,11 @@ function RuleCard({
           {rule.reapplied ? (
             <Badge>
               <Trans>Reapplied after a conflict: saves as a new rule</Trans>
+            </Badge>
+          ) : null}
+          {matched ? (
+            <Badge>
+              <Trans>Matched in the tester</Trans>
             </Badge>
           ) : null}
           {disabled ? null : (

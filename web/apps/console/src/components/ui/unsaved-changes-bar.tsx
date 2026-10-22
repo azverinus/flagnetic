@@ -12,7 +12,15 @@ export type UnsavedChangesBarProps = {
   /** Submits the form; omitted when the form's own button saves. */
   onSave?: () => void;
   pending?: boolean;
+  /**
+   * Whether a navigation keeps the form on screen, as opening a panel
+   * beside it through the address does, so it is not asked about.
+   */
+  keeps?: (from: Place, to: Place) => boolean;
 };
+
+/** Where a navigation starts or ends: the path and its search parameters. */
+type Place = { pathname: string; search: object };
 
 /** The space between the bar and a toast above it. */
 const toastGap = 16;
@@ -24,11 +32,17 @@ const toastGap = 16;
  * it shows. Leaving the page while it shows asks first, inside the console
  * and when the browser closes the tab.
  */
-export function UnsavedChangesBar({ dirty, onDiscard, onSave, pending }: UnsavedChangesBarProps) {
+export function UnsavedChangesBar({
+  dirty,
+  onDiscard,
+  onSave,
+  pending,
+  keeps,
+}: UnsavedChangesBarProps) {
   const { t } = useLingui();
   const bar = useRef<HTMLDivElement>(null);
   const blocker = useBlocker({
-    shouldBlockFn: () => dirty,
+    shouldBlockFn: ({ current, next }) => dirty && !keeps?.(current, next),
     enableBeforeUnload: () => dirty,
     withResolver: true,
   });

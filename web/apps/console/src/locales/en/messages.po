@@ -11,6 +11,10 @@ msgstr ""
 msgid "{browser} on {os}"
 msgstr "{browser} on {os}"
 
+#: src/components/tester-panel.tsx
+msgid "{bucket} of {total}"
+msgstr "{bucket} of {total}"
+
 #: src/components/duration-input.tsx
 msgid "{count, plural, one {day} other {days}}"
 msgstr "{count, plural, one {day} other {days}}"
@@ -253,6 +257,10 @@ msgstr "A project token belongs to the project, not to whoever created it: it ke
 msgid "A project token does what its role allows in this project, narrowed to its scopes, and never manages who has access. Every write scope includes read."
 msgstr "A project token does what its role allows in this project, narrowed to its scopes, and never manages who has access. Every write scope includes read."
 
+#: src/components/tester-panel.tsx
+msgid "A required flag does not serve the variation required: the off variation is served."
+msgstr "A required flag does not serve the variation required: the off variation is served."
+
 #: src/components/member-credentials.tsx
 #: src/components/session-list.tsx
 msgid "A revoked device is signed out at its next request."
@@ -265,6 +273,10 @@ msgstr "A rule has at most {max} conditions."
 #: src/components/rule-editor.tsx
 msgid "A rule has at most {maxConditionsText} conditions."
 msgstr "A rule has at most {maxConditionsText} conditions."
+
+#: src/components/tester-panel.tsx
+msgid "A rule's rollout served: the unit's bucket is below its percentage."
+msgstr "A rule's rollout served: the unit's bucket is below its percentage."
 
 #: src/components/segment-fields.tsx
 msgid "A segment compares declared attributes only; one without conditions holds every context."
@@ -307,6 +319,7 @@ msgid "A token lets a script act for you, narrowed to its scopes. Only a signed-
 msgstr "A token lets a script act for you, narrowed to its scopes. Only a signed-in session creates or revokes one."
 
 #: src/lib/flag-detail.ts
+#: src/lib/tester.ts
 msgid "A unit ID has at most {max} bytes."
 msgstr "A unit ID has at most {max} bytes."
 
@@ -362,6 +375,10 @@ msgstr "Add an override"
 msgid "Add at least one value."
 msgstr "Add at least one value."
 
+#: src/components/tester-panel.tsx
+msgid "Add attribute"
+msgstr "Add attribute"
+
 #: src/components/rule-editor.tsx
 msgid "Add attribute condition"
 msgstr "Add attribute condition"
@@ -389,6 +406,10 @@ msgstr "Add rule"
 #: src/components/rule-editor.tsx
 msgid "Add segment condition"
 msgstr "Add segment condition"
+
+#: src/components/tester-panel.tsx
+msgid "Add unit"
+msgstr "Add unit"
 
 #: src/components/variations-editor.tsx
 msgid "Add variation"
@@ -426,6 +447,14 @@ msgstr "An instance admin administers every project, every member and the instan
 #: src/components/invitation-acceptance.tsx
 msgid "An invitation link works once, for seven days, and only until a newer one replaces it. Ask an instance admin for a new link, or sign in if you have already joined."
 msgstr "An invitation link works once, for seven days, and only until a newer one replaces it. Ask an instance admin for a new link, or sign in if you have already joined."
+
+#: src/components/tester-panel.tsx
+msgid "An override of a required flag decided this result."
+msgstr "An override of a required flag decided this result."
+
+#: src/components/tester-panel.tsx
+msgid "An override serves this unit ID; rules are not consulted."
+msgstr "An override serves this unit ID; rules are not consulted."
 
 #: src/components/member-form.tsx
 msgid "Another member already has this email address."
@@ -542,6 +571,10 @@ msgstr "Attribute"
 msgid "Attribute (condition {position})"
 msgstr "Attribute (condition {position})"
 
+#: src/components/tester-panel.tsx
+msgid "Attribute {n}"
+msgstr "Attribute {n}"
+
 #: src/lib/audit.ts
 msgid "Attribute declared"
 msgstr "Attribute declared"
@@ -555,6 +588,7 @@ msgid "Attribute updated"
 msgstr "Attribute updated"
 
 #: src/components/navigation.tsx
+#: src/components/tester-panel.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Attributes"
 msgstr "Attributes"
@@ -620,6 +654,10 @@ msgstr "Both environments serve the same."
 #: src/components/breadcrumb.tsx
 msgid "Breadcrumb"
 msgstr "Breadcrumb"
+
+#: src/components/tester-panel.tsx
+msgid "Bucket"
+msgstr "Bucket"
 
 #: src/components/kill-switch-dialog.tsx
 #: src/components/ui/confirm-dialog.tsx
@@ -747,6 +785,7 @@ msgid "Choose a variation."
 msgstr "Choose a variation."
 
 #: src/components/condition-row.tsx
+#: src/components/tester-panel.tsx
 msgid "Choose an attribute"
 msgstr "Choose an attribute"
 
@@ -775,6 +814,7 @@ msgid "Choose one of the offered types."
 msgstr "Choose one of the offered types."
 
 #: src/lib/conditions.ts
+#: src/lib/tester.ts
 msgid "Choose true or false."
 msgstr "Choose true or false."
 
@@ -797,6 +837,10 @@ msgstr "Clear filters"
 #: src/components/ui/sheet.tsx
 msgid "Close"
 msgstr "Close"
+
+#: src/components/tester-panel.tsx
+msgid "Close the tester"
+msgstr "Close the tester"
 
 #: src/components/app-shell.tsx
 msgid "Collapse the sidebar"
@@ -1114,6 +1158,10 @@ msgstr "edit the project"
 msgid "Email"
 msgstr "Email"
 
+#: src/components/tester-panel.tsx
+msgid "Empty context"
+msgstr "Empty context"
+
 #: src/components/session-list.tsx
 msgid "Ends at the latest"
 msgstr "Ends at the latest"
@@ -1149,6 +1197,7 @@ msgid "Enter a new password."
 msgstr "Enter a new password."
 
 #: src/lib/conditions.ts
+#: src/lib/tester.ts
 #: src/lib/variations.ts
 msgid "Enter a number."
 msgstr "Enter a number."
@@ -1245,6 +1294,34 @@ msgstr "Environments and history"
 msgid "equals"
 msgstr "equals"
 
+#: src/components/tester-panel.tsx
+msgid "Error"
+msgstr "Error"
+
+#: src/components/tester-panel.tsx
+msgid "Evaluate"
+msgstr "Evaluate"
+
+#: src/components/tester-panel.tsx
+msgid "Evaluate for context"
+msgstr "Evaluate for context"
+
+#: src/components/tester-panel.tsx
+msgid "Evaluated with the saved configuration."
+msgstr "Evaluated with the saved configuration."
+
+#: src/components/tester-panel.tsx
+msgid "Evaluated with the unsaved draft."
+msgstr "Evaluated with the unsaved draft."
+
+#: src/components/tester-panel.tsx
+msgid "Evaluation reason"
+msgstr "Evaluation reason"
+
+#: src/components/tester-panel.tsx
+msgid "Evaluation result"
+msgstr "Evaluation result"
+
 #: src/routes/_signed-in/projects/$project/audit.tsx
 msgid "Every change made in this project, newest first, with its values before and after."
 msgstr "Every change made in this project, newest first, with its values before and after."
@@ -1326,6 +1403,10 @@ msgstr "Expired"
 #: src/components/token-list.tsx
 msgid "Expires"
 msgstr "Expires"
+
+#: src/components/tester-panel.tsx
+msgid "Fallthrough"
+msgstr "Fallthrough"
 
 #: src/components/compare-environments.tsx
 #: src/components/configuration-editor.tsx
@@ -1519,6 +1600,10 @@ msgstr "I have stored it somewhere safe"
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "in {environment}"
 msgstr "in {environment}"
+
+#: src/components/tester-panel.tsx
+msgid "In {name}, as the server evaluates the flag."
+msgstr "In {name}, as the server evaluates the flag."
 
 #: src/components/audit-log.tsx
 msgid "In the action, the entity's key and the actor's name."
@@ -1854,6 +1939,14 @@ msgstr "Manual, granted on {when}"
 msgid "Manual, granted on {when} by a member without a grant here"
 msgstr "Manual, granted on {when} by a member without a grant here"
 
+#: src/components/rule-editor.tsx
+msgid "Matched in the tester"
+msgstr "Matched in the tester"
+
+#: src/components/tester-panel.tsx
+msgid "Matched rule"
+msgstr "Matched rule"
+
 #: src/lib/conditions.ts
 msgid "matches the pattern"
 msgstr "matches the pattern"
@@ -2081,6 +2174,10 @@ msgstr "No project matches that."
 msgid "No projects yet"
 msgstr "No projects yet"
 
+#: src/components/tester-panel.tsx
+msgid "No rule matched: the fallthrough variation is served."
+msgstr "No rule matched: the fallthrough variation is served."
+
 #: src/components/rule-editor.tsx
 msgid "No rules: every context receives the fallthrough variation."
 msgstr "No rules: every context receives the fallthrough variation."
@@ -2088,6 +2185,10 @@ msgstr "No rules: every context receives the fallthrough variation."
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "No segment matches these filters."
 msgstr "No segment matches these filters."
+
+#: src/components/tester-panel.tsx
+msgid "No value"
+msgstr "No value"
 
 #: src/components/condition-row.tsx
 msgid "No value needed."
@@ -2168,6 +2269,7 @@ msgid "Number"
 msgstr "Number"
 
 #: src/components/compare-environments.tsx
+#: src/components/tester-panel.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Off"
@@ -2224,6 +2326,10 @@ msgstr "Only an invited member has an invitation to replace."
 msgid "Operator (condition {position})"
 msgstr "Operator (condition {position})"
 
+#: src/components/tester-panel.tsx
+msgid "Override"
+msgstr "Override"
+
 #: src/components/structural-diff-view.tsx
 msgid "Override added: {unit} receives <0/>."
 msgstr "Override added: {unit} receives <0/>."
@@ -2243,6 +2349,10 @@ msgstr "Override removed: {unit} received <0/>."
 #: src/lib/audit.ts
 msgid "Override set"
 msgstr "Override set"
+
+#: src/components/tester-panel.tsx
+msgid "Override."
+msgstr "Override."
 
 #: src/components/compare-environments.tsx
 #: src/components/overrides-section.tsx
@@ -2323,6 +2433,10 @@ msgstr "Permanent"
 msgid "Personal settings"
 msgstr "Personal settings"
 
+#: src/components/tester-panel.tsx
+msgid "Prerequisite"
+msgstr "Prerequisite"
+
 #: src/components/prerequisites-section.tsx
 msgid "Prerequisite {position}"
 msgstr "Prerequisite {position}"
@@ -2334,6 +2448,10 @@ msgstr "Prerequisite <0>{flag}</0> requires <1>{after}</1> instead of <2>{before
 #: src/components/structural-diff-view.tsx
 msgid "Prerequisite added: <0>{flag}</0> serves <1>{after}</1>."
 msgstr "Prerequisite added: <0>{flag}</0> serves <1>{after}</1>."
+
+#: src/components/tester-panel.tsx
+msgid "Prerequisite failed"
+msgstr "Prerequisite failed"
 
 #: src/components/structural-diff-view.tsx
 msgid "Prerequisite removed: <0>{flag}</0> serves <1>{before}</1>."
@@ -2443,6 +2561,10 @@ msgstr "Reason"
 msgid "Recent activity"
 msgstr "Recent activity"
 
+#: src/components/tester-panel.tsx
+msgid "Recent contexts"
+msgstr "Recent contexts"
+
 #: src/components/kill-switch-dialog.tsx
 msgid "Recorded in the audit log."
 msgstr "Recorded in the audit log."
@@ -2477,6 +2599,10 @@ msgstr "Remove {entry}"
 msgid "Remove {role} from {holder}"
 msgstr "Remove {role} from {holder}"
 
+#: src/components/tester-panel.tsx
+msgid "Remove attribute {n}"
+msgstr "Remove attribute {n}"
+
 #: src/components/condition-row.tsx
 msgid "Remove condition {position}"
 msgstr "Remove condition {position}"
@@ -2500,6 +2626,10 @@ msgstr "Remove tag {tag}"
 #: src/components/overrides-section.tsx
 msgid "Remove the override of {unit}"
 msgstr "Remove the override of {unit}"
+
+#: src/components/tester-panel.tsx
+msgid "Remove unit {n}"
+msgstr "Remove unit {n}"
 
 #: src/components/variations-editor.tsx
 msgid "Remove variation {n}"
@@ -2624,6 +2754,7 @@ msgid "Role granted"
 msgstr "Role granted"
 
 #: src/components/rule-editor.tsx
+#: src/components/tester-panel.tsx
 msgid "Rollout"
 msgstr "Rollout"
 
@@ -2631,12 +2762,17 @@ msgstr "Rollout"
 msgid "Rollout salt regenerated"
 msgstr "Rollout salt regenerated"
 
+#: src/components/tester-panel.tsx
+msgid "Rule"
+msgstr "Rule"
+
 #: src/components/rule-editor.tsx
 msgid "Rule {from} moved to position {to}."
 msgstr "Rule {from} moved to position {to}."
 
 #: src/components/compare-environments.tsx
 #: src/components/rule-editor.tsx
+#: src/components/tester-panel.tsx
 msgid "Rule {position}"
 msgstr "Rule {position}"
 
@@ -2668,6 +2804,10 @@ msgstr "Rule {position} removed: <0/>."
 msgid "Rule {position} removed."
 msgstr "Rule {position} removed."
 
+#: src/components/tester-panel.tsx
+msgid "Rule {position}, new in the draft"
+msgstr "Rule {position}, new in the draft"
+
 #: src/components/rule-editor.tsx
 msgid "Rules"
 msgstr "Rules"
@@ -2675,6 +2815,10 @@ msgstr "Rules"
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Rules of these flags use the segment and evaluate by what it holds once saved:"
 msgstr "Rules of these flags use the segment and evaluate by what it holds once saved:"
+
+#: src/components/tester-panel.tsx
+msgid "Salt"
+msgstr "Salt"
 
 #: src/components/rule-editor.tsx
 msgid "Salt (rule {position})"
@@ -3013,6 +3157,10 @@ msgstr "Temporary"
 msgid "Temporary, to be removed by {expected}"
 msgstr "Temporary, to be removed by {expected}"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Tester"
+msgstr "Tester"
+
 #: src/components/session-list.tsx
 msgid "That device is signed out at its next request and must sign in again."
 msgstr "That device is signed out at its next request and must sign in again."
@@ -3036,6 +3184,10 @@ msgstr "The auth settings are saved."
 #: src/components/ui/reveal-secret.tsx
 msgid "The browser refused the clipboard. Select the value and copy it by hand."
 msgstr "The browser refused the clipboard. Select the value and copy it by hand."
+
+#: src/components/tester-panel.tsx
+msgid "The configuration has no unsaved changes."
+msgstr "The configuration has no unsaved changes."
 
 #: src/components/flag-history.tsx
 msgid "The configuration in {name} is at this version now."
@@ -3097,6 +3249,10 @@ msgstr "The environments serve differently where marked."
 msgid "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
 msgstr "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
 
+#: src/components/tester-panel.tsx
+msgid "The first rule whose conditions all hold served."
+msgstr "The first rule whose conditions all hold served."
+
 #: src/lib/problem-messages.ts
 msgid "the flag {key}"
 msgstr "the flag {key}"
@@ -3121,6 +3277,10 @@ msgstr "The flag {key} is restored."
 msgid "The flag and its configuration in every environment are deleted. This cannot be taken back; its audit entries stay."
 msgstr "The flag and its configuration in every environment are deleted. This cannot be taken back; its audit entries stay."
 
+#: src/components/tester-panel.tsx
+msgid "The flag could not be evaluated."
+msgstr "The flag could not be evaluated."
+
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
 #: src/lib/flag-detail.ts
@@ -3137,6 +3297,10 @@ msgstr "The flag is archived. Restore it to change its configurations."
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The flag is created off in every environment, serving its off variation until it is switched on."
 msgstr "The flag is created off in every environment, serving its off variation until it is switched on."
+
+#: src/components/tester-panel.tsx
+msgid "The flag is off here: the off variation is served."
+msgstr "The flag is off here: the off variation is served."
 
 #: src/lib/flag-detail.ts
 msgid "The flags would require each other in a cycle: {path}."
@@ -3221,6 +3385,7 @@ msgstr "The passwords do not match."
 
 #: src/lib/conditions.ts
 #: src/lib/flag-detail.ts
+#: src/lib/tester.ts
 msgid "The project does not declare this attribute."
 msgstr "The project does not declare this attribute."
 
@@ -3272,6 +3437,7 @@ msgid "The request was not sent as JSON."
 msgstr "The request was not sent as JSON."
 
 #: src/components/configuration-editor.tsx
+#: src/components/tester-panel.tsx
 #: src/lib/problem-messages.ts
 msgid "The request was refused."
 msgstr "The request was refused."
@@ -3340,9 +3506,17 @@ msgstr "The token is revoked."
 msgid "The type of every value the flag serves. It never changes."
 msgstr "The type of every value the flag serves. It never changes."
 
+#: src/components/tester-panel.tsx
+msgid "The unit is pinned to a variation."
+msgstr "The unit is pinned to a variation."
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The unit type {key} is no longer declared, and its key can be declared again."
 msgstr "The unit type {key} is no longer declared, and its key can be declared again."
+
+#: src/components/tester-panel.tsx
+msgid "The unsaved draft cannot be evaluated as it is:"
+msgstr "The unsaved draft cannot be evaluated as it is:"
 
 #: src/lib/problem-messages.ts
 msgid "The value is out of range."
@@ -3376,6 +3550,10 @@ msgstr "They get a link to set their password, shown to you once. What they may 
 #: src/lib/flag-detail.ts
 msgid "This appears twice."
 msgstr "This appears twice."
+
+#: src/lib/tester.ts
+msgid "This attribute is in the context already."
+msgstr "This attribute is in the context already."
 
 #: src/lib/flag-detail.ts
 msgid "This cannot be changed here."
@@ -3500,6 +3678,10 @@ msgstr "This project has no unit type yet."
 msgid "This rule is no longer in the configuration."
 msgstr "This rule is no longer in the configuration."
 
+#: src/lib/tester.ts
+msgid "This unit type is in the context already."
+msgstr "This unit type is in the context already."
+
 #: src/lib/problem-messages.ts
 msgid "This value is not valid here."
 msgstr "This value is not valid here."
@@ -3569,6 +3751,10 @@ msgstr "Type {typeToConfirm} to confirm"
 msgid "Unit ID"
 msgstr "Unit ID"
 
+#: src/components/tester-panel.tsx
+msgid "Unit ID (unit {n})"
+msgstr "Unit ID (unit {n})"
+
 #: src/components/auth-settings-form.tsx
 msgid "Unit of the maximum token lifetime"
 msgstr "Unit of the maximum token lifetime"
@@ -3591,6 +3777,10 @@ msgstr "Unit type"
 msgid "Unit type (rule {position})"
 msgstr "Unit type (rule {position})"
 
+#: src/components/tester-panel.tsx
+msgid "Unit type (unit {n})"
+msgstr "Unit type (unit {n})"
+
 #: src/lib/audit.ts
 msgid "Unit type declared"
 msgstr "Unit type declared"
@@ -3607,6 +3797,10 @@ msgstr "Unit type updated"
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Unit types"
 msgstr "Unit types"
+
+#: src/components/tester-panel.tsx
+msgid "Units"
+msgstr "Units"
 
 #: src/components/rule-editor.tsx
 msgid "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
@@ -3632,6 +3826,10 @@ msgstr "Updated"
 msgid "Use {min} to {max} characters."
 msgstr "Use {min} to {max} characters."
 
+#: src/components/tester-panel.tsx
+msgid "Use unsaved draft"
+msgstr "Use unsaved draft"
+
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Used by"
 msgstr "Used by"
@@ -3640,9 +3838,14 @@ msgstr "Used by"
 msgid "Used by flags"
 msgstr "Used by flags"
 
+#: src/components/tester-panel.tsx
 #: src/components/variations-editor.tsx
 msgid "Value"
 msgstr "Value"
+
+#: src/components/tester-panel.tsx
+msgid "Value (attribute {n})"
+msgstr "Value (attribute {n})"
 
 #: src/components/condition-row.tsx
 msgid "Value (condition {position})"
@@ -3658,6 +3861,7 @@ msgstr "Values of {label}"
 
 #: src/components/overrides-section.tsx
 #: src/components/rule-editor.tsx
+#: src/components/tester-panel.tsx
 msgid "Variation"
 msgstr "Variation"
 

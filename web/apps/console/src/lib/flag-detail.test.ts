@@ -4,7 +4,38 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { activateForTests } from "@/test/render";
 
-import { entryOfVersion, killReasonReady, lastKillOf, overrideIssues } from "./flag-detail";
+import {
+  entryOfVersion,
+  killReasonReady,
+  lastKillOf,
+  onlyTesterToggled,
+  overrideIssues,
+  validateFlagDetailSearch,
+} from "./flag-detail";
+
+describe("the flag page's address", () => {
+  it("keeps the environment, the history's open entry and the tester", () => {
+    expect(
+      validateFlagDetailSearch({
+        environment: "staging",
+        tester: true,
+        tab: "history",
+        entry: "e",
+      }),
+    ).toEqual({ environment: "staging", tester: true, tab: "history", entry: "e" });
+    expect(validateFlagDetailSearch({ entry: "e", tester: "yes" })).toEqual({});
+  });
+
+  it("leaves the draft on screen when only the tester opens or closes", () => {
+    const at = (search: object, pathname = "/projects/p/flags/f") => ({ pathname, search });
+    expect(
+      onlyTesterToggled(at({ environment: "qa" }), at({ environment: "qa", tester: true })),
+    ).toBe(true);
+    expect(onlyTesterToggled(at({ tester: true }), at({}))).toBe(true);
+    expect(onlyTesterToggled(at({}), at({ environment: "qa" }))).toBe(false);
+    expect(onlyTesterToggled(at({}), at({}, "/projects/p/flags"))).toBe(false);
+  });
+});
 
 beforeAll(() => activateForTests("en"));
 

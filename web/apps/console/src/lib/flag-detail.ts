@@ -40,6 +40,19 @@ export function validateFlagDetailSearch(search: Record<string, unknown>): FlagD
   return out;
 }
 
+/**
+ * Whether a navigation only opens or closes the tester, which sits beside
+ * the editor: the draft stays on screen, so leaving it is not asked about.
+ */
+export function onlyTesterToggled(
+  from: { pathname: string; search: object },
+  to: { pathname: string; search: object },
+): boolean {
+  const { tester: _was, ...before } = from.search as Record<string, unknown>;
+  const { tester: _is, ...after } = to.search as Record<string, unknown>;
+  return from.pathname === to.pathname && JSON.stringify(before) === JSON.stringify(after);
+}
+
 /** The flag with one environment's configuration replaced by a newer one the server answered. */
 export function withConfiguration(flag: Flag, configuration: FlagConfiguration): Flag {
   return {

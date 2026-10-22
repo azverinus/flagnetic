@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { ConflictBanner } from "@/components/conflict-banner";
 import { PrerequisitesSection } from "@/components/prerequisites-section";
 import { RuleEditor } from "@/components/rule-editor";
+import { TesterPanel } from "@/components/tester-panel";
 import { ConfigurationDiff } from "@/components/structural-diff-view";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -39,11 +40,15 @@ import {
   reapply,
 } from "@/lib/configuration-draft";
 import { ApiError, unwrap } from "@/lib/errors";
-import { configurationViolationMessage, entryOfVersion } from "@/lib/flag-detail";
+import {
+  configurationViolationMessage,
+  entryOfVersion,
+  onlyTesterToggled,
+} from "@/lib/flag-detail";
 import { ifMatch } from "@/lib/http";
 import { problemMessage } from "@/lib/problem-messages";
 import { flagEntriesQuery } from "@/lib/queries";
-import { type RuleDraft, ruleIssues, withRule } from "@/lib/rule-editor";
+import { type RuleDraft, ruleDrafts, ruleIssues, withRule } from "@/lib/rule-editor";
 import { diffConfigurations, fingerprint } from "@/lib/structural-diff";
 import { useConfigurationAnswer } from "@/lib/use-configuration-answer";
 
@@ -67,6 +72,8 @@ export type ConfigurationEditorProps = {
   overrides: ReactNode;
   /** Why the configuration cannot be edited here, when it cannot. */
   readOnly?: string;
+  /** The tester beside the editor, while it is open. */
+  tester?: { onClose: () => void };
 };
 
 /** A save met a newer version: the version the draft was based on, the newer one, and who saved it. */
@@ -95,6 +102,7 @@ export function ConfigurationEditor({
   declarations,
   overrides,
   readOnly,
+  tester,
 }: ConfigurationEditorProps) {
   const { i18n, t } = useLingui();
   const queryClient = useQueryClient();
@@ -138,6 +146,11 @@ export function ConfigurationEditor({
   const [refusal, setRefusal] = useState<Refusal>();
   const [conflict, setConflict] = useState<Conflict>();
   const [salting, setSalting] = useState<RuleDraft>();
+  // The card of the rule that served the tester's last result, marked
+  // only while the tester is open.
+  const [matched, setMatched] = useState<string>();
+  if (!tester && matched !== undefined) setMatched(undefined);
+  const savedRules = useMemo(() => ruleDrafts(configuration.rules, types), [configuration, types]);
 
   const { draft } = state;
   const dirty = readOnly === undefined && isDraftDirty(state, types);
@@ -372,6 +385,7 @@ export function ConfigurationEditor({
         errors={errors}
         saltedRules={salted}
         onRegenerateSalt={readOnly === undefined ? setSalting : undefined}
+        matchedRule={matched}
         disabled={readOnly !== undefined}
       />
       <Field
@@ -407,7 +421,28 @@ export function ConfigurationEditor({
         }}
         onSave={submit}
         pending={save.isPending}
+        keeps={onlyTesterToggled}
       />
+      {tester ? (
+        <TesterPanel
+          project={project}
+          flagKey={flag.key}
+          environment={{ key: configuration.environment, name }}
+          savedRules={savedRules}
+          draft={
+            dirty
+              ? { configuration: configurationPutOf(state, types), rules: draft.rules }
+              : undefined
+          }
+          draftIssues={[...issues.values()]}
+          onDraftIssues={() => setChecked(true)}
+          unitTypes={declarations.unitTypes}
+          attributes={declarations.attributes}
+          types={types}
+          onMatch={setMatched}
+          onClose={tester.onClose}
+        />
+      ) : null}
       <ConfirmDialog
         open={salting !== undefined}
         onOpenChange={(open) => !open && setSalting(undefined)}
