@@ -1,7 +1,6 @@
 import {
   type Attribute,
   type AttributeListItem,
-  type AttributeType,
   createAttribute,
   deleteAttribute,
   getAttribute,
@@ -9,7 +8,6 @@ import {
   zAttributeType,
 } from "@flagnetic/api";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { I18n, MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +20,7 @@ import { z } from "zod";
 
 import { Can } from "@/components/can";
 import { NamedConflictBanner } from "@/components/conflict-banner";
+import { DiscoveredAttributes } from "@/components/discovered-attributes";
 import { QueryError } from "@/components/query-error";
 import { DeleteRowDialog, RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
 import { Badge } from "@/components/ui/badge";
@@ -34,10 +33,12 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Table } from "@/components/ui/table";
+import { Tabs } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { formatNumber } from "@/i18n/format";
 import { useCan } from "@/lib/access";
 import type { Permission } from "@/lib/access-names";
+import { typeName } from "@/lib/attribute-types";
 import { ApiError, unwrap } from "@/lib/errors";
 import { changedFields, descriptionSchema, keySchema, nameSchema } from "@/lib/forms";
 import { ifMatch } from "@/lib/http";
@@ -51,21 +52,6 @@ export const Route = createFileRoute("/_signed-in/projects/$project/attributes")
 });
 
 const permission: Permission = "declaration.manage";
-
-const typeNames = {
-  string: msg({ message: "String", comment: "An attribute type." }),
-  number: msg({ message: "Number", comment: "An attribute type." }),
-  boolean: msg({ message: "Boolean", comment: "An attribute type." }),
-  semver: msg({ message: "Semantic version", comment: "An attribute type." }),
-  date: msg({ message: "Date", comment: "An attribute type." }),
-  list: msg({ message: "List", comment: "An attribute type." }),
-} satisfies Record<AttributeType, MessageDescriptor>;
-
-/** The type's display name, or its name on the wire for one this build does not know. */
-function typeName(i18n: I18n, type: string): string {
-  const known = zAttributeType.safeParse(type);
-  return known.success ? i18n._(typeNames[known.data]) : type;
-}
 
 /** What targeting can read about a unit, each with a type fixed once declared. */
 function Attributes() {
@@ -138,18 +124,8 @@ function Attributes() {
     </Can>
   );
 
-  return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
-      <PageHeader
-        title={t`Attributes`}
-        description={
-          <Trans>
-            What targeting reads about a unit. The standard attributes are in every project; they
-            can be renamed but not deleted. A type never changes once declared.
-          </Trans>
-        }
-        actions={newAttribute}
-      />
+  const declared = (
+    <>
       {attributes.isError ? (
         <QueryError error={attributes.error} onRetry={() => void attributes.refetch()} />
       ) : attributes.data?.length === 0 ? (
@@ -168,6 +144,36 @@ function Attributes() {
           getRowId={(attribute) => attribute.id}
         />
       )}
+    </>
+  );
+
+  return (
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+      <PageHeader
+        title={t`Attributes`}
+        description={
+          <Trans>
+            What targeting reads about a unit. The standard attributes are in every project; they
+            can be renamed but not deleted. A type never changes once declared.
+          </Trans>
+        }
+        actions={newAttribute}
+      />
+      <Tabs
+        label={t`Attribute lists`}
+        tabs={[
+          {
+            value: "declared",
+            label: <Trans>Declared</Trans>,
+            content: declared,
+          },
+          {
+            value: "discovered",
+            label: <Trans>Discovered</Trans>,
+            content: <DiscoveredAttributes project={project} />,
+          },
+        ]}
+      />
 
       <Dialog open={creating} onOpenChange={setCreating} title={t`New attribute`}>
         <AttributeForm project={project} onDone={() => setCreating(false)} />

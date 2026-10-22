@@ -25,7 +25,7 @@ While a replica cannot build a ruleset for two seconds (the database slow or unr
 
 ## Downloading from the management API
 
-`GET /api/v1/projects/{project}/environments/{environment}/ruleset` answers the same document a server key receives, with the same `ETag`, to anyone holding `project.read` in the project: a file to feed a test helper or to evaluate offline. It carries the replica's own latest writes and answers `503 ruleset_unavailable` with `Retry-After` the same way.
+`GET /api/v1/projects/{project}/environments/{environment}/ruleset` answers the same document a server key receives, with the same `ETag`, to anyone holding `project.read` in the project: a file to feed a test helper or to evaluate offline. It carries the replica's own latest writes and answers `503 ruleset_unavailable` with `Retry-After` the same way. The console offers it as **Download ruleset** on every environment page, for anyone who can view the project: it saves the document as `<project>-<environment>-ruleset-<version>.json`.
 
 ## Compression
 

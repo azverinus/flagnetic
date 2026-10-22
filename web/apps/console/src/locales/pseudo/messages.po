@@ -554,6 +554,10 @@ msgstr ""
 msgid "API tokens"
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
+msgid "App version"
+msgstr ""
+
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Appearance"
 msgstr ""
@@ -636,6 +640,10 @@ msgstr ""
 msgid "Attribute deleted"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Attribute lists"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Attribute updated"
 msgstr ""
@@ -644,6 +652,14 @@ msgstr ""
 #: src/components/tester-panel.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Attributes"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Attributes in the contexts SDKs evaluate or the tester sends, that the project has not declared, are listed here within a few seconds."
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Attributes SDKs sent in evaluated contexts that this project has not declared. Only the key and the type of each value are kept, never the value. A dismissed attribute comes back if it is seen with a type not seen before."
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -695,8 +711,8 @@ msgid "Before and after"
 msgstr ""
 
 #. An attribute type.
+#: src/lib/attribute-types.ts
 #: src/lib/flags.ts
-#: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Boolean"
 msgstr ""
 
@@ -809,10 +825,12 @@ msgstr ""
 msgid "Choose a time in the future."
 msgstr ""
 
+#: src/components/discovered-attributes.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type"
 msgstr ""
 
+#: src/components/discovered-attributes.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type."
 msgstr ""
@@ -1053,7 +1071,7 @@ msgid "Dark"
 msgstr ""
 
 #. An attribute type.
-#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/lib/attribute-types.ts
 msgid "Date"
 msgstr ""
 
@@ -1077,8 +1095,24 @@ msgstr ""
 msgid "Deactivation ends every session and API token of yours at once, this one included, and you cannot sign in until another instance admin reactivates you."
 msgstr ""
 
+#: src/components/discovered-attributes.tsx
+msgid "Declare {key}"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Declare attribute"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Declare the kinds of unit its flags are served to."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Declared"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Declaring {key} makes it usable in rules. Its type is fixed once declared."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -1167,6 +1201,26 @@ msgstr ""
 msgid "Discard my draft"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Discovered"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Discovered attributes"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Dismiss {dismissedKey}"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Dismiss {key}"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Dismiss attribute"
+msgstr ""
+
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Display name"
@@ -1178,6 +1232,10 @@ msgstr ""
 
 #: src/lib/conditions.ts
 msgid "does not equal"
+msgstr ""
+
+#: src/components/download-ruleset.tsx
+msgid "Download ruleset"
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -1518,6 +1576,11 @@ msgstr ""
 msgid "Filter the segments"
 msgstr ""
 
+#: src/components/discovered-attributes.tsx
+#: src/components/sdk-inventory.tsx
+msgid "First seen"
+msgstr ""
+
 #: src/components/configuration-editor.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Fix what is marked above before saving."
@@ -1853,8 +1916,10 @@ msgstr ""
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr ""
 
+#: src/components/discovered-attributes.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
+#: src/components/sdk-inventory.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -1901,6 +1966,12 @@ msgstr ""
 msgid "Language"
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
+msgid "Last ruleset version"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+#: src/components/sdk-inventory.tsx
 #: src/components/session-list.tsx
 msgid "Last seen"
 msgstr ""
@@ -1968,7 +2039,7 @@ msgid "Light"
 msgstr ""
 
 #. An attribute type.
-#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/lib/attribute-types.ts
 msgid "List"
 msgstr ""
 
@@ -2158,7 +2229,7 @@ msgstr ""
 msgid "Needs the permission to {name}."
 msgstr ""
 
-#: src/components/sdk-keys.tsx
+#: src/components/moment.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -2291,8 +2362,16 @@ msgstr ""
 msgid "No rules: every context receives the fallthrough variation."
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
+msgid "No SDK has used this environment yet. SDKs appear here after their first request, made with one of its SDK keys."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "No segment matches these filters."
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "No undeclared attribute has been seen."
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -2376,9 +2455,14 @@ msgid "Nothing that a member edits changed."
 msgstr ""
 
 #. An attribute type.
+#: src/lib/attribute-types.ts
 #: src/lib/flags.ts
-#: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Number"
+msgstr ""
+
+#. A JSON type an SDK sent.
+#: src/lib/attribute-types.ts
+msgid "Object"
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -2409,6 +2493,10 @@ msgstr ""
 
 #: src/components/compare-environments.tsx
 msgid "On or off"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "One of the types SDKs sent it with."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -2548,6 +2636,10 @@ msgstr ""
 #: src/components/personal-menu.tsx
 #: src/routes/_signed-in/settings/route.tsx
 msgid "Personal settings"
+msgstr ""
+
+#: src/components/sdk-inventory.tsx
+msgid "Platform"
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -3020,9 +3112,18 @@ msgstr ""
 msgid "Scopes"
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
+msgid "SDK"
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
 msgid "SDK keys"
+msgstr ""
+
+#: src/components/sdk-inventory.tsx
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "SDKs"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -3079,7 +3180,7 @@ msgid "Segments"
 msgstr ""
 
 #. An attribute type.
-#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/lib/attribute-types.ts
 msgid "Semantic version"
 msgstr ""
 
@@ -3250,8 +3351,8 @@ msgid "Status"
 msgstr ""
 
 #. An attribute type.
+#: src/lib/attribute-types.ts
 #: src/lib/flags.ts
-#: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
 msgstr ""
 
@@ -3341,6 +3442,10 @@ msgstr ""
 
 #: src/components/member-credentials.tsx
 msgid "The API tokens of {name}"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "The attribute {dismissedKey} leaves this list. It comes back if SDKs send it with a type not seen before."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -3640,6 +3745,10 @@ msgstr ""
 msgid "The rollout has a new salt."
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
+msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "the segment {key}"
 msgstr ""
@@ -3872,6 +3981,14 @@ msgstr ""
 msgid "This rule is no longer in the configuration."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "This server cannot load the ruleset yet. Try again in {retry}."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This server cannot load the ruleset yet. Try again in a moment."
+msgstr ""
+
 #: src/lib/tester.ts
 msgid "This unit type is in the context already."
 msgstr ""
@@ -3883,6 +4000,10 @@ msgstr ""
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Time"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Times seen"
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -3930,6 +4051,7 @@ msgstr ""
 msgid "Try again"
 msgstr ""
 
+#: src/components/discovered-attributes.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
@@ -3939,6 +4061,10 @@ msgstr ""
 
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
+msgstr ""
+
+#: src/components/discovered-attributes.tsx
+msgid "Types seen"
 msgstr ""
 
 #: src/components/overrides-section.tsx
@@ -4000,6 +4126,7 @@ msgstr ""
 msgid "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
 #: src/components/session-list.tsx
 msgid "Unknown"
 msgstr ""
@@ -4094,6 +4221,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Variations reordered: <0>{order}</0>."
+msgstr ""
+
+#: src/components/sdk-inventory.tsx
+msgid "Version"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/index.tsx

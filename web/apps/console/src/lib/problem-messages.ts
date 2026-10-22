@@ -67,6 +67,10 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return retry
         ? i18n._(msg`The server is unavailable. Try again in ${retry}.`)
         : i18n._(msg`The server is unavailable. Try again in a moment.`);
+    case "ruleset_unavailable":
+      return retry
+        ? i18n._(msg`This server cannot load the ruleset yet. Try again in ${retry}.`)
+        : i18n._(msg`This server cannot load the ruleset yet. Try again in a moment.`);
     case "internal":
       return i18n._(msg`Something went wrong on the server.`);
     case "already_exists":

@@ -554,6 +554,10 @@ msgstr "API token revoked"
 msgid "API tokens"
 msgstr "API tokens"
 
+#: src/components/sdk-inventory.tsx
+msgid "App version"
+msgstr "App version"
+
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Appearance"
 msgstr "Appearance"
@@ -636,6 +640,10 @@ msgstr "Attribute declared"
 msgid "Attribute deleted"
 msgstr "Attribute deleted"
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Attribute lists"
+msgstr "Attribute lists"
+
 #: src/lib/audit.ts
 msgid "Attribute updated"
 msgstr "Attribute updated"
@@ -645,6 +653,14 @@ msgstr "Attribute updated"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Attributes"
 msgstr "Attributes"
+
+#: src/components/discovered-attributes.tsx
+msgid "Attributes in the contexts SDKs evaluate or the tester sends, that the project has not declared, are listed here within a few seconds."
+msgstr "Attributes in the contexts SDKs evaluate or the tester sends, that the project has not declared, are listed here within a few seconds."
+
+#: src/components/discovered-attributes.tsx
+msgid "Attributes SDKs sent in evaluated contexts that this project has not declared. Only the key and the type of each value are kept, never the value. A dismissed attribute comes back if it is seen with a type not seen before."
+msgstr "Attributes SDKs sent in evaluated contexts that this project has not declared. Only the key and the type of each value are kept, never the value. A dismissed attribute comes back if it is seen with a type not seen before."
 
 #: src/components/audit-log.tsx
 msgid "Audit entries, newest first"
@@ -695,8 +711,8 @@ msgid "Before and after"
 msgstr "Before and after"
 
 #. An attribute type.
+#: src/lib/attribute-types.ts
 #: src/lib/flags.ts
-#: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Boolean"
 msgstr "Boolean"
 
@@ -809,10 +825,12 @@ msgstr "Choose a stronger password."
 msgid "Choose a time in the future."
 msgstr "Choose a time in the future."
 
+#: src/components/discovered-attributes.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type"
 msgstr "Choose a type"
 
+#: src/components/discovered-attributes.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type."
 msgstr "Choose a type."
@@ -1053,7 +1071,7 @@ msgid "Dark"
 msgstr "Dark"
 
 #. An attribute type.
-#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/lib/attribute-types.ts
 msgid "Date"
 msgstr "Date"
 
@@ -1077,9 +1095,25 @@ msgstr "Deactivation ends every session and API token of {name} at once, and the
 msgid "Deactivation ends every session and API token of yours at once, this one included, and you cannot sign in until another instance admin reactivates you."
 msgstr "Deactivation ends every session and API token of yours at once, this one included, and you cannot sign in until another instance admin reactivates you."
 
+#: src/components/discovered-attributes.tsx
+msgid "Declare {key}"
+msgstr "Declare {key}"
+
+#: src/components/discovered-attributes.tsx
+msgid "Declare attribute"
+msgstr "Declare attribute"
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Declare the kinds of unit its flags are served to."
 msgstr "Declare the kinds of unit its flags are served to."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Declared"
+msgstr "Declared"
+
+#: src/components/discovered-attributes.tsx
+msgid "Declaring {key} makes it usable in rules. Its type is fixed once declared."
+msgstr "Declaring {key} makes it usable in rules. Its type is fixed once declared."
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
@@ -1167,6 +1201,26 @@ msgstr "Discard"
 msgid "Discard my draft"
 msgstr "Discard my draft"
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Discovered"
+msgstr "Discovered"
+
+#: src/components/discovered-attributes.tsx
+msgid "Discovered attributes"
+msgstr "Discovered attributes"
+
+#: src/components/discovered-attributes.tsx
+msgid "Dismiss {dismissedKey}"
+msgstr "Dismiss {dismissedKey}"
+
+#: src/components/discovered-attributes.tsx
+msgid "Dismiss {key}"
+msgstr "Dismiss {key}"
+
+#: src/components/discovered-attributes.tsx
+msgid "Dismiss attribute"
+msgstr "Dismiss attribute"
+
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Display name"
@@ -1179,6 +1233,10 @@ msgstr "does not contain"
 #: src/lib/conditions.ts
 msgid "does not equal"
 msgstr "does not equal"
+
+#: src/components/download-ruleset.tsx
+msgid "Download ruleset"
+msgstr "Download ruleset"
 
 #: src/components/rule-editor.tsx
 msgid "Drag rule {position}"
@@ -1518,6 +1576,11 @@ msgstr "Filter the flags"
 msgid "Filter the segments"
 msgstr "Filter the segments"
 
+#: src/components/discovered-attributes.tsx
+#: src/components/sdk-inventory.tsx
+msgid "First seen"
+msgstr "First seen"
+
 #: src/components/configuration-editor.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Fix what is marked above before saving."
@@ -1853,8 +1916,10 @@ msgstr "Keep the old key working for"
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 
+#: src/components/discovered-attributes.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
+#: src/components/sdk-inventory.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -1901,6 +1966,12 @@ msgstr "Kind"
 msgid "Language"
 msgstr "Language"
 
+#: src/components/sdk-inventory.tsx
+msgid "Last ruleset version"
+msgstr "Last ruleset version"
+
+#: src/components/discovered-attributes.tsx
+#: src/components/sdk-inventory.tsx
 #: src/components/session-list.tsx
 msgid "Last seen"
 msgstr "Last seen"
@@ -1968,7 +2039,7 @@ msgid "Light"
 msgstr "Light"
 
 #. An attribute type.
-#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/lib/attribute-types.ts
 msgid "List"
 msgstr "List"
 
@@ -2158,7 +2229,7 @@ msgstr "Needs the permission to {name}, held by {list}."
 msgid "Needs the permission to {name}."
 msgstr "Needs the permission to {name}."
 
-#: src/components/sdk-keys.tsx
+#: src/components/moment.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -2291,9 +2362,17 @@ msgstr "No rule matched: the fallthrough variation is served."
 msgid "No rules: every context receives the fallthrough variation."
 msgstr "No rules: every context receives the fallthrough variation."
 
+#: src/components/sdk-inventory.tsx
+msgid "No SDK has used this environment yet. SDKs appear here after their first request, made with one of its SDK keys."
+msgstr "No SDK has used this environment yet. SDKs appear here after their first request, made with one of its SDK keys."
+
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "No segment matches these filters."
 msgstr "No segment matches these filters."
+
+#: src/components/discovered-attributes.tsx
+msgid "No undeclared attribute has been seen."
+msgstr "No undeclared attribute has been seen."
 
 #: src/components/tester-panel.tsx
 msgid "No value"
@@ -2376,10 +2455,15 @@ msgid "Nothing that a member edits changed."
 msgstr "Nothing that a member edits changed."
 
 #. An attribute type.
+#: src/lib/attribute-types.ts
 #: src/lib/flags.ts
-#: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Number"
 msgstr "Number"
+
+#. A JSON type an SDK sent.
+#: src/lib/attribute-types.ts
+msgid "Object"
+msgstr "Object"
 
 #: src/components/compare-environments.tsx
 #: src/components/tester-panel.tsx
@@ -2410,6 +2494,10 @@ msgstr "On"
 #: src/components/compare-environments.tsx
 msgid "On or off"
 msgstr "On or off"
+
+#: src/components/discovered-attributes.tsx
+msgid "One of the types SDKs sent it with."
+msgstr "One of the types SDKs sent it with."
 
 #: src/lib/problem-messages.ts
 msgid "One with this key already exists."
@@ -2549,6 +2637,10 @@ msgstr "Permanent"
 #: src/routes/_signed-in/settings/route.tsx
 msgid "Personal settings"
 msgstr "Personal settings"
+
+#: src/components/sdk-inventory.tsx
+msgid "Platform"
+msgstr "Platform"
 
 #: src/components/tester-panel.tsx
 msgid "Prerequisite"
@@ -3020,10 +3112,19 @@ msgstr "Save with usages?"
 msgid "Scopes"
 msgstr "Scopes"
 
+#: src/components/sdk-inventory.tsx
+msgid "SDK"
+msgstr "SDK"
+
 #: src/components/sdk-keys.tsx
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
 msgid "SDK keys"
 msgstr "SDK keys"
+
+#: src/components/sdk-inventory.tsx
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "SDKs"
+msgstr "SDKs"
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "SDKs receive the flag again, configured in every environment as it was left."
@@ -3079,7 +3180,7 @@ msgid "Segments"
 msgstr "Segments"
 
 #. An attribute type.
-#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/lib/attribute-types.ts
 msgid "Semantic version"
 msgstr "Semantic version"
 
@@ -3250,8 +3351,8 @@ msgid "Status"
 msgstr "Status"
 
 #. An attribute type.
+#: src/lib/attribute-types.ts
 #: src/lib/flags.ts
-#: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
 msgstr "String"
 
@@ -3342,6 +3443,10 @@ msgstr "That is not your current password."
 #: src/components/member-credentials.tsx
 msgid "The API tokens of {name}"
 msgstr "The API tokens of {name}"
+
+#: src/components/discovered-attributes.tsx
+msgid "The attribute {dismissedKey} leaves this list. It comes back if SDKs send it with a type not seen before."
+msgstr "The attribute {dismissedKey} leaves this list. It comes back if SDKs send it with a type not seen before."
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "The attribute {key} is no longer declared, and its key can be declared again."
@@ -3640,6 +3745,10 @@ msgstr "The role includes the permission to {name}, which you do not hold yourse
 msgid "The rollout has a new salt."
 msgstr "The rollout has a new salt."
 
+#: src/components/sdk-inventory.tsx
+msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
+msgstr "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
+
 #: src/lib/problem-messages.ts
 msgid "the segment {key}"
 msgstr "the segment {key}"
@@ -3872,6 +3981,14 @@ msgstr "This project has no unit type yet."
 msgid "This rule is no longer in the configuration."
 msgstr "This rule is no longer in the configuration."
 
+#: src/lib/problem-messages.ts
+msgid "This server cannot load the ruleset yet. Try again in {retry}."
+msgstr "This server cannot load the ruleset yet. Try again in {retry}."
+
+#: src/lib/problem-messages.ts
+msgid "This server cannot load the ruleset yet. Try again in a moment."
+msgstr "This server cannot load the ruleset yet. Try again in a moment."
+
 #: src/lib/tester.ts
 msgid "This unit type is in the context already."
 msgstr "This unit type is in the context already."
@@ -3884,6 +4001,10 @@ msgstr "This value is not valid here."
 #: src/components/audit-log.tsx
 msgid "Time"
 msgstr "Time"
+
+#: src/components/discovered-attributes.tsx
+msgid "Times seen"
+msgstr "Times seen"
 
 #: src/components/audit-log.tsx
 msgid "To"
@@ -3930,6 +4051,7 @@ msgstr "Too many."
 msgid "Try again"
 msgstr "Try again"
 
+#: src/components/discovered-attributes.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
@@ -3940,6 +4062,10 @@ msgstr "Type"
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Type {typeToConfirm} to confirm"
+
+#: src/components/discovered-attributes.tsx
+msgid "Types seen"
+msgstr "Types seen"
 
 #: src/components/overrides-section.tsx
 msgid "Unit ID"
@@ -4000,6 +4126,7 @@ msgstr "Units"
 msgid "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
 msgstr "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
 
+#: src/components/sdk-inventory.tsx
 #: src/components/session-list.tsx
 msgid "Unknown"
 msgstr "Unknown"
@@ -4095,6 +4222,10 @@ msgstr "Variations"
 #: src/components/structural-diff-view.tsx
 msgid "Variations reordered: <0>{order}</0>."
 msgstr "Variations reordered: <0>{order}</0>."
+
+#: src/components/sdk-inventory.tsx
+msgid "Version"
+msgstr "Version"
 
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "View all environments"
