@@ -153,6 +153,23 @@ func ParseSDKKeyValue(value string) (SDKKeyKind, SDKKeyHash, error) {
 	return "", SDKKeyHash{}, ErrSDKKeyInvalid
 }
 
+// ErrServerKeyInQuery refuses a server key presented in a URL, where logs,
+// histories and referrers keep it.
+var ErrServerKeyInQuery = apperrors.Forbidden("server_key_in_query",
+	"a server key must never be put in a URL; send it in the Authorization header")
+
+// CheckKeyInQuery refuses a value presented in a URL's query that is shaped
+// like a server key, known or not: only a client key, which ships in apps
+// and browsers anyway, may travel there, for a browser's EventSource that
+// cannot set headers. The refusal does not depend on a lookup, so it tells
+// nothing of which keys exist.
+func CheckKeyInQuery(value string) error {
+	if strings.HasPrefix(value, sdkKeyPrefixes[SDKKeyServer]) {
+		return ErrServerKeyInQuery
+	}
+	return nil
+}
+
 // StatusAt returns what the key is at t: revoked once revoked, whatever its
 // expiry; expired from the end of its overlap; rotating within it; active
 // otherwise.

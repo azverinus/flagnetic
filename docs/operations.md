@@ -137,7 +137,29 @@ The public listener bounds what one client can hold:
 | `FLAGNETIC_HTTP_IDLE_TIMEOUT` | `120s` | Time a keep-alive connection may stay idle. |
 | `FLAGNETIC_HTTP_MAX_BODY_BYTES` | `1048576` | Size of a request body; a larger one is answered 413. The few routes that take larger bodies declare their own limit. |
 
-There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own.
+There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) and must allow it a read timeout above its 15-second heartbeat.
+
+## Rate limits on the SDK API
+
+Every operation of the SDK API (`/sdk/v1`) is limited per SDK key, so one misbehaving app cannot exhaust a replica. A client key ships in many apps at once, so its requests are counted per key and client IP; a server key's per key, whatever the IP. Requests are counted in fixed one-minute windows, each starting with the first request counted, and streams by how many a key holds open at once:
+
+| Setting | Default | Limit |
+|---|---|---|
+| `FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE` | `120` | Remote evaluations per minute of a client key and IP. |
+| `FLAGNETIC_RATE_LIMIT_CLIENT_EVENTS` | `60` | Event batches per minute of a client key and IP. |
+| `FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS` | `30` | Streams opened per minute by a client key and IP. |
+| `FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS` | `10` | Streams a client key and IP hold open at once. |
+| `FLAGNETIC_RATE_LIMIT_SERVER_RULESET` | `600` | Ruleset downloads per minute of a server key. |
+| `FLAGNETIC_RATE_LIMIT_SERVER_EVALUATE` | `6000` | Remote evaluations per minute of a server key. |
+| `FLAGNETIC_RATE_LIMIT_SERVER_EVENTS` | `600` | Event batches per minute of a server key. |
+| `FLAGNETIC_RATE_LIMIT_SERVER_CONCURRENT_STREAMS` | `1000` | Streams a server key holds open at once; its stream connects are not limited per minute. |
+| `FLAGNETIC_RATE_LIMIT_FAILED_AUTHENTICATIONS` | `30` | Refused keys per minute from one client IP. |
+
+The failed authentications are checked before any key is looked up: once an IP presented 30 keys in a minute that were malformed, unknown, revoked or expired, every SDK API request from it is refused until the window ends, which makes guessing keys slow and cheap to refuse. A request that carries no key is not counted.
+
+A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`; a stream's tells the budget of the streams held at once. A refusal is `429 rate_limited` with `Retry-After` and `RateLimit-Reset`, both in whole seconds of at least 1, and the problem's `retry_after`.
+
+Each replica counts on its own, in memory: an instance of three replicas behind a load balancer lets up to three times each limit through. Size the limits for the replica count. A limit set to `off` is switched off; `0` or a negative value is refused at start, so a typo never lifts a limit silently. The client IP is the one `FLAGNETIC_TRUSTED_PROXIES` resolves, so behind a proxy list it there, or every client counts as the proxy.
 
 ## Metrics
 
@@ -156,6 +178,7 @@ Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNET
 | `flagnetic_listener_up` | `channel` | Whether the replica is listening on a PostgreSQL notification channel, through which replicas tell each other about changes: 1 listening, 0 not. Each listener checks itself every 10 seconds by sending itself a notification, so a connection that went silent without failing is caught too. |
 | `flagnetic_ruleset_materializations_total` | | Rulesets the replica built from PostgreSQL. It grows by one per environment change the replica serves, and by one per request while the `rulesets` listener is down. |
 | `flagnetic_ruleset_propagation_seconds` | `environment` (its identifier) | Time from a change to an environment's ruleset to this replica's first answer carrying it (histogram, 0.01 s to 60 s). A version nobody asks for is not observed. The series of a deleted environment is dropped. |
+| `flagnetic_sdk_rate_limited_total` | `endpoint`, `kind` | SDK API requests refused `429 rate_limited`, by endpoint (`ruleset`, `evaluate`, `events`, `stream`) and key kind (`server`, `client`, or `none` for a client IP refused for its failed authentications before its key is known). See [Rate limits on the SDK API](#rate-limits-on-the-sdk-api). |
 | `go_*`, `process_*` | | The Go runtime and the process. |
 
 Worth an alert: `flagnetic_listener_up` at 0 for more than a minute, which leaves that replica unable to trust what it caches and serving from PostgreSQL directly, often because something between the replica and PostgreSQL (a connection pooler in transaction mode, say) does not carry `LISTEN`; any increase of `flagnetic_worker_panics_total`, which is a bug to report with the stack from the log; `flagnetic_worker_failures_total` growing round after round for one worker, which is work not getting done; and `flagnetic_db_pool_acquired_conns` close to `flagnetic_db_pool_max_conns` for minutes, or a growing rate of `flagnetic_db_pool_acquire_wait_seconds_total`: the pool is saturated and requests will start to time out. Raise `FLAGNETIC_DB_MAX_CONNS` within what PostgreSQL's `max_connections` allows across all replicas, or add replicas.
@@ -172,7 +195,7 @@ Each request is logged once when it completes, as a `request` record with `metho
 
 On SIGTERM or SIGINT a replica stops in three steps:
 
-1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. This gives load balancers time to notice and route away, so a rolling deploy never refuses a request. `0` skips the drain.
+1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. Every [ruleset stream](sdks/stream.md) the replica holds is closed, and its SDK reconnects, usually to another replica. This gives load balancers time to notice and route away, so a rolling deploy never refuses a request. `0` skips the drain.
 2. **Grace** (`FLAGNETIC_SHUTDOWN_GRACE`, 15 s by default): the replica stops accepting connections and lets requests in flight finish.
 3. **Cancel**: requests still running when the grace period ends are cancelled, background work is stopped, and the database pool closes.
 

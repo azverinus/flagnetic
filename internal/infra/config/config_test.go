@@ -291,3 +291,43 @@ func TestTheSecretKeyIsOptionalForCommandsOtherThanServe(t *testing.T) {
 		t.Errorf("Load without a secret key = %v, %v; want no error and no key", cfg.SecretKey, err)
 	}
 }
+
+func TestRateLimitsDefaultToTheirDocumentedValuesAndOffSwitchesOneOff(t *testing.T) {
+	cfg, err := config.Load(env(map[string]string{"DATABASE_URL": "postgres://localhost/flagnetic"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := config.RateLimits{
+		ClientEvaluate: 120, ClientEvents: 60, ClientStreamConnects: 30, ClientConcurrentStreams: 10,
+		ServerRuleset: 600, ServerEvaluate: 6000, ServerEvents: 600, ServerConcurrentStreams: 1000,
+		FailedAuthentications: 30,
+	}
+	if cfg.RateLimits != want {
+		t.Errorf("RateLimits = %+v, want %+v", cfg.RateLimits, want)
+	}
+
+	cfg, err = config.Load(env(map[string]string{
+		"DATABASE_URL":                                "postgres://localhost/flagnetic",
+		"FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE":        "off",
+		"FLAGNETIC_RATE_LIMIT_SERVER_RULESET":         "1200",
+		"FLAGNETIC_RATE_LIMIT_FAILED_AUTHENTICATIONS": "OFF",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RateLimits.ClientEvaluate != 0 || cfg.RateLimits.ServerRuleset != 1200 || cfg.RateLimits.FailedAuthentications != 0 ||
+		cfg.RateLimits.ClientEvents != 60 {
+		t.Errorf("RateLimits = %+v, want client evaluate and failed authentications off, server ruleset 1200", cfg.RateLimits)
+	}
+}
+
+func TestARateLimitOfZeroOrLessIsRefusedRatherThanSwitchedOff(t *testing.T) {
+	for _, value := range []string{"0", "-5", "many", "1.5"} {
+		_, err := config.Load(env(map[string]string{
+			"DATABASE_URL": "postgres://localhost/flagnetic", "FLAGNETIC_RATE_LIMIT_SERVER_EVENTS": value,
+		}))
+		if err == nil || !strings.Contains(err.Error(), "FLAGNETIC_RATE_LIMIT_SERVER_EVENTS") {
+			t.Errorf("FLAGNETIC_RATE_LIMIT_SERVER_EVENTS=%s: err = %v, want refused naming the variable", value, err)
+		}
+	}
+}

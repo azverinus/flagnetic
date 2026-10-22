@@ -319,3 +319,18 @@ func TestAKeysUseIsRecordedAtMostOnceAMinute(t *testing.T) {
 		t.Error("a use a minute after the last one recorded is not recorded")
 	}
 }
+
+func TestOnlyAClientKeyMayBePresentedInAURL(t *testing.T) {
+	_, server := newKey(t, delivery.SDKKeyServer)
+	_, client := newKey(t, delivery.SDKKeyClient)
+	for _, v := range []string{server, "fn_srv_unknown"} {
+		if err := delivery.CheckKeyInQuery(v); !errors.Is(err, delivery.ErrServerKeyInQuery) {
+			t.Errorf("CheckKeyInQuery(%q) = %v, want server_key_in_query", v, err)
+		}
+	}
+	for _, v := range []string{client, "anything else"} {
+		if err := delivery.CheckKeyInQuery(v); err != nil {
+			t.Errorf("CheckKeyInQuery(%q) = %v, want it left to authentication", v, err)
+		}
+	}
+}

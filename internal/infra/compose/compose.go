@@ -59,6 +59,8 @@ type Options struct {
 	// RulesetLoadFault lets a test stall the replica's ruleset
 	// materializations; nil in production.
 	RulesetLoadFault *pgdelivery.RulesetLoadFault
+	// RateLimits are the limits of the SDK API.
+	RateLimits config.RateLimits
 	management.Options
 }
 
@@ -259,10 +261,14 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// notification of each change, and writes their uses in rounds.
 	sdkKeyCache := pgdelivery.NewSDKKeyCache(deliveryStore)
 	sdkKeyUses := appdelivery.NewSDKKeyUses(deliveryStore)
+	// Every replica offers each new ruleset version to the streams it holds
+	// once it has loaded it, woken by the notification of each bump.
+	rulesetStream := pgdelivery.NewRulesetStream(rulesetCache, edge.Logger())
 	sdk.Mount(edge, sdk.Handlers{
 		Authenticate: appdelivery.NewAuthenticateSDKKey(sdkKeyCache, sdkKeyUses, d.Clock),
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
-	})
+		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
+	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
 		Workers: []worker.Worker{
 			worker.AuthRetention(appaccess.NewPurgeAuthRecords(tx, accessStore, settings, d.Clock), reg),
@@ -272,9 +278,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Listeners: []Listener{
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},
 			{Channel: pgdelivery.SDKKeysChannel, Handler: sdkKeyCache},
-			{Channel: pgdelivery.RulesetsChannel, Handler: rulesetCache},
+			{Channel: pgdelivery.RulesetsChannel, Handler: rulesetStream},
 		},
-		Close: rulesetCache.Close,
+		Close: func() {
+			rulesetStream.Close()
+			rulesetCache.Close()
+		},
 	}
 }
 

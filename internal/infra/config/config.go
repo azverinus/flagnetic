@@ -86,6 +86,27 @@ type Config struct {
 	HTTPIdleTimeout       time.Duration
 	HTTPBodyReadTimeout   time.Duration
 	HTTPMaxBodyBytes      int64
+
+	// RateLimits are the limits of the SDK API.
+	RateLimits RateLimits
+}
+
+// RateLimits are the limits of the SDK API, each counted by every replica on
+// its own; 0 is a limit switched off. The per-minute limits count requests
+// in fixed one-minute windows, a client key's per key and client IP, a
+// server key's per key.
+type RateLimits struct {
+	ClientEvaluate          int
+	ClientEvents            int
+	ClientStreamConnects    int
+	ClientConcurrentStreams int
+	ServerRuleset           int
+	ServerEvaluate          int
+	ServerEvents            int
+	ServerConcurrentStreams int
+	// FailedAuthentications limits the refused SDK keys per client IP and
+	// minute, checked before any key is looked up.
+	FailedAuthentications int
 }
 
 // Setting is one row of the settings table.
@@ -421,6 +442,61 @@ func Settings() []Setting {
 				cfg.HTTPMaxBodyBytes = n
 				return nil
 			},
+		},
+		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "120", "requests per minute",
+			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP.",
+			func(l *RateLimits) *int { return &l.ClientEvaluate }),
+		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVENTS", "60", "requests per minute",
+			"Event batches a client key may post to one replica per minute, counted per key and client IP.",
+			func(l *RateLimits) *int { return &l.ClientEvents }),
+		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS", "30", "requests per minute",
+			"Ruleset streams a client key may open on one replica per minute, counted per key and client IP.",
+			func(l *RateLimits) *int { return &l.ClientStreamConnects }),
+		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS", "10", "streams",
+			"Ruleset streams a client key may hold open on one replica at once, counted per key and client IP.",
+			func(l *RateLimits) *int { return &l.ClientConcurrentStreams }),
+		rateLimit("FLAGNETIC_RATE_LIMIT_SERVER_RULESET", "600", "requests per minute",
+			"Ruleset downloads a server key may ask of one replica per minute, counted per key.",
+			func(l *RateLimits) *int { return &l.ServerRuleset }),
+		rateLimit("FLAGNETIC_RATE_LIMIT_SERVER_EVALUATE", "6000", "requests per minute",
+			"Remote evaluations a server key may ask of one replica per minute, counted per key.",
+			func(l *RateLimits) *int { return &l.ServerEvaluate }),
+		rateLimit("FLAGNETIC_RATE_LIMIT_SERVER_EVENTS", "600", "requests per minute",
+			"Event batches a server key may post to one replica per minute, counted per key.",
+			func(l *RateLimits) *int { return &l.ServerEvents }),
+		rateLimit("FLAGNETIC_RATE_LIMIT_SERVER_CONCURRENT_STREAMS", "1000", "streams",
+			"Ruleset streams a server key may hold open on one replica at once, counted per key. A server key's stream connects are not limited per minute.",
+			func(l *RateLimits) *int { return &l.ServerConcurrentStreams }),
+		rateLimit("FLAGNETIC_RATE_LIMIT_FAILED_AUTHENTICATIONS", "30", "refusals per minute",
+			"SDK API requests from one client IP whose key is refused (malformed, unknown, revoked or expired) that one replica takes per minute. "+
+				"Past it, every SDK API request from that IP is answered 429 before its key is looked up, which keeps guessing keys slow. A request without a key is not counted.",
+			func(l *RateLimits) *int { return &l.FailedAuthentications }),
+	}
+}
+
+// rateLimit is the setting of one limit of the SDK API, which field picks
+// from the limits. A value of off switches the limit off; 0 or less is
+// refused, so a typo never silently lifts a limit.
+func rateLimit(name, def, unit, description string, field func(*RateLimits) *int) Setting {
+	return Setting{
+		Name:    name,
+		Key:     strings.ToLower(strings.TrimPrefix(name, "FLAGNETIC_")),
+		Default: def,
+		Unit:    unit,
+		Description: description + " Each replica counts on its own, so an instance of n replicas lets up to n times as much through. " +
+			"A refused request is answered 429 `rate_limited` with `Retry-After`. `off` switches the limit off.",
+		Example: def,
+		apply: func(cfg *Config, v string) error {
+			if strings.EqualFold(v, "off") {
+				*field(&cfg.RateLimits) = 0
+				return nil
+			}
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 {
+				return errors.New("not a whole number of at least 1, or off")
+			}
+			*field(&cfg.RateLimits) = n
+			return nil
 		},
 	}
 }
