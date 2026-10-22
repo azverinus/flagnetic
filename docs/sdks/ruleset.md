@@ -15,6 +15,18 @@ The answer's `ETag` is the ruleset's version, quoted, as a strong tag: `ETag: "1
 
 Every answer carries `Cache-Control: private, no-cache` (no shared cache may keep it, and an SDK revalidates it each time) and `Vary: Authorization, Accept-Encoding`.
 
+## Changes and replicas
+
+Every replica keeps each environment's ruleset in memory by version and learns every change through a PostgreSQL notification sent when the change commits, so any replica can serve any SDK and none needs sticky sessions. A change made through a replica is served by that same replica as soon as the write is answered, and by every other replica once its notification arrives, normally well within a second. The ruleset is built from the database once per environment however many SDKs ask at the same moment.
+
+A replica whose notification listener is down keeps no ruleset in memory and builds it from the database for every request, since it could have missed a change. When its listener connects again, as after a database failover or a restore, it forgets everything it held and takes the versions the database holds as the newest, even when they are older than versions it saw before: an SDK is never kept waiting for, or served, a version the database lost. Versions come from the server clock, so the first change after such a recovery is numbered above every version handed out before it, and reaches every SDK.
+
+While a replica cannot build a ruleset for two seconds (the database slow or unreachable), it answers `503 ruleset_unavailable` with `Retry-After: 2` rather than an empty ruleset: the SDK keeps the ruleset it holds and asks again. The build goes on in the background for up to 30 seconds, so the requests after it find it done.
+
+## Downloading from the management API
+
+`GET /api/v1/projects/{project}/environments/{environment}/ruleset` answers the same document a server key receives, with the same `ETag`, to anyone holding `project.read` in the project: a file to feed a test helper or to evaluate offline. It carries the replica's own latest writes and answers `503 ruleset_unavailable` with `Retry-After` the same way.
+
 ## Compression
 
 An SDK sending `Accept-Encoding: gzip` receives the ruleset in gzip. Every answer of the SDK API is compressed the same way, problems included, and every answer varies by `Accept-Encoding`. A request body may be sent in gzip with `Content-Encoding: gzip`; every size limit counts the body after decompression, a body that is not valid gzip is `400 invalid_request`, and any other coding `415 unsupported_media_type`.

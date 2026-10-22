@@ -99,6 +99,8 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		Keyring: secret.NewKeyring(cfg.SecretKey), PasswordHashConcurrency: cfg.PasswordHashConcurrency,
 		Options: management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
 	})
+	// Run on every way out, after the requests are done.
+	defer background.Close()
 	for _, w := range background.Workers {
 		if err = runner.Register(w); err != nil {
 			return failStart(ctx, log, err)

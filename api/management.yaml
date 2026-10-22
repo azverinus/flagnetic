@@ -815,6 +815,52 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/environments/{environment}/ruleset:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+    get:
+      operationId: getEnvironmentRuleset
+      summary: The environment's ruleset, as server SDKs download it
+      description: |
+        The environment's whole ruleset document, private segments
+        included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+        key, with its version as the `ETag`: a file to feed a test helper
+        or to evaluate offline. It carries the replica's own latest writes.
+        A replica that cannot load the ruleset answers
+        `503 ruleset_unavailable` with `Retry-After`.
+      x-permission: project.read
+      tags: [environments]
+      responses:
+        "200":
+          description: The ruleset document (schema 1), as described by the SDK API's `Ruleset`.
+          headers:
+            ETag:
+              description: The ruleset version, quoted, as a strong tag.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "503":
+          description: "`ruleset_unavailable`: this replica cannot load the ruleset yet; retry after `Retry-After` seconds."
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying.
+              schema:
+                type: integer
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /projects/{project}/environments/{environment}/sdk-keys:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"

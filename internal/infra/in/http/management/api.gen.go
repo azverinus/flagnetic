@@ -2881,6 +2881,18 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 	Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
+	//
+	// The environment's whole ruleset document, private segments
+	// included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+	// key, with its version as the `ETag`: a file to feed a test helper
+	// or to evaluate offline. It carries the replica's own latest writes.
+	// A replica that cannot load the ruleset answers
+	// `503 ruleset_unavailable` with `Retry-After`.
+	//
+	// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
+	GetEnvironmentRuleset(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListSdkKeys The environment's SDK keys
 	//
 	// Every SDK key of the environment, the oldest first, revoked and
@@ -4761,6 +4773,28 @@ func (c *Client) EvaluateWithBody(ctx context.Context, project ProjectKey, envir
 // Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 func (c *Client) Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEvaluateRequest(c.Server, project, environment, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
+//
+// The environment's whole ruleset document, private segments
+// included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+// key, with its version as the `ETag`: a file to feed a test helper
+// or to evaluate offline. It carries the replica's own latest writes.
+// A replica that cannot load the ruleset answers
+// `503 ruleset_unavailable` with `Retry-After`.
+//
+// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
+func (c *Client) GetEnvironmentRuleset(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEnvironmentRulesetRequest(c.Server, project, environment)
 	if err != nil {
 		return nil, err
 	}
@@ -8135,6 +8169,47 @@ func NewEvaluateRequestWithBody(server string, project ProjectKey, environment E
 	return req, nil
 }
 
+// NewGetEnvironmentRulesetRequest constructs an http.Request for the GetEnvironmentRuleset method
+func NewGetEnvironmentRulesetRequest(server string, project ProjectKey, environment EnvironmentKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/ruleset", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListSdkKeysRequest constructs an http.Request for the ListSdkKeys method
 func NewListSdkKeysRequest(server string, project ProjectKey, environment EnvironmentKey) (*http.Request, error) {
 	var err error
@@ -11056,6 +11131,20 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 	EvaluateWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*EvaluateResponse, error)
+
+	// GetEnvironmentRulesetWithResponse The environment's ruleset, as server SDKs download it
+	//
+	// The environment's whole ruleset document, private segments
+	// included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+	// key, with its version as the `ETag`: a file to feed a test helper
+	// or to evaluate offline. It carries the replica's own latest writes.
+	// A replica that cannot load the ruleset answers
+	// `503 ruleset_unavailable` with `Retry-After`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
+	GetEnvironmentRulesetWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*GetEnvironmentRulesetResponse, error)
 
 	// ListSdkKeysWithResponse The environment's SDK keys
 	//
@@ -15228,6 +15317,96 @@ func (r EvaluateResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r EvaluateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetEnvironmentRulesetResponse200Headers the declared response headers of an HTTP 200 response for GetEnvironmentRuleset
+type GetEnvironmentRulesetResponse200Headers struct {
+	ETag *string
+}
+
+// GetEnvironmentRulesetResponse401Headers the declared response headers of an HTTP 401 response for GetEnvironmentRuleset
+type GetEnvironmentRulesetResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+// GetEnvironmentRulesetResponse503Headers the declared response headers of an HTTP 503 response for GetEnvironmentRuleset
+type GetEnvironmentRulesetResponse503Headers struct {
+	RetryAfter *int
+}
+
+type GetEnvironmentRulesetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *map[string]interface{}
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetEnvironmentRulesetResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetEnvironmentRulesetResponse401Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetEnvironmentRulesetResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetEnvironmentRulesetResponse) GetJSON200() *map[string]interface{} {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetEnvironmentRulesetResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetEnvironmentRulesetResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetEnvironmentRulesetResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r GetEnvironmentRulesetResponse) GetApplicationproblemJSON503() *Problem {
+	return r.ApplicationproblemJSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetEnvironmentRulesetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetEnvironmentRulesetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetEnvironmentRulesetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetEnvironmentRulesetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -19652,6 +19831,26 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, project 
 	return ParseEvaluateResponse(rsp)
 }
 
+// GetEnvironmentRulesetWithResponse The environment's ruleset, as server SDKs download it
+//
+// The environment's whole ruleset document, private segments
+// included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+// key, with its version as the `ETag`: a file to feed a test helper
+// or to evaluate offline. It carries the replica's own latest writes.
+// A replica that cannot load the ruleset answers
+// `503 ruleset_unavailable` with `Retry-After`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
+func (c *ClientWithResponses) GetEnvironmentRulesetWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*GetEnvironmentRulesetResponse, error) {
+	rsp, err := c.GetEnvironmentRuleset(ctx, project, environment, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetEnvironmentRulesetResponse(rsp)
+}
+
 // ListSdkKeysWithResponse The environment's SDK keys
 //
 // Every SDK key of the environment, the oldest first, revoked and
@@ -23843,6 +24042,93 @@ func ParseEvaluateResponse(rsp *http.Response) (*EvaluateResponse, error) {
 	return response, nil
 }
 
+// ParseGetEnvironmentRulesetResponse parses an HTTP response from a GetEnvironmentRulesetWithResponse call
+func ParseGetEnvironmentRulesetResponse(rsp *http.Response) (*GetEnvironmentRulesetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEnvironmentRulesetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetEnvironmentRulesetResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetEnvironmentRulesetResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetEnvironmentRulesetResponse503Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers503 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListSdkKeysResponse parses an HTTP response from a ListSdkKeysWithResponse call
 func ParseListSdkKeysResponse(rsp *http.Response) (*ListSdkKeysResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -27061,6 +27347,9 @@ type ServerInterface interface {
 	// Evaluate Evaluate flags for a context, as the environment's SDKs would
 	// (POST /projects/{project}/environments/{environment}/evaluate)
 	Evaluate(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
+	// (GET /projects/{project}/environments/{environment}/ruleset)
+	GetEnvironmentRuleset(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
 	// ListSdkKeys The environment's SDK keys
 	// (GET /projects/{project}/environments/{environment}/sdk-keys)
 	ListSdkKeys(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
@@ -28735,6 +29024,41 @@ func (siw *ServerInterfaceWrapper) Evaluate(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Evaluate(w, r, project, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEnvironmentRuleset operation middleware
+func (siw *ServerInterfaceWrapper) GetEnvironmentRuleset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEnvironmentRuleset(w, r, project, environment)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -30739,6 +31063,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.GetEnvironment)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.UpdateEnvironment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/evaluate", wrapper.Evaluate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/ruleset", wrapper.GetEnvironmentRuleset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys", wrapper.ListSdkKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys", wrapper.CreateSdkKey)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}", wrapper.RevokeSdkKey)
@@ -34860,6 +35185,114 @@ func (response Evaluate422ApplicationProblemPlusJSONResponse) VisitEvaluateRespo
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRulesetRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+}
+
+type GetEnvironmentRulesetResponseObject interface {
+	VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error
+}
+
+type GetEnvironmentRuleset200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetEnvironmentRuleset200JSONResponse struct {
+	Body    map[string]interface{}
+	Headers GetEnvironmentRuleset200ResponseHeaders
+}
+
+func (response GetEnvironmentRuleset200JSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRuleset401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetEnvironmentRuleset401ApplicationProblemPlusJSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRuleset403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetEnvironmentRuleset403ApplicationProblemPlusJSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRuleset404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetEnvironmentRuleset404ApplicationProblemPlusJSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRuleset503ResponseHeaders struct {
+	RetryAfter *int
+}
+
+type GetEnvironmentRuleset503ApplicationProblemPlusJSONResponse struct {
+	Body    Problem
+	Headers GetEnvironmentRuleset503ResponseHeaders
+}
+
+func (response GetEnvironmentRuleset503ApplicationProblemPlusJSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -39320,6 +39753,9 @@ type StrictServerInterface interface {
 	// Evaluate Evaluate flags for a context, as the environment's SDKs would
 	// (POST /projects/{project}/environments/{environment}/evaluate)
 	Evaluate(ctx context.Context, request EvaluateRequestObject) (EvaluateResponseObject, error)
+	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
+	// (GET /projects/{project}/environments/{environment}/ruleset)
+	GetEnvironmentRuleset(ctx context.Context, request GetEnvironmentRulesetRequestObject) (GetEnvironmentRulesetResponseObject, error)
 	// ListSdkKeys The environment's SDK keys
 	// (GET /projects/{project}/environments/{environment}/sdk-keys)
 	ListSdkKeys(ctx context.Context, request ListSdkKeysRequestObject) (ListSdkKeysResponseObject, error)
@@ -40736,6 +41172,33 @@ func (sh *strictHandler) Evaluate(w http.ResponseWriter, r *http.Request, projec
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EvaluateResponseObject); ok {
 		if err := validResponse.VisitEvaluateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEnvironmentRuleset operation middleware
+func (sh *strictHandler) GetEnvironmentRuleset(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey) {
+	var request GetEnvironmentRulesetRequestObject
+
+	request.Project = project
+	request.Environment = environment
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnvironmentRuleset(ctx, request.(GetEnvironmentRulesetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnvironmentRuleset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEnvironmentRulesetResponseObject); ok {
+		if err := validResponse.VisitGetEnvironmentRulesetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

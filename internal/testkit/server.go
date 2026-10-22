@@ -20,6 +20,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -33,10 +34,16 @@ type Server struct {
 	// Logs captures everything the server logs.
 	Logs *LogSink
 
-	metrics   http.Handler
-	runner    *worker.Runner
-	listeners *postgres.Listeners
+	metrics    http.Handler
+	runner     *worker.Runner
+	listeners  *postgres.Listeners
+	background func()
 }
+
+// CloseBackground ends the work the replica's use cases started on their
+// own, such as ruleset loads nobody waits for, as stopping the replica
+// does.
+func (s *Server) CloseBackground() { s.background() }
 
 // Listen starts a notification listener of the server's replica, reported on
 // its registry, until the test ends.
@@ -92,6 +99,7 @@ type serverOptions struct {
 	// console is the default locale of the console served, "" for none.
 	console string
 	listen  pglisten.Options
+	fault   *pgdelivery.RulesetLoadFault
 }
 
 type route struct {
@@ -125,6 +133,11 @@ type ServerOption func(*serverOptions)
 // such as a short ping interval and the fault hook that silences them.
 func WithListenerOptions(o pglisten.Options) ServerOption {
 	return func(so *serverOptions) { so.listen = o }
+}
+
+// WithRulesetLoadFault lets f stall the replica's ruleset materializations.
+func WithRulesetLoadFault(f *pgdelivery.RulesetLoadFault) ServerOption {
+	return func(o *serverOptions) { o.fault = f }
 }
 
 // WithClock serves with c as the application clock instead of the wall clock.
@@ -198,7 +211,10 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	}
 	background := compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Options{
 		Keyring: secret.NewKeyring(secret.New(SecretKey)), PasswordHashConcurrency: defaultHashConcurrency, Options: o.web,
+		RulesetLoadFault: o.fault,
 	})
+	// Registered first, so it runs once the server below has stopped.
+	t.Cleanup(background.Close)
 	for _, w := range background.Workers {
 		if err := runner.Register(w); err != nil {
 			t.Fatal(err)
@@ -221,7 +237,10 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	for _, l := range background.Listeners {
 		listeners.Start(l.Channel, l.Handler, o.listen)
 	}
-	return &Server{URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg), runner: runner, listeners: listeners}
+	return &Server{
+		URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg), runner: runner, listeners: listeners,
+		background: background.Close,
+	}
 }
 
 // defaults returns the configuration a replica has when nothing is set.
@@ -237,4 +256,13 @@ func defaults(t testing.TB) config.Config {
 		t.Fatal(err)
 	}
 	return cfg
+}
+
+// RestartListeners ends the replica's notification listeners and starts them
+// again on new connections, as a database failover or restore makes them do.
+func (s *Server) RestartListeners(t testing.TB) {
+	t.Helper()
+	if !s.listeners.Restart(10 * time.Second) {
+		t.Fatal("the listeners did not stop in time")
+	}
 }

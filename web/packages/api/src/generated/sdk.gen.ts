@@ -84,6 +84,9 @@ import type {
   GetEnvironmentData,
   GetEnvironmentErrors,
   GetEnvironmentResponses,
+  GetEnvironmentRulesetData,
+  GetEnvironmentRulesetErrors,
+  GetEnvironmentRulesetResponses,
   GetFlagConfigurationData,
   GetFlagConfigurationErrors,
   GetFlagConfigurationResponses,
@@ -922,6 +925,37 @@ export const evaluate = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * The environment's ruleset, as server SDKs download it
+ *
+ * The environment's whole ruleset document, private segments
+ * included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+ * key, with its version as the `ETag`: a file to feed a test helper
+ * or to evaluate offline. It carries the replica's own latest writes.
+ * A replica that cannot load the ruleset answers
+ * `503 ruleset_unavailable` with `Retry-After`.
+ *
+ */
+export const getEnvironmentRuleset = <ThrowOnError extends boolean = false>(
+  options: Options<GetEnvironmentRulesetData, ThrowOnError>,
+): RequestResult<GetEnvironmentRulesetResponses, GetEnvironmentRulesetErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetEnvironmentRulesetResponses,
+    GetEnvironmentRulesetErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/ruleset",
+    ...options,
   });
 
 /**

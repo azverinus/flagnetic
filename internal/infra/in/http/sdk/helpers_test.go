@@ -10,8 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -168,4 +170,44 @@ func decode(t *testing.T, body []byte) document {
 		t.Fatalf("not a ruleset: %v: %s", err, body)
 	}
 	return d
+}
+
+// kill switches flag off in environment, a write moving its ruleset on.
+func (p project) kill(t *testing.T, flag, environment string) {
+	t.Helper()
+	res := do(p.admin.KillFlagWithResponse(t.Context(), p.key, flag, environment, management.Kill{}))
+	if res.StatusCode() != http.StatusOK {
+		t.Fatalf("kill = %d: %s", res.StatusCode(), res.Body)
+	}
+}
+
+// environmentID returns the identifier of environment.
+func (p project) environmentID(t *testing.T, environment string) workspace.EnvironmentID {
+	t.Helper()
+	res := do(p.admin.GetEnvironmentWithResponse(t.Context(), p.key, environment))
+	if res.JSON200 == nil {
+		t.Fatalf("GET …/environments/%s = %d: %s", environment, res.StatusCode(), res.Body)
+	}
+	return id.FromBytes[workspace.Environment](res.JSON200.Id)
+}
+
+// projectID returns the identifier of the project.
+func (p project) projectID(t *testing.T) workspace.ProjectID {
+	t.Helper()
+	res := do(p.admin.GetProjectWithResponse(t.Context(), p.key))
+	if res.JSON200 == nil {
+		t.Fatalf("GET /projects/%s = %d: %s", p.key, res.StatusCode(), res.Body)
+	}
+	return id.FromBytes[workspace.Project](res.JSON200.Id)
+}
+
+// switchOn switches a new flag on in environment, serving true.
+func (p project) switchOn(t *testing.T, flag, environment string) {
+	t.Helper()
+	res := do(p.admin.PutFlagConfigurationWithResponse(t.Context(), p.key, flag, environment,
+		&management.PutFlagConfigurationParams{IfMatch: ptr(`"1"`)},
+		management.FlagConfigurationPut{On: true, OffVariation: "false", Fallthrough: "true"}))
+	if res.JSON200 == nil {
+		t.Fatalf("PUT …/%s/configurations/%s = %d: %s", flag, environment, res.StatusCode(), res.Body)
+	}
 }

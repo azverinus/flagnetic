@@ -17,6 +17,12 @@ import (
 // finish, short enough that an SDK starting up is served within seconds.
 const SDKRetryAfter = 2 * time.Second
 
+// RulesetWait is how long a request waits for a ruleset its replica is
+// loading before it is answered ErrRulesetUnavailable: an SDK holding a
+// ruleset keeps it and retries, rather than wait on a load that may take up
+// to its own bound. The load goes on for the requests after it.
+const RulesetWait = 2 * time.Second
+
 // ErrRulesetUnavailable answers a ruleset this replica cannot load for now.
 // An SDK keeps the ruleset it holds rather than receive an empty one.
 var ErrRulesetUnavailable = apperrors.Unavailable("ruleset_unavailable",
@@ -258,4 +264,30 @@ func readMaterials(ctx context.Context, declarations Declarations, configured Co
 	}
 	m.Configurations, err = configured.EnvironmentConfigurations(ctx, environment)
 	return err
+}
+
+// ReadRuleset answers a member the ruleset of one of a project's
+// environments, as its server SDKs receive it.
+type ReadRuleset struct {
+	environments RulesetEnvironments
+	rulesets     Rulesets
+}
+
+// NewReadRuleset returns the handler.
+func NewReadRuleset(environments RulesetEnvironments, rulesets Rulesets) *ReadRuleset {
+	return &ReadRuleset{environments: environments, rulesets: rulesets}
+}
+
+// Handle returns the ruleset of project's environment keyed environment,
+// the same document a server key receives, or not_found for an environment
+// the project does not have.
+func (h *ReadRuleset) Handle(ctx context.Context, project workspace.ProjectID, environment string) (Ruleset, error) {
+	envID, _, err := h.environments.RulesetEnvironment(ctx, project, environment)
+	if errors.Is(err, ErrNotFound) {
+		return Ruleset{}, errEnvironmentNotFound
+	}
+	if err != nil {
+		return Ruleset{}, err
+	}
+	return h.rulesets.Ruleset(ctx, envID)
 }

@@ -56,6 +56,9 @@ type Options struct {
 	// PasswordHashConcurrency bounds the password hashes and verifications
 	// the replica runs at once.
 	PasswordHashConcurrency int
+	// RulesetLoadFault lets a test stall the replica's ruleset
+	// materializations; nil in production.
+	RulesetLoadFault *pgdelivery.RulesetLoadFault
 	management.Options
 }
 
@@ -66,6 +69,10 @@ type Background struct {
 	Workers []worker.Worker
 	// Listeners are started on the replica's notification listeners.
 	Listeners []Listener
+	// Close ends the work the replica's use cases started on their own, such
+	// as the ruleset loads in flight; whoever runs the replica calls it once
+	// the requests are done.
+	Close func()
 }
 
 // Listener is a handler of the notifications of one channel.
@@ -85,6 +92,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// on, through the delivery context.
 	deliveryStore := pgdelivery.NewStore(d.Pool)
 	rulesets := appdelivery.NewBumpRulesets(deliveryStore, d.Clock)
+	// Every replica serves rulesets from memory by version, learning each
+	// version from its notification, and its own writes' versions as they
+	// commit, before they are answered.
+	rulesetCache := pgdelivery.NewRulesetCache(pgdelivery.RulesetCacheOptions{
+		Load: appdelivery.NewMaterializeRuleset(appdelivery.MaterializeRulesetDeps{
+			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
+		}),
+		Clock: d.Clock, Registerer: reg, Logger: edge.Logger(), Fault: o.RulesetLoadFault,
+	})
+	deliveryStore.OnCommitted(rulesetCache.Committed)
 	sdkKeys := appdelivery.SDKKeyDeps{
 		Tx: tx, Store: deliveryStore, Audit: auditLog, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 	}
@@ -214,6 +231,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
 			Drafts: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
 		}),
+		ReadRuleset: appdelivery.NewReadRuleset(deliveryStore, rulesetCache),
 
 		ListSDKKeys:  appdelivery.NewListSDKKeys(deliveryStore, d.Clock),
 		CreateSDKKey: appdelivery.NewCreateSDKKey(sdkKeys),
@@ -243,9 +261,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	sdkKeyUses := appdelivery.NewSDKKeyUses(deliveryStore)
 	sdk.Mount(edge, sdk.Handlers{
 		Authenticate: appdelivery.NewAuthenticateSDKKey(sdkKeyCache, sdkKeyUses, d.Clock),
-		ServeRuleset: appdelivery.NewServeRuleset(appdelivery.NewMaterializeRuleset(appdelivery.MaterializeRulesetDeps{
-			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
-		})),
+		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
 	})
 	return Background{
 		Workers: []worker.Worker{
@@ -256,7 +272,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Listeners: []Listener{
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},
 			{Channel: pgdelivery.SDKKeysChannel, Handler: sdkKeyCache},
+			{Channel: pgdelivery.RulesetsChannel, Handler: rulesetCache},
 		},
+		Close: rulesetCache.Close,
 	}
 }
 

@@ -160,7 +160,9 @@ func (a *api) GetRuleset(w http.ResponseWriter, r *http.Request, params GetRules
 		a.writeError(w, r, err)
 		return
 	}
-	rs, err := a.h.ServeRuleset.Handle(r.Context(), keyOf(r.Context()))
+	ctx, cancel := context.WithTimeout(r.Context(), appdelivery.RulesetWait)
+	defer cancel()
+	rs, err := a.h.ServeRuleset.Handle(ctx, keyOf(r.Context()))
 	if err != nil {
 		a.writeError(w, r, err)
 		return
