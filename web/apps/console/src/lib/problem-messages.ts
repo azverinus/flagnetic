@@ -121,6 +121,12 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       }
       return i18n._(msg`The role includes a permission you do not hold yourself here.`);
     }
+    case "sdk_key_limit_reached":
+      return i18n._(
+        msg`The environment already has 10 active keys of this kind. Revoke one, or wait for a rotated one to end, first.`,
+      );
+    case "sdk_key_not_active":
+      return i18n._(msg`Only an active key can be rotated. This one was rotated or revoked.`);
     case "invitation_gone":
       return i18n._(
         msg`This invitation link no longer works: it was used, replaced by a newer one, or it expired.`,
@@ -219,6 +225,12 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       const max = numberParam(i18n, violation, "max");
       return max ? i18n._(msg`At most ${max}.`) : i18n._(msg`Too many.`);
     }
+    case "server_key_origins":
+      return i18n._(msg`A server key is never used from a browser, so it takes no origins.`);
+    case "invalid_origin":
+      return i18n._(
+        msg`Enter a scheme, a host and an optional port, such as https://app.example.com.`,
+      );
     case "invalid_value":
       return i18n._(msg`This value is not valid here.`);
     case "invalid_owner":

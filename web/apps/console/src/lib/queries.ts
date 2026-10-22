@@ -30,6 +30,9 @@ import {
   listRoles,
   listAttributes,
   listEnvironments,
+  getEnvironment,
+  listSdkKeys,
+  type SdkKey,
   listFlags,
   getFlag,
   listSegments,
@@ -124,6 +127,22 @@ export function environmentsQuery(project: string) {
   return queryOptions<Environment[]>({
     queryKey: ["projects", project, "environments"],
     queryFn: async () => (await unwrap(listEnvironments({ path: { project } }))).items,
+  });
+}
+
+/** One environment of a project. */
+export function environmentQuery(project: string, environment: string) {
+  return queryOptions<Environment>({
+    queryKey: ["projects", project, "environments", environment],
+    queryFn: () => unwrap(getEnvironment({ path: { project, environment } })),
+  });
+}
+
+/** An environment's SDK keys, the oldest first, revoked and expired ones included. */
+export function sdkKeysQuery(project: string, environment: string) {
+  return queryOptions<SdkKey[]>({
+    queryKey: ["projects", project, "environments", environment, "sdk-keys"],
+    queryFn: async () => (await unwrap(listSdkKeys({ path: { project, environment } }))).items,
   });
 }
 

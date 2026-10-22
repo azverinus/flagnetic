@@ -7,6 +7,10 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: ru\n"
 
+#: src/components/sdk-keys.tsx
+msgid "“{bad}” is not an origin. Use a scheme, a host and an optional port, such as https://app.example.com."
+msgstr "«{bad}» не источник. Укажите схему, хост и, при необходимости, порт, например https://app.example.com."
+
 #: src/lib/device.ts
 msgid "{browser} on {os}"
 msgstr "{browser} на {os}"
@@ -179,6 +183,10 @@ msgstr "{who} сохранил(а) эту конфигурацию {when}, уж�
 msgid "<0>{variation}</0> (note: {note})"
 msgstr "<0>{variation}</0> (заметка: {note})"
 
+#: src/lib/sdk-keys.ts
+msgid "1 hour"
+msgstr "1 час"
+
 #: src/components/condition-row.tsx
 msgid "1.41.0"
 msgstr "1.41.0"
@@ -186,6 +194,14 @@ msgstr "1.41.0"
 #: src/components/condition-row.tsx
 msgid "1.41.0, then Enter"
 msgstr "1.41.0, затем Enter"
+
+#: src/lib/sdk-keys.ts
+msgid "24 hours"
+msgstr "24 часа"
+
+#: src/lib/sdk-keys.ts
+msgid "7 days"
+msgstr "7 дней"
 
 #: src/components/variations-editor.tsx
 msgid "A boolean flag always has exactly the variations true and false."
@@ -257,6 +273,10 @@ msgstr "Токен проекта принадлежит проекту, а не
 msgid "A project token does what its role allows in this project, narrowed to its scopes, and never manages who has access. Every write scope includes read."
 msgstr "Токен проекта может то, что разрешает его роль в этом проекте, в пределах своих областей доступа, и никогда не управляет доступом. Каждая область записи включает чтение."
 
+#: src/components/sdk-keys.tsx
+msgid "A replacement key is created with the same kind, name and allowed origins. The old key keeps working for the overlap, so services can move to the new one without an outage; then it is refused."
+msgstr "Создаётся ключ на замену с тем же видом, названием и разрешёнными источниками. Старый ключ продолжает работать в течение перекрытия, поэтому сервисы переходят на новый без простоя; затем он перестаёт приниматься."
+
 #: src/components/tester-panel.tsx
 msgid "A required flag does not serve the variation required: the off variation is served."
 msgstr "Требуемый флаг не отдаёт нужный вариант: отдаётся вариант при выключении."
@@ -289,6 +309,18 @@ msgstr "В сегменте не больше {maxConditionsText} условий
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "A segment names a group of contexts once, for the rules of every flag."
 msgstr "Сегмент один раз задаёт группу контекстов для правил всех флагов."
+
+#: src/components/sdk-keys.tsx
+msgid "A server key is for a backend; a client key is for a browser or an app. It cannot be changed later."
+msgstr "Серверный ключ нужен бэкенду, клиентский — браузеру или приложению. Позже вид изменить нельзя."
+
+#: src/lib/problem-messages.ts
+msgid "A server key is never used from a browser, so it takes no origins."
+msgstr "Серверный ключ никогда не используется из браузера, поэтому источников у него нет."
+
+#: src/components/sdk-keys.tsx
+msgid "A server key lets a backend SDK download this environment’s ruleset. A client key lets a browser or app ask for the values served to one context, and can be limited to the origins it is used from. A key’s value is shown once, when it is created."
+msgstr "Серверный ключ позволяет SDK бэкенда загружать набор правил этого окружения. Клиентский ключ позволяет браузеру или приложению запрашивать значения, выдаваемые одному контексту, и его можно ограничить источниками, откуда он используется. Значение ключа показывается один раз, при создании."
 
 #: src/components/auth-settings-form.tsx
 msgid "A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older."
@@ -335,6 +367,10 @@ msgstr "Вариант, закреплённый за одной единице�
 msgid "A year"
 msgstr "Год"
 
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "About {key}"
+msgstr "Об окружении {key}"
+
 #: src/components/invitation-acceptance.tsx
 msgid "Accept invitation"
 msgstr "Принять приглашение"
@@ -355,6 +391,7 @@ msgstr "Действия"
 
 #: src/components/token-list.tsx
 #: src/lib/members.ts
+#: src/lib/sdk-keys.ts
 msgid "Active"
 msgstr "Действует"
 
@@ -436,6 +473,10 @@ msgstr "После"
 msgid "All projects"
 msgstr "Все проекты"
 
+#: src/components/sdk-keys.tsx
+msgid "Allowed origins"
+msgstr "Разрешённые источники"
+
 #: src/lib/problem-messages.ts
 msgid "An attribute's type is fixed once it is declared."
 msgstr "Тип атрибута после объявления не меняется."
@@ -476,6 +517,10 @@ msgstr "Любое"
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any environments"
 msgstr "Любые окружения"
+
+#: src/components/sdk-keys.tsx
+msgid "Any origin"
+msgstr "Любой источник"
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any owner"
@@ -565,6 +610,10 @@ msgstr "Не более {max} символов."
 #: src/lib/problem-messages.ts
 msgid "At most {max}."
 msgstr "Не более {max}."
+
+#: src/components/sdk-keys.tsx
+msgid "At most {maxAllowedOrigins} origins."
+msgstr "Не больше {maxAllowedOrigins} источников."
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
@@ -836,6 +885,10 @@ msgstr "Выбранные теги"
 msgid "Clear filters"
 msgstr "Сбросить фильтры"
 
+#: src/lib/sdk-keys.ts
+msgid "Client"
+msgstr "Клиентский"
+
 #: src/components/ui/dialog.tsx
 #: src/components/ui/reveal-secret.tsx
 #: src/components/ui/sheet.tsx
@@ -949,13 +1002,17 @@ msgstr "Скопировать конфигурацию"
 msgid "Create attribute"
 msgstr "Создать атрибут"
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Create environment"
 msgstr "Создать окружение"
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Create flag"
 msgstr "Создать флаг"
+
+#: src/components/sdk-keys.tsx
+msgid "Create key"
+msgstr "Создать ключ"
 
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "Create project"
@@ -977,6 +1034,7 @@ msgstr "Создать токен"
 msgid "Create unit type"
 msgstr "Создать тип единицы"
 
+#: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
 msgid "Created"
 msgstr "Создан"
@@ -1029,7 +1087,7 @@ msgid "Delete"
 msgstr "Удалить"
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
@@ -1040,7 +1098,7 @@ msgstr "Удалить {key}"
 msgid "Delete attribute"
 msgstr "Удалить атрибут"
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Delete environment"
 msgstr "Удалить окружение"
 
@@ -1139,6 +1197,10 @@ msgstr "Изменить {key}"
 msgid "Edit {name}"
 msgstr "Изменить участника {name}"
 
+#: src/components/sdk-keys.tsx
+msgid "Edit {name} ({keyId})"
+msgstr "Изменить ключ {name} ({keyId})"
+
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Edit definition"
@@ -1147,6 +1209,10 @@ msgstr "Изменить определение"
 #: src/lib/access-names.ts
 msgid "edit flags"
 msgstr "изменять флаги"
+
+#: src/components/sdk-keys.tsx
+msgid "Edit key {name}"
+msgstr "Изменить ключ {name}"
 
 #: src/lib/access-names.ts
 msgid "edit segments"
@@ -1215,6 +1281,10 @@ msgid "Enter a percentage from 0 to 100, to two decimal places."
 msgstr "Введите процент от 0 до 100, не больше двух знаков после запятой."
 
 #: src/lib/problem-messages.ts
+msgid "Enter a scheme, a host and an optional port, such as https://app.example.com."
+msgstr "Укажите схему, хост и, при необходимости, порт, например https://app.example.com."
+
+#: src/lib/problem-messages.ts
 msgid "Enter a valid email address."
 msgstr "Введите корректный адрес электронной почты."
 
@@ -1280,12 +1350,17 @@ msgstr "Окружение создано"
 msgid "Environment deleted"
 msgstr "Окружение удалено"
 
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "Environment not found"
+msgstr "Окружение не найдено"
+
 #: src/lib/audit.ts
 msgid "Environment updated"
 msgstr "Окружение изменено"
 
 #: src/components/navigation.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
+#: src/routes/_signed-in/projects/$project/environments/route.tsx
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "Environments"
 msgstr "Окружения"
@@ -1366,6 +1441,10 @@ msgstr "Каждый флаг есть во всех окружениях про
 msgid "Every new API token must have an expiry; none may live forever."
 msgstr "У каждого нового API-токена должен быть срок действия: бессрочных токенов не будет."
 
+#: src/components/sdk-keys.tsx
+msgid "Every SDK using the key {keyId} is refused at once, even within a rotation overlap. This cannot be undone."
+msgstr "Все SDK, использующие ключ {keyId}, перестанут приниматься сразу, даже в пределах перекрытия при ротации. Это нельзя отменить."
+
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Every status"
 msgstr "Любой статус"
@@ -1400,9 +1479,11 @@ msgid "Experiments are not available yet."
 msgstr "Эксперименты пока недоступны."
 
 #: src/components/token-list.tsx
+#: src/lib/sdk-keys.ts
 msgid "Expired"
 msgstr "Истёк"
 
+#: src/components/sdk-keys.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 msgid "Expires"
@@ -1515,6 +1596,10 @@ msgstr "Отформатировать вариант {n}"
 #: src/components/audit-log.tsx
 msgid "From"
 msgstr "С"
+
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "Go to the environments"
+msgstr "К окружениям"
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Go to the flags"
@@ -1760,6 +1845,10 @@ msgstr "JSON"
 msgid "Keep my edits"
 msgstr "Оставить мои правки"
 
+#: src/components/sdk-keys.tsx
+msgid "Keep the old key working for"
+msgstr "Сохранять работу старого ключа"
+
 #: src/components/theme-choice.tsx
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr "Хранится в этом браузере и применяется и на странице входа. Вариант «Как в системе» следует настройке устройства."
@@ -1769,7 +1858,7 @@ msgstr "Хранится в этом браузере и применяется 
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
@@ -1781,6 +1870,10 @@ msgstr "Ключ"
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "Key <0>{key}</0>"
 msgstr "Ключ <0>{key}</0>"
+
+#: src/components/sdk-keys.tsx
+msgid "Key ID"
+msgstr "Идентификатор ключа"
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
@@ -1798,6 +1891,10 @@ msgstr "Сработал аварийный выключатель"
 #: src/components/kill-switch-dialog.tsx
 msgid "Kill switch: {flagKey} in {name}"
 msgstr "Аварийный выключатель: {flagKey} в окружении {name}"
+
+#: src/components/sdk-keys.tsx
+msgid "Kind"
+msgstr "Вид"
 
 #: src/components/personal-menu.tsx
 #: src/components/profile-form.tsx
@@ -1817,6 +1914,7 @@ msgstr "Последний вход"
 msgid "Last updated"
 msgstr "Последнее изменение"
 
+#: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
 msgid "Last used"
 msgstr "Последнее использование"
@@ -1883,7 +1981,7 @@ msgid "Locked out after failed sign-ins"
 msgstr "Вход заблокирован после неудачных попыток"
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Lowercase letters, digits, - and _. It never changes."
 msgstr "Строчные буквы, цифры, - и _. Никогда не меняется."
@@ -2029,13 +2127,14 @@ msgstr "Переместить правило {position} выше"
 
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
+#: src/components/sdk-keys.tsx
 #: src/components/segment-fields.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
@@ -2059,6 +2158,7 @@ msgstr "Нужно право {name}, оно есть у ролей {list}."
 msgid "Needs the permission to {name}."
 msgstr "Нужно право {name}."
 
+#: src/components/sdk-keys.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -2078,7 +2178,7 @@ msgstr "Новый API-токен"
 msgid "New attribute"
 msgstr "Новый атрибут"
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "New environment"
 msgstr "Новое окружение"
 
@@ -2099,6 +2199,10 @@ msgstr "Новый проект"
 #: src/components/project-token-list.tsx
 msgid "New project token"
 msgstr "Новый токен проекта"
+
+#: src/components/sdk-keys.tsx
+msgid "New SDK key"
+msgstr "Новый SDK-ключ"
 
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
@@ -2223,6 +2327,10 @@ msgstr "Нет"
 msgid "none chosen"
 msgstr "не выбран"
 
+#: src/lib/sdk-keys.ts
+msgid "None, end the old key now"
+msgstr "Нет, отключить старый ключ сразу"
+
 #: src/routes/_signed-in/$.tsx
 msgid "Not found"
 msgstr "Не найдено"
@@ -2318,6 +2426,10 @@ msgstr "Соль есть только у правила с раскаткой."
 #: src/lib/problem-messages.ts
 msgid "Only a signed-in session can do this, not an API token."
 msgstr "Это можно сделать только в сеансе входа, а не с API-токеном."
+
+#: src/lib/problem-messages.ts
+msgid "Only an active key can be rotated. This one was rotated or revoked."
+msgstr "Ротировать можно только действующий ключ. Этот уже ротирован или отозван."
 
 #: src/routes/_signed-in/admin/route.tsx
 msgid "Only an instance admin can open it."
@@ -2538,6 +2650,14 @@ msgstr "Проект: {label}"
 msgid "Projects"
 msgstr "Проекты"
 
+#: src/components/sdk-keys.tsx
+msgid "Put it in the client SDK’s configuration. It ships inside the browser or the app, so anyone can read it: it learns only the values served to a context, never the ruleset."
+msgstr "Укажите его в настройках клиентского SDK. Он поставляется внутри браузера или приложения, поэтому его может прочитать любой: он узнаёт только значения, выданные контексту, но не набор правил."
+
+#: src/components/sdk-keys.tsx
+msgid "Put it in the server SDK’s configuration, where only the service that uses it can read it. Never ship it in a browser or an app."
+msgstr "Укажите его в настройках серверного SDK, где его прочитает только использующий его сервис. Никогда не поставляйте его в браузере или приложении."
+
 #: src/components/member-actions.tsx
 msgid "Reactivate"
 msgstr "Активировать снова"
@@ -2641,7 +2761,7 @@ msgstr "Удалить единицу {n}"
 msgid "Remove variation {n}"
 msgstr "Удалить вариант {n}"
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Rename {key}"
 msgstr "Переименовать {key}"
 
@@ -2714,6 +2834,10 @@ msgstr "Вернуть версию {version}"
 msgid "Revoke {name}"
 msgstr "Отозвать {name}"
 
+#: src/components/sdk-keys.tsx
+msgid "Revoke {name} ({keyId})"
+msgstr "Отозвать ключ {name} ({keyId})"
+
 #: src/components/token-list.tsx
 msgid "Revoke {revokingName}"
 msgstr "Отозвать {revokingName}"
@@ -2734,6 +2858,14 @@ msgstr "Снять права администратора экземпляра"
 msgid "Revoke instance admin from {name}"
 msgstr "Снять с участника {name} права администратора экземпляра"
 
+#: src/components/sdk-keys.tsx
+msgid "Revoke key"
+msgstr "Отозвать ключ"
+
+#: src/components/sdk-keys.tsx
+msgid "Revoke key {name}"
+msgstr "Отозвать ключ {name}"
+
 #: src/components/session-list.tsx
 msgid "Revoke session"
 msgstr "Отозвать сеанс"
@@ -2751,6 +2883,7 @@ msgid "Revoke token"
 msgstr "Отозвать токен"
 
 #: src/components/token-list.tsx
+#: src/lib/sdk-keys.ts
 msgid "Revoked"
 msgstr "Отозван"
 
@@ -2771,6 +2904,22 @@ msgstr "Раскатка"
 #: src/lib/audit.ts
 msgid "Rollout salt regenerated"
 msgstr "Соль раскатки сменена"
+
+#: src/components/sdk-keys.tsx
+msgid "Rotate {name} ({keyId})"
+msgstr "Ротировать ключ {name} ({keyId})"
+
+#: src/components/sdk-keys.tsx
+msgid "Rotate key"
+msgstr "Ротировать ключ"
+
+#: src/components/sdk-keys.tsx
+msgid "Rotate key {name}"
+msgstr "Ротировать ключ {name}"
+
+#: src/lib/sdk-keys.ts
+msgid "Rotating"
+msgstr "Ротируется"
 
 #: src/components/tester-panel.tsx
 msgid "Rule"
@@ -2845,9 +2994,10 @@ msgstr "Соль <0>{salt}</0>"
 #: src/components/auth-settings-form.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
+#: src/components/sdk-keys.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Save"
@@ -2869,6 +3019,11 @@ msgstr "Сохранить сегмент, который используетс
 #: src/components/token-list.tsx
 msgid "Scopes"
 msgstr "Области доступа"
+
+#: src/components/sdk-keys.tsx
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "SDK keys"
+msgstr "SDK-ключи"
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "SDKs receive the flag again, configured in every environment as it was left."
@@ -2943,6 +3098,10 @@ msgstr "Отдаётся, пока флаг выключен, и когда не
 #: src/components/configuration-editor.tsx
 msgid "Served while the flag is on and no rule matches."
 msgstr "Отдаётся, когда флаг включён и ни одно правило не подошло."
+
+#: src/lib/sdk-keys.ts
+msgid "Server"
+msgstr "Серверный"
 
 #: src/components/rule-editor.tsx
 msgid "Serves (rule {position})"
@@ -3084,6 +3243,7 @@ msgstr "начинается с"
 msgid "State"
 msgstr "Состояние"
 
+#: src/components/sdk-keys.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Status"
@@ -3247,9 +3407,13 @@ msgstr "Неверный адрес электронной почты или п�
 msgid "The entry records no values."
 msgstr "Запись не содержит значений."
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "The environment {key} is deleted. This cannot be undone."
 msgstr "Окружение {key} будет удалено. Отменить это нельзя."
+
+#: src/lib/problem-messages.ts
+msgid "The environment already has 10 active keys of this kind. Revoke one, or wait for a rotated one to end, first."
+msgstr "В окружении уже 10 действующих ключей этого вида. Сначала отзовите один из них или дождитесь окончания перекрытия ротированного."
 
 #: src/components/compare-environments.tsx
 msgid "The environments serve differently where marked."
@@ -3369,6 +3533,10 @@ msgstr "Новые пароли не совпадают."
 msgid "The new project token"
 msgstr "Токен проекта создан"
 
+#: src/components/sdk-keys.tsx
+msgid "The new SDK key"
+msgstr "Новый SDK-ключ"
+
 #: src/components/overrides-section.tsx
 msgid "The override of {unit} is removed."
 msgstr "Переопределение {unit} удалено."
@@ -3404,6 +3572,10 @@ msgstr "В проекте не объявлен такой атрибут."
 msgid "The project does not declare this unit type."
 msgstr "В проекте не объявлен такой тип единицы."
 
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "The project has no environment with this key. It may have been deleted."
+msgstr "В проекте нет окружения с таким ключом. Возможно, его удалили."
+
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "The project has no flag with this key. It may have been deleted."
 msgstr "В проекте нет флага с таким ключом. Возможно, его удалили."
@@ -3433,6 +3605,10 @@ msgstr "Проект сохранён."
 #: src/components/navigation.tsx
 msgid "The project's screens could not be read."
 msgstr "Не удалось загрузить разделы проекта."
+
+#: src/components/sdk-keys.tsx
+msgid "The replacement SDK key"
+msgstr "SDK-ключ на замену"
 
 #: src/lib/problem-messages.ts
 msgid "The request came from another site and was refused."
@@ -3504,6 +3680,10 @@ msgstr "Сервер недоступен. Попробуйте ещё раз ч
 msgid "The session is revoked."
 msgstr "Сеанс отозван."
 
+#: src/components/sdk-keys.tsx
+msgid "The sites the key may be used from, such as https://app.example.com. Leave it empty to allow any origin."
+msgstr "Сайты, откуда можно использовать ключ, например https://app.example.com. Оставьте пустым, чтобы разрешить любой источник."
+
 #: src/lib/problem-messages.ts
 msgid "The token in use does not carry the scope this needs."
 msgstr "У используемого токена нет нужной для этого области доступа."
@@ -3572,6 +3752,10 @@ msgstr "Это здесь изменить нельзя."
 #: src/components/session-list.tsx
 msgid "This device"
 msgstr "Это устройство"
+
+#: src/components/sdk-keys.tsx
+msgid "This environment has no SDK key yet."
+msgstr "В этом окружении пока нет SDK-ключей."
 
 #: src/lib/configuration-draft.ts
 msgid "This flag is already a prerequisite."
@@ -3660,7 +3844,7 @@ msgstr "В этом проекте уже есть сегмент с таким 
 msgid "This project already has a unit type or an attribute with that key."
 msgstr "В этом проекте уже есть тип единицы или атрибут с таким ключом."
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "This project already has an environment with that key."
 msgstr "В этом проекте уже есть окружение с таким ключом."
 
@@ -3949,6 +4133,10 @@ msgstr "Что флаг отдаёт в двух окружениях, по то
 msgid "What the project is called and what it is for."
 msgstr "Как называется проект и для чего он."
 
+#: src/components/sdk-keys.tsx
+msgid "What uses the key, to tell it apart later."
+msgstr "Что использует ключ, чтобы потом отличать его от других."
+
 #: src/components/token-create-form.tsx
 msgid "What uses the token, to tell it apart later."
 msgstr "Что будет пользоваться токеном, чтобы потом отличать его от других."
@@ -3957,7 +4145,7 @@ msgstr "Что будет пользоваться токеном, чтобы п
 msgid "Whatever uses the token is refused from now on. This cannot be undone."
 msgstr "Всё, что пользуется токеном, с этого момента получит отказ. Это нельзя отменить."
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr "Откуда проект отдаёт значения. Ключ после создания не меняется, название можно изменить."
 

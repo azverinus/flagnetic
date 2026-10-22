@@ -7,6 +7,10 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: pseudo\n"
 
+#: src/components/sdk-keys.tsx
+msgid "“{bad}” is not an origin. Use a scheme, a host and an optional port, such as https://app.example.com."
+msgstr ""
+
 #: src/lib/device.ts
 msgid "{browser} on {os}"
 msgstr ""
@@ -179,12 +183,24 @@ msgstr ""
 msgid "<0>{variation}</0> (note: {note})"
 msgstr ""
 
+#: src/lib/sdk-keys.ts
+msgid "1 hour"
+msgstr ""
+
 #: src/components/condition-row.tsx
 msgid "1.41.0"
 msgstr ""
 
 #: src/components/condition-row.tsx
 msgid "1.41.0, then Enter"
+msgstr ""
+
+#: src/lib/sdk-keys.ts
+msgid "24 hours"
+msgstr ""
+
+#: src/lib/sdk-keys.ts
+msgid "7 days"
 msgstr ""
 
 #: src/components/variations-editor.tsx
@@ -257,6 +273,10 @@ msgstr ""
 msgid "A project token does what its role allows in this project, narrowed to its scopes, and never manages who has access. Every write scope includes read."
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "A replacement key is created with the same kind, name and allowed origins. The old key keeps working for the overlap, so services can move to the new one without an outage; then it is refused."
+msgstr ""
+
 #: src/components/tester-panel.tsx
 msgid "A required flag does not serve the variation required: the off variation is served."
 msgstr ""
@@ -288,6 +308,18 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "A segment names a group of contexts once, for the rules of every flag."
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "A server key is for a backend; a client key is for a browser or an app. It cannot be changed later."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "A server key is never used from a browser, so it takes no origins."
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "A server key lets a backend SDK download this environment’s ruleset. A client key lets a browser or app ask for the values served to one context, and can be limited to the origins it is used from. A key’s value is shown once, when it is created."
 msgstr ""
 
 #: src/components/auth-settings-form.tsx
@@ -335,6 +367,10 @@ msgstr ""
 msgid "A year"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "About {key}"
+msgstr ""
+
 #: src/components/invitation-acceptance.tsx
 msgid "Accept invitation"
 msgstr ""
@@ -355,6 +391,7 @@ msgstr ""
 
 #: src/components/token-list.tsx
 #: src/lib/members.ts
+#: src/lib/sdk-keys.ts
 msgid "Active"
 msgstr ""
 
@@ -436,6 +473,10 @@ msgstr ""
 msgid "All projects"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "Allowed origins"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "An attribute's type is fixed once it is declared."
 msgstr ""
@@ -475,6 +516,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any environments"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Any origin"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -564,6 +609,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "At most {max}."
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "At most {maxAllowedOrigins} origins."
 msgstr ""
 
 #. A kind of entity in the audit log.
@@ -836,6 +885,10 @@ msgstr ""
 msgid "Clear filters"
 msgstr ""
 
+#: src/lib/sdk-keys.ts
+msgid "Client"
+msgstr ""
+
 #: src/components/ui/dialog.tsx
 #: src/components/ui/reveal-secret.tsx
 #: src/components/ui/sheet.tsx
@@ -949,12 +1002,16 @@ msgstr ""
 msgid "Create attribute"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Create environment"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Create flag"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Create key"
 msgstr ""
 
 #: src/routes/_signed-in/admin/projects.tsx
@@ -977,6 +1034,7 @@ msgstr ""
 msgid "Create unit type"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
 msgid "Created"
 msgstr ""
@@ -1029,7 +1087,7 @@ msgid "Delete"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
@@ -1040,7 +1098,7 @@ msgstr ""
 msgid "Delete attribute"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Delete environment"
 msgstr ""
 
@@ -1139,6 +1197,10 @@ msgstr ""
 msgid "Edit {name}"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "Edit {name} ({keyId})"
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Edit definition"
@@ -1146,6 +1208,10 @@ msgstr ""
 
 #: src/lib/access-names.ts
 msgid "edit flags"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Edit key {name}"
 msgstr ""
 
 #: src/lib/access-names.ts
@@ -1215,6 +1281,10 @@ msgid "Enter a percentage from 0 to 100, to two decimal places."
 msgstr ""
 
 #: src/lib/problem-messages.ts
+msgid "Enter a scheme, a host and an optional port, such as https://app.example.com."
+msgstr ""
+
+#: src/lib/problem-messages.ts
 msgid "Enter a valid email address."
 msgstr ""
 
@@ -1280,12 +1350,17 @@ msgstr ""
 msgid "Environment deleted"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "Environment not found"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Environment updated"
 msgstr ""
 
 #: src/components/navigation.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
+#: src/routes/_signed-in/projects/$project/environments/route.tsx
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "Environments"
 msgstr ""
@@ -1366,6 +1441,10 @@ msgstr ""
 msgid "Every new API token must have an expiry; none may live forever."
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "Every SDK using the key {keyId} is refused at once, even within a rotation overlap. This cannot be undone."
+msgstr ""
+
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Every status"
 msgstr ""
@@ -1400,9 +1479,11 @@ msgid "Experiments are not available yet."
 msgstr ""
 
 #: src/components/token-list.tsx
+#: src/lib/sdk-keys.ts
 msgid "Expired"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 msgid "Expires"
@@ -1514,6 +1595,10 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "From"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "Go to the environments"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -1760,6 +1845,10 @@ msgstr ""
 msgid "Keep my edits"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "Keep the old key working for"
+msgstr ""
+
 #: src/components/theme-choice.tsx
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr ""
@@ -1769,7 +1858,7 @@ msgstr ""
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
@@ -1780,6 +1869,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "Key <0>{key}</0>"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Key ID"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -1797,6 +1890,10 @@ msgstr ""
 
 #: src/components/kill-switch-dialog.tsx
 msgid "Kill switch: {flagKey} in {name}"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Kind"
 msgstr ""
 
 #: src/components/personal-menu.tsx
@@ -1817,6 +1914,7 @@ msgstr ""
 msgid "Last updated"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
 msgid "Last used"
 msgstr ""
@@ -1883,7 +1981,7 @@ msgid "Locked out after failed sign-ins"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Lowercase letters, digits, - and _. It never changes."
 msgstr ""
@@ -2029,13 +2127,14 @@ msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
+#: src/components/sdk-keys.tsx
 #: src/components/segment-fields.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
@@ -2059,6 +2158,7 @@ msgstr ""
 msgid "Needs the permission to {name}."
 msgstr ""
 
+#: src/components/sdk-keys.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -2078,7 +2178,7 @@ msgstr ""
 msgid "New attribute"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "New environment"
 msgstr ""
 
@@ -2098,6 +2198,10 @@ msgstr ""
 
 #: src/components/project-token-list.tsx
 msgid "New project token"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "New SDK key"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
@@ -2223,6 +2327,10 @@ msgstr ""
 msgid "none chosen"
 msgstr ""
 
+#: src/lib/sdk-keys.ts
+msgid "None, end the old key now"
+msgstr ""
+
 #: src/routes/_signed-in/$.tsx
 msgid "Not found"
 msgstr ""
@@ -2317,6 +2425,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Only a signed-in session can do this, not an API token."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Only an active key can be rotated. This one was rotated or revoked."
 msgstr ""
 
 #: src/routes/_signed-in/admin/route.tsx
@@ -2538,6 +2650,14 @@ msgstr ""
 msgid "Projects"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "Put it in the client SDK’s configuration. It ships inside the browser or the app, so anyone can read it: it learns only the values served to a context, never the ruleset."
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Put it in the server SDK’s configuration, where only the service that uses it can read it. Never ship it in a browser or an app."
+msgstr ""
+
 #: src/components/member-actions.tsx
 msgid "Reactivate"
 msgstr ""
@@ -2641,7 +2761,7 @@ msgstr ""
 msgid "Remove variation {n}"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Rename {key}"
 msgstr ""
 
@@ -2714,6 +2834,10 @@ msgstr ""
 msgid "Revoke {name}"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "Revoke {name} ({keyId})"
+msgstr ""
+
 #: src/components/token-list.tsx
 msgid "Revoke {revokingName}"
 msgstr ""
@@ -2734,6 +2858,14 @@ msgstr ""
 msgid "Revoke instance admin from {name}"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "Revoke key"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Revoke key {name}"
+msgstr ""
+
 #: src/components/session-list.tsx
 msgid "Revoke session"
 msgstr ""
@@ -2751,6 +2883,7 @@ msgid "Revoke token"
 msgstr ""
 
 #: src/components/token-list.tsx
+#: src/lib/sdk-keys.ts
 msgid "Revoked"
 msgstr ""
 
@@ -2770,6 +2903,22 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Rollout salt regenerated"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Rotate {name} ({keyId})"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Rotate key"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "Rotate key {name}"
+msgstr ""
+
+#: src/lib/sdk-keys.ts
+msgid "Rotating"
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -2845,9 +2994,10 @@ msgstr ""
 #: src/components/auth-settings-form.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
+#: src/components/sdk-keys.tsx
 #: src/components/ui/unsaved-changes-bar.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Save"
@@ -2868,6 +3018,11 @@ msgstr ""
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 msgid "Scopes"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "SDK keys"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -2942,6 +3097,10 @@ msgstr ""
 
 #: src/components/configuration-editor.tsx
 msgid "Served while the flag is on and no rule matches."
+msgstr ""
+
+#: src/lib/sdk-keys.ts
+msgid "Server"
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -3084,6 +3243,7 @@ msgstr ""
 msgid "State"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Status"
@@ -3247,8 +3407,12 @@ msgstr ""
 msgid "The entry records no values."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "The environment {key} is deleted. This cannot be undone."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The environment already has 10 active keys of this kind. Revoke one, or wait for a rotated one to end, first."
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -3369,6 +3533,10 @@ msgstr ""
 msgid "The new project token"
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "The new SDK key"
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "The override of {unit} is removed."
 msgstr ""
@@ -3404,6 +3572,10 @@ msgstr ""
 msgid "The project does not declare this unit type."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "The project has no environment with this key. It may have been deleted."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "The project has no flag with this key. It may have been deleted."
 msgstr ""
@@ -3432,6 +3604,10 @@ msgstr ""
 
 #: src/components/navigation.tsx
 msgid "The project's screens could not be read."
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "The replacement SDK key"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -3504,6 +3680,10 @@ msgstr ""
 msgid "The session is revoked."
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "The sites the key may be used from, such as https://app.example.com. Leave it empty to allow any origin."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "The token in use does not carry the scope this needs."
 msgstr ""
@@ -3571,6 +3751,10 @@ msgstr ""
 
 #: src/components/session-list.tsx
 msgid "This device"
+msgstr ""
+
+#: src/components/sdk-keys.tsx
+msgid "This environment has no SDK key yet."
 msgstr ""
 
 #: src/lib/configuration-draft.ts
@@ -3660,7 +3844,7 @@ msgstr ""
 msgid "This project already has a unit type or an attribute with that key."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "This project already has an environment with that key."
 msgstr ""
 
@@ -3949,6 +4133,10 @@ msgstr ""
 msgid "What the project is called and what it is for."
 msgstr ""
 
+#: src/components/sdk-keys.tsx
+msgid "What uses the key, to tell it apart later."
+msgstr ""
+
 #: src/components/token-create-form.tsx
 msgid "What uses the token, to tell it apart later."
 msgstr ""
@@ -3957,7 +4145,7 @@ msgstr ""
 msgid "Whatever uses the token is refused from now on. This cannot be undone."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr ""
 
