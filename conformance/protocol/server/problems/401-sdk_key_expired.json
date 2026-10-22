@@ -1,8 +1,8 @@
 {
   "code": "sdk_key_expired",
   "detail": "the SDK key expired after a rotation; use its replacement",
+  "request_id": "<request id>",
   "status": 401,
-  "title": "SDK key expired",
+  "title": "Unauthenticated",
   "type": "urn:flagnetic:problem:sdk_key_expired"
 }
-

@@ -52,6 +52,7 @@ Every SDK follows these rules, so an additive change never needs a new `schema_v
 | Unknown flag type | The flag is absent. |
 | Unknown evaluation reason | Passed through with the served value. |
 | Unknown event type (sent to the server) | Rejected per event with `event_type_unknown`; the rest of the batch is accepted and the rejected event is never sent again. |
+| Unknown rejection code (in an events answer) | A rejection like any other: the event is never sent again. The codes are an open set a later server may add to. |
 | `schema_version` outside the SDK's range | A failure of the fallback chain, as above. |
 
 ## What the Go SDK declares

@@ -1,0 +1,8 @@
+{
+  "code": "request_too_large",
+  "detail": "the request body is larger than 32768 bytes",
+  "request_id": "<request id>",
+  "status": 413,
+  "title": "Request too large",
+  "type": "urn:flagnetic:problem:request_too_large"
+}

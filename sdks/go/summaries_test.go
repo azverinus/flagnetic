@@ -620,7 +620,7 @@ func TestRejectedRowsAreNeverRetried(t *testing.T) {
 func TestOtherClientErrorsDropTheBatchAndLog(t *testing.T) {
 	var l logs
 	m := newIngestMock(t,
-		reply{status: http.StatusBadRequest, body: `{"code": "malformed_body"}`},
+		reply{status: http.StatusBadRequest, body: `{"code": "invalid_request"}`},
 		reply{status: http.StatusAccepted, body: accepted},
 	)
 	c, ticks := summaryClient(t, m, flagnetic.WithLogger(l.logger()))

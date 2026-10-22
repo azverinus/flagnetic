@@ -1,8 +1,8 @@
 {
   "code": "method_not_allowed",
-  "detail": "DELETE is not allowed here; allowed: GET, HEAD, OPTIONS",
+  "detail": "this path does not accept this method",
+  "request_id": "<request id>",
   "status": 405,
   "title": "Method not allowed",
   "type": "urn:flagnetic:problem:method_not_allowed"
 }
-

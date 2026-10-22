@@ -1254,6 +1254,19 @@
         "status": 202
       },
       "why": "the server rejects an event type it does not know per event (event_type_unknown), as it rejects invalid events; the batch was answered, so nothing is retried"
+    },
+    {
+      "endpoint": "POST /sdk/v1/events",
+      "name": "events-unknown-rejection-code",
+      "outcome": "never_retry_rejected",
+      "response": {
+        "body": "degradation/events-unknown-rejection-code.json",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 202
+      },
+      "why": "rejection codes are an open set: a code the SDK does not know is a rejection like any other, so the event is never sent again"
     }
   ],
   "context": {

@@ -53,9 +53,10 @@ const (
 	// It exists because a retry nobody can see is a retry nobody can alert on.
 	EventIngestFailed Event = "ingest_failed"
 	// EventExposureSkipped (debug): an exposure call sent nothing.
-	// Fields: flag, cause (no_experiment when no recent evaluation of that
-	// flag for that context carried an experiment block, repeat when the
-	// same unit was already recorded seeing this variation).
+	// Fields: flag, cause (no_experiment when no evaluation of that flag
+	// has carried an experiment block, no_detail when one has but not for
+	// this context, repeat when the same unit was already recorded seeing
+	// this variation).
 	// It exists because "nothing was sent" is what a developer
 	// who called Exposure needs to see.
 	EventExposureSkipped Event = "exposure_skipped"

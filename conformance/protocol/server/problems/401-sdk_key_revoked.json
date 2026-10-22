@@ -1,8 +1,8 @@
 {
   "code": "sdk_key_revoked",
   "detail": "the SDK key was revoked",
+  "request_id": "<request id>",
   "status": 401,
-  "title": "SDK key revoked",
+  "title": "Unauthenticated",
   "type": "urn:flagnetic:problem:sdk_key_revoked"
 }
-

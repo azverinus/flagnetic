@@ -1,8 +1,8 @@
 {
   "code": "server_key_in_query",
   "detail": "a server key never travels in a URL; send it in Authorization: Bearer and rotate this one",
+  "request_id": "<request id>",
   "status": 403,
-  "title": "Server key in query",
+  "title": "Forbidden",
   "type": "urn:flagnetic:problem:server_key_in_query"
 }
-

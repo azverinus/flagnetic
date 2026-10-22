@@ -1,8 +1,8 @@
 {
   "code": "sdk_key_invalid",
   "detail": "the SDK key is not one this platform issued",
+  "request_id": "<request id>",
   "status": 401,
-  "title": "SDK key invalid",
+  "title": "Unauthenticated",
   "type": "urn:flagnetic:problem:sdk_key_invalid"
 }
-

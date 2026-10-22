@@ -115,8 +115,9 @@ type Experiment struct {
 	VariationSalt   string `json:"variation_salt"`
 	InclusionBucket int    `json:"inclusion_bucket"`
 	VariationBucket int    `json:"variation_bucket"`
-	// Override is true when an override decided the value; exposures
-	// carrying it are excluded from analysis.
+	// Override is true when an override influenced the value, directly or
+	// through a prerequisite (the evaluator's override_influenced);
+	// exposures carrying it are excluded from analysis.
 	Override bool `json:"override"`
 }
 

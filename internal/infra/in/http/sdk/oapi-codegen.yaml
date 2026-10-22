@@ -1,0 +1,18 @@
+# Generates the SDK API's models, standard-library server, strict server and
+# client from api/sdk.yaml (`task generate`).
+package: sdk
+output: api.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+  client: true
+output-options:
+  # The event types are schemas of their own that no operation names (a
+  # batch holds events of any type, so that an unknown one is rejected per
+  # event rather than refusing the batch); they are generated all the same.
+  skip-prune: true
+compatibility:
+  # Enum values are named after their type, so values of different enums
+  # never collide in the package.
+  always-prefix-enum-values: true

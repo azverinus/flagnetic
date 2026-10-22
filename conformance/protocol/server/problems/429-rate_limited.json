@@ -1,8 +1,9 @@
 {
   "code": "rate_limited",
   "detail": "too many requests; retry after Retry-After seconds",
+  "request_id": "<request id>",
+  "retry_after": 60,
   "status": 429,
-  "title": "Rate limited",
+  "title": "Too many requests",
   "type": "urn:flagnetic:problem:rate_limited"
 }
-

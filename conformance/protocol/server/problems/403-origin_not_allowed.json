@@ -1,8 +1,8 @@
 {
   "code": "origin_not_allowed",
   "detail": "the client key does not allow the origin https://elsewhere.example.com; a member lists it in the key's allowed origins",
+  "request_id": "<request id>",
   "status": 403,
-  "title": "Origin not allowed",
+  "title": "Forbidden",
   "type": "urn:flagnetic:problem:origin_not_allowed"
 }
-

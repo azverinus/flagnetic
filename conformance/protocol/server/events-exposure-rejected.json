@@ -1,0 +1,13 @@
+{
+  "accepted": 0,
+  "dropped_rows": 0,
+  "duplicates": 0,
+  "rejected": [
+    {
+      "code": "unknown_experiment",
+      "detail": "no running experiment is keyed \"onboarding_test\"",
+      "event_id": "01a0b91b-c500-7000-8000-00000000000d",
+      "index": 0
+    }
+  ]
+}

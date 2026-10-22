@@ -17,11 +17,13 @@ Wrap the evaluator in getters that never throw or panic: a missing flag, a type 
 
 ## 3. The protocol
 
-[`conformance/protocol`](../../conformance/protocol/README.md) holds the documents of `/sdk/v1` in exactly the shapes the server serves, and a step language a mock server in any language can script:
+[`conformance/protocol`](../../conformance/protocol/README.md) holds the documents of `/sdk/v1` in exactly the shapes the server serves (their contract is [`api/sdk.yaml`](../../api/sdk.yaml)), and a step language a mock server in any language can script:
 
 - **Degradation cases** (`degradation/cases.json`): what the fallback chain does with an empty, truncated, newer, lower-versioned or otherwise wrong document, and the answers served afterwards; `logs` names what must have been logged.
 - **Scenarios** (`scenarios.json`, `versioning-scenarios.json`, `experiment-scenarios.json`): the fallback chain, the store, a revoked key, the change stream, local overrides, offline mode, the events retry policy, evaluation summaries, schema versions, and running experiments with explicit and automatic exposures. Run every scenario of every mode your SDK supports; `server` mode evaluates locally from the ruleset, `client` mode reads evaluate answers.
 - **A client key's answers** carry `targeting_match` in place of the reasons targeting decided, and no rule identifier. A client-mode SDK reads and reports them as they are.
+- **Errors** are problem documents in the management API's shape (`server/problems/`): `type`, `title`, `status`, a stable `code`, `detail`, the `request_id` of the request, and for a refused body `errors`, each with a JSON Pointer into the body, a `code` and the rule's `params`. Act on the status and `Retry-After` (and the `code` where it helps a log line), never on `title` or `detail`.
+- **Events answers** list each refused event in `rejected` with a `code`. The codes are an open set: treat a code you do not know like any other rejection and never send that event again.
 
 Your runner should fail when a scenario of a mode you support runs nowhere, as the Go SDK's `TestEveryServerScenarioIsCovered` does, and generate your section of the [behaviour matrix](behaviour-matrix.md) from what it ran.
 

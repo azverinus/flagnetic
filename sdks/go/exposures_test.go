@@ -586,28 +586,50 @@ func TestEventsEnqueuedDuringFailuresFlushOnceWithTheSameIDs(t *testing.T) {
 	}
 }
 
+// The rejection codes are an open set: every code the server documents,
+// and one a later server may add, is final, so the rejected event is never
+// sent again.
 func TestRejectedEventsAreNeverSentAgain(t *testing.T) {
-	var l logs
-	const oneRejected = `{"accepted": 1, "duplicates": 0, "dropped_rows": 0,
-		"rejected": [{"index": 1, "event_id": "x", "code": "undeclared_unit_type", "detail": "ghost"}]}`
-	m := newExperimentMock(t, reply{status: http.StatusAccepted, body: oneRejected})
-	c := onExperiments(t, m, flagnetic.WithLogger(l.logger()))
+	var mixed struct {
+		Rejected []struct {
+			Code string `json:"code"`
+		} `json:"rejected"`
+	}
+	if err := json.Unmarshal(readProtocol(t, "server/events-mixed.json"), &mixed); err != nil {
+		t.Fatal(err)
+	}
+	codes := []string{"a_code_from_a_later_server"}
+	for _, r := range mixed.Rejected {
+		codes = append(codes, r.Code)
+	}
+	for _, code := range codes {
+		t.Run(code, func(t *testing.T) {
+			var l logs
+			oneRejected := `{"accepted": 1, "duplicates": 0, "dropped_rows": 0,
+				"rejected": [{"index": 1, "event_id": "x", "code": "` + code + `", "detail": "refused"}]}`
+			m := newExperimentMock(t, reply{status: http.StatusAccepted, body: oneRejected})
+			c := onExperiments(t, m, flagnetic.WithLogger(l.logger()))
 
-	c.Alias(context.Background(), "anonymous", "d-8f1c", "user", "u-1001")
-	c.Alias(context.Background(), "ghost", "g-1", "user", "u-1001")
-	if err := c.Flush(context.Background()); err != nil {
-		t.Fatalf("Flush: %v", err)
+			c.Alias(context.Background(), "anonymous", "d-8f1c", "user", "u-1001")
+			c.Alias(context.Background(), "ghost", "g-1", "user", "u-1001")
+			if err := c.Flush(context.Background()); err != nil {
+				t.Fatalf("Flush: %v", err)
+			}
+			if got := len(m.nth(1).eventIDs()); got != 2 {
+				t.Fatalf("the batch carries %d events, want 2", got)
+			}
+			dropped := l.named(flagnetic.EventQueueDropped)
+			if len(dropped) != 1 || dropped[0].Fields["cause"] != "refused_by_the_platform" {
+				t.Fatalf("queue_dropped = %v, want one naming the platform's refusal", dropped)
+			}
+			_ = c.Flush(context.Background())
+			if got := m.count(); got != 1 {
+				t.Errorf("%d batches sent, want 1: a rejected event was sent again", got)
+			}
+		})
 	}
-	if got := len(m.nth(1).eventIDs()); got != 2 {
-		t.Fatalf("the batch carries %d events, want 2", got)
-	}
-	dropped := l.named(flagnetic.EventQueueDropped)
-	if len(dropped) != 1 || dropped[0].Fields["cause"] != "refused_by_the_platform" {
-		t.Fatalf("queue_dropped = %v, want one naming the platform's refusal", dropped)
-	}
-	_ = c.Flush(context.Background())
-	if got := m.count(); got != 1 {
-		t.Errorf("%d batches sent, want 1: a rejected event was sent again", got)
+	if len(codes) != 9 {
+		t.Errorf("events-mixed.json rejects with %d codes, want every per-event rejection code (8)", len(codes)-1)
 	}
 }
 
