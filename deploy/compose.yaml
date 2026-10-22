@@ -6,10 +6,13 @@
 #
 # then:
 #
-#   docker compose up
+#   docker compose up -d
+#   docker compose exec flagnetic flagnetic admin bootstrap --email you@example.com
 #
-# then open http://localhost:8080. The image is pulled from GHCR, or built
-# from this checkout with `docker compose build`.
+# then open http://localhost:8080 and sign in with that email and the
+# password bootstrap printed. The image is pulled from GHCR (FLAGNETIC_VERSION
+# pins its version, `latest` by default), or built from this checkout with
+# `docker compose build`. docs/install.md has the whole guide.
 name: flagnetic
 
 services:
@@ -52,7 +55,9 @@ services:
       FLAGNETIC_SECRET_KEY: ${FLAGNETIC_SECRET_KEY:?store a secret key in deploy/.env first; see the top of compose.yaml}
     ports:
       - "8080:8080"
-      - "9090:9090"
+      # Metrics on this host only: they tell anyone who reads them the
+      # instance's routes and environments, so keep them off the network.
+      - "127.0.0.1:9090:9090"
     depends_on:
       migrate:
         condition: service_completed_successfully

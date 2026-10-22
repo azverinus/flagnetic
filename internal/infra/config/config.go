@@ -161,7 +161,7 @@ func Settings() []Setting {
 			Key:         "database_url",
 			Required:    true,
 			Secret:      true,
-			Description: "PostgreSQL connection string, as a URL or as keyword/value pairs. PostgreSQL 16 or newer.",
+			Description: "PostgreSQL connection string, as a URL or as keyword/value pairs. PostgreSQL 16 or newer. What it leaves out is taken from the standard PostgreSQL variables, such as `PGPASSWORD`, so the password need not be in it.",
 			Example:     "postgres://flagnetic@db:5432/flagnetic?sslmode=require",
 			apply: func(cfg *Config, v string) error {
 				if _, err := pgxpool.ParseConfig(v); err != nil {
