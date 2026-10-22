@@ -1,0 +1,8 @@
+{
+  "code": "invalid_request",
+  "detail": "can't decode JSON body: unexpected end of JSON input",
+  "request_id": "<request id>",
+  "status": 400,
+  "title": "Invalid request",
+  "type": "urn:flagnetic:problem:invalid_request"
+}

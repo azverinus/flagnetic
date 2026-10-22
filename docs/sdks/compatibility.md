@@ -16,9 +16,11 @@ The table names the core module of each SDK. The Go OpenFeature provider and `fl
 
 ## What a key learns
 
+A ruleset document has a single scope, `server`, and only a server key receives one; an SDK refuses a document of any other scope (`wrong_scope`).
+
 A **server key** belongs in a backend. It fetches the whole ruleset of its environment, private segments included, and the SDK evaluates locally with the true evaluation reason: `rule`, `rollout`, `experiment`, `override`, `prerequisite_failed`, `off`, `fallthrough`, and the SDK's own `fallback` and `local_override`.
 
-A **client key** ships inside apps and browsers, so it learns served values only. Its evaluate answers carry the value, the variation, the experiment block an exposure needs, and one of these reasons:
+A **client key** ships inside apps and browsers, so it never receives a ruleset: a client SDK evaluates remotely, posting its context to `POST /sdk/v1/evaluate`, and learns served values only. Its evaluate answers carry the value, the variation, the experiment block an exposure needs, and one of these reasons:
 
 | Reason | When |
 |---|---|
@@ -46,9 +48,11 @@ Every SDK follows these rules, so an additive change never needs a new `schema_v
 |---|---|
 | Unknown field, at any level | Ignored. |
 | Unknown operator, condition kind or serve kind (an unsupported rule) | Logged as `rule_unsupported` once per flag and ruleset version; where evaluation reaches it, the getter serves the built-in default with reason `fallback` and `inconsistent_ruleset`. Every other flag evaluates normally. |
+| Experiment serve breaking its invariants (a missing key, unit type or salt; a traffic allocation outside 0 to 10000; fewer than two weights, a negative one, two naming the same variation or one naming a variation the flag lacks, or weights not summing to 10000) | Found when the document is decoded; where evaluation reaches it, the getter serves the built-in default with reason `fallback` and `inconsistent_ruleset`. Every other flag evaluates normally. |
 | Unknown flag type | The flag is absent. |
 | Unknown evaluation reason | Passed through with the served value. |
 | Unknown event type (sent to the server) | Rejected per event with `event_type_unknown`; the rest of the batch is accepted and the rejected event is never sent again. |
+| Unknown rejection code (in an events answer) | A rejection like any other: the event is never sent again. The codes are an open set a later server may add to. |
 | `schema_version` outside the SDK's range | A failure of the fallback chain, as above. |
 
 ## What the Go SDK declares

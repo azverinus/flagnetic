@@ -61,10 +61,9 @@ const (
 // ErrorCode says why a Detail has reason fallback.
 type ErrorCode string
 
-// Error codes of a fallback. The first four are the evaluator's.
+// Error codes of a fallback. The first three are the evaluator's.
 const (
 	ErrorFlagNotFound        ErrorCode = "flag_not_found"
-	ErrorServerOnly          ErrorCode = "server_only"
 	ErrorPrerequisiteCycle   ErrorCode = "prerequisite_cycle"
 	ErrorInconsistentRuleset ErrorCode = "inconsistent_ruleset"
 	// ErrorTypeMismatch: the flag's type differs from the getter's.
@@ -116,8 +115,9 @@ type Experiment struct {
 	VariationSalt   string `json:"variation_salt"`
 	InclusionBucket int    `json:"inclusion_bucket"`
 	VariationBucket int    `json:"variation_bucket"`
-	// Override is true when an override decided the value; exposures
-	// carrying it are excluded from analysis.
+	// Override is true when an override influenced the value, directly or
+	// through a prerequisite (the evaluator's override_influenced);
+	// exposures carrying it are excluded from analysis.
 	Override bool `json:"override"`
 }
 

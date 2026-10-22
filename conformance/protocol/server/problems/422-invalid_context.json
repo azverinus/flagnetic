@@ -1,0 +1,26 @@
+{
+  "code": "invalid_context",
+  "detail": "the context is not valid",
+  "errors": [
+    {
+      "code": "too_long",
+      "detail": "a string has at most 256 characters",
+      "params": {
+        "max": 256
+      },
+      "pointer": "/context/attributes/country"
+    },
+    {
+      "code": "too_long",
+      "detail": "a unit ID has at most 256 bytes",
+      "params": {
+        "max": 256
+      },
+      "pointer": "/context/units/user"
+    }
+  ],
+  "request_id": "<request id>",
+  "status": 422,
+  "title": "Invalid",
+  "type": "urn:flagnetic:problem:invalid_context"
+}

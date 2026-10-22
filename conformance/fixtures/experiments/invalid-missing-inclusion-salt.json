@@ -1,0 +1,177 @@
+{
+  "name": "experiments/invalid-missing-inclusion-salt",
+  "ruleset": {
+    "schema_version": 1,
+    "version": 1,
+    "scope": "server",
+    "environment": {
+      "key": "production",
+      "protected": false
+    },
+    "unit_types": [
+      "user",
+      "anonymous"
+    ],
+    "attributes": [
+      {
+        "key": "os",
+        "type": "string"
+      }
+    ],
+    "segments": [],
+    "flags": [
+      {
+        "key": "invalid",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": [
+          {
+            "id": "r1",
+            "conditions": [
+              {
+                "kind": "attribute",
+                "attribute": "os",
+                "op": "eq",
+                "value": "ios"
+              }
+            ],
+            "serve": {
+              "kind": "variation",
+              "variation": "control"
+            }
+          },
+          {
+            "id": "rx",
+            "conditions": [],
+            "serve": {
+              "kind": "experiment",
+              "experiment": "checkout_v2",
+              "unit_type": "anonymous",
+              "variation_salt": "7e1d4c90b2a6f3d1",
+              "traffic_allocation": 10000,
+              "weights": [
+                {
+                  "variation": "control",
+                  "weight": 5000
+                },
+                {
+                  "variation": "treatment",
+                  "weight": 5000
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "key": "valid",
+        "type": "string",
+        "automatic_exposure": false,
+        "variations": [
+          {
+            "key": "off",
+            "value": "off"
+          },
+          {
+            "key": "control",
+            "value": "control"
+          },
+          {
+            "key": "treatment",
+            "value": "treatment"
+          }
+        ],
+        "on": true,
+        "off_variation": "off",
+        "fallthrough": "off",
+        "prerequisites": [],
+        "overrides": [],
+        "rules": []
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "an experiment serve without an inclusion salt is an inconsistent ruleset where evaluation reaches it",
+      "flag": "invalid",
+      "context": {
+        "units": {
+          "user": "u1",
+          "anonymous": "anon-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "expect": {
+        "type": "string",
+        "reason": "error",
+        "error_code": "inconsistent_ruleset",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "a rule matching before the invalid serve still serves",
+      "flag": "invalid",
+      "context": {
+        "units": {
+          "user": "u1",
+          "anonymous": "anon-0"
+        },
+        "attributes": {
+          "os": "ios"
+        }
+      },
+      "expect": {
+        "type": "string",
+        "value": "control",
+        "variation": "control",
+        "reason": "rule",
+        "rule_id": "r1",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    },
+    {
+      "name": "another flag of the document is unaffected",
+      "flag": "valid",
+      "context": {
+        "units": {
+          "user": "u1",
+          "anonymous": "anon-0"
+        },
+        "attributes": {
+          "os": "linux"
+        }
+      },
+      "expect": {
+        "type": "string",
+        "value": "off",
+        "variation": "off",
+        "reason": "fallthrough",
+        "automatic_exposure": false,
+        "override_influenced": false
+      }
+    }
+  ]
+}

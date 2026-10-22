@@ -19,11 +19,8 @@ import (
 // conformanceDir holds the fixtures every evaluator passes.
 const conformanceDir = "../../../../../conformance/fixtures"
 
-// fixturesNotRulesets are the fixture files that hold no ruleset, and
-// scope/client the one ruleset of client scope, which the management API
-// does not write: it writes configurations, and client scope is a view of
-// them SDK keys receive.
-var fixturesNotRulesets = []string{"murmur3", "regex", "scope/client"}
+// fixturesNotRulesets are the fixture files that hold no ruleset.
+var fixturesNotRulesets = []string{"murmur3", "regex"}
 
 // refusedByTheAPI are the fixture flags and segments the management API
 // refuses to write: experiment serves, which a configuration cannot hold
@@ -70,6 +67,18 @@ var refusedByTheAPI = []string{
 	"experiments/boundaries keyed_on_user",
 	"experiments/boundaries two_experiments",
 	"experiments/boundaries weights_235",
+	"experiments/invalid-allocation-above-range invalid",
+	"experiments/invalid-allocation-below-range invalid",
+	"experiments/invalid-duplicate-weight-variation invalid",
+	"experiments/invalid-missing-experiment invalid",
+	"experiments/invalid-missing-inclusion-salt invalid",
+	"experiments/invalid-missing-unit-type invalid",
+	"experiments/invalid-missing-variation-salt invalid",
+	"experiments/invalid-negative-weight invalid",
+	"experiments/invalid-one-weight invalid",
+	"experiments/invalid-unknown-weight-variation invalid",
+	"experiments/invalid-weights-above-total invalid",
+	"experiments/invalid-weights-below-total invalid",
 	"overrides/influence checkout",
 	"overrides/influence checkout_not_included",
 	"overrides/influence checkout_off",

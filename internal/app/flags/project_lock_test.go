@@ -35,7 +35,7 @@ func TestWritesOfAProjectGoneBeforeItsLockAreNotFound(t *testing.T) {
 	ids := id.NewSource(c)
 	tx, ws, store := postgres.NewTransactor(pool), pgworkspace.NewStore(pool), pgflags.NewStore(pool)
 	rec := appflags.NewRecorder(pggovernance.NewAuditLog(pool), c, ids)
-	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool))
+	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool), c)
 	owners := appaccess.NewOwnership(pgaccess.NewStore(pool))
 	archival := appflags.ArchivalDeps{Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec}
 

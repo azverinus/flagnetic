@@ -148,7 +148,7 @@ The rest of an environment's tab is a draft, laid out in the order evaluation re
 
 ## Trying a configuration
 
-`POST /environments/{environment}/evaluate` evaluates flags for a context as the environment's SDKs would, with the full reason of each result: the served value and variation, the reason, the rule that served, an error code, and for a rollout the unit's bucket and the rollout's salt. It evaluates every flag that is not archived, or those `flags` names. With a `draft` (`{flag, configuration}`) it evaluates that flag's unsaved configuration in place of its saved one, validated as a replace would be and never stored. It answers the environment's `ruleset_version` beside the results, needs only `project.read`, and records no exposure.
+`POST /environments/{environment}/evaluate` evaluates flags for a context as the environment's SDKs would, with the full reason of each result: the served value and variation, the reason, the rule that served, an error code, and for a rollout the unit's bucket and the rollout's salt. It evaluates every flag that is not archived, or those `flags` names. With a `draft` (`{flag, configuration}`) it evaluates that flag's unsaved configuration in place of its saved one, validated as a replace would be and never stored. It answers the environment's `ruleset_version` beside the results (every write that changes a ruleset moves its version to the greater of the previous version plus one and the server clock in milliseconds, so versions only increase and a version is never handed out twice, even after a database failover or restore that lost recent writes), needs only `project.read`, and records no exposure.
 
 ```json
 {

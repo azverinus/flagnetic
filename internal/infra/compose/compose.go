@@ -83,7 +83,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Every write changing what SDKs receive moves the rulesets it changed
 	// on, through the delivery context.
 	deliveryStore := pgdelivery.NewStore(d.Pool)
-	rulesets := appdelivery.NewBumpRulesets(deliveryStore)
+	rulesets := appdelivery.NewBumpRulesets(deliveryStore, d.Clock)
 	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
 	// Deleting a unit type or attribute asks the flags context what still

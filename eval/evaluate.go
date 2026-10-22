@@ -45,7 +45,6 @@ type ErrorCode string
 // Error codes.
 const (
 	ErrorFlagNotFound        ErrorCode = "flag_not_found"
-	ErrorServerOnly          ErrorCode = "server_only"
 	ErrorPrerequisiteCycle   ErrorCode = "prerequisite_cycle"
 	ErrorInconsistentRuleset ErrorCode = "inconsistent_ruleset"
 )
@@ -192,10 +191,6 @@ func (e *evaluation) flag(key string) Result {
 }
 
 func (e *evaluation) compute(f *compiledFlag) Result {
-	// 1. server_only flags carry no configuration.
-	if f.ServerOnly {
-		return errorResult(ErrorServerOnly, false)
-	}
 	// 2. Off.
 	if !f.On {
 		return e.serve(f, f.OffVariation, Result{Reason: ReasonOff})
@@ -245,6 +240,9 @@ func (e *evaluation) body(f *compiledFlag) Result {
 		}
 		if !matched {
 			continue
+		}
+		if f.invalidServes[i] {
+			return errorResult(ErrorInconsistentRuleset, influenced)
 		}
 		s := rule.Serve
 		switch s.Kind {
@@ -330,7 +328,7 @@ func (e *evaluation) serve(f *compiledFlag, variation string, r Result) Result {
 // serving its off variation. Influence is accumulated into influenced.
 func (e *evaluation) prerequisite(key, variation string, influenced *bool) (bool, *ErrorCode) {
 	f, ok := e.idx.flags[key]
-	if !ok || (!f.ServerOnly && !hasVariation(f, variation)) {
+	if !ok || !hasVariation(f, variation) {
 		return false, errCode(ErrorInconsistentRuleset)
 	}
 	r := e.flag(key)

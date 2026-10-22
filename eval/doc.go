@@ -28,8 +28,7 @@
 //
 // For one flag and one context:
 //
-//  1. An absent flag is error flag_not_found; a server_only flag is error
-//     server_only.
+//  1. An absent flag is error flag_not_found.
 //  2. A flag that is off serves its off variation, reason off.
 //  3. The first override whose unit type is in the context with an equal
 //     unit ID serves its variation, reason override, override_influenced
@@ -54,8 +53,12 @@
 //     list order, reason experiment; otherwise evaluation continues.
 //  6. No rule matched: the fallthrough variation, reason fallthrough.
 //  7. A variation, segment, flag or attribute referenced but missing from
-//     the document, or a condition that cannot be evaluated, is error
-//     inconsistent_ruleset, only when evaluation reaches it.
+//     the document, a condition that cannot be evaluated, or an experiment
+//     serve breaking its invariants (an experiment key, a unit type and
+//     both salts present; a traffic allocation within 0 to 10000; at least
+//     two weights, none negative, naming distinct variations of the flag
+//     and summing to exactly 10000) is error inconsistent_ruleset, only
+//     when evaluation reaches it, as a matched rule for a serve.
 //
 // An operator, condition kind or serve kind this evaluator does not know,
 // typically sent by a server newer than it, is an unsupported rule: Decode

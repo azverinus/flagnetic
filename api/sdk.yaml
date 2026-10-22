@@ -1,0 +1,1005 @@
+openapi: 3.0.3
+info:
+  title: Flagnetic SDK API
+  version: "1"
+  description: |
+    The API SDKs speak, served under `/sdk/v1`. A server SDK downloads its
+    environment's ruleset and evaluates locally; a client SDK (a browser or
+    a mobile app) never receives a ruleset and asks the server to evaluate
+    for it. Both hold the ruleset stream and post events. Every change to
+    this API is additive: an SDK released against it keeps working with
+    every later server.
+
+    **Keys.** Every operation authenticates an SDK key of one environment as
+    a bearer in `Authorization`: a server key (`fn_srv_…`) belongs in a
+    backend, a client key (`fn_cli_…`) ships inside apps and browsers. A
+    browser's `EventSource` cannot set headers, so the stream also accepts a
+    client key as the query parameter `sdk_key`; a server key there is
+    refused `403 server_key_in_query`. No key is `401 sdk_key_missing` with
+    a plain `WWW-Authenticate: Bearer`; a malformed or unknown key
+    `sdk_key_invalid`, a revoked one `sdk_key_revoked` and one whose
+    rotation overlap has ended `sdk_key_expired`, each `401` with
+    `WWW-Authenticate: Bearer error="invalid_token"`. A key that cannot be
+    checked because the server cannot reach its store is
+    `503 unavailable` with `Retry-After`.
+
+    **Browsers.** A preflight `OPTIONS` on any path of this API is answered
+    `204` without a key, allowing `GET`, `POST` and `OPTIONS` and the headers
+    `Authorization`, `Content-Type`, `Content-Encoding`,
+    `Flagnetic-Schema-Version` and `Last-Event-ID`, cached for a day. Every
+    answer exposes `ETag`, `Retry-After`, `RateLimit-Limit`,
+    `RateLimit-Remaining` and `RateLimit-Reset` to scripts and allows any
+    origin (`Access-Control-Allow-Origin: *`), unless a client key lists
+    allowed origins: then a listed origin is echoed with `Vary: Origin` and
+    any other refused `403 origin_not_allowed`. A server key sent with an
+    `Origin` header is refused `403 server_key_from_browser`. Credentials are
+    never allowed.
+
+    **Schema versions.** Every request for a document and every events batch
+    carries `Flagnetic-Schema-Version`, the highest document schema the SDK
+    reads. Absent, or 1 and above, is served schema 1; below 1 or not an
+    integer is `406 schema_version_unsupported`.
+
+    **Rate limits.** Each operation is limited per key in fixed one-minute
+    windows counted by each replica (a client key per key and client IP).
+    A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`; a
+    refusal is `429 rate_limited` with `Retry-After` and `RateLimit-Reset` in
+    whole seconds and the problem's `retry_after`. Failed authentications
+    are limited per client IP before any key is looked up.
+
+    **Bodies.** A request body may be gzip (`Content-Encoding: gzip`); every
+    size limit counts the body after decompression. A body over its limit
+    is `413 request_too_large`, one that is not JSON `400 invalid_request`,
+    one sent as another media type than `application/json`
+    `415 unsupported_media_type`. An answer is gzip when the request accepts
+    it.
+
+    **Problems.** Every error is a problem document (RFC 9457) in the same
+    shape as the management API's: `type` (`urn:flagnetic:problem:<code>`),
+    `title`, `status`, a stable `code`, `detail` for humans, the
+    `request_id` of the request, and for a refused body `errors`, each a
+    violation with a JSON Pointer into the request body, a `code`, a
+    `detail` and the `params` of the rule broken. An SDK branches on the
+    status and `code` alone. A path this API does not serve is
+    `404 not_found`, a method a path does not accept
+    `405 method_not_allowed` with `Allow`.
+servers:
+  - url: /sdk/v1
+tags:
+  - name: ruleset
+  - name: evaluation
+  - name: stream
+  - name: events
+paths:
+  /ruleset:
+    get:
+      operationId: getRuleset
+      summary: The environment's whole ruleset, for a server key
+      description: |
+        The ruleset document of the key's environment (scope `server`), private
+        segments and overrides included, which a server SDK evaluates
+        locally. Only a server key receives it: a client key is refused
+        `403 key_kind_not_allowed` and uses remote evaluation instead.
+
+        The `ETag` is the ruleset version, quoted (`"1745040000000"`).
+        `If-None-Match` is compared weakly: a `W/` tag, a list of tags and
+        `*` are accepted, and a match is answered `304` with no body. A
+        replica that cannot load the ruleset answers
+        `503 ruleset_unavailable` with `Retry-After`, never an empty
+        ruleset, so an SDK keeps its last good one.
+      tags: [ruleset]
+      parameters:
+        - $ref: "#/components/parameters/SchemaVersion"
+        - name: If-None-Match
+          in: header
+          description: The `ETag` of the ruleset the SDK holds.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The ruleset.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControlPrivate"
+            Vary:
+              $ref: "#/components/headers/VaryAuthorization"
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimitLimit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimitRemaining"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ruleset"
+        "304":
+          description: The ruleset named in `If-None-Match` is still the current one.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+            Cache-Control:
+              $ref: "#/components/headers/CacheControlPrivate"
+            Vary:
+              $ref: "#/components/headers/VaryAuthorization"
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimitLimit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimitRemaining"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "406":
+          $ref: "#/components/responses/SchemaVersionUnsupported"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /evaluate:
+    post:
+      operationId: evaluate
+      summary: The served value of every flag for a context
+      description: |
+        Evaluates the environment's ruleset for the context posted, against
+        the whole server-side document, private segments included, and
+        answers the served value of every flag, or of the flags named. A
+        flag named that the ruleset does not hold is left out of the answer.
+
+        Attributes are typed against the project's declarations: an
+        undeclared attribute, or one named like a unit type, is left out and
+        listed in `ignored_attributes` with `undeclared`; a value of the
+        wrong type is left out and listed with `type_mismatch`; `null` is
+        kept. A context over the limits (64 attributes, 256 characters per
+        string, 64 items per list, 256 bytes per unit ID) is
+        `422 invalid_context`, every violation pointing into the body with
+        `too_long` or `too_many` and `params.max`. The body is at most
+        32 KiB after decompression.
+
+        A client key's answer never says how a value was reached: the
+        reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`
+        are answered `targeting_match`, and no `rule_id` is ever present;
+        `off`, `override`, `experiment` and `error` and the experiment block
+        stay. A server key's answer carries the true reason and `rule_id`.
+        Evaluating records no exposure.
+      tags: [evaluation]
+      parameters:
+        - $ref: "#/components/parameters/SchemaVersion"
+        - $ref: "#/components/parameters/ContentEncoding"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluationRequest"
+      responses:
+        "200":
+          description: The served value of every flag evaluated, by flag key.
+          headers:
+            Cache-Control:
+              description: "`no-store`: one context's values are never cached for another."
+              schema:
+                type: string
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimitLimit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimitRemaining"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evaluation"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "406":
+          $ref: "#/components/responses/SchemaVersionUnsupported"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "422":
+          $ref: "#/components/responses/InvalidContext"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /stream:
+    get:
+      operationId: streamRuleset
+      summary: The ruleset stream
+      description: |
+        A server-sent event stream telling the SDK each new ruleset version
+        of its environment, as soon as this replica has loaded it. It
+        carries versions only, never a document: the SDK fetches the ruleset
+        (server key) or evaluates again (client key) when it hears one.
+
+        The first frame is `retry: 3000`. Each version is a frame
+        `event: ruleset`, `id: <version>`, `data: {"version":<version>}`.
+        The current version is sent at once when it is above
+        `Last-Event-ID` (an unreadable one counts as none), and the versions
+        sent only increase. A comment `: hb` every 15 seconds tells a quiet
+        stream from a dead one; on each the key is checked again, and a
+        refused key ends the stream. The server closes a stream after about
+        an hour (60 minutes plus up to 5 of jitter) and when it shuts down;
+        the SDK reconnects with `Last-Event-ID`.
+      tags: [stream]
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          description: The last version the SDK heard.
+          schema:
+            type: string
+        - name: sdk_key
+          in: query
+          description: A client key, for a browser `EventSource`, which cannot set `Authorization`.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The stream, held open.
+          headers:
+            Cache-Control:
+              description: "`no-cache`."
+              schema:
+                type: string
+            X-Accel-Buffering:
+              description: "`no`, so a proxy passes each frame on at once."
+              schema:
+                type: string
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimitLimit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimitRemaining"
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /events:
+    post:
+      operationId: postEvents
+      summary: A batch of evaluation summaries, aliases and exposures
+      description: |
+        Accepts a batch of events from either key. The batch is refused as a
+        whole only for its envelope (`400 invalid_request` with violations),
+        its key, its size (`413 request_too_large`: over 500 events or
+        1 MiB after decompression), a rate limit or a server error; an SDK
+        retries those with the same event IDs, except a `4xx` other than
+        `401`, `403` and `429`, which it drops.
+
+        Otherwise each event is judged on its own and the batch is answered
+        `202` once every accepted event is durable, so the SDK can drop what
+        it sent. Each event is idempotent by its `event_id`, a lowercase
+        UUIDv7, within the retention window: one already received is
+        counted in `duplicates`, never twice. A summary row naming a flag
+        the environment does not have is dropped and counted in
+        `dropped_rows`. A refused event is listed in `rejected` with its
+        index, its `event_id` when it has one, a `code` and a `detail`; the
+        SDK never sends it again.
+
+        The rejection codes are an open set, which a later server may add
+        to: an SDK treats a code it does not know like any other rejection
+        and never resends the event. The codes today: `event_invalid` (a
+        member missing, of the wrong type, a string over 256 bytes or
+        holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
+        `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
+        time older than the retention window), `undeclared_unit_type`,
+        `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
+        type is not its experiment's) and `unknown_variation` (an exposure
+        naming a variation its experiment does not have). An `occurred_at`
+        more than 24 hours ahead is taken as the time the event was
+        received.
+      tags: [events]
+      parameters:
+        - $ref: "#/components/parameters/SchemaVersion"
+        - $ref: "#/components/parameters/ContentEncoding"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventBatch"
+      responses:
+        "202":
+          description: The batch was judged; every accepted event is durable.
+          headers:
+            RateLimit-Limit:
+              $ref: "#/components/headers/RateLimitLimit"
+            RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimitRemaining"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventBatchResult"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "406":
+          $ref: "#/components/responses/SchemaVersionUnsupported"
+        "413":
+          $ref: "#/components/responses/RequestTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+components:
+  securitySchemes:
+    sdkKey:
+      type: http
+      scheme: bearer
+      description: A server key (`fn_srv_…`) or a client key (`fn_cli_…`) of one environment.
+  parameters:
+    SchemaVersion:
+      name: Flagnetic-Schema-Version
+      in: header
+      description: The highest document schema the SDK reads; absent is 1.
+      schema:
+        type: string
+    ContentEncoding:
+      name: Content-Encoding
+      in: header
+      description: "`gzip` for a compressed body."
+      schema:
+        type: string
+  headers:
+    ETag:
+      description: The ruleset version, quoted, as a strong tag.
+      schema:
+        type: string
+    CacheControlPrivate:
+      description: "`private, no-cache`: no shared cache holds a ruleset, and an SDK revalidates it."
+      schema:
+        type: string
+    VaryAuthorization:
+      description: "`Authorization, Accept-Encoding`: the answer depends on the key."
+      schema:
+        type: string
+    RateLimitLimit:
+      description: The requests the window allows.
+      schema:
+        type: integer
+    RateLimitRemaining:
+      description: The requests left in the window.
+      schema:
+        type: integer
+    RateLimitReset:
+      description: Seconds until the window ends, at least 1.
+      schema:
+        type: integer
+    RetryAfter:
+      description: Seconds to wait before trying again, at least 1.
+      schema:
+        type: integer
+  responses:
+    InvalidRequest:
+      description: "`invalid_request`: a body that is not JSON, or an events envelope that breaks its shape, with `errors`."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unauthenticated:
+      description: |
+        `sdk_key_missing` without a key, with `WWW-Authenticate: Bearer`;
+        `sdk_key_invalid`, `sdk_key_revoked` or `sdk_key_expired`, with
+        `WWW-Authenticate: Bearer error="invalid_token"`.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Forbidden:
+      description: |
+        `key_kind_not_allowed` (a client key at the ruleset),
+        `server_key_in_query`, `server_key_from_browser` or
+        `origin_not_allowed`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    SchemaVersionUnsupported:
+      description: "`schema_version_unsupported`: `Flagnetic-Schema-Version` below 1 or not an integer."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    RequestTooLarge:
+      description: "`request_too_large`: the body is over its limit after decompression."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    UnsupportedMediaType:
+      description: "`unsupported_media_type`: the body is not `application/json`."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    InvalidContext:
+      description: "`invalid_context`: the context breaks a limit; `errors` names every violation."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    RateLimited:
+      description: "`rate_limited`: the window is spent."
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+        RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unavailable:
+      description: |
+        `ruleset_unavailable` (this replica cannot load the environment's
+        ruleset yet) or `unavailable` (the key could not be checked), with
+        `Retry-After`.
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Problem:
+      type: object
+      description: A problem document (RFC 9457). Code-specific values are further members.
+      required: [type, title, status, code, request_id]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+          description: Stable snake_case name of the problem, which an SDK branches on.
+        detail:
+          type: string
+          description: An English explanation for humans; never what an SDK branches on.
+        request_id:
+          type: string
+        retry_after:
+          type: integer
+          description: Seconds to wait before retrying, for `rate_limited`, `ruleset_unavailable` and `unavailable`.
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Violation"
+    Violation:
+      type: object
+      required: [pointer, code, detail]
+      properties:
+        pointer:
+          type: string
+          description: JSON Pointer into the request body.
+        code:
+          type: string
+          description: The rule broken, such as `too_long` or `too_many`.
+        detail:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+          description: The values of the rule broken, such as `max`, for a client to explain the violation in its own language.
+    Ruleset:
+      type: object
+      description: |
+        The complete evaluable configuration of one environment at one
+        moment. An SDK ignores members it does not know, at any level. Every
+        list is ordered by key.
+      required: [schema_version, version, scope, unit_types, attributes, segments, flags]
+      properties:
+        schema_version:
+          type: integer
+          description: The document schema, 1.
+        version:
+          type: integer
+          format: int64
+          description: |
+            The ruleset version, which only grows and is never given to two
+            different rulesets of the environment. It is below 2^53.
+        scope:
+          type: string
+          enum: [server]
+          description: The one scope of a ruleset; an SDK refuses a document of any other.
+        environment:
+          $ref: "#/components/schemas/RulesetEnvironment"
+        unit_types:
+          type: array
+          items:
+            type: string
+        attributes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetAttribute"
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetSegment"
+        flags:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetFlag"
+    RulesetEnvironment:
+      type: object
+      required: [key, protected]
+      properties:
+        key:
+          type: string
+        protected:
+          type: boolean
+          description: An SDK ignores local overrides in a protected environment.
+    RulesetAttribute:
+      type: object
+      required: [key, type]
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          description: "`string`, `number`, `boolean`, `semver`, `date` or `list`."
+    RulesetSegment:
+      type: object
+      required: [key, private, conditions]
+      properties:
+        key:
+          type: string
+        private:
+          type: boolean
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetCondition"
+    RulesetFlag:
+      type: object
+      required: [key, type, automatic_exposure, on]
+      properties:
+        key:
+          type: string
+        type:
+          type: string
+          description: "`boolean`, `string`, `number` or `json`; an SDK drops a flag of a type it does not know."
+        automatic_exposure:
+          type: boolean
+        variations:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetVariation"
+        "on":
+          type: boolean
+        off_variation:
+          type: string
+        fallthrough:
+          type: string
+        prerequisites:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetPrerequisite"
+        overrides:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetOverride"
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetRule"
+    RulesetVariation:
+      type: object
+      required: [key, value]
+      properties:
+        key:
+          type: string
+        value:
+          description: The variation's JSON value.
+    RulesetPrerequisite:
+      type: object
+      required: [flag, variation]
+      properties:
+        flag:
+          type: string
+        variation:
+          type: string
+    RulesetOverride:
+      type: object
+      required: [unit_type, unit_id, variation]
+      properties:
+        unit_type:
+          type: string
+        unit_id:
+          type: string
+        variation:
+          type: string
+    RulesetRule:
+      type: object
+      required: [id, conditions, serve]
+      properties:
+        id:
+          type: string
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetCondition"
+        serve:
+          $ref: "#/components/schemas/RulesetServe"
+    RulesetCondition:
+      type: object
+      required: [kind]
+      description: |
+        `attribute` (`attribute`, `op`, `value`), `in_segment` or
+        `not_in_segment` (`segment`), or `prerequisite` (`flag`,
+        `variation`). An operator or kind an SDK does not know is an
+        unsupported rule.
+      properties:
+        kind:
+          type: string
+        attribute:
+          type: string
+        op:
+          type: string
+        value:
+          description: The operand, of the attribute's type.
+        segment:
+          type: string
+        flag:
+          type: string
+        variation:
+          type: string
+    RulesetServe:
+      type: object
+      required: [kind]
+      description: |
+        `variation` (`variation`); `rollout` (`unit_type`, `variation`,
+        `percentage` in basis points, `salt`); or `experiment`
+        (`experiment`, `unit_type`, `inclusion_salt`, `variation_salt`,
+        `traffic_allocation` within 0 to 10,000, and at least two `weights`,
+        none negative, naming distinct variations of the flag and summing to
+        10,000; an evaluator answers a serve breaking these
+        `inconsistent_ruleset`). A kind an SDK does not know is an
+        unsupported rule.
+      properties:
+        kind:
+          type: string
+        variation:
+          type: string
+        unit_type:
+          type: string
+        percentage:
+          type: integer
+        salt:
+          type: string
+        experiment:
+          type: string
+        inclusion_salt:
+          type: string
+        variation_salt:
+          type: string
+        traffic_allocation:
+          type: integer
+        weights:
+          type: array
+          items:
+            $ref: "#/components/schemas/RulesetWeight"
+    RulesetWeight:
+      type: object
+      required: [variation, weight]
+      properties:
+        variation:
+          type: string
+        weight:
+          type: integer
+          description: The variation's share of the allocated traffic, in basis points.
+    EvaluationRequest:
+      type: object
+      required: [context]
+      properties:
+        context:
+          $ref: "#/components/schemas/EvaluationContext"
+        flags:
+          type: array
+          description: The flags to evaluate; every flag when absent.
+          items:
+            type: string
+    EvaluationContext:
+      type: object
+      properties:
+        units:
+          type: object
+          description: The unit ID of each unit type, such as `{"user":"u-1001"}`; an empty ID is an absent unit.
+          additionalProperties:
+            type: string
+        attributes:
+          type: object
+          description: The context's attributes, by key.
+          additionalProperties: true
+    Evaluation:
+      type: object
+      required: [schema_version, ruleset_version, environment, flags, ignored_attributes]
+      properties:
+        schema_version:
+          type: integer
+        ruleset_version:
+          type: integer
+          format: int64
+          description: The version of the ruleset evaluated.
+        environment:
+          $ref: "#/components/schemas/RulesetEnvironment"
+        flags:
+          type: object
+          description: The result of each flag evaluated, by flag key.
+          additionalProperties:
+            $ref: "#/components/schemas/FlagEvaluation"
+        ignored_attributes:
+          type: array
+          description: The attributes left out of the evaluation, and why.
+          items:
+            $ref: "#/components/schemas/IgnoredAttribute"
+    FlagEvaluation:
+      type: object
+      required: [type, reason, automatic_exposure, override_influenced]
+      properties:
+        type:
+          type: string
+        value:
+          description: The served value; absent for `error`.
+        variation:
+          type: string
+          description: The served variation; absent for `error`.
+        reason:
+          type: string
+          description: |
+            Why the value was served. A client key receives `targeting_match`,
+            `off`, `override`, `experiment` or `error`; a server key the
+            true reason: `rule`, `rollout`, `fallthrough`,
+            `prerequisite_failed`, `off`, `override`, `experiment` or
+            `error`. An SDK passes a reason it does not know through with
+            the served value.
+        rule_id:
+          type: string
+          description: The rule that served, for a server key only.
+        automatic_exposure:
+          type: boolean
+          description: Whether the SDK records an exposure after every evaluation carrying `experiment`.
+        override_influenced:
+          type: boolean
+          description: Whether an override influenced the value, directly or through a prerequisite.
+        experiment:
+          $ref: "#/components/schemas/ExperimentDetail"
+        error_code:
+          type: string
+          description: "For `error`: `flag_not_found`, `prerequisite_cycle` or `inconsistent_ruleset`."
+    ExperimentDetail:
+      type: object
+      description: The running experiment the value comes from, which an exposure carries.
+      required: [key, variation, unit_type, unit_id, inclusion_salt, variation_salt, inclusion_bucket, variation_bucket, override]
+      properties:
+        key:
+          type: string
+        variation:
+          type: string
+          description: The served variation; an override's when an override decided the value.
+        unit_type:
+          type: string
+        unit_id:
+          type: string
+        inclusion_salt:
+          type: string
+        variation_salt:
+          type: string
+        inclusion_bucket:
+          type: integer
+        variation_bucket:
+          type: integer
+        override:
+          type: boolean
+          description: Whether an override influenced the value; analysis excludes such exposures.
+    IgnoredAttribute:
+      type: object
+      required: [name, code]
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+          description: "`undeclared` or `type_mismatch`."
+    EventBatch:
+      type: object
+      required: [schema_version, sdk, sent_at, events]
+      properties:
+        schema_version:
+          type: integer
+          description: The envelope's schema, 1.
+        sdk:
+          $ref: "#/components/schemas/SDKIdentity"
+        sent_at:
+          type: string
+          format: date-time
+        events:
+          type: array
+          description: |
+            At most 500 events, each judged on its own. An event is an
+            object with a `type` and an `event_id`; the types today are
+            `evaluation_summary` (EvaluationSummaryEvent), `alias`
+            (AliasEvent) and `exposure` (ExposureEvent). An event of a type
+            the server does not know is rejected `event_type_unknown`.
+          items:
+            type: object
+            additionalProperties: true
+    SDKIdentity:
+      type: object
+      required: [name, version]
+      properties:
+        name:
+          type: string
+          description: The SDK's name, such as `flagnetic-go`.
+        version:
+          type: string
+        platform:
+          type: string
+    EvaluationSummaryEvent:
+      type: object
+      description: Counts of the evaluations an SDK made over an interval, per flag, variation and reason.
+      required: [type, event_id, interval_start, interval_end, ruleset_version, counts]
+      properties:
+        type:
+          type: string
+          enum: [evaluation_summary]
+        event_id:
+          type: string
+        interval_start:
+          type: string
+          format: date-time
+        interval_end:
+          type: string
+          format: date-time
+        ruleset_version:
+          type: integer
+          format: int64
+          description: The version of the ruleset held at the interval's end.
+        app_version:
+          type: string
+        counts:
+          type: array
+          description: At most 1,000 rows.
+          items:
+            $ref: "#/components/schemas/EvaluationSummaryRow"
+    EvaluationSummaryRow:
+      type: object
+      required: [flag, variation, reason, count]
+      properties:
+        flag:
+          type: string
+        variation:
+          type: string
+          nullable: true
+          description: Null when no variation was served.
+        reason:
+          type: string
+          description: |
+            A true reason (`rule`, `rollout`, `fallthrough`,
+            `prerequisite_failed`, `off`, `override`, `experiment`), the
+            SDK's own `fallback` or `local_override`, or `targeting_match`,
+            which a client SDK counts from the answers it receives.
+        count:
+          type: integer
+          format: int64
+    AliasEvent:
+      type: object
+      description: Links the unit ID in use before sign-up to the one after.
+      required: [type, event_id, occurred_at, from_unit_type, from_unit_id, to_unit_type, to_unit_id]
+      properties:
+        type:
+          type: string
+          enum: [alias]
+        event_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        from_unit_type:
+          type: string
+        from_unit_id:
+          type: string
+        to_unit_type:
+          type: string
+        to_unit_id:
+          type: string
+    ExposureEvent:
+      type: object
+      description: A unit encountered behaviour that depends on its experiment assignment.
+      required: [type, event_id, occurred_at, experiment_key, flag_key, variation_key, unit_type, unit_id, evaluation_reason, override, ruleset_version]
+      properties:
+        type:
+          type: string
+          enum: [exposure]
+        event_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        experiment_key:
+          type: string
+        flag_key:
+          type: string
+        variation_key:
+          type: string
+        unit_type:
+          type: string
+        unit_id:
+          type: string
+        platform:
+          type: string
+          nullable: true
+        app_version:
+          type: string
+          nullable: true
+        evaluation_reason:
+          type: string
+          description: "`experiment`, or `override` when an override decided the variation."
+        override:
+          type: boolean
+        ruleset_version:
+          type: integer
+          format: int64
+    EventBatchResult:
+      type: object
+      required: [accepted, duplicates, dropped_rows, rejected]
+      properties:
+        accepted:
+          type: integer
+          description: The events stored.
+        duplicates:
+          type: integer
+          description: The events already received, by `event_id`.
+        dropped_rows:
+          type: integer
+          description: The summary rows naming a flag the environment does not have.
+        rejected:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventRejection"
+    EventRejection:
+      type: object
+      required: [index, code, detail]
+      properties:
+        index:
+          type: integer
+          description: The event's position in the batch.
+        event_id:
+          type: string
+        code:
+          type: string
+          description: |
+            Why the event was refused. An open set: an SDK treats a code it
+            does not know like any other rejection and never resends the
+            event.
+        detail:
+          type: string
+security:
+  - sdkKey: []

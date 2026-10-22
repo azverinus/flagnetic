@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/eval"
 	"github.com/azverinus/flagnetic/internal/domain/access"
@@ -343,5 +344,44 @@ func TestKillSwitchServesTheOffVariationToEveryContext(t *testing.T) {
 		if r := got.Flags["other"]; r.Reason != "fallthrough" {
 			t.Errorf("other for %s = %+v, want it untouched", name, r)
 		}
+	}
+}
+
+// A ruleset version is the greater of the previous plus one and the
+// application clock in milliseconds, so a version lost with a failover's
+// commits is never handed out again with other content.
+func TestRulesetVersionsComeFromTheClock(t *testing.T) {
+	c := testkit.Clock()
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	version := func() int64 {
+		t.Helper()
+		return mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: management.EvaluationContext{}}).RulesetVersion
+	}
+	if got := version(); got != 1 {
+		t.Errorf("a new environment's ruleset_version = %d, want 1", got)
+	}
+
+	c.Advance(time.Minute)
+	stringFlag(t, admin, p.Key, "checkout")
+	if got, want := version(), c.Now().UnixMilli(); got != want {
+		t.Errorf("after a write = %d, want the clock's milliseconds %d", got, want)
+	}
+	mustPut(t, admin, p.Key, "checkout", "staging", 1, management.FlagConfigurationPut{On: true, OffVariation: "a", Fallthrough: "b"})
+	if got, want := version(), c.Now().UnixMilli()+1; got != want {
+		t.Errorf("after a second write in the same millisecond = %d, want the next one %d", got, want)
+	}
+
+	c.Advance(time.Second)
+	mustPut(t, admin, p.Key, "checkout", "staging", 2, management.FlagConfigurationPut{On: false, OffVariation: "a", Fallthrough: "b"})
+	if got, want := version(), c.Now().UnixMilli(); got != want {
+		t.Errorf("after the clock moved on = %d, want the clock's milliseconds %d", got, want)
+	}
+	before := version()
+	c.Set(c.Now().Add(-time.Hour))
+	mustPut(t, admin, p.Key, "checkout", "staging", 3, management.FlagConfigurationPut{On: true, OffVariation: "a", Fallthrough: "c"})
+	if got := version(); got != before+1 {
+		t.Errorf("after the clock moved back = %d, want one above %d", got, before)
 	}
 }

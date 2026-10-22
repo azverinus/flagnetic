@@ -1,8 +1,8 @@
 {
   "code": "schema_version_unsupported",
   "detail": "Flagnetic-Schema-Version must be an integer of at least 1, the lowest document schema served",
+  "request_id": "<request id>",
   "status": 406,
   "title": "Schema version unsupported",
   "type": "urn:flagnetic:problem:schema_version_unsupported"
 }
-

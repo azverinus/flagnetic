@@ -26,7 +26,30 @@
       "detail": "the event_id time is older than the raw retention",
       "event_id": "01a01976-a100-7000-8000-000000000006",
       "index": 6
+    },
+    {
+      "code": "undeclared_unit_type",
+      "detail": "from_unit_type \"device\" is not a unit type of this project",
+      "event_id": "01a0b91b-c500-7000-8000-000000000009",
+      "index": 7
+    },
+    {
+      "code": "unknown_experiment",
+      "detail": "no running experiment is keyed \"onboarding_test\"",
+      "event_id": "01a0b91b-c500-7000-8000-00000000000a",
+      "index": 8
+    },
+    {
+      "code": "unit_type_mismatch",
+      "detail": "experiment \"pricing_test\" assigns units of type \"user\", not \"anonymous\"",
+      "event_id": "01a0b91b-c500-7000-8000-00000000000b",
+      "index": 9
+    },
+    {
+      "code": "unknown_variation",
+      "detail": "experiment \"pricing_test\" has no variation \"premium\"",
+      "event_id": "01a0b91b-c500-7000-8000-00000000000c",
+      "index": 10
     }
   ]
 }
-
