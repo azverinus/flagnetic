@@ -6,11 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -26,18 +28,23 @@ func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 
 func (s *Store) db(ctx context.Context) pgxtx.DB { return pgxtx.Querier(ctx, s.pool) }
 
-// BumpProject increments the ruleset version of every environment of
-// project.
-func (s *Store) BumpProject(ctx context.Context, project workspace.ProjectID) error {
-	_, err := s.db(ctx).Exec(ctx, `UPDATE environments SET ruleset_version = ruleset_version + 1 WHERE project_id = $1`,
-		project.Bytes())
+// BumpProject moves the ruleset version of every environment of project on
+// to its next version at now (delivery.NextRulesetVersion). The rule is
+// applied in the statement, on the row it locks, so two bumps racing on one
+// environment never both start from the same previous version.
+func (s *Store) BumpProject(ctx context.Context, project workspace.ProjectID, now time.Time) error {
+	_, err := s.db(ctx).Exec(ctx,
+		`UPDATE environments SET ruleset_version = greatest(ruleset_version + 1, $2) WHERE project_id = $1`,
+		project.Bytes(), delivery.RulesetVersionFloor(now))
 	return err
 }
 
-// BumpEnvironment increments the ruleset version of environment.
-func (s *Store) BumpEnvironment(ctx context.Context, environment workspace.EnvironmentID) error {
-	_, err := s.db(ctx).Exec(ctx, `UPDATE environments SET ruleset_version = ruleset_version + 1 WHERE id = $1`,
-		environment.Bytes())
+// BumpEnvironment moves the ruleset version of environment on to its next
+// version at now, as BumpProject does.
+func (s *Store) BumpEnvironment(ctx context.Context, environment workspace.EnvironmentID, now time.Time) error {
+	_, err := s.db(ctx).Exec(ctx,
+		`UPDATE environments SET ruleset_version = greatest(ruleset_version + 1, $2) WHERE id = $1`,
+		environment.Bytes(), delivery.RulesetVersionFloor(now))
 	return err
 }
 

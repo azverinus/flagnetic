@@ -73,17 +73,17 @@ func rulesetVersions(t *testing.T, p management.Project) map[string]int64 {
 }
 
 // bumped returns the environments whose ruleset version moved between
-// before and after, failing if one moved by more than one.
+// before and after, failing if one moved back.
 func bumped(t *testing.T, name string, before, after map[string]int64) []string {
 	t.Helper()
 	var out []string
 	for env, v := range after {
-		switch v - before[env] {
-		case 0:
-		case 1:
+		switch {
+		case v == before[env]:
+		case v > before[env]:
 			out = append(out, env)
 		default:
-			t.Errorf("%s: %s moved from %d to %d, want at most one step", name, env, before[env], v)
+			t.Errorf("%s: %s moved back from %d to %d", name, env, before[env], v)
 		}
 	}
 	slices.Sort(out)

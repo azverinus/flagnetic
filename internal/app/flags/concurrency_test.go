@@ -52,7 +52,7 @@ func newApp(t *testing.T) *app {
 	ids := id.NewSource(c)
 	tx, ws, store := postgres.NewTransactor(pool), pgworkspace.NewStore(pool), pgflags.NewStore(pool)
 	rec := appflags.NewRecorder(pggovernance.NewAuditLog(pool), c, ids)
-	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool))
+	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool), c)
 	owners := appaccess.NewOwnership(pgaccess.NewStore(pool))
 	wsRec := appworkspace.NewRecorder(pggovernance.NewAuditLog(pool), c, ids)
 	return &app{

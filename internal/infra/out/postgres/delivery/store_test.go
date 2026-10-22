@@ -4,6 +4,7 @@ import (
 	"maps"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
@@ -59,11 +60,13 @@ func TestARulesetVersionStartsAtOneAndMovesOnAProjectOrAnEnvironmentAtATime(t *t
 	if got, want := versions(mobile), map[string]int64{"development": 1, "staging": 1, "production": 1}; !maps.Equal(got, want) {
 		t.Errorf("new = %v, want %v", got, want)
 	}
-	if err := store.BumpProject(t.Context(), mobile.ID); err != nil {
+	at := testkit.Start
+	millis := at.UnixMilli()
+	if err := store.BumpProject(t.Context(), mobile.ID, at); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := versions(mobile), map[string]int64{"development": 2, "staging": 2, "production": 2}; !maps.Equal(got, want) {
-		t.Errorf("after bumping the project = %v, want %v", got, want)
+	if got, want := versions(mobile), map[string]int64{"development": millis, "staging": millis, "production": millis}; !maps.Equal(got, want) {
+		t.Errorf("after bumping the project = %v, want the clock's milliseconds %v", got, want)
 	}
 	if got, want := versions(web), map[string]int64{"development": 1, "staging": 1, "production": 1}; !maps.Equal(got, want) {
 		t.Errorf("another project = %v, want %v untouched", got, want)
@@ -74,10 +77,23 @@ func TestARulesetVersionStartsAtOneAndMovesOnAProjectOrAnEnvironmentAtATime(t *t
 			staging = e
 		}
 	}
-	if err := store.BumpEnvironment(t.Context(), staging.ID); err != nil {
+	if err := store.BumpEnvironment(t.Context(), staging.ID, at); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := versions(mobile), map[string]int64{"development": 2, "staging": 3, "production": 2}; !maps.Equal(got, want) {
-		t.Errorf("after bumping staging = %v, want %v", got, want)
+	if got, want := versions(mobile), map[string]int64{"development": millis, "staging": millis + 1, "production": millis}; !maps.Equal(got, want) {
+		t.Errorf("after bumping staging in the same millisecond = %v, want %v", got, want)
+	}
+	if err := store.BumpProject(t.Context(), mobile.ID, at.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := versions(mobile), map[string]int64{"development": millis + 1, "staging": millis + 2, "production": millis + 1}; !maps.Equal(got, want) {
+		t.Errorf("after bumping the project with the clock set back = %v, want each one up %v", got, want)
+	}
+	later := at.Add(time.Second)
+	if err := store.BumpEnvironment(t.Context(), staging.ID, later); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := versions(mobile)["staging"], later.UnixMilli(); got != want {
+		t.Errorf("staging after the clock moved on = %d, want the clock's %d", got, want)
 	}
 }
