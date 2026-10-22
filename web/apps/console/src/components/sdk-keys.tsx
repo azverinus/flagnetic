@@ -407,7 +407,17 @@ function CreateKey({
             refusal={create.error}
             pointer="/kind"
           >
-            <Select value={field.value} onValueChange={field.onChange} onBlur={field.onBlur}>
+            <Select
+              value={field.value}
+              onValueChange={(next) => {
+                field.onChange(next);
+                // A server key takes no origins. The origins field leaves the
+                // screen but keeps its value, which would otherwise still be
+                // checked and block the form with an error nobody can see.
+                if (next === "server") form.setValue("origins", []);
+              }}
+              onBlur={field.onBlur}
+            >
               <SelectItem value="server">{kindName(i18n, "server")}</SelectItem>
               <SelectItem value="client">{kindName(i18n, "client")}</SelectItem>
             </Select>

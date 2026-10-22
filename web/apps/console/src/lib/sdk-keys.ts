@@ -103,6 +103,8 @@ export function normalizeOrigin(text: string): string | undefined {
     return undefined;
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+  // The parser takes port 0, which no browser sends and the server refuses.
+  if (url.port === "0") return undefined;
   // The parser lowercases the host, brackets an IPv6 one and drops the
   // scheme's default port, so what is left is the origin itself.
   return `${url.protocol}//${url.host}`;

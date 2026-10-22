@@ -188,6 +188,27 @@ describe("the SDK keys of an environment", () => {
     expect(server.requests.some((request) => request.method === "POST")).toBe(false);
   });
 
+  it("create a server key after origins were typed for a client key", async () => {
+    const server = serve(["project.read", "sdk_key.manage"], () => [], {
+      [`POST ${base}`]: () => ({ status: 201, body: { key: serverKey, value } }),
+    });
+    renderKeys();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "New SDK key" }));
+    const dialog = await screen.findByRole("dialog", { name: "New SDK key" });
+    await user.click(within(dialog).getByRole("combobox", { name: "Kind" }));
+    await user.click(await screen.findByRole("option", { name: "Client" }));
+    await user.type(within(dialog).getByLabelText("Allowed origins"), "shop.example.com{Enter}");
+    await user.click(within(dialog).getByRole("combobox", { name: "Kind" }));
+    await user.click(await screen.findByRole("option", { name: "Server" }));
+    await user.type(within(dialog).getByLabelText("Name"), "checkout backend");
+    await user.click(within(dialog).getByRole("button", { name: "Create key" }));
+
+    expect(await screen.findByRole("dialog", { name: "The new SDK key" })).toBeInTheDocument();
+    const sent = await server.requests.find((r) => r.method === "POST")!.json();
+    expect(sent).toEqual({ kind: "server", name: "checkout backend", allowed_origins: [] });
+  });
+
   it("explain the limit of active keys in the dialog", async () => {
     serve(["project.read", "sdk_key.manage"], () => [], {
       [`POST ${base}`]: () => problem(409, "sdk_key_limit_reached"),

@@ -64,6 +64,8 @@ describe("normalizing an origin as the server does", () => {
     "https://user:secret@app.example.com",
     "https://app.example.com:",
     "https://app.example.com:99999",
+    "http://app.example.com:0",
+    "http://app.example.com:00",
     "javascript:alert(1)",
     "*",
   ])("refuses %j", (typed) => {
