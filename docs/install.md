@@ -143,7 +143,7 @@ Flagnetic serves plain HTTP; terminate TLS in a reverse proxy or load balancer i
 
 - **Tell Flagnetic about it.** List the proxy's addresses in `FLAGNETIC_TRUSTED_PROXIES` so its `X-Forwarded-For` and `X-Forwarded-Proto` are believed: otherwise every client is seen with the proxy's address, and rate limits, the sign-in throttle and the audit log all see one client. Set `FLAGNETIC_BASE_URL` to the public URL (`https://flags.example.com`), so the session cookie is `Secure` and invitation links point at the right host. See [Behind a reverse proxy](operations.md#behind-a-reverse-proxy).
 - **Do not buffer the ruleset stream.** `GET /sdk/v1/stream` is a long-lived `text/event-stream` answer; a proxy that buffers it holds every version back. Turn response buffering off for that path (Flagnetic sends `X-Accel-Buffering: no`, which nginx honours by itself).
-- **Read timeout above 15 seconds.** The stream sends a heartbeat every 15 seconds and nothing else while nothing changes, so a proxy must not close a connection idle for 15 seconds; 60 seconds leaves a margin. Each stream lasts up to 65 minutes before the server closes it; a proxy that caps connections sooner only makes SDKs reconnect sooner, which they do without losing a version.
+- **Read timeout above 15 seconds.** The ruleset stream sends a heartbeat every 15 seconds and nothing else while nothing changes, so a proxy must not close a connection idle for 15 seconds; 60 seconds leaves a margin. Each ruleset stream lasts up to 65 minutes before the server closes it; a proxy that caps connections sooner only makes SDKs reconnect sooner, which they do without losing a version.
 - **Keep the metrics port off it.** Proxy the public listener (`FLAGNETIC_LISTEN_ADDR`, `:8080`) only; scrape `/metrics` on `FLAGNETIC_METRICS_LISTEN_ADDR` from inside your network.
 - **Compression is optional.** Flagnetic compresses SDK API answers itself when asked.
 
@@ -196,7 +196,7 @@ with `FLAGNETIC_TRUSTED_PROXIES` set to the nginx host's address and `FLAGNETIC_
 
 Each replica listens on PostgreSQL notification channels (`LISTEN`) to learn of changes made through other replicas: rulesets, SDK keys and auth settings. A connection pooler in transaction or statement mode, such as PgBouncer with `pool_mode = transaction`, hands the listening session to other clients and delivers nothing. Connect Flagnetic to PostgreSQL directly, or through a pooler in **session mode**.
 
-Through a pooler that does not carry `LISTEN`, Flagnetic still works but slowly and late: each listener checks itself every 10 seconds, finds that its own notifications do not come back, and reports itself down (`flagnetic_listener_up` at 0); the replica then trusts no cache and reads PostgreSQL on every SDK request, and the ruleset streams it holds hear of no change made through another replica, so their SDKs learn of it only at their next poll.
+Through a pooler that does not carry `LISTEN`, Flagnetic still works but slowly and late: each listener checks itself every 10 seconds, finds that its own notifications do not come back, and reports itself down (`flagnetic_listener_up` at 0); the replica then trusts no cache and reads PostgreSQL on every SDK request, and the ruleset streams it holds hear of no change made through another replica, so their SDKs learn of it only at their next poll (every 5 minutes for a Go SDK holding the ruleset stream, by default) and the [declared propagation time](sdks/stream.md#propagation) does not hold. Session mode is required for the 2 seconds.
 
 ### The connection budget
 
@@ -222,10 +222,11 @@ Both are on the public listener. A load balancer routes only to ready replicas; 
 
 Read the release notes of every version between yours and the new one: a change that needs you to act is marked there.
 
-1. **Back up the database**, so that whatever goes wrong you can go back.
-2. **Migrate.** Run `flagnetic migrate` with the new version, as a job, then roll the replicas one at a time. Or leave `FLAGNETIC_AUTO_MIGRATE` on and redeploy: the first new replica migrates, and replicas starting together take turns. With Compose, set the new `FLAGNETIC_VERSION` in `.env` and run `docker compose pull && docker compose up -d`: the `migrate` job runs again before the new server starts.
-3. **Roll the replicas.** Old and new replicas may serve side by side while you roll.
+1. **Back up the database.** A backup taken before the upgrade is the way back if anything goes wrong.
+2. **Stop every replica.** In this developer preview, upgrade all replicas together and accept a brief downtime: 0.1 does not promise that two versions serve side by side.
+3. **Migrate.** Run `flagnetic migrate` with the new version, as a job. Or leave `FLAGNETIC_AUTO_MIGRATE` on: the first new replica migrates, and replicas starting together take turns. With Compose, set the new `FLAGNETIC_VERSION` in `.env` and run `docker compose pull && docker compose up -d`: the `migrate` job runs again before the new server starts.
+4. **Start the new replicas.**
 
-From 0.1.0 on, migrations only move forward and only add: an upgrade never loses data, and a migration never changes the schema in a way the release before it cannot run against. There are no down migrations. To roll a binary back, deploy the previous version against the migrated database: with `FLAGNETIC_AUTO_MIGRATE=false` it starts and logs a warning that the schema is ahead, and keeps working (see [Migrations](operations.md#migrations)). A replica never runs against a schema older than its own: with auto-migration off it refuses to start until `flagnetic migrate` has run.
+From 0.1.0 on, migrations only move forward, without data loss: a migration is never edited once released, and there are no down migrations. 0.1 does not promise that an older version keeps working against a database a newer one migrated: to go back, restore the backup taken before the upgrade and deploy the previous version. A replica never runs against a schema older than its own: with auto-migration off it refuses to start until `flagnetic migrate` has run (see [Migrations](operations.md#migrations)).
 
-The SDK API (`/sdk/v1`) and the ruleset format only grow, so SDKs keep working across server upgrades without being upgraded themselves. The management API (`/api/v1`) and the console may still change incompatibly between 0.x releases, each such change marked in the release notes; scripts using the management API should be checked against them.
+The SDK API (`/sdk/v1`) and the ruleset format only grow, so SDKs keep working across server upgrades without being upgraded themselves. The management API (`/api/v1`) and the console may still change incompatibly between 0.x releases, each such change marked as breaking in the release notes; scripts using the management API should be checked against them.

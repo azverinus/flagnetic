@@ -27,12 +27,12 @@ Exit codes: `0` success, `1` a runtime failure (PostgreSQL unreachable or too ol
 
 By default `serve` applies pending migrations on start, so an upgrade is a redeploy. Replicas that start together take turns through a PostgreSQL lock, and each migration is applied once.
 
-To run migrations as a separate step instead, for example as a job before a rolling deploy, run `flagnetic migrate` with the new version and start the replicas with `FLAGNETIC_AUTO_MIGRATE=false`.
+To run migrations as a separate step instead, for example as a job before the new version starts, run `flagnetic migrate` with the new version and start the replicas with `FLAGNETIC_AUTO_MIGRATE=false`.
 
 With `FLAGNETIC_AUTO_MIGRATE=false`, `serve` compares the database's schema with the migrations the binary carries before it opens any port:
 
 - **Behind** (the job has not run yet): `serve` refuses to start, exit code 1, naming both versions and `flagnetic migrate`. New code never meets an old schema.
-- **Ahead** (a binary rolled back after a newer one migrated): `serve` starts and logs a warning naming both versions. Migrations only add to the schema in a way older binaries ignore, so a rollback keeps working.
+- **Ahead** (a newer version migrated the database): `serve` starts and logs a warning naming both versions. 0.1 does not promise that an older version works against a newer schema: to go back after an upgrade, restore the backup taken before it (see [Upgrades](install.md#upgrades)).
 - **Equal**: `serve` starts without a word.
 
 ## The secret key
@@ -145,10 +145,10 @@ There is no bound on the time to write a response, which would cut off streams; 
 
 Any replica serves any SDK: it can download its environment's [ruleset](sdks/ruleset.md) from one replica, hold its [ruleset stream](sdks/stream.md) on another and post [events](sdks/events.md) to a third, so a load balancer needs no sticky sessions. Replicas share nothing but PostgreSQL. Each keeps two caches in memory and learns through PostgreSQL notifications when what they hold changed:
 
-- **Rulesets**, each environment's document by version, built from PostgreSQL once per environment however many SDKs ask at the same moment. Remote evaluation evaluates against the same document. A change is notified when its transaction commits, with the environment and its new version; every replica then builds the new document and offers its version to the streams it holds. A replica that took a write serves it at once, without waiting for its own notification.
+- **Rulesets**, each environment's document by version, built from PostgreSQL once per environment however many SDKs ask at the same moment. Remote evaluation evaluates against the same document. A change is notified when its transaction commits, with the environment and its new version; every replica then builds the new document and offers its version to the ruleset streams it holds. A replica that took a write serves it at once, without waiting for its own notification.
 - **SDK keys**, each key the replica has accepted, by the hash of its value. A key's revocation, rotation, a change of its allowed origins and the deletion of its environment or project are notified, and every replica drops the key; an unknown key is never cached. A rotated key's expiry is judged on every request, with no notification needed.
 
-Deleting an environment drops its cached ruleset, ends its streams at their next heartbeat (their key is gone with it) and removes its series of `flagnetic_ruleset_propagation_seconds`.
+Deleting an environment drops its cached ruleset, ends its ruleset streams at their next heartbeat (their key is gone with it) and removes its series of `flagnetic_ruleset_propagation_seconds`.
 
 ### Notification listeners
 
@@ -156,7 +156,7 @@ Each replica holds one PostgreSQL connection per channel, outside its pool, for 
 
 | Channel | Carries | While it is down |
 |---|---|---|
-| `rulesets` | every change to an environment's ruleset, and the deletion of an environment | The replica caches no ruleset: it builds one from PostgreSQL for every ruleset request and remote evaluation (`flagnetic_ruleset_materializations_total` grows with each). The streams it holds hear of no change made through another replica, so their SDKs learn of it only at their next poll. |
+| `rulesets` | every change to an environment's ruleset, and the deletion of an environment | The replica caches no ruleset: it builds one from PostgreSQL for every ruleset request and remote evaluation (`flagnetic_ruleset_materializations_total` grows with each). The streams it holds hear of no change made through another replica, so their SDKs learn of it only at their next poll (every 5 minutes for a Go SDK holding the ruleset stream, by default) and the [declared propagation time](#propagation) does not hold for them. A pooler in transaction or statement mode keeps this listener down for good: connect directly or through a pooler in session mode ([Poolers in session mode only](install.md#poolers-in-session-mode-only)). |
 | `sdk_keys` | every change that ends or restricts an SDK key | The replica caches no key and reads every SDK request's key from PostgreSQL, so a revocation still applies at once. |
 | `auth_settings` | changes to the instance's auth settings | The replica reads the settings from PostgreSQL on every use (see [Signing in to the console](#signing-in-to-the-console)). |
 
@@ -164,7 +164,7 @@ A listener that is down never serves stale data, only slower. When a listener co
 
 ### Propagation
 
-The declared propagation time of a server SDK, from the commit of a change until the SDK holds the new ruleset, is at most 2 seconds at the 99th percentile with the ruleset stream, whichever replicas the writer and the SDK use; without the stream, at most the SDK's poll interval (see [Propagation](sdks/stream.md#propagation)).
+The declared propagation time of a server SDK, from the commit of a change until the SDK holds the new ruleset, is at most 2 seconds at the 99th percentile with the ruleset stream, whichever replicas the writer and the SDK use, as long as the `rulesets` listener of the replica holding the ruleset stream is up; without the ruleset stream, at most the SDK's safety poll, 30 seconds for the Go SDK (see [Propagation](sdks/stream.md#propagation)).
 
 `flagnetic_ruleset_propagation_seconds` measures the server's part, from the commit (by the clock of the replica that committed it) to each replica's first ruleset or evaluation answer carrying the version; the SDK's download comes on top. Watch its 99th percentile, for example:
 
@@ -212,8 +212,8 @@ Each replica counts on its own, in memory: an instance of three replicas behind 
 
 The client-key limits count each key and client IP together, which assumes that one address is one device. Many devices often share one: an office network, a campus or a hotel behind one NAT address, and mobile carriers, which put thousands of phones behind each address of a carrier-grade NAT. Every app using the key behind that address then shares one budget per replica:
 
-- **Concurrent streams.** Each app in the foreground holds a ruleset stream, so the 11th app open behind one address is refused its stream (`FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS`, 10).
-- **Stream connects.** When a replica drains, as in every rolling deploy, the streams it held reconnect within seconds: past 30 apps behind one address, the rest are refused until the minute ends (`FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS`).
+- **Concurrent ruleset streams.** Each app in the foreground holds a ruleset stream, so the 11th app open behind one address is refused its ruleset stream (`FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS`, 10).
+- **Ruleset stream connects.** When a replica drains, as on every deploy or restart, the ruleset streams it held reconnect within seconds: past 30 apps behind one address, the rest are refused until the minute ends (`FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS`).
 - **Evaluations.** Each change of the environment makes every open app evaluate once, at about the same moment: past 120 open apps behind one address, the rest are refused until the minute ends (`FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE`), and so are their evaluations on start.
 - **Failed authentications.** An app still shipping a revoked or expired key is refused, and each refusal counts against its address: 30 in a minute and every SDK API request from that address is refused, the apps with a valid key included, until the minute ends (`FLAGNETIC_RATE_LIMIT_FAILED_AUTHENTICATIONS`).
 
@@ -262,7 +262,7 @@ Each request is logged once when it completes, as a `request` record with `metho
 
 On SIGTERM or SIGINT a replica stops in three steps:
 
-1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. Every [ruleset stream](sdks/stream.md) the replica holds is closed, and its SDK reconnects, usually to another replica. This gives load balancers time to notice and route away, so a rolling deploy never refuses a request. `0` skips the drain.
+1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. Every [ruleset stream](sdks/stream.md) the replica holds is closed, and its SDK reconnects, usually to another replica. This gives load balancers time to notice and route away, so stopping one replica of several never refuses a request. `0` skips the drain.
 2. **Grace** (`FLAGNETIC_SHUTDOWN_GRACE`, 15 s by default): the replica stops accepting connections and lets requests in flight finish.
 3. **Cancel**: requests still running when the grace period ends are cancelled, background work is stopped, and the database pool closes.
 
