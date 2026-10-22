@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -197,6 +198,14 @@ func TestEveryProblemDocumentIsOfThePlatformShape(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no problem documents: %v", err)
 	}
+	// The schema leaves a problem's code an open string, so that an SDK
+	// treats a code it does not know like any other problem of its status;
+	// every code a document answers must still be one the contract names, or
+	// an SDK written against the contract would never see it coming.
+	spec, err := os.ReadFile(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, f := range files {
 		data, err := os.ReadFile(f)
 		if err != nil {
@@ -204,10 +213,9 @@ func TestEveryProblemDocumentIsOfThePlatformShape(t *testing.T) {
 		}
 		var p sdk.Problem
 		strictly(t, filepath.Base(f), data, &p)
-		for _, legacy := range []string{"malformed_body", "body_too_large", "context_invalid"} {
-			if p.Code == legacy {
-				t.Errorf("%s answers %s, which the platform names otherwise", filepath.Base(f), legacy)
-			}
+		// A code stands in backticks, alone or after its status (`404 not_found`).
+		if !regexp.MustCompile("[` ]" + regexp.QuoteMeta(p.Code) + "`").Match(spec) {
+			t.Errorf("%s answers %s, which the contract does not name", filepath.Base(f), p.Code)
 		}
 		if p.Errors != nil {
 			for _, v := range *p.Errors {
