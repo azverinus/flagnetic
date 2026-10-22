@@ -169,6 +169,53 @@ func (k SDKKey) StatusAt(t time.Time) SDKKeyStatus {
 	}
 }
 
+// ErrSDKKeyMissing refuses a request to the SDK API that presents no key.
+var ErrSDKKeyMissing = apperrors.Unauthenticated("sdk_key_missing", "the request carries no SDK key")
+
+var (
+	errSDKKeyRevoked = apperrors.Unauthenticated("sdk_key_revoked", "the SDK key is revoked")
+	errSDKKeyExpired = apperrors.Unauthenticated("sdk_key_expired",
+		"the SDK key was rotated and its rotation overlap has ended")
+	errKeyKindNotAllowed = apperrors.Forbidden("key_kind_not_allowed",
+		"this operation does not serve this kind of SDK key")
+)
+
+// AcceptAt refuses the key presented at t when it no longer works: revoked
+// (sdk_key_revoked), or rotated and past its overlap (sdk_key_expired). The
+// time is the request's, so a rotation ends on time without anyone acting.
+func (k SDKKey) AcceptAt(t time.Time) error {
+	switch k.StatusAt(t) {
+	case SDKKeyRevoked:
+		return errSDKKeyRevoked
+	case SDKKeyExpired:
+		return errSDKKeyExpired
+	default:
+		return nil
+	}
+}
+
+// CheckKind refuses the key, key_kind_not_allowed, unless it is of one of
+// the kinds served. A client key ships inside apps anyone can read, so it
+// never reaches what only a server key may, such as a ruleset carrying
+// private segments.
+func (k SDKKey) CheckKind(served ...SDKKeyKind) error {
+	if slices.Contains(served, k.Kind) {
+		return nil
+	}
+	return errKeyKindNotAllowed
+}
+
+// SDKKeyUseInterval is how often at most a key's last use is recorded: often
+// enough for a member to see whether a key is still in use, rarely enough
+// that an SDK polling every few seconds costs no write per request.
+const SDKKeyUseInterval = time.Minute
+
+// UseToRecord reports whether a use of the key at at is worth recording: its
+// first, or one at least SDKKeyUseInterval after the last recorded.
+func (k SDKKey) UseToRecord(at time.Time) bool {
+	return k.LastUsedAt == nil || !at.Before(k.LastUsedAt.Add(SDKKeyUseInterval))
+}
+
 // IsActive reports whether the key is neither rotated nor revoked: what
 // counts towards MaxActiveSDKKeys and what may be rotated.
 func (k SDKKey) IsActive() bool { return k.RevokedAt == nil && k.ExpiresAt == nil }

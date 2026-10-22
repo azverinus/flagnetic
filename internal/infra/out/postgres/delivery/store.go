@@ -87,3 +87,23 @@ func (s *Store) RulesetEnvironment(ctx context.Context, project workspace.Projec
 	}
 	return id.FromBytes[workspace.Environment](environment), version, nil
 }
+
+// RulesetEnvironmentByID returns the project, key and ruleset version of
+// environment, or appdelivery.ErrNotFound.
+func (s *Store) RulesetEnvironmentByID(ctx context.Context, environment workspace.EnvironmentID,
+) (workspace.ProjectID, string, int64, error) {
+	var (
+		project [16]byte
+		key     string
+		version int64
+	)
+	err := s.db(ctx).QueryRow(ctx, `SELECT project_id, key, ruleset_version FROM environments WHERE id = $1`,
+		environment.Bytes()).Scan(&project, &key, &version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return workspace.ProjectID{}, "", 0, appdelivery.ErrNotFound
+	}
+	if err != nil {
+		return workspace.ProjectID{}, "", 0, fmt.Errorf("reading an environment's ruleset version: %w", err)
+	}
+	return id.FromBytes[workspace.Project](project), key, version, nil
+}

@@ -91,6 +91,7 @@ type serverOptions struct {
 	routes  []route
 	// console is the default locale of the console served, "" for none.
 	console string
+	listen  pglisten.Options
 }
 
 type route struct {
@@ -119,6 +120,12 @@ func WithEdge(change func(*flaghttp.Options)) ServerOption {
 
 // ServerOption changes what the in-process server is built with.
 type ServerOption func(*serverOptions)
+
+// WithListenerOptions starts the replica's notification listeners with o,
+// such as a short ping interval and the fault hook that silences them.
+func WithListenerOptions(o pglisten.Options) ServerOption {
+	return func(so *serverOptions) { so.listen = o }
+}
 
 // WithClock serves with c as the application clock instead of the wall clock.
 func WithClock(c clock.Clock) ServerOption {
@@ -212,7 +219,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	listeners := postgres.NewListeners(runner.PanicHook(context.Background()), o.pool, logs.Logger(), reg)
 	t.Cleanup(func() { listeners.Stop(10 * time.Second) })
 	for _, l := range background.Listeners {
-		listeners.Start(l.Channel, l.Handler, pglisten.Options{})
+		listeners.Start(l.Channel, l.Handler, o.listen)
 	}
 	return &Server{URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg), runner: runner, listeners: listeners}
 }

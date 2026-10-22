@@ -62,6 +62,13 @@ func UnsupportedMediaType(detail string) error {
 	return &adapterProblem{problem{status: http.StatusUnsupportedMediaType, code: "unsupported_media_type", title: "Unsupported media type", detail: detail}}
 }
 
+// NotAcceptable is answered 406 with code: a request asking for a
+// representation the operation cannot answer, such as a document schema
+// older than any it serves.
+func NotAcceptable(code, detail string) error {
+	return &adapterProblem{problem{status: http.StatusNotAcceptable, code: code, title: "Not acceptable", detail: detail}}
+}
+
 // PreconditionRequired is answered 428 precondition_required: a write that
 // must name the version it read and does not.
 func PreconditionRequired(detail string) error {

@@ -146,18 +146,5 @@ func (h *Evaluate) materials(ctx context.Context, project workspace.ProjectID, e
 		return m, err
 	}
 	m.Version = version
-	if m.UnitTypes, err = h.d.Declarations.UnitTypes(ctx, project); err != nil {
-		return m, err
-	}
-	if m.Attributes, err = h.d.Declarations.Attributes(ctx, project); err != nil {
-		return m, err
-	}
-	if m.Segments, err = h.d.Flags.Segments(ctx, project); err != nil {
-		return m, err
-	}
-	if m.Flags, err = h.d.Flags.ProjectFlags(ctx, project); err != nil {
-		return m, err
-	}
-	m.Configurations, err = h.d.Flags.EnvironmentConfigurations(ctx, envID)
-	return m, err
+	return m, readMaterials(ctx, h.d.Declarations, h.d.Flags, project, envID, &m)
 }
