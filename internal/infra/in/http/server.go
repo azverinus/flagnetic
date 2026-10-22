@@ -104,6 +104,23 @@ type Server struct {
 	draining    atomic.Bool
 	// console answers the paths no route owns, nil while none is mounted.
 	console http.Handler
+	// wraps are the middlewares around every request under a prefix.
+	wraps []wrap
+}
+
+type wrap struct {
+	prefix string
+	mw     func(http.Handler) http.Handler
+}
+
+// Wrap serves every request whose path is under prefix, such as /sdk/v1/,
+// through mw, whether a route matches it or not: an API's own handling of
+// its requests, such as compressing answers, then covers its 404 and 405
+// too. mw runs inside the edge, so the request already has its ID, is
+// logged and recovered; it may replace the body before the route's body
+// limit applies, so a limit counts what mw hands on.
+func (s *Server) Wrap(prefix string, mw func(http.Handler) http.Handler) {
+	s.wraps = append(s.wraps, wrap{prefix: prefix, mw: mw})
 }
 
 // New returns the public handler with its probes mounted.
@@ -237,6 +254,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.accessLog(r, st, rw, time.Since(start), false)
 	}()
 
+	route := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) { s.route(w, rw, r, st) })
+	for _, wr := range s.wraps {
+		if r.URL.Path == strings.TrimSuffix(wr.prefix, "/") || strings.HasPrefix(r.URL.Path, wr.prefix) {
+			wr.mw(route).ServeHTTP(rw, r)
+			return
+		}
+	}
+	route.ServeHTTP(rw, r)
+}
+
+// route serves r on rw by the route it matches. conn is the connection's
+// own writer, which body limits and deadlines act on.
+func (s *Server) route(conn, rw http.ResponseWriter, r *http.Request, st *requestState) {
 	_, pattern := s.mux.Handler(r)
 	route, ok := s.patterns[pattern]
 	if !ok && s.servesConsole(r) {
@@ -257,7 +287,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	st.route = pattern
 	if !route.stream && s.opts.BodyReadTimeout > 0 && r.Body != nil && r.Body != http.NoBody {
-		r.Body = withReadDeadline(r.Body, r.ContentLength, http.NewResponseController(w), s.opts.BodyReadTimeout)
+		r.Body = withReadDeadline(r.Body, r.ContentLength, http.NewResponseController(conn), s.opts.BodyReadTimeout)
 	}
 	if route.maxBodyBytes > 0 {
 		if r.ContentLength > route.maxBodyBytes {
@@ -266,7 +296,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		// The connection's own writer, so net/http learns of a body too
 		// large and closes the connection rather than read the rest.
-		r.Body = http.MaxBytesReader(w, r.Body, route.maxBodyBytes)
+		r.Body = http.MaxBytesReader(conn, r.Body, route.maxBodyBytes)
 	}
 	s.mux.ServeHTTP(rw, r)
 }

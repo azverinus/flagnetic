@@ -1274,6 +1274,16 @@ export const zEvaluatePath = z.object({
  */
 export const zEvaluateResponse = zEvaluation;
 
+export const zGetEnvironmentRulesetPath = z.object({
+  project: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The ruleset document (schema 1), as described by the SDK API's `Ruleset`.
+ */
+export const zGetEnvironmentRulesetResponse = z.record(z.string(), z.unknown());
+
 export const zListSdkKeysPath = z.object({
   project: z.string(),
   environment: z.string(),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -149,4 +150,32 @@ func origins(o []string) []string {
 		return []string{}
 	}
 	return o
+}
+
+// SDKKeyByHash returns the key whose value hashes to hash, or
+// appdelivery.ErrNotFound.
+func (s *Store) SDKKeyByHash(ctx context.Context, hash delivery.SDKKeyHash) (delivery.SDKKey, error) {
+	k, err := scanSDKKey(s.db(ctx).QueryRow(ctx, `
+		SELECT `+sdkKeyColumns+` FROM sdk_keys k JOIN environments e ON e.id = k.environment_id
+		WHERE k.key_hash = $1`, hash[:]))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return delivery.SDKKey{}, appdelivery.ErrNotFound
+	}
+	if err != nil {
+		return delivery.SDKKey{}, fmt.Errorf("looking up an SDK key: %w", err)
+	}
+	return k, nil
+}
+
+// RecordSDKKeyUse records that key was used at at, unless a use less than
+// delivery.SDKKeyUseInterval before at is recorded already.
+func (s *Store) RecordSDKKeyUse(ctx context.Context, key delivery.SDKKeyID, at time.Time) error {
+	_, err := s.db(ctx).Exec(ctx, `
+		UPDATE sdk_keys SET last_used_at = $2
+		WHERE id = $1 AND (last_used_at IS NULL OR last_used_at <= $2::timestamptz - make_interval(secs => $3))`,
+		key.Bytes(), at, delivery.SDKKeyUseInterval.Seconds())
+	if err != nil {
+		return fmt.Errorf("recording an SDK key's use: %w", err)
+	}
+	return nil
 }

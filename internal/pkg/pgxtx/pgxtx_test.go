@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -226,5 +227,47 @@ func TestAConcurrencyFailureIsPassedToTheConfiguredWrapper(t *testing.T) {
 	err := tx.Within(t.Context(), func(context.Context) error { return errFailed })
 	if errors.Is(err, errWrapped) {
 		t.Error("an ordinary failure was wrapped as a concurrency failure")
+	}
+}
+
+func TestAfterCommitRunsOnceTheOutermostTransactionCommits(t *testing.T) {
+	pool := pgtest.Pool(t)
+	tx := pgxtx.New(pool)
+	var ran []string
+	err := tx.Within(t.Context(), func(ctx context.Context) error {
+		pgxtx.AfterCommit(ctx, func() { ran = append(ran, "outer") })
+		return tx.Within(ctx, func(ctx context.Context) error {
+			pgxtx.AfterCommit(ctx, func() { ran = append(ran, "inner") })
+			if len(ran) != 0 {
+				t.Error("a hook ran before the commit")
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(ran, ",") != "outer,inner" {
+		t.Errorf("ran = %v, want both hooks in order after the commit", ran)
+	}
+}
+
+func TestAfterCommitNeverRunsForARolledBackTransaction(t *testing.T) {
+	tx := pgxtx.New(pgtest.Pool(t))
+	ran := false
+	_ = tx.Within(t.Context(), func(ctx context.Context) error {
+		pgxtx.AfterCommit(ctx, func() { ran = true })
+		return errors.New("fail")
+	})
+	if ran {
+		t.Error("a hook ran for a transaction rolled back")
+	}
+}
+
+func TestAfterCommitOutsideATransactionRunsAtOnce(t *testing.T) {
+	ran := false
+	pgxtx.AfterCommit(t.Context(), func() { ran = true })
+	if !ran {
+		t.Error("a hook outside a transaction did not run at once")
 	}
 }

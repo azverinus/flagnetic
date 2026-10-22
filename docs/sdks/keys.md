@@ -7,6 +7,21 @@ An SDK key identifies one environment to an SDK. Each environment has its own ke
 
 A key's value is the kind's prefix and 40 random characters. It is shown once, when the key is created or is a rotation's replacement, and never again: Flagnetic keeps only its SHA-256. Every key is listed by its **key ID**, the first 8 characters after the prefix, so you can tell which key a service holds without seeing the value.
 
+## Presenting a key
+
+An SDK sends its key as a bearer token on every request to the SDK API, `/sdk/v1`: `Authorization: Bearer fn_srv_…`. A key that does not work is refused `401`, with a problem whose `code` says why and the challenge of RFC 6750 in `WWW-Authenticate`:
+
+| Code | When | `WWW-Authenticate` |
+|---|---|---|
+| `sdk_key_missing` | no key, or an `Authorization` of another scheme | `Bearer` |
+| `sdk_key_invalid` | a malformed or unknown value, refused alike | `Bearer error="invalid_token", error_description="sdk_key_invalid"` |
+| `sdk_key_revoked` | a revoked key | `Bearer error="invalid_token", error_description="sdk_key_revoked"` |
+| `sdk_key_expired` | a rotated key past its overlap | `Bearer error="invalid_token", error_description="sdk_key_expired"` |
+
+A key the server cannot check because its database does not answer is `503 unavailable` with `Retry-After`, never a `401`, so an SDK keeps what it holds and retries. A key of a kind an operation does not serve, such as a client key asking for the ruleset, is `403 key_kind_not_allowed`.
+
+Each replica keeps the keys it has accepted in memory, and every replica drops a key within a second of its revocation, its rotation, a change of its allowed origins or the deletion of its environment or project, whichever replica the change went through. A replica that is not sure it hears of every change (its notification listener is down) keeps nothing and checks every key against the database. A rotated key's expiry is judged on every request, so it ends on time with no change to hear of. A key's `last_used_at` is written at most once a minute.
+
 ## Managing keys
 
 The keys of an environment are under `/api/v1/projects/{project}/environments/{environment}/sdk-keys`. Listing them needs `project.read`; every change needs `sdk_key.manage`, which maintainers and owners hold and which a project token or a personal access token carrying the `project:admin` scope exercises too, so a pipeline provisioning an environment can give its services keys (see [Access](../access.md)).

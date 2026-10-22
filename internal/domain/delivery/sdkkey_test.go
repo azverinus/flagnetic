@@ -264,3 +264,58 @@ func TestAnUpdateRenamesAndReplacesTheAllowedOrigins(t *testing.T) {
 		t.Errorf("a blank name: %v", got)
 	}
 }
+
+func TestAKeyIsAcceptedUntilRevokedOrPastItsOverlap(t *testing.T) {
+	k, _ := newKey(t, delivery.SDKKeyServer)
+	if err := k.AcceptAt(bumpedAt); err != nil {
+		t.Errorf("an active key: %v", err)
+	}
+	rotated, _, _, err := k.Rotate(id.New[delivery.SDKKey](keyIDs), time.Hour, bumpedAt, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rotated.AcceptAt(bumpedAt.Add(time.Hour - time.Millisecond)); err != nil {
+		t.Errorf("a key within its overlap: %v", err)
+	}
+	if err := rotated.AcceptAt(bumpedAt.Add(time.Hour)); !hasCode(err, apperrors.KindUnauthenticated, "sdk_key_expired") {
+		t.Errorf("a key at the end of its overlap: %v, want sdk_key_expired", err)
+	}
+	revoked, _ := rotated.Revoke(bumpedAt)
+	if err := revoked.AcceptAt(bumpedAt); !hasCode(err, apperrors.KindUnauthenticated, "sdk_key_revoked") {
+		t.Errorf("a revoked key: %v, want sdk_key_revoked", err)
+	}
+}
+
+func TestAnOperationRefusesAKeyOfAKindItDoesNotServe(t *testing.T) {
+	server, _ := newKey(t, delivery.SDKKeyServer)
+	client, _ := newKey(t, delivery.SDKKeyClient)
+	if err := server.CheckKind(delivery.SDKKeyServer); err != nil {
+		t.Errorf("a server key where server keys are served: %v", err)
+	}
+	if err := client.CheckKind(delivery.SDKKeyServer, delivery.SDKKeyClient); err != nil {
+		t.Errorf("a client key where both kinds are served: %v", err)
+	}
+	if err := client.CheckKind(delivery.SDKKeyServer); !hasCode(err, apperrors.KindForbidden, "key_kind_not_allowed") {
+		t.Errorf("a client key where only server keys are served: %v, want key_kind_not_allowed", err)
+	}
+}
+
+func hasCode(err error, kind apperrors.Kind, code string) bool {
+	e, ok := apperrors.From(err)
+	return ok && e.Kind == kind && e.Code == code
+}
+
+func TestAKeysUseIsRecordedAtMostOnceAMinute(t *testing.T) {
+	k, _ := newKey(t, delivery.SDKKeyServer)
+	if !k.UseToRecord(bumpedAt) {
+		t.Error("the first use of a key is not recorded")
+	}
+	used := bumpedAt
+	k.LastUsedAt = &used
+	if k.UseToRecord(bumpedAt.Add(time.Minute - time.Millisecond)) {
+		t.Error("a use within a minute of the last one recorded is recorded again")
+	}
+	if !k.UseToRecord(bumpedAt.Add(time.Minute)) {
+		t.Error("a use a minute after the last one recorded is not recorded")
+	}
+}
