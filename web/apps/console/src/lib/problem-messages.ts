@@ -83,6 +83,18 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(
         msg`Someone else changed this since you opened it. Reload to see their changes, then make yours again.`,
       );
+    case "in_use": {
+      const references = referenceList(i18n, error);
+      return references
+        ? i18n._(msg`It is still in use by ${references}.`)
+        : i18n._(msg`It is still in use.`);
+    }
+    case "not_archived":
+      return i18n._(msg`Archive the flag first; only an archived flag can be deleted.`);
+    case "archived":
+      return i18n._(msg`The flag is archived. Restore it to change its configurations.`);
+    case "not_a_rollout":
+      return i18n._(msg`Only a rule serving a rollout has a salt.`);
     case "key_immutable":
       return i18n._(msg`A key never changes once it is set.`);
     case "scope_not_allowed":
@@ -117,6 +129,26 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       }
       return error.detail || i18n._(msg`The request was refused.`);
   }
+}
+
+/**
+ * What an `in_use` refusal names, joined as the member's language joins a
+ * list: each flag or segment by its key, with the environment it is named
+ * in when it is one.
+ */
+function referenceList(i18n: I18n, error: ApiError): string | undefined {
+  const references = error.problem.references;
+  if (!Array.isArray(references) || references.length === 0) return undefined;
+  const named = references.map(({ kind, key, environment }) => {
+    const what =
+      kind === "flag"
+        ? i18n._(msg`the flag ${key}`)
+        : kind === "segment"
+          ? i18n._(msg`the segment ${key}`)
+          : key;
+    return environment ? i18n._(msg`${what} in ${environment}`) : what;
+  });
+  return new Intl.ListFormat(i18n.locale, { type: "conjunction" }).format(named);
 }
 
 function param(violation: Violation, name: string): unknown {

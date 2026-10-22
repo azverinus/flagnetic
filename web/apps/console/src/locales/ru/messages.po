@@ -27,6 +27,20 @@ msgstr "{count, plural, one {минута} few {минуты} many {минут} 
 msgid "{count, plural, one {second} other {seconds}}"
 msgstr "{count, plural, one {секунда} few {секунды} many {секунд} other {секунды}}"
 
+#: src/components/condition-row.tsx
+#: src/lib/conditions.ts
+msgid "{entry} is not a full semantic version, such as 1.41.0."
+msgstr "{entry} — не полная семантическая версия, например 1.41.0."
+
+#: src/components/condition-row.tsx
+#: src/lib/conditions.ts
+msgid "{entry} is not a number."
+msgstr "{entry} — не число."
+
+#: src/lib/conditions.ts
+msgid "{flag} serves {variation}"
+msgstr "{flag} отдаёт {variation}"
+
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "{holder} no longer holds {role} in this project and keeps their other roles here."
 msgstr "У участника {holder} больше не будет роли «{role}» в этом проекте; остальные его роли здесь сохранятся."
@@ -34,6 +48,23 @@ msgstr "У участника {holder} больше не будет роли «{
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "{holder} no longer holds any role in this project and leaves its members. They stay a member of the instance."
 msgstr "У участника {holder} не останется ролей в этом проекте, и он выйдет из числа его участников. Участником экземпляра он останется."
+
+#: src/components/kill-switch-dialog.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "{key} is off in {name}."
+msgstr "{key} выключен в окружении {name}."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "{key} is on in {name}."
+msgstr "{key} включён в окружении {name}."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "{key} on in {name}"
+msgstr "{key} включён в окружении {name}"
+
+#: src/components/kill-switch-dialog.tsx
+msgid "{key} was already off in {name}. Nothing changed."
+msgstr "{key} уже был выключен в окружении {name}. Ничего не изменилось."
 
 #: src/components/grant-form.tsx
 msgid "{label}: {status}"
@@ -46,6 +77,10 @@ msgstr "{live, plural, one {Отозвать # сеанс} few {Отозвать
 #: src/components/grant-form.tsx
 msgid "{name} ({email})"
 msgstr "{name} ({email})"
+
+#: src/components/condition-row.tsx
+msgid "{name} (unit ID)"
+msgstr "{name} (ID единицы)"
 
 #: src/components/member-actions.tsx
 msgid "{name} can sign in again. What deactivation revoked stays revoked: their sessions and API tokens do not come back."
@@ -100,15 +135,60 @@ msgstr "{others, plural, one {Отозвать # сеанс} few {Отозват
 msgid "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
 msgstr "{revoked, plural, one {Отозван # сеанс.} few {Отозвано # сеанса.} many {Отозвано # сеансов.} other {Отозвано # сеанса.}}"
 
+#: src/lib/conditions.ts
+msgid "{variation} to {percent}% of {unitType} units"
+msgstr "{variation} для {percent}% единиц {unitType}"
+
+#: src/lib/problem-messages.ts
+msgid "{what} in {environment}"
+msgstr "{what} в окружении {environment}"
+
 #: src/components/token-list.tsx
 msgid "{when} from {ip}"
 msgstr "{when} с {ip}"
+
+#: src/components/conflict-banner.tsx
+msgid "{who} saved a change on {when}, after you opened this."
+msgstr "{who} сохранил(а) изменение {when}, уже после того, как вы это открыли."
+
+#: src/components/conflict-banner.tsx
+msgid "{who} saved this configuration on {when}, after this draft was loaded."
+msgstr "{who} сохранил(а) эту конфигурацию {when}, уже после загрузки этого черновика."
+
+#: src/components/structural-diff-view.tsx
+msgid "<0>{variation}</0> (note: {note})"
+msgstr "<0>{variation}</0> (заметка: {note})"
+
+#: src/components/condition-row.tsx
+msgid "1.41.0"
+msgstr "1.41.0"
+
+#: src/components/condition-row.tsx
+msgid "1.41.0, then Enter"
+msgstr "1.41.0, затем Enter"
 
 #: src/components/variations-editor.tsx
 msgid "A boolean flag always has exactly the variations true and false."
 msgstr "У логического флага всегда ровно два варианта: true и false."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/lib/flag-detail.ts
+msgid "A chain of prerequisites has at most 5 steps: {path}."
+msgstr "Цепочка предусловий — не длиннее 5 шагов: {path}."
+
+#: src/lib/flag-detail.ts
+msgid "A chain of prerequisites has at most 5 steps."
+msgstr "Цепочка предусловий — не длиннее 5 шагов."
+
+#: src/components/rule-editor.tsx
+msgid "A configuration has at most {maxRulesText} rules."
+msgstr "В конфигурации — не более {maxRulesText} правил."
+
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
+msgid "A flag cannot require itself."
+msgstr "Флаг не может требовать сам себя."
+
+#: src/lib/flags.ts
 msgid "A flag has at most 50 tags."
 msgstr "У флага не более 50 тегов."
 
@@ -141,6 +221,10 @@ msgstr "Новый проект создаётся с окружениями dev
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr "Выдать вам роль в нём может владелец проекта или администратор экземпляра."
 
+#: src/components/overrides-section.tsx
+msgid "A project token"
+msgstr "Токен проекта"
+
 #: src/components/project-token-list.tsx
 msgid "A project token belongs to the project, not to whoever created it: it keeps working when they leave. Only a signed-in session creates one."
 msgstr "Токен проекта принадлежит проекту, а не тому, кто его создал: он продолжит работать, когда создатель уйдёт. Создать токен можно только в сеансе входа."
@@ -154,6 +238,14 @@ msgstr "Токен проекта может то, что разрешает е�
 msgid "A revoked device is signed out at its next request."
 msgstr "Устройство с отозванным сеансом выходит из системы при следующем запросе."
 
+#: src/lib/rule-editor.ts
+msgid "A rule has at most {max} conditions."
+msgstr "В правиле — не более {max} условий."
+
+#: src/components/rule-editor.tsx
+msgid "A rule has at most {maxConditionsText} conditions."
+msgstr "В правиле — не более {maxConditionsText} условий."
+
 #: src/components/auth-settings-form.tsx
 msgid "A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older."
 msgstr "Через столько времени после входа сеанс завершается, как бы активно им ни пользовались. Уменьшение сразу завершает уже более старые сеансы."
@@ -162,11 +254,11 @@ msgstr "Через столько времени после входа сеан�
 msgid "A session ends this long after its last request."
 msgstr "Через столько времени после последнего запроса сеанс завершается."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/lib/flags.ts
 msgid "A tag has at most 64 characters."
 msgstr "Тег — не более 64 символов."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "A temporary flag is meant to be removed once its change is released; a permanent one stays."
 msgstr "Временный флаг удаляют, когда изменение выпущено; постоянный остаётся."
 
@@ -181,6 +273,18 @@ msgstr "Токен может только то, что можете вы сам
 #: src/components/token-list.tsx
 msgid "A token lets a script act for you, narrowed to its scopes. Only a signed-in session creates or revokes one."
 msgstr "Токен позволяет скрипту действовать от вашего имени в пределах его областей доступа. Создать или отозвать токен можно только в сеансе входа."
+
+#: src/lib/flag-detail.ts
+msgid "A unit ID has at most {max} bytes."
+msgstr "ID единицы — не более {max} байт."
+
+#: src/components/condition-row.tsx
+msgid "A value, then Enter"
+msgstr "Значение, затем Enter"
+
+#: src/components/overrides-section.tsx
+msgid "A variation pinned for one unit, checked before any rule. An override is saved as soon as it is added or removed."
+msgstr "Вариант, закреплённый за одной единицей; проверяется раньше любого правила. Переопределение сохраняется сразу, как только его добавили или удалили."
 
 #: src/components/token-create-form.tsx
 msgid "A year"
@@ -199,6 +303,7 @@ msgstr "Примите приглашение"
 msgid "Action"
 msgstr "Действие"
 
+#: src/components/overrides-section.tsx
 #: src/components/row-dialogs.tsx
 msgid "Actions"
 msgstr "Действия"
@@ -217,9 +322,45 @@ msgstr "Автор"
 msgid "Actor kind"
 msgstr "Вид автора"
 
+#: src/components/overrides-section.tsx
+msgid "Add an override"
+msgstr "Добавить переопределение"
+
+#: src/lib/conditions.ts
+msgid "Add at least one value."
+msgstr "Добавьте хотя бы одно значение."
+
+#: src/components/rule-editor.tsx
+msgid "Add attribute condition"
+msgstr "Добавить условие по атрибуту"
+
+#: src/components/overrides-section.tsx
+msgid "Add override"
+msgstr "Добавить переопределение"
+
+#: src/components/prerequisites-section.tsx
+msgid "Add prerequisite"
+msgstr "Добавить предусловие"
+
+#: src/components/rule-editor.tsx
+msgid "Add prerequisite condition"
+msgstr "Добавить условие-предусловие"
+
+#: src/components/rule-editor.tsx
+msgid "Add rule"
+msgstr "Добавить правило"
+
+#: src/components/rule-editor.tsx
+msgid "Add segment condition"
+msgstr "Добавить условие по сегменту"
+
 #: src/components/variations-editor.tsx
 msgid "Add variation"
 msgstr "Добавить вариант"
+
+#: src/components/overrides-section.tsx
+msgid "Added by"
+msgstr "Кто добавил"
 
 #: src/lib/personal-tokens.ts
 msgid "Administer projects: environments, members and tokens."
@@ -294,17 +435,45 @@ msgstr "API-токены"
 msgid "Appearance"
 msgstr "Оформление"
 
+#: src/components/flag-definition-sheet.tsx
+msgid "Applies to the flag in every environment."
+msgstr "Действует для флага во всех окружениях."
+
 #: src/components/audit-log.tsx
 msgid "Apply filters"
 msgstr "Применить фильтры"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Archive"
+msgstr "В архив"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Archive {key}"
+msgstr "Архивировать {key}"
 
 #: src/lib/access-names.ts
 msgid "archive and delete flags"
 msgstr "архивировать и удалять флаги"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Archive flag"
+msgstr "Архивировать флаг"
+
+#: src/lib/problem-messages.ts
+msgid "Archive the flag first; only an archived flag can be deleted."
+msgstr "Сначала архивируйте флаг: удалить можно только архивный."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Archived"
+msgstr "В архиве"
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Archived flags instead"
 msgstr "Только архивные флаги"
+
+#: src/components/structural-diff-view.tsx
+msgid "Archived."
+msgstr "Отправлен в архив."
 
 #: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
@@ -323,6 +492,10 @@ msgstr "Не более {max}."
 #: src/lib/audit.ts
 msgid "Attribute"
 msgstr "Атрибут"
+
+#: src/components/condition-row.tsx
+msgid "Attribute (condition {position})"
+msgstr "Атрибут (условие {position})"
 
 #: src/lib/audit.ts
 msgid "Attribute declared"
@@ -369,6 +542,18 @@ msgstr "Настройки аутентификации"
 msgid "Authentication settings updated"
 msgstr "Настройки аутентификации изменены"
 
+#: src/components/flag-definition-sheet.tsx
+msgid "Automatic exposure"
+msgstr "Автоматическая экспозиция"
+
+#: src/components/structural-diff-view.tsx
+msgid "Automatic exposure switched off."
+msgstr "Автоматическая экспозиция выключена."
+
+#: src/components/structural-diff-view.tsx
+msgid "Automatic exposure switched on."
+msgstr "Автоматическая экспозиция включена."
+
 #: src/components/audit-entry-sheet.tsx
 msgid "Before"
 msgstr "До"
@@ -387,6 +572,7 @@ msgstr "Логический"
 msgid "Breadcrumb"
 msgstr "Навигационная цепочка"
 
+#: src/components/kill-switch-dialog.tsx
 #: src/components/ui/confirm-dialog.tsx
 #: src/components/ui/form-page.tsx
 msgid "Cancel"
@@ -412,9 +598,31 @@ msgstr "Сменить пароль"
 msgid "changed"
 msgstr "изменено"
 
+#: src/components/structural-diff-view.tsx
+msgid "Changes to the configuration"
+msgstr "Изменения конфигурации"
+
+#: src/components/structural-diff-view.tsx
+msgid "Changes to the definition"
+msgstr "Изменения определения"
+
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr "После смены пароля все остальные устройства выйдут из системы; на этом вход сохранится."
+
+#: src/components/rule-editor.tsx
+msgid "Checked top to bottom; the first whose conditions all hold serves. Reorder by dragging, with the arrows, or with Alt+Arrow Up and Down."
+msgstr "Проверяются сверху вниз; срабатывает первое правило, все условия которого выполнены. Порядок меняется перетаскиванием, стрелками или клавишами Alt+стрелка вверх и вниз."
+
+#: src/components/condition-row.tsx
+#: src/components/prerequisites-section.tsx
+msgid "Choose a flag"
+msgstr "Выберите флаг"
+
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
+msgid "Choose a flag."
+msgstr "Выберите флаг."
 
 #: src/components/grant-form.tsx
 msgid "Choose a member"
@@ -437,6 +645,14 @@ msgstr "Выберите роль"
 msgid "Choose a role."
 msgstr "Выберите роль."
 
+#: src/components/condition-row.tsx
+msgid "Choose a segment"
+msgstr "Выберите сегмент"
+
+#: src/lib/conditions.ts
+msgid "Choose a segment."
+msgstr "Выберите сегмент."
+
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
 msgstr "Выберите более надёжный пароль."
@@ -452,6 +668,34 @@ msgstr "Выберите тип"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type."
 msgstr "Выберите тип."
+
+#: src/components/rule-editor.tsx
+msgid "Choose a unit type"
+msgstr "Выберите тип единицы"
+
+#: src/lib/rule-editor.ts
+msgid "Choose a unit type."
+msgstr "Выберите тип единицы."
+
+#: src/components/condition-row.tsx
+#: src/components/prerequisites-section.tsx
+#: src/components/rule-editor.tsx
+msgid "Choose a variation"
+msgstr "Выберите вариант"
+
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
+#: src/lib/rule-editor.ts
+msgid "Choose a variation."
+msgstr "Выберите вариант."
+
+#: src/components/condition-row.tsx
+msgid "Choose an attribute"
+msgstr "Выберите атрибут"
+
+#: src/lib/conditions.ts
+msgid "Choose an attribute."
+msgstr "Выберите атрибут."
 
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered languages."
@@ -472,6 +716,10 @@ msgstr "Выберите одну из предложенных областей
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered types."
 msgstr "Выберите один из предложенных типов."
+
+#: src/lib/conditions.ts
+msgid "Choose true or false."
+msgstr "Выберите true или false."
 
 #: src/components/tags-input.tsx
 msgid "Chosen tags"
@@ -497,6 +745,26 @@ msgstr "Свернуть боковую панель"
 msgid "Command line"
 msgstr "Командная строка"
 
+#: src/components/condition-row.tsx
+msgid "Condition {position}"
+msgstr "Условие {position}"
+
+#: src/components/structural-diff-view.tsx
+msgid "Condition {position} added: <0/>."
+msgstr "Добавлено условие {position}: <0/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Condition {position} changed from <0/> to <1/>."
+msgstr "Условие {position} изменено: было <0/>, стало <1/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Condition {position} removed: <0/>."
+msgstr "Удалено условие {position}: <0/>."
+
+#: src/components/rule-editor.tsx
+msgid "Conditions (all must hold)"
+msgstr "Условия (должны выполняться все)"
+
 #: src/components/password-form.tsx
 msgid "Confirm the new password"
 msgstr "Повторите новый пароль"
@@ -504,6 +772,22 @@ msgstr "Повторите новый пароль"
 #: src/components/invitation-acceptance.tsx
 msgid "Confirm the password"
 msgstr "Повторите пароль"
+
+#: src/lib/conditions.ts
+msgid "contains"
+msgstr "содержит"
+
+#: src/lib/conditions.ts
+msgid "contains all of"
+msgstr "содержит все из"
+
+#: src/lib/conditions.ts
+msgid "contains any of"
+msgstr "содержит любое из"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Contexts are served by the overrides, rules and fallthrough below."
+msgstr "Контексты получают значения по переопределениям, правилам и варианту без совпадений ниже."
 
 #: src/components/ui/reveal-secret.tsx
 msgid "Copied to the clipboard."
@@ -521,7 +805,7 @@ msgstr "Создать атрибут"
 msgid "Create environment"
 msgstr "Создать окружение"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Create flag"
 msgstr "Создать флаг"
 
@@ -587,8 +871,13 @@ msgstr "Деактивация сразу завершает все ваши с�
 msgid "Declare the kinds of unit its flags are served to."
 msgstr "Объявите виды единиц, которым отдаются его флаги."
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Delete"
+msgstr "Удалить"
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete {key}"
 msgstr "Удалить {key}"
@@ -601,6 +890,10 @@ msgstr "Удалить атрибут"
 msgid "Delete environment"
 msgstr "Удалить окружение"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Delete flag"
+msgstr "Удалить флаг"
+
 #: src/lib/access-names.ts
 msgid "delete segments"
 msgstr "удалять сегменты"
@@ -609,14 +902,28 @@ msgstr "удалять сегменты"
 msgid "Delete unit type"
 msgstr "Удалить тип единицы"
 
+#: src/components/flag-definition-sheet.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Description"
 msgstr "Описание"
+
+#: src/components/rule-editor.tsx
+msgid "Description (rule {position}, optional)"
+msgstr "Описание (правило {position}, необязательно)"
+
+#: src/components/structural-diff-view.tsx
+msgid "Description changed from “{before}” to “{after}”."
+msgstr "Описание изменено: было «{before}», стало «{after}»."
+
+#: src/components/structural-diff-view.tsx
+msgid "Description changed."
+msgstr "Описание изменено."
 
 #. The name of a built-in role.
 #: src/lib/access-names.ts
@@ -631,10 +938,26 @@ msgstr "Устройство"
 msgid "Discard"
 msgstr "Отменить изменения"
 
+#: src/components/configuration-editor.tsx
+msgid "Discard my draft"
+msgstr "Отбросить мой черновик"
+
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Display name"
 msgstr "Отображаемое имя"
+
+#: src/lib/conditions.ts
+msgid "does not contain"
+msgstr "не содержит"
+
+#: src/lib/conditions.ts
+msgid "does not equal"
+msgstr "не равно"
+
+#: src/components/rule-editor.tsx
+msgid "Drag rule {position}"
+msgstr "Перетащить правило {position}"
 
 #: src/components/member-actions.tsx
 msgid "Edit"
@@ -648,6 +971,11 @@ msgstr "Изменить {key}"
 #: src/components/member-actions.tsx
 msgid "Edit {name}"
 msgstr "Изменить участника {name}"
+
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Edit definition"
+msgstr "Изменить определение"
 
 #: src/lib/access-names.ts
 msgid "edit flags"
@@ -671,6 +999,14 @@ msgstr "Электронная почта"
 msgid "Ends at the latest"
 msgstr "Завершится не позднее"
 
+#: src/lib/conditions.ts
+msgid "ends with"
+msgstr "заканчивается на"
+
+#: src/lib/conditions.ts
+msgid "Enter a date and time."
+msgstr "Введите дату и время."
+
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Enter a display name."
@@ -679,6 +1015,10 @@ msgstr "Введите отображаемое имя."
 #: src/lib/auth-settings.ts
 msgid "Enter a duration from {from} to {to}."
 msgstr "Укажите длительность от {from} до {to}."
+
+#: src/lib/conditions.ts
+msgid "Enter a full semantic version, such as 1.41.0."
+msgstr "Введите полную семантическую версию, например 1.41.0."
 
 #: src/lib/forms.ts
 #: src/lib/problem-messages.ts
@@ -689,9 +1029,18 @@ msgstr "Введите название."
 msgid "Enter a new password."
 msgstr "Введите новый пароль."
 
+#: src/lib/conditions.ts
 #: src/lib/variations.ts
 msgid "Enter a number."
 msgstr "Введите число."
+
+#: src/lib/conditions.ts
+msgid "Enter a pattern in RE2 syntax, which has no look-around or back-references."
+msgstr "Введите шаблон в синтаксисе RE2: без просмотра вперёд и назад и без обратных ссылок."
+
+#: src/lib/rule-editor.ts
+msgid "Enter a percentage from 0 to 100, to two decimal places."
+msgstr "Введите процент от 0 до 100, не больше двух знаков после запятой."
 
 #: src/lib/problem-messages.ts
 msgid "Enter a valid email address."
@@ -705,6 +1054,10 @@ msgstr "Введите значение от {min} до {max}."
 msgid "Enter a value of the flag's type."
 msgstr "Введите значение типа флага."
 
+#: src/lib/conditions.ts
+msgid "Enter a value."
+msgstr "Введите значение."
+
 #: src/lib/auth-settings.ts
 msgid "Enter a whole number."
 msgstr "Введите целое число."
@@ -716,6 +1069,10 @@ msgstr "Введите адрес электронной почты."
 #: src/lib/variations.ts
 msgid "Enter JSON other than null."
 msgstr "Введите JSON, отличный от null."
+
+#: src/lib/flag-detail.ts
+msgid "Enter the unit's ID."
+msgstr "Введите ID единицы."
 
 #: src/components/password-form.tsx
 msgid "Enter your current password."
@@ -759,6 +1116,14 @@ msgstr "Окружение изменено"
 msgid "Environments"
 msgstr "Окружения"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Environments and history"
+msgstr "Окружения и история"
+
+#: src/lib/conditions.ts
+msgid "equals"
+msgstr "равно"
+
 #: src/routes/_signed-in/projects/$project/audit.tsx
 msgid "Every change made in this project, newest first, with its values before and after."
 msgstr "Все изменения в этом проекте, сначала новые, со значениями до и после."
@@ -766,6 +1131,14 @@ msgstr "Все изменения в этом проекте, сначала н�
 #: src/routes/_signed-in/admin/audit.tsx
 msgid "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
 msgstr "Все изменения в этом экземпляре: во всех проектах и вне их, например участники, входы и настройки."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Every change to this flag, its definition and its configurations, is recorded in the project's audit log."
+msgstr "Каждое изменение флага — его определения и конфигураций — записывается в журнал аудита проекта."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Every context receives the off variation."
+msgstr "Каждый контекст получает вариант при выключении."
 
 #: src/components/member-credentials.tsx
 msgid "Every device {name} is signed in on is signed out at its next request. Their API tokens keep working."
@@ -799,6 +1172,14 @@ msgstr "У каждого нового API-токена должен быть с
 msgid "Every status"
 msgstr "Любой статус"
 
+#: src/components/configuration-editor.tsx
+msgid "Every unit is bucketed afresh: units now in the rollout may fall out of it and others come in. The new salt is saved at once, apart from the rest of the draft."
+msgstr "Все единицы распределяются заново: те, что сейчас в раскатке, могут из неё выпасть, а другие — попасть. Новая соль сохраняется сразу, отдельно от остального черновика."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Everyone receives the off variation in {name}, whatever the rules and overrides say. Switching the flag back on is an ordinary configuration change."
+msgstr "Все в окружении {name} получат вариант при выключении, что бы ни говорили правила и переопределения. Обратное включение флага — обычное изменение конфигурации."
+
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
 msgstr "Все, кто может входить в этот экземпляр. Что участник может делать в проекте, определяют выданные ему там роли."
@@ -807,9 +1188,18 @@ msgstr "Все, кто может входить в этот экземпляр.
 msgid "Expand the sidebar"
 msgstr "Развернуть боковую панель"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Expected removal"
 msgstr "Ожидаемое удаление"
+
+#: src/components/structural-diff-view.tsx
+msgid "Expected removal changed from {before} to {after}."
+msgstr "Ожидаемое удаление изменено: было {before}, стало {after}."
+
+#: src/lib/flag-detail.ts
+msgid "Experiments are not available yet."
+msgstr "Эксперименты пока недоступны."
 
 #: src/components/token-list.tsx
 msgid "Expired"
@@ -819,6 +1209,14 @@ msgstr "Истёк"
 #: src/components/token-list.tsx
 msgid "Expires"
 msgstr "Истекает"
+
+#: src/components/configuration-editor.tsx
+msgid "Fallthrough variation"
+msgstr "Вариант без совпадений"
+
+#: src/components/structural-diff-view.tsx
+msgid "Fallthrough variation changed from <0>{before}</0> to <1>{after}</1>."
+msgstr "Вариант без совпадений изменён: был <0>{before}</0>, стал <1>{after}</1>."
 
 #: src/components/audit-entry-sheet.tsx
 msgid "Field"
@@ -831,6 +1229,10 @@ msgstr "Фильтры журнала аудита"
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Filter the flags"
 msgstr "Фильтр флагов"
+
+#: src/components/configuration-editor.tsx
+msgid "Fix what is marked above before saving."
+msgstr "Перед сохранением исправьте отмеченное выше."
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
@@ -845,11 +1247,27 @@ msgstr "Не меняется после создания проекта: по �
 msgid "Flag"
 msgstr "Флаг"
 
+#: src/components/condition-row.tsx
+msgid "Flag (condition {position})"
+msgstr "Флаг (условие {position})"
+
+#: src/components/prerequisites-section.tsx
+msgid "Flag (prerequisite {position})"
+msgstr "Флаг (предусловие {position})"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Flag not found"
+msgstr "Флаг не найден"
+
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/route.tsx
 msgid "Flags"
 msgstr "Флаги"
+
+#: src/components/prerequisites-section.tsx
+msgid "Flags that must serve a variation for this flag to be evaluated here; otherwise it serves its off variation."
+msgstr "Флаги, которые должны отдавать указанный вариант, чтобы этот флаг вычислялся здесь; иначе он отдаёт вариант при выключении."
 
 #: src/components/personal-menu.tsx
 #: src/components/profile-form.tsx
@@ -867,6 +1285,10 @@ msgstr "Отформатировать вариант {n}"
 #: src/components/audit-log.tsx
 msgid "From"
 msgstr "С"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Go to the flags"
+msgstr "К флагам"
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Go to the members"
@@ -905,7 +1327,11 @@ msgstr "Выдать роль"
 msgid "Grants"
 msgstr "Роли"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "History"
+msgstr "История"
+
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
 msgstr "Имя флага в коде, например checkout.newFlow: буквы, цифры, ., - и _. Не меняется."
 
@@ -928,6 +1354,10 @@ msgstr "Я сохранил это в надёжном месте"
 #: src/components/audit-log.tsx
 msgid "In the action, the entity's key and the actor's name."
 msgstr "В действии, ключе объекта и имени автора."
+
+#: src/lib/conditions.ts
+msgid "in the segment {segment}"
+msgstr "в сегменте {segment}"
 
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
@@ -974,6 +1404,58 @@ msgstr "Приглашён"
 msgid "IP address"
 msgstr "IP-адрес"
 
+#: src/lib/conditions.ts
+msgid "is after"
+msgstr "позже"
+
+#: src/lib/conditions.ts
+msgid "is at least"
+msgstr "не меньше"
+
+#: src/lib/conditions.ts
+msgid "is at most"
+msgstr "не больше"
+
+#: src/lib/conditions.ts
+msgid "is before"
+msgstr "раньше"
+
+#: src/lib/conditions.ts
+msgid "is empty"
+msgstr "пуст"
+
+#: src/lib/conditions.ts
+msgid "is greater than"
+msgstr "больше"
+
+#: src/components/condition-row.tsx
+msgid "is in the segment"
+msgstr "в сегменте"
+
+#: src/lib/conditions.ts
+msgid "is less than"
+msgstr "меньше"
+
+#: src/components/condition-row.tsx
+msgid "is not in the segment"
+msgstr "не в сегменте"
+
+#: src/lib/conditions.ts
+msgid "is not one of"
+msgstr "не входит в"
+
+#: src/lib/conditions.ts
+msgid "is not set"
+msgstr "не задан"
+
+#: src/lib/conditions.ts
+msgid "is one of"
+msgstr "входит в"
+
+#: src/lib/conditions.ts
+msgid "is set"
+msgstr "задан"
+
 #: src/components/member-actions.tsx
 msgid "Issue a new invitation link"
 msgstr "Выпустить новую ссылку-приглашение"
@@ -990,6 +1472,14 @@ msgstr "Выпустить ссылку"
 msgid "It does not exist, or it was deleted."
 msgstr "Этого не существует, или это было удалено."
 
+#: src/lib/problem-messages.ts
+msgid "It is still in use by {references}."
+msgstr "Это всё ещё используют: {references}."
+
+#: src/lib/problem-messages.ts
+msgid "It is still in use."
+msgstr "Это всё ещё используется."
+
 #: src/components/invitation-acceptance.tsx
 msgid "Joining…"
 msgstr "Присоединяемся…"
@@ -998,16 +1488,21 @@ msgstr "Присоединяемся…"
 msgid "JSON"
 msgstr "JSON"
 
+#: src/components/flag-definition-sheet.tsx
+msgid "Keep my edits"
+msgstr "Оставить мои правки"
+
 #: src/components/theme-choice.tsx
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr "Хранится в этом браузере и применяется и на странице входа. Вариант «Как в системе» следует настройке устройства."
 
+#: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Key"
@@ -1020,6 +1515,14 @@ msgstr "Ключ <0>{key}</0>"
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Key or name"
 msgstr "Ключ или название"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Kill switch"
+msgstr "Аварийный выключатель"
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Kill switch: {flagKey} in {name}"
+msgstr "Аварийный выключатель: {flagKey} в окружении {name}"
 
 #: src/components/personal-menu.tsx
 #: src/components/profile-form.tsx
@@ -1039,6 +1542,14 @@ msgstr "Последний вход"
 msgid "Last used"
 msgstr "Последнее использование"
 
+#: src/components/kill-switch-dialog.tsx
+msgid "Last used by {who} on {when}, with no reason."
+msgstr "Последним использовал(а) {who} {when}, без причины."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Last used by {who} on {when}: “{lastReason}”"
+msgstr "Последним использовал(а) {who} {when}: «{lastReason}»"
+
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Leave"
 msgstr "Уйти"
@@ -1047,7 +1558,8 @@ msgstr "Уйти"
 msgid "Leave without saving?"
 msgstr "Уйти без сохранения?"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Left empty, 90 days from today."
 msgstr "Если оставить пустым — через 90 дней."
 
@@ -1063,9 +1575,15 @@ msgstr "Пока ничего не позволяет."
 msgid "Letters, digits, ., - and _, at most 64."
 msgstr "Буквы, цифры, ., - и _, не более 64."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Lifetime"
 msgstr "Срок жизни"
+
+#: src/components/structural-diff-view.tsx
+msgid "Lifetime changed from {before} to {after}."
+msgstr "Срок жизни изменён: был {before}, стал {after}."
 
 #: src/components/personal-menu.tsx
 #: src/components/theme-choice.tsx
@@ -1139,11 +1657,15 @@ msgstr "Выдана вручную {when}"
 msgid "Manual, granted on {when} by a member without a grant here"
 msgstr "Выдана вручную {when} участником без роли в этом проекте"
 
+#: src/lib/conditions.ts
+msgid "matches the pattern"
+msgstr "соответствует шаблону"
+
 #: src/components/auth-settings-form.tsx
 msgid "Maximum token lifetime"
 msgstr "Наибольший срок действия токена"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Me ({myName})"
 msgstr "Я ({myName})"
 
@@ -1198,6 +1720,19 @@ msgstr "Участники"
 msgid "Members of the project"
 msgstr "Участники проекта"
 
+#: src/components/condition-row.tsx
+msgid "Membership (condition {position})"
+msgstr "Принадлежность (условие {position})"
+
+#: src/components/rule-editor.tsx
+msgid "Move rule {position} down"
+msgstr "Переместить правило {position} ниже"
+
+#: src/components/rule-editor.tsx
+msgid "Move rule {position} up"
+msgstr "Переместить правило {position} выше"
+
+#: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
@@ -1205,11 +1740,15 @@ msgstr "Участники проекта"
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Name"
 msgstr "Название"
+
+#: src/components/structural-diff-view.tsx
+msgid "Name changed from “{before}” to “{after}”."
+msgstr "Название изменено: было «{before}», стало «{after}»."
 
 #: src/components/search-field.tsx
 msgid "Name or email"
@@ -1230,6 +1769,10 @@ msgstr "Нужно право {name}."
 msgid "Never"
 msgstr "Никогда"
 
+#: src/components/kill-switch-dialog.tsx
+msgid "Never used on this flag in {name}."
+msgstr "Для этого флага в окружении {name} ещё не использовался."
+
 #: src/components/token-list.tsx
 msgid "New API token"
 msgstr "Новый API-токен"
@@ -1242,8 +1785,8 @@ msgstr "Новый атрибут"
 msgid "New environment"
 msgstr "Новое окружение"
 
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "New flag"
 msgstr "Новый флаг"
 
@@ -1276,6 +1819,10 @@ msgstr "Далее"
 msgid "No"
 msgstr "Нет"
 
+#: src/components/rule-editor.tsx
+msgid "No conditions: matches every context."
+msgstr "Без условий: подходит любой контекст."
+
 #: src/components/audit-log.tsx
 msgid "No entry matches these filters."
 msgstr "Нет записей, подходящих под эти фильтры."
@@ -1300,6 +1847,14 @@ msgstr "Ни один участник не подходит под поиск �
 msgid "No members yet."
 msgstr "Участников пока нет."
 
+#: src/components/overrides-section.tsx
+msgid "No overrides in this environment."
+msgstr "В этом окружении нет переопределений."
+
+#: src/components/prerequisites-section.tsx
+msgid "No prerequisites."
+msgstr "Предусловий нет."
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "No project has this key. It may be mistyped, or the link may point to another instance."
 msgstr "Проекта с таким ключом нет. Возможно, в ключе опечатка или ссылка ведёт на другой экземпляр."
@@ -1313,6 +1868,14 @@ msgstr "Подходящих проектов нет."
 msgid "No projects yet"
 msgstr "Проектов пока нет"
 
+#: src/components/rule-editor.tsx
+msgid "No rules: every context receives the fallthrough variation."
+msgstr "Правил нет: каждый контекст получает вариант без совпадений."
+
+#: src/components/condition-row.tsx
+msgid "No value needed."
+msgstr "Значение не нужно."
+
 #: src/components/sign-in-form.tsx
 msgid "No way to sign in is enabled on this instance. Ask its operator."
 msgstr "На этом экземпляре не включён ни один способ входа. Обратитесь к его администратору."
@@ -1323,8 +1886,13 @@ msgstr "В этом проекте пока ни у кого нет роли."
 
 #. An audit entry's value before a creation or after a deletion.
 #: src/components/audit-entry-sheet.tsx
+#: src/components/structural-diff-view.tsx
 msgid "none"
 msgstr "нет"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "None"
+msgstr "Нет"
 
 #. The project switcher, when no project is open.
 #: src/components/project-switcher.tsx
@@ -1335,9 +1903,21 @@ msgstr "не выбран"
 msgid "Not found"
 msgstr "Не найдено"
 
+#: src/lib/conditions.ts
+msgid "not in the segment {segment}"
+msgstr "не в сегменте {segment}"
+
 #: src/lib/project-members.ts
 msgid "Not recorded"
 msgstr "Не записано"
+
+#: src/components/overrides-section.tsx
+msgid "Note"
+msgstr "Заметка"
+
+#: src/components/overrides-section.tsx
+msgid "Note (optional)"
+msgstr "Заметка (необязательно)"
 
 #: src/components/audit-log.tsx
 msgid "Nothing has been recorded yet."
@@ -1351,15 +1931,35 @@ msgstr "В этом проекте пока ничего не менялось."
 msgid "Nothing here yet."
 msgstr "Здесь пока ничего нет."
 
+#: src/components/structural-diff-view.tsx
+msgid "Nothing that a member edits changed."
+msgstr "Ничего из того, что редактируют участники, не изменилось."
+
 #. An attribute type.
 #: src/lib/flags.ts
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Number"
 msgstr "Число"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Off"
+msgstr "Выключен"
+
+#: src/components/configuration-editor.tsx
+msgid "Off variation"
+msgstr "Вариант при выключении"
+
+#: src/components/structural-diff-view.tsx
+msgid "Off variation changed from <0>{before}</0> to <1>{after}</1>."
+msgstr "Вариант при выключении изменён: был <0>{before}</0>, стал <1>{after}</1>."
+
 #: src/components/audit-log.tsx
 msgid "Older entries"
 msgstr "Более старые записи"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "On"
+msgstr "Включён"
 
 #: src/lib/problem-messages.ts
 msgid "One with this key already exists."
@@ -1368,6 +1968,10 @@ msgstr "Объект с таким ключом уже существует."
 #: src/components/member-credentials.tsx
 msgid "Only {name} creates their tokens. Project tokens they created belong to their projects, not to them."
 msgstr "Свои токены создаёт только сам участник {name}. Созданные им токены проектов принадлежат проектам, а не ему."
+
+#: src/lib/problem-messages.ts
+msgid "Only a rule serving a rollout has a salt."
+msgstr "Соль есть только у правила с раскаткой."
 
 #: src/lib/problem-messages.ts
 msgid "Only a signed-in session can do this, not an API token."
@@ -1381,16 +1985,50 @@ msgstr "Его может открыть только администратор
 msgid "Only an invited member has an invitation to replace."
 msgstr "Заменить приглашение можно только у приглашённого участника."
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Open the audit log"
+msgstr "Открыть журнал аудита"
+
+#: src/components/condition-row.tsx
+msgid "Operator (condition {position})"
+msgstr "Оператор (условие {position})"
+
+#: src/components/structural-diff-view.tsx
+msgid "Override added: {unit} receives <0/>."
+msgstr "Добавлено переопределение: {unit} получает <0/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Override of {unit} changed from <0/> to <1/>."
+msgstr "Переопределение {unit} изменено: было <0/>, стало <1/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Override removed: {unit} received <0/>."
+msgstr "Удалено переопределение: {unit} получал(а) <0/>."
+
+#: src/components/overrides-section.tsx
+msgid "Overrides"
+msgstr "Переопределения"
+
+#: src/components/overrides-section.tsx
+msgid "Overrides in this environment"
+msgstr "Переопределения в этом окружении"
+
 #: src/components/navigation.tsx
 msgid "Overview"
 msgstr "Обзор"
 
 #. The name of a built-in role.
+#: src/components/flag-definition-sheet.tsx
 #: src/lib/access-names.ts
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Owner"
 msgstr "Владелец"
+
+#: src/components/structural-diff-view.tsx
+msgid "Owner changed from {before} to {after}."
+msgstr "Владелец изменён: был {before}, стал {after}."
 
 #: src/components/not-found.tsx
 msgid "Page not found"
@@ -1418,7 +2056,17 @@ msgstr "Пароль изменён"
 msgid "Password minimum length"
 msgstr "Наименьшая длина пароля"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/components/rule-editor.tsx
+msgid "Percentage (rule {position})"
+msgstr "Процент (правило {position})"
+
+#: src/components/structural-diff-view.tsx
+msgid "permanent"
+msgstr "постоянный"
+
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Permanent"
 msgstr "Постоянный"
 
@@ -1427,13 +2075,42 @@ msgstr "Постоянный"
 msgid "Personal settings"
 msgstr "Личные настройки"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/components/prerequisites-section.tsx
+msgid "Prerequisite {position}"
+msgstr "Предусловие {position}"
+
+#: src/components/structural-diff-view.tsx
+msgid "Prerequisite <0>{flag}</0> requires <1>{after}</1> instead of <2>{before}</2>."
+msgstr "Предусловие <0>{flag}</0> требует <1>{after}</1> вместо <2>{before}</2>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Prerequisite added: <0>{flag}</0> serves <1>{after}</1>."
+msgstr "Добавлено предусловие: <0>{flag}</0> отдаёт <1>{after}</1>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Prerequisite removed: <0>{flag}</0> serves <1>{before}</1>."
+msgstr "Удалено предусловие: <0>{flag}</0> отдаёт <1>{before}</1>."
+
+#: src/components/prerequisites-section.tsx
+msgid "Prerequisites"
+msgstr "Предусловия"
+
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Press Enter after each tag."
 msgstr "Нажимайте Enter после каждого тега."
+
+#: src/components/condition-row.tsx
+msgid "Press Enter after each value."
+msgstr "Нажимайте Enter после каждого значения."
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Previous"
 msgstr "Назад"
+
+#: src/components/condition-row.tsx
+msgid "Private: evaluated on the server only."
+msgstr "Приватный: вычисляется только на сервере."
 
 #: src/routes/_signed-in/settings/profile.tsx
 #: src/routes/_signed-in/settings/route.tsx
@@ -1495,21 +2172,74 @@ msgstr "Читать всё, что можете читать вы."
 msgid "Reading the members…"
 msgstr "Загружаем участников…"
 
+#: src/components/rule-editor.tsx
+msgid "Reapplied after a conflict: saves as a new rule"
+msgstr "Перенесено после конфликта: сохранится как новое правило"
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Reason"
+msgstr "Причина"
+
 #: src/components/project-audit.tsx
 msgid "Recent activity"
 msgstr "Последние изменения"
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Recorded in the audit log."
+msgstr "Записывается в журнал аудита."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Recorded in the audit log. Characters still needed: {missing}."
+msgstr "Записывается в журнал аудита. Не хватает символов: {missing}."
+
+#: src/components/configuration-editor.tsx
+#: src/components/rule-editor.tsx
+msgid "Regenerate salt"
+msgstr "Сменить соль"
+
+#: src/components/configuration-editor.tsx
+msgid "Regenerate the salt?"
+msgstr "Сменить соль?"
+
+#: src/components/flag-definition-sheet.tsx
+msgid "Reload and lose my edits"
+msgstr "Перезагрузить, потеряв мои правки"
+
+#: src/components/configuration-editor.tsx
+msgid "Reload and reapply my draft"
+msgstr "Перезагрузить и перенести мой черновик"
+
+#: src/components/condition-row.tsx
+msgid "Remove {entry}"
+msgstr "Удалить {entry}"
 
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Remove {role} from {holder}"
 msgstr "Отозвать роль «{role}» у участника {holder}"
 
+#: src/components/condition-row.tsx
+msgid "Remove condition {position}"
+msgstr "Удалить условие {position}"
+
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Remove grant"
 msgstr "Отозвать роль"
 
+#: src/components/prerequisites-section.tsx
+msgid "Remove prerequisite {position}"
+msgstr "Удалить предусловие {position}"
+
+#: src/components/rule-editor.tsx
+msgid "Remove rule {position}"
+msgstr "Удалить правило {position}"
+
 #: src/components/tags-input.tsx
 msgid "Remove tag {tag}"
 msgstr "Удалить тег {tag}"
+
+#: src/components/overrides-section.tsx
+msgid "Remove the override of {unit}"
+msgstr "Удалить переопределение {unit}"
 
 #: src/components/variations-editor.tsx
 msgid "Remove variation {n}"
@@ -1528,9 +2258,33 @@ msgstr "ID запроса"
 msgid "Request ID: {requestId}"
 msgstr "ID запроса: {requestId}"
 
+#: src/components/condition-row.tsx
+msgid "Required variation (condition {position})"
+msgstr "Требуемый вариант (условие {position})"
+
+#: src/components/prerequisites-section.tsx
+msgid "Required variation (prerequisite {position})"
+msgstr "Требуемый вариант (предусловие {position})"
+
 #: src/lib/problem-messages.ts
 msgid "Required."
 msgstr "Обязательное поле."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Restore"
+msgstr "Восстановить"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Restore {key}"
+msgstr "Восстановить {key}"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Restore flag"
+msgstr "Восстановить флаг"
+
+#: src/components/structural-diff-view.tsx
+msgid "Restored."
+msgstr "Восстановлен из архива."
 
 #: src/lib/access-names.ts
 msgid "revert flag configurations to earlier versions"
@@ -1589,6 +2343,58 @@ msgstr "Роль"
 msgid "Role granted"
 msgstr "Роль выдана"
 
+#: src/components/rule-editor.tsx
+msgid "Rollout"
+msgstr "Раскатка"
+
+#: src/components/rule-editor.tsx
+msgid "Rule {from} moved to position {to}."
+msgstr "Правило {from} перемещено на позицию {to}."
+
+#: src/components/rule-editor.tsx
+msgid "Rule {position}"
+msgstr "Правило {position}"
+
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} added: <0/>."
+msgstr "Добавлено правило {position}: <0/>."
+
+#: src/components/rule-editor.tsx
+msgid "Rule {position} added."
+msgstr "Добавлено правило {position}."
+
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} changed."
+msgstr "Правило {position} изменено."
+
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} moved here from position {movedFrom} and changed."
+msgstr "Правило {position} перемещено сюда с позиции {movedFrom} и изменено."
+
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} moved here from position {movedFrom}."
+msgstr "Правило {position} перемещено сюда с позиции {movedFrom}."
+
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} removed: <0/>."
+msgstr "Удалено правило {position}: <0/>."
+
+#: src/components/rule-editor.tsx
+msgid "Rule {position} removed."
+msgstr "Правило {position} удалено."
+
+#: src/components/rule-editor.tsx
+msgid "Rules"
+msgstr "Правила"
+
+#: src/components/rule-editor.tsx
+msgid "Salt (rule {position})"
+msgstr "Соль (правило {position})"
+
+#: src/components/rule-editor.tsx
+msgid "Salt (rule {position}): given by the server when the rule is saved as a rollout."
+msgstr "Соль (правило {position}): сервер назначит её, когда правило сохранится как раскатка."
+
 #: src/components/auth-settings-form.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
@@ -1600,10 +2406,26 @@ msgstr "Роль выдана"
 msgid "Save"
 msgstr "Сохранить"
 
+#: src/components/flag-definition-sheet.tsx
+msgid "Save definition"
+msgstr "Сохранить определение"
+
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 msgid "Scopes"
 msgstr "Области доступа"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "SDKs receive the flag again, configured in every environment as it was left."
+msgstr "SDK снова получат флаг с той конфигурацией в каждом окружении, какой она была."
+
+#: src/components/flag-definition-sheet.tsx
+msgid "SDKs record an exposure after every evaluation whose result carries an experiment."
+msgstr "SDK записывают экспозицию после каждого вычисления, результат которого относится к эксперименту."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "SDKs stop receiving the flag in every environment and code falls back to its default. It can be restored later; refused while another flag requires it."
+msgstr "SDK перестанут получать флаг во всех окружениях, и код вернётся к своему значению по умолчанию. Флаг можно будет восстановить; архивировать нельзя, пока его требует другой флаг."
 
 #: src/components/audit-log.tsx
 #: src/components/search-field.tsx
@@ -1613,6 +2435,10 @@ msgstr "Поиск"
 #: src/components/project-switcher.tsx
 msgid "Search projects"
 msgstr "Поиск проектов"
+
+#: src/components/condition-row.tsx
+msgid "Segment (condition {position})"
+msgstr "Сегмент (условие {position})"
 
 #. An attribute type.
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -1626,6 +2452,22 @@ msgstr "Передавайте его как токен Bearer в заголов
 #: src/components/token-list.tsx
 msgid "Send it as a bearer token in the Authorization header. Keep it where only what uses it can read it."
 msgstr "Передавайте его как токен Bearer в заголовке Authorization. Храните его там, где его может прочитать только то, что им пользуется."
+
+#: src/components/configuration-editor.tsx
+msgid "Served while the flag is off, and when a prerequisite fails."
+msgstr "Отдаётся, пока флаг выключен, и когда не выполнено предусловие."
+
+#: src/components/configuration-editor.tsx
+msgid "Served while the flag is on and no rule matches."
+msgstr "Отдаётся, когда флаг включён и ни одно правило не подошло."
+
+#: src/components/rule-editor.tsx
+msgid "Serves (rule {position})"
+msgstr "Отдаёт (правило {position})"
+
+#: src/components/structural-diff-view.tsx
+msgid "Serves <0/> instead of <1/>."
+msgstr "Отдаёт <0/> вместо <1/>."
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
@@ -1702,9 +2544,21 @@ msgstr "Перейти к содержимому"
 msgid "Some fields need correcting."
 msgstr "Исправьте некоторые поля."
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
+msgstr "Кто-то только что изменил эту конфигурацию. Она загружена заново: переключите ещё раз, если всё ещё нужно."
+
 #: src/lib/problem-messages.ts
 msgid "Someone else changed this since you opened it. Reload to see their changes, then make yours again."
 msgstr "Кто-то другой изменил это, пока вы редактировали. Перезагрузите страницу, чтобы увидеть его изменения, и внесите свои заново."
+
+#: src/components/conflict-banner.tsx
+msgid "Someone saved a change after you opened this."
+msgstr "Кто-то сохранил изменение уже после того, как вы это открыли."
+
+#: src/components/conflict-banner.tsx
+msgid "Someone saved this configuration after this draft was loaded."
+msgstr "Кто-то сохранил эту конфигурацию уже после загрузки этого черновика."
 
 #: src/lib/problem-messages.ts
 msgid "Something went wrong on the server."
@@ -1726,6 +2580,10 @@ msgstr "Начните с буквы; дальше буквы, цифры, ., - 
 msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
 msgstr "Начните со строчной латинской буквы; далее строчные буквы, цифры, - и _, всего не более 64."
 
+#: src/lib/conditions.ts
+msgid "starts with"
+msgstr "начинается с"
+
 #: src/components/token-list.tsx
 msgid "State"
 msgstr "Состояние"
@@ -1745,6 +2603,22 @@ msgstr "Строка"
 msgid "switch flags off with the kill switch"
 msgstr "выключать флаги аварийным выключателем"
 
+#: src/components/kill-switch-dialog.tsx
+msgid "Switch off"
+msgstr "Выключить"
+
+#: src/components/structural-diff-view.tsx
+msgid "Switched off."
+msgstr "Выключен."
+
+#: src/components/structural-diff-view.tsx
+msgid "Switched on."
+msgstr "Включён."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Switching off…"
+msgstr "Выключаем…"
+
 #. A kind of actor in the audit log.
 #: src/lib/audit.ts
 msgid "System"
@@ -1760,14 +2634,34 @@ msgstr "Как в системе"
 msgid "Tag"
 msgstr "Тег"
 
+#: src/components/structural-diff-view.tsx
+msgid "Tag added: <0>{tag}</0>."
+msgstr "Добавлен тег <0>{tag}</0>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Tag removed: <0>{tag}</0>."
+msgstr "Удалён тег <0>{tag}</0>."
+
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Tags"
 msgstr "Теги"
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/components/structural-diff-view.tsx
+msgid "temporary"
+msgstr "временный"
+
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Temporary"
 msgstr "Временный"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Temporary, to be removed by {expected}"
+msgstr "Временный, удалить до {expected}"
 
 #: src/components/session-list.tsx
 msgid "That device is signed out at its next request and must sign in again."
@@ -1793,9 +2687,17 @@ msgstr "Настройки аутентификации сохранены."
 msgid "The browser refused the clipboard. Select the value and copy it by hand."
 msgstr "Браузер не дал доступ к буферу обмена. Выделите значение и скопируйте его вручную."
 
+#: src/components/configuration-editor.tsx
+msgid "The configuration in {name} is saved."
+msgstr "Конфигурация в окружении {name} сохранена."
+
 #: src/components/profile-form.tsx
 msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
 msgstr "Язык консоли на всех устройствах, где вы входите. «Как в браузере» — первый из языков браузера, который есть в консоли."
+
+#: src/components/flag-definition-sheet.tsx
+msgid "The definition is saved."
+msgstr "Определение сохранено."
 
 #: src/components/member-credentials.tsx
 msgid "The devices {name} is signed in on"
@@ -1821,13 +2723,53 @@ msgstr "Окружение {key} будет удалено. Отменить э�
 msgid "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
 msgstr "Сколько символов как минимум должно быть в пароле, выбранном с этого момента: от 12 до 128. Заданные раньше пароли продолжат работать."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/lib/problem-messages.ts
+msgid "the flag {key}"
+msgstr "флаг {key}"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag {key} is archived."
+msgstr "Флаг {key} отправлен в архив."
+
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The flag {key} is created."
 msgstr "Флаг {key} создан."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag {key} is deleted."
+msgstr "Флаг {key} удалён."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag {key} is restored."
+msgstr "Флаг {key} восстановлен."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag and its configuration in every environment are deleted. This cannot be taken back; its audit entries stay."
+msgstr "Флаг и его конфигурации во всех окружениях будут удалены. Это нельзя отменить; записи журнала аудита останутся."
+
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
+#: src/lib/flag-detail.ts
+#: src/lib/rule-editor.ts
+msgid "The flag has no such variation."
+msgstr "У флага нет такого варианта."
+
+#: src/lib/problem-messages.ts
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag is archived. Restore it to change its configurations."
+msgstr "Флаг в архиве. Восстановите его, чтобы менять конфигурации."
+
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The flag is created off in every environment, serving its off variation until it is switched on."
 msgstr "Флаг создаётся выключенным во всех окружениях и отдаёт вариант для выключенного состояния, пока его не включат."
+
+#: src/lib/flag-detail.ts
+msgid "The flags would require each other in a cycle: {path}."
+msgstr "Флаги требовали бы друг друга по кругу: {path}."
+
+#: src/lib/flag-detail.ts
+msgid "The flags would require each other in a cycle."
+msgstr "Флаги требовали бы друг друга по кругу."
 
 #: src/components/auth-settings-form.tsx
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
@@ -1841,7 +2783,8 @@ msgstr "Тайм-аут бездействия не может быть боль
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 msgstr "Виды единиц, которым отдаётся флаг, например пользователь или устройство. Ключ не должен совпадать с ключами атрибутов и никогда не меняется."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The member accountable for the flag."
 msgstr "Участник, отвечающий за флаг."
 
@@ -1877,6 +2820,14 @@ msgstr "Новые пароли не совпадают."
 msgid "The new project token"
 msgstr "Токен проекта создан"
 
+#: src/components/overrides-section.tsx
+msgid "The override of {unit} is removed."
+msgstr "Переопределение {unit} удалено."
+
+#: src/components/overrides-section.tsx
+msgid "The override of {unit} is saved."
+msgstr "Переопределение {unit} сохранено."
+
 #: src/lib/problem-messages.ts
 msgid "The owner must be an active member holding a role in the project, or an instance admin."
 msgstr "Владельцем может быть активный участник с ролью в проекте или администратор экземпляра."
@@ -1892,6 +2843,34 @@ msgstr "Пароль не должен содержать ваш адрес эл
 #: src/components/invitation-acceptance.tsx
 msgid "The passwords do not match."
 msgstr "Пароли не совпадают."
+
+#: src/lib/conditions.ts
+#: src/lib/flag-detail.ts
+msgid "The project does not declare this attribute."
+msgstr "В проекте не объявлен такой атрибут."
+
+#: src/lib/flag-detail.ts
+#: src/lib/rule-editor.ts
+msgid "The project does not declare this unit type."
+msgstr "В проекте не объявлен такой тип единицы."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The project has no flag with this key. It may have been deleted."
+msgstr "В проекте нет флага с таким ключом. Возможно, его удалили."
+
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
+msgid "The project has no such flag, or it is archived."
+msgstr "В проекте нет такого флага, или он в архиве."
+
+#: src/lib/flag-detail.ts
+msgid "The project has no such flag."
+msgstr "В проекте нет такого флага."
+
+#: src/lib/conditions.ts
+#: src/lib/flag-detail.ts
+msgid "The project has no such segment."
+msgstr "В проекте нет такого сегмента."
 
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "The project is saved."
@@ -1913,6 +2892,7 @@ msgstr "Запрос слишком большой."
 msgid "The request was not sent as JSON."
 msgstr "Запрос отправлен не в формате JSON."
 
+#: src/components/configuration-editor.tsx
 #: src/lib/problem-messages.ts
 msgid "The request was refused."
 msgstr "Запрос отклонён."
@@ -1924,6 +2904,14 @@ msgstr "Роль включает право, которого у вас сам�
 #: src/lib/problem-messages.ts
 msgid "The role includes the permission to {name}, which you do not hold yourself here."
 msgstr "Роль включает право {name}, которого у вас самих здесь нет."
+
+#: src/components/configuration-editor.tsx
+msgid "The rollout has a new salt."
+msgstr "У раскатки новая соль."
+
+#: src/lib/problem-messages.ts
+msgid "the segment {key}"
+msgstr "сегмент {key}"
 
 #: src/lib/problem-messages.ts
 msgid "The server could not be reached. Check your connection and try again."
@@ -1957,7 +2945,7 @@ msgstr "У используемого токена нет нужной для э
 msgid "The token is revoked."
 msgstr "Токен отозван."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The type of every value the flag serves. It never changes."
 msgstr "Тип всех значений, которые отдаёт флаг. Не меняется."
 
@@ -1977,6 +2965,10 @@ msgstr "Значения, которые может отдавать флаг. �
 msgid "The whole tag"
 msgstr "Тег целиком"
 
+#: src/components/conflict-banner.tsx
+msgid "Their change:"
+msgstr "Их изменение:"
+
 #: src/components/personal-menu.tsx
 #: src/components/theme-choice.tsx
 msgid "Theme"
@@ -1990,9 +2982,25 @@ msgstr "По этому адресу ничего нет. Возможно, сс
 msgid "They get a link to set their password, shown to you once. What they may do in a project comes from the grants a project owner gives them."
 msgstr "Участник получит ссылку, чтобы задать пароль; она будет показана вам один раз. Что он сможет делать в проекте, определяют роли, которые выдаст ему владелец проекта."
 
+#: src/lib/flag-detail.ts
+msgid "This appears twice."
+msgstr "Это указано дважды."
+
+#: src/lib/flag-detail.ts
+msgid "This cannot be changed here."
+msgstr "Это здесь изменить нельзя."
+
 #: src/components/session-list.tsx
 msgid "This device"
 msgstr "Это устройство"
+
+#: src/lib/configuration-draft.ts
+msgid "This flag is already a prerequisite."
+msgstr "Этот флаг уже указан как предусловие."
+
+#: src/lib/flag-detail.ts
+msgid "This flag is archived; restore it or choose another."
+msgstr "Этот флаг в архиве: восстановите его или выберите другой."
 
 #: src/components/token-create-form.tsx
 msgid "This instance allows a token at most {lifetime} ahead, and every token must expire."
@@ -2051,11 +3059,16 @@ msgstr "Это последнее окружение проекта. У прое
 msgid "This key is reserved."
 msgstr "Этот ключ зарезервирован."
 
+#: src/lib/conditions.ts
+#: src/lib/flag-detail.ts
+msgid "This operator does not apply to the attribute's type."
+msgstr "Этот оператор не подходит к типу атрибута."
+
 #: src/lib/problem-messages.ts
 msgid "This password is too common. Choose another."
 msgstr "Этот пароль слишком распространён. Выберите другой."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "This project already has a flag with that key."
 msgstr "В этом проекте уже есть флаг с таким ключом."
 
@@ -2083,6 +3096,10 @@ msgstr "У этого проекта пока нет токенов."
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "This project has no unit type yet."
 msgstr "В этом проекте пока нет типов единиц."
+
+#: src/lib/flag-detail.ts
+msgid "This rule is no longer in the configuration."
+msgstr "Этого правила больше нет в конфигурации."
 
 #: src/lib/problem-messages.ts
 msgid "This value is not valid here."
@@ -2138,15 +3155,20 @@ msgstr "Слишком много."
 msgid "Try again"
 msgstr "Попробовать ещё раз"
 
+#: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Type"
 msgstr "Тип"
 
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Введите {typeToConfirm} для подтверждения"
+
+#: src/components/overrides-section.tsx
+msgid "Unit ID"
+msgstr "ID единицы"
 
 #: src/components/auth-settings-form.tsx
 msgid "Unit of the maximum token lifetime"
@@ -2161,9 +3183,14 @@ msgid "Unit of the session idle timeout"
 msgstr "Единица тайм-аута бездействия сеанса"
 
 #. A kind of entity in the audit log.
+#: src/components/overrides-section.tsx
 #: src/lib/audit.ts
 msgid "Unit type"
 msgstr "Тип единицы"
+
+#: src/components/rule-editor.tsx
+msgid "Unit type (rule {position})"
+msgstr "Тип единицы (правило {position})"
 
 #: src/lib/audit.ts
 msgid "Unit type declared"
@@ -2181,6 +3208,10 @@ msgstr "Тип единицы изменён"
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Unit types"
 msgstr "Типы единиц"
+
+#: src/components/rule-editor.tsx
+msgid "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
+msgstr "Единицы вне процента переходят к следующему правилу. При увеличении процента все уже попавшие единицы остаются."
 
 #: src/components/session-list.tsx
 msgid "Unknown"
@@ -2202,17 +3233,54 @@ msgstr "Используйте от {min} до {max} символов."
 msgid "Value"
 msgstr "Значение"
 
+#: src/components/condition-row.tsx
+msgid "Value (condition {position})"
+msgstr "Значение (условие {position})"
+
 #: src/components/audit-entry-sheet.tsx
 msgid "Values before and after the change"
 msgstr "Значения до и после изменения"
+
+#: src/components/condition-row.tsx
+msgid "Values of {label}"
+msgstr "Значения: {label}"
+
+#: src/components/overrides-section.tsx
+#: src/components/rule-editor.tsx
+msgid "Variation"
+msgstr "Вариант"
+
+#: src/components/rule-editor.tsx
+msgid "Variation (rule {position})"
+msgstr "Вариант (правило {position})"
 
 #: src/components/variations-editor.tsx
 msgid "Variation {n}"
 msgstr "Вариант {n}"
 
+#: src/components/structural-diff-view.tsx
+msgid "Variation <0>{key}</0> added, serving <1/>."
+msgstr "Добавлен вариант <0>{key}</0> со значением <1/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Variation <0>{key}</0> has a new name or description."
+msgstr "У варианта <0>{key}</0> новое название или описание."
+
+#: src/components/structural-diff-view.tsx
+msgid "Variation <0>{key}</0> removed."
+msgstr "Удалён вариант <0>{key}</0>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Variation <0>{key}</0> serves <1/> instead of <2/>."
+msgstr "Вариант <0>{key}</0> отдаёт <1/> вместо <2/>."
+
 #: src/components/variations-editor.tsx
 msgid "Variations"
 msgstr "Варианты"
+
+#: src/components/structural-diff-view.tsx
+msgid "Variations reordered: <0>{order}</0>."
+msgstr "Порядок вариантов изменён: <0>{order}</0>."
 
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "View all environments"
@@ -2258,6 +3326,10 @@ msgstr "Всё, что пользуется токеном, с этого мом
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr "Откуда проект отдаёт значения. Ключ после создания не меняется, название можно изменить."
+
+#: src/components/overrides-section.tsx
+msgid "Why the unit has this override, such as the test it is for. Never sent to SDKs."
+msgstr "Зачем у единицы это переопределение, например для какого теста. В SDK не передаётся."
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Yes"

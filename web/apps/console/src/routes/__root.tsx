@@ -2,7 +2,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 
-import type { projectNameCrumb } from "@/components/breadcrumb";
+import type { ParamCrumb, projectNameCrumb } from "@/components/breadcrumb";
 import { Toaster } from "@/components/toaster";
 
 declare module "@tanstack/react-router" {
@@ -10,9 +10,10 @@ declare module "@tanstack/react-router" {
     /**
      * What the breadcrumb calls the route, in the member's language, or
      * `projectNameCrumb` for the route of one project, which the
-     * breadcrumb calls by the project's name.
+     * breadcrumb calls by the project's name, or a `ParamCrumb` naming the
+     * path parameter that holds the entity's key.
      */
-    crumb?: MessageDescriptor | typeof projectNameCrumb;
+    crumb?: MessageDescriptor | typeof projectNameCrumb | ParamCrumb;
   }
 }
 

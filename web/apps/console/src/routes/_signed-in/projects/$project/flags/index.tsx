@@ -56,7 +56,7 @@ function Flags() {
   const newFlag = (
     <Can permission="flag.edit" whenMissing="disable">
       <Button asChild>
-        <Link to="/projects/$project/flags/new" params={{ project }}>
+        <Link to="/projects/$project/flags/-/new" params={{ project }}>
           <PlusIcon aria-hidden />
           <Trans>New flag</Trans>
         </Link>

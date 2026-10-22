@@ -31,6 +31,10 @@ import {
   listAttributes,
   listEnvironments,
   listFlags,
+  getFlag,
+  listSegments,
+  type Flag,
+  type Segment,
   listUnitTypes,
   type Attribute,
   type AuthMethods,
@@ -143,6 +147,45 @@ export function flagsQuery(project: string, search: FlagsSearch) {
   });
 }
 
+/** One flag with its configuration in every environment. */
+export function flagQuery(project: string, flag: string) {
+  return queryOptions<Flag>({
+    queryKey: [...flagsQueryKey(project), "detail", flag],
+    queryFn: () => unwrap(getFlag({ path: { project, flag } })),
+    retry: false,
+  });
+}
+
+/**
+ * Every flag of a project that is not archived, read page by page: the
+ * flags a prerequisite can name, with their variations.
+ */
+export function flagChoicesQuery(project: string) {
+  return queryOptions<FlagList["items"]>({
+    queryKey: [...flagsQueryKey(project), "choices"],
+    queryFn: async () => {
+      const items: FlagList["items"] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await unwrap(
+          listFlags({ path: { project }, query: { limit: 200, ...(cursor ? { cursor } : {}) } }),
+        );
+        items.push(...page.items);
+        cursor = page.next_cursor ?? undefined;
+      } while (cursor);
+      return items;
+    },
+  });
+}
+
+/** A project's segments, which a rule's conditions name. */
+export function segmentsQuery(project: string) {
+  return queryOptions<Segment[]>({
+    queryKey: ["projects", project, "segments"],
+    queryFn: async () => (await unwrap(listSegments({ path: { project } }))).items,
+  });
+}
+
 /** A project's declared attributes, the standard ones among them. */
 export function attributesQuery(project: string) {
   return queryOptions<Attribute[]>({
@@ -250,6 +293,36 @@ export function auditEntriesQuery(scope: AuditScope, search: AuditSearch, limit?
       );
     },
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * The newest audit entries of one flag, by its identifier, which follows
+ * it whatever its key, in one environment or in all:
+ * what tells a member who made the version they ran into, and when.
+ */
+export function flagEntriesQuery(
+  project: string,
+  flagId: string,
+  { environment, killSwitch, limit }: { environment?: string; killSwitch?: true; limit: number },
+) {
+  return queryOptions<AuditEntry[]>({
+    queryKey: [...auditQueryKey, { project }, "flag", flagId, { environment, killSwitch, limit }],
+    queryFn: async () =>
+      (
+        await unwrap(
+          listProjectAuditEntries({
+            path: { project },
+            query: {
+              entity_kind: "flag",
+              entity_id: flagId,
+              ...(environment ? { environment } : {}),
+              ...(killSwitch ? { kill_switch: true } : {}),
+              limit,
+            },
+          }),
+        )
+      ).items,
   });
 }
 

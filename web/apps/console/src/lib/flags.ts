@@ -1,6 +1,7 @@
-import { type FlagType, type Violation, zFlagType } from "@flagnetic/api";
+import { type FlagType, type Violation, zFlagCreate, zFlagType } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
+import { z } from "zod";
 
 import { ApiError } from "./errors";
 import { violationMessage } from "./problem-messages";
@@ -79,6 +80,34 @@ export function flagRefusalAt(i18n: I18n, refusal: unknown, pointer: string): st
   if (!(refusal instanceof ApiError)) return undefined;
   const violation = refusal.violations.find((candidate) => candidate.pointer === pointer);
   return violation && flagViolationMessage(i18n, violation);
+}
+
+/** The server's rules for a flag's tags: how many, and how long each. */
+const tagRules = zFlagCreate.shape.tags.unwrap();
+
+/** A flag's tags, checked by the server's rules before it is asked. */
+export function tagsSchema(i18n: I18n) {
+  return z
+    .array(z.string())
+    .refine((tags) => tags.every((tag) => tagRules.element.safeParse(tag).success), {
+      message: i18n._(msg`A tag has at most 64 characters.`),
+    })
+    .refine((tags) => tagRules.safeParse(tags).success, {
+      message: i18n._(msg`A flag has at most 50 tags.`),
+    });
+}
+
+/** The first instant of a day (YYYY-MM-DD) in the member's time zone. */
+export function startOfDay(day: string): string {
+  const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+  return new Date(year, month - 1, date).toISOString();
+}
+
+/** The day (YYYY-MM-DD) an instant falls on in the member's time zone. */
+export function dayOf(instant: string): string {
+  const date = new Date(instant);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 /** A flag type as a member reads it. */

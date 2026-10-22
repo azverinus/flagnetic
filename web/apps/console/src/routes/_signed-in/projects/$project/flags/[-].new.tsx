@@ -19,7 +19,14 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { VariationsEditor } from "@/components/variations-editor";
 import { ApiError, unwrap } from "@/lib/errors";
-import { flagRefusalAt, flagTypeName, flagTypes, flagViolationMessage } from "@/lib/flags";
+import {
+  flagRefusalAt,
+  flagTypeName,
+  flagTypes,
+  flagViolationMessage,
+  startOfDay,
+  tagsSchema,
+} from "@/lib/flags";
 import { descriptionSchema, nameSchema } from "@/lib/forms";
 import { memberName } from "@/lib/members";
 import { flagsQueryKey, meQuery, projectMembersQuery } from "@/lib/queries";
@@ -30,7 +37,13 @@ import {
   variationIssues,
 } from "@/lib/variations";
 
-export const Route = createFileRoute("/_signed-in/projects/$project/flags/new")({
+/**
+ * The page that creates a flag lives under `flags/-/` rather than at
+ * `flags/new`, because `new` is a key a flag may have and that flag's page is
+ * `flags/new`. A flag key starts with a letter, so no flag's address passes
+ * through `flags/-`.
+ */
+export const Route = createFileRoute("/_signed-in/projects/$project/flags/-/new")({
   staticData: { crumb: msg`New flag` },
   component: NewFlag,
 });
@@ -59,18 +72,9 @@ function NewFlag() {
 /** The owner's value for the member creating the flag, whom the server names when none is sent. */
 const me = "me";
 
-/** The server's rules for a flag's tags: how many, and how long each. */
-const tagRules = zFlagCreate.shape.tags.unwrap();
-
 /** The fields whose refusals the form shows under them, by their pointers. */
 const fieldPointer =
   /^\/(key|type|name|description|owner|tags(\/\d+)?|lifetime|expected_removal_at|variations\/\d+\/(key|value|name|description))$/;
-
-/** The first instant of a day (YYYY-MM-DD) in the member's time zone. */
-function startOfDay(day: string): string {
-  const [year, month, date] = day.split("-").map(Number) as [number, number, number];
-  return new Date(year, month - 1, date).toISOString();
-}
 
 function CreateFlag({ project }: { project: string }) {
   const { i18n, t } = useLingui();
@@ -91,14 +95,7 @@ function CreateFlag({ project }: { project: string }) {
       name: nameSchema(i18n),
       description: descriptionSchema(i18n),
       owner: z.string(),
-      tags: z
-        .array(z.string())
-        .refine((tags) => tags.every((tag) => tagRules.element.safeParse(tag).success), {
-          message: i18n._(msg`A tag has at most 64 characters.`),
-        })
-        .refine((tags) => tagRules.safeParse(tags).success, {
-          message: i18n._(msg`A flag has at most 50 tags.`),
-        }),
+      tags: tagsSchema(i18n),
       lifetime: zLifetime,
       expected_removal_at: z.string(),
       variations: z.array(z.custom<VariationDraft>()),
@@ -153,7 +150,7 @@ function CreateFlag({ project }: { project: string }) {
       await queryClient.invalidateQueries({ queryKey: flagsQueryKey(project) });
       const key = flag.key;
       toast.success(t`The flag ${key} is created.`);
-      await navigate({ to: "/projects/$project/flags", params: { project } });
+      await navigate({ to: "/projects/$project/flags/$flag", params: { project, flag: key } });
     },
   });
 

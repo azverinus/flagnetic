@@ -6,16 +6,16 @@ A **flag** is a named, typed switch defined once per project. What it is lives i
 
 `POST /flags` creates a flag; `PATCH /flags/{flag}` changes its definition for every environment at once.
 
-| Field | Rule |
-|---|---|
-| `key` | Names the flag in code, such as `checkout.newFlow`: a letter, then letters, digits, `_`, `.` and `-`, at most 128 in all. Unique in the project, case sensitively, and never changes. |
-| `type` | The **flag type**: `boolean`, `string`, `number` or `json`. Never changes. |
-| `name`, `description` | A name of 1 to 200 characters, a description of at most 2,000. |
-| `variations` | The values the flag can serve, in order (see below). |
-| `owner` | The member accountable for the flag: an active member holding a grant in the project, or an instance admin (`invalid_owner` otherwise). It defaults to the calling member; a project token must name one. |
-| `tags` | At most 50, each of 1 to 64 characters, no two alike. |
-| `lifetime` | `permanent`, or `temporary` with an `expected_removal_at`. A flag created without a lifetime is temporary, and a temporary flag given no date is expected to be removed 90 days after it is created. |
-| `automatic_exposure` | Whether SDKs record an exposure when the flag is evaluated, instead of waiting for an explicit call. |
+| Field                 | Rule                                                                                                                                                                                                      |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `key`                 | Names the flag in code, such as `checkout.newFlow`: a letter, then letters, digits, `_`, `.` and `-`, at most 128 in all. Unique in the project, case sensitively, and never changes.                     |
+| `type`                | The **flag type**: `boolean`, `string`, `number` or `json`. Never changes.                                                                                                                                |
+| `name`, `description` | A name of 1 to 200 characters, a description of at most 2,000.                                                                                                                                            |
+| `variations`          | The values the flag can serve, in order (see below).                                                                                                                                                      |
+| `owner`               | The member accountable for the flag: an active member holding a grant in the project, or an instance admin (`invalid_owner` otherwise). It defaults to the calling member; a project token must name one. |
+| `tags`                | At most 50, each of 1 to 64 characters, no two alike.                                                                                                                                                     |
+| `lifetime`            | `permanent`, or `temporary` with an `expected_removal_at`. A flag created without a lifetime is temporary, and a temporary flag given no date is expected to be removed 90 days after it is created.      |
+| `automatic_exposure`  | Whether SDKs record an exposure when the flag is evaluated, instead of waiting for an explicit call.                                                                                                      |
 
 A key, type or other field that does not fit is refused `422 invalid_flag`, each violation pointing at its field; sending a new key or type is `immutable`.
 
@@ -129,18 +129,22 @@ To compare, `GET /flags?differs_between=staging,production` lists the flags whos
 
 `GET /flags` lists the project's flags, each with its **flag state** in every environment: `{environment, on, has_rules, has_rollout}`, and its `updated_at`.
 
-| Parameter | Lists |
-|---|---|
-| `q` | Flags whose key or name contains the text, whatever its case. |
-| `type`, `tag`, `owner` | Flags of that type, carrying that tag, owned by that member. |
-| `archived` | The archived flags instead of the others. |
-| `environment` and `state` | Flags whose configuration in that environment is `on`, `off`, has `rules`, or has a `rollout`. |
-| `differs_between` | Flags whose configurations differ between two environments (above). |
-| `sort` | By `key` (the default) or `name` in byte order, or by `updated`, the last change to the definition first. |
+| Parameter                 | Lists                                                                                                     |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `q`                       | Flags whose key or name contains the text, whatever its case.                                             |
+| `type`, `tag`, `owner`    | Flags of that type, carrying that tag, owned by that member.                                              |
+| `archived`                | The archived flags instead of the others.                                                                 |
+| `environment` and `state` | Flags whose configuration in that environment is `on`, `off`, has `rules`, or has a `rollout`.            |
+| `differs_between`         | Flags whose configurations differ between two environments (above).                                       |
+| `sort`                    | By `key` (the default) or `name` in byte order, or by `updated`, the last change to the definition first. |
 
 Pages hold `limit` flags; `next_cursor` fetches the next page under the same `sort`.
 
-In the console, **Flags** in the project navigation lists the project's flags with their type, owner and tags, filtered by text, type, tag, owner and archived, the filters and the page kept in the address so a view can be shared. **New flag**, offered to a member holding `flag.edit`, creates a flag of any type: a boolean flag is created with its `true` and `false`, any other starts with two variations to fill in, and the owner is the member creating it unless they choose another member of the project.
+In the console, **Flags** in the project navigation lists the project's flags with their type, owner and tags, filtered by text, type, tag, owner and archived, the filters and the page kept in the address so a view can be shared. **New flag**, offered to a member holding `flag.edit`, creates a flag of any type: a boolean flag is created with its `true` and `false`, any other starts with two variations to fill in, and the owner is the member creating it unless they choose another member of the project. Creating it opens the flag's page.
+
+A flag's page has one tab per environment and a History tab. **Edit definition** edits the definition for every environment; archiving, restoring and deleting (an archived flag only, typing its key) sit beside it, and a refusal names what still requires the flag. An environment's tab switches the flag on or off there and adds or removes overrides, each saved at once; while the flag is on, **Kill switch** switches it off after a reason of at least 10 characters, showing who used it last and why. If someone saved the definition while it was open, saving shows who and when with a diff of their change, and offers to reload, losing the edits, or to keep the edits and save them onto the newer version.
+
+The rest of an environment's tab is a draft, laid out in the order evaluation reads it: the off variation, the overrides, the prerequisites, the rules and the fallthrough. Each rule holds up to 20 conditions on an attribute (the operators and value inputs follow the attribute's type: lists as chips, full semantic versions, dates and times), on a segment, or on another flag's variation, and serves a variation or a rollout, whose salt is shown and is regenerated only on request, after a warning. Rules reorder by dragging, with their arrow buttons, or with Alt+Arrow Up and Down. **Save** replaces the configuration under the version the draft was loaded at; leaving the tab with a draft asks first; a refusal is shown on the rule and condition it names. If someone saved the configuration meanwhile, saving shows who and when with a diff of their change, and offers to reload and reapply the draft (rules matched by identifier; new cards, and edited cards whose rule they removed, are appended and marked) or to discard it.
 
 ## Trying a configuration
 
