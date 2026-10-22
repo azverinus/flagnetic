@@ -32,6 +32,9 @@ type EventStore interface {
 		at time.Time) (map[delivery.EventID]bool, error)
 	SaveSummaries(ctx context.Context, rows []delivery.SummaryRecord) error
 	SaveAliases(ctx context.Context, aliases []delivery.AliasRecord) error
+	// EnsureEventPartitions makes sure the raw event tables can take rows
+	// received at at, outside any unit of work ctx carries.
+	EnsureEventPartitions(ctx context.Context, at time.Time) error
 }
 
 // IngestEvents stores the events an SDK posts in a batch.
@@ -96,24 +99,25 @@ func (r BatchResult) AcceptedTotal() int {
 func (h *IngestEvents) Handle(ctx context.Context, key delivery.SDKKey, b EventBatch) (BatchResult, error) {
 	now := h.clock.Now()
 	judged := make([]delivery.JudgedEvent, len(b.Events))
-	duplicate := make([]bool, len(b.Events))
-	seen := map[delivery.EventID]bool{}
 	for i, raw := range b.Events {
 		e := delivery.JudgeEvent(raw, now, h.retention)
 		if e.Rejection == nil && e.Exposure != nil {
 			e = e.Reject(delivery.RejectUnknownExperiment,
 				fmt.Sprintf("no running experiment is keyed %q", e.Exposure.ExperimentKey))
 		}
-		if e.Rejection == nil {
-			duplicate[i] = seen[e.ID]
-			seen[e.ID] = true
-		}
 		judged[i] = e
+	}
+	// The day's partitions are made sure of before the unit of work begins:
+	// creating one takes a connection of its own, and doing it while the
+	// unit of work holds another could leave concurrent batches each holding
+	// one connection and waiting for a second the pool no longer has.
+	if err := h.store.EnsureEventPartitions(ctx, now); err != nil {
+		return BatchResult{}, err
 	}
 	var res BatchResult
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
 		var err error
-		res, err = h.write(ctx, key, b.SDK, judged, duplicate, now)
+		res, err = h.write(ctx, key, b.SDK, judged, now)
 		return err
 	})
 	return res, err
@@ -121,13 +125,13 @@ func (h *IngestEvents) Handle(ctx context.Context, key delivery.SDKKey, b EventB
 
 // write stores the events judged in the unit of work ctx carries.
 func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk delivery.SDKIdentity, judged []delivery.JudgedEvent,
-	duplicate []bool, now time.Time,
+	now time.Time,
 ) (BatchResult, error) {
 	judged = slices.Clone(judged)
 	var unitTypes, flags []string
-	for i, e := range judged {
+	for _, e := range judged {
 		switch {
-		case duplicate[i] || e.Rejection != nil:
+		case e.Rejection != nil:
 		case e.Alias != nil:
 			unitTypes = append(unitTypes, e.Alias.FromUnitType, e.Alias.ToUnitType)
 		case e.Summary != nil:
@@ -144,9 +148,14 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 	if err != nil {
 		return BatchResult{}, err
 	}
+	// An event is a duplicate within the batch only after an earlier copy
+	// that was not refused: a copy of a refused event is refused alike
+	// rather than counted as received.
 	ids := map[delivery.EventType][]delivery.EventID{}
+	duplicate := make([]bool, len(judged))
+	seen := map[delivery.EventID]bool{}
 	for i, e := range judged {
-		if duplicate[i] || e.Rejection != nil {
+		if e.Rejection != nil {
 			continue
 		}
 		if a := e.Alias; a != nil {
@@ -161,6 +170,11 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 				continue
 			}
 		}
+		if seen[e.ID] {
+			duplicate[i] = true
+			continue
+		}
+		seen[e.ID] = true
 		ids[e.Type] = append(ids[e.Type], e.ID)
 	}
 	// Claimed in a fixed order of types and IDs, so two replicas storing

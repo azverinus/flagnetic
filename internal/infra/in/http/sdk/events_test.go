@@ -402,3 +402,40 @@ func TestThePartitionWorkerKeepsPartitionsAheadOfTheClock(t *testing.T) {
 		t.Errorf("aliases = %+v, %v", aliases, err)
 	}
 }
+
+func TestACopyOfARefusedEventIsRefusedNotADuplicate(t *testing.T) {
+	srv, _, value := eventsServer(t)
+	undeclared := aliasEvent(eventID(protocolTime, 1))
+	undeclared["to_unit_type"] = "device"
+	res := batchResult(t, srv, value, batch(undeclared, undeclared))
+	if res.Accepted != 0 || res.Duplicates != 0 || len(res.Rejected) != 2 {
+		t.Fatalf("an undeclared alias twice = %+v, want both refused", res)
+	}
+	for _, r := range res.Rejected {
+		if r.Code != "undeclared_unit_type" {
+			t.Errorf("rejection = %+v, want undeclared_unit_type", r)
+		}
+	}
+}
+
+func TestCreatingAPartitionGivesUpRatherThanStallInserts(t *testing.T) {
+	testkit.StartServer(t)
+	pool := testkit.Pool(t)
+	reader, err := pool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reader.Rollback(t.Context()) }()
+	// A reader that stays open holds the parent table for as long as it runs.
+	if _, err = reader.Exec(t.Context(), `LOCK TABLE evaluation_summary_events IN ACCESS SHARE MODE`); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	err = pgdelivery.NewStore(pool).CreateEventPartitions(t.Context(), protocolTime.AddDate(1, 0, 0), 0)
+	if err == nil {
+		t.Fatal("a partition was attached while a reader held its parent")
+	}
+	if waited := time.Since(start); waited > 30*time.Second {
+		t.Errorf("gave up after %v, want within seconds", waited)
+	}
+}

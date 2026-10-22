@@ -99,7 +99,7 @@ func (s *Store) SaveSummaries(ctx context.Context, rows []delivery.SummaryRecord
 	if len(rows) == 0 {
 		return nil
 	}
-	if err := s.ensurePartitions(ctx, rows[0].ReceivedAt); err != nil {
+	if err := s.EnsureEventPartitions(ctx, rows[0].ReceivedAt); err != nil {
 		return err
 	}
 	_, err := s.db(ctx).CopyFrom(ctx, pgx.Identifier{"evaluation_summary_events"}, []string{
@@ -128,7 +128,7 @@ func (s *Store) SaveAliases(ctx context.Context, aliases []delivery.AliasRecord)
 	if len(aliases) == 0 {
 		return nil
 	}
-	if err := s.ensurePartitions(ctx, aliases[0].ReceivedAt); err != nil {
+	if err := s.EnsureEventPartitions(ctx, aliases[0].ReceivedAt); err != nil {
 		return err
 	}
 	_, err := s.db(ctx).CopyFrom(ctx, pgx.Identifier{"alias_events"}, []string{
@@ -148,11 +148,11 @@ func (s *Store) SaveAliases(ctx context.Context, aliases []delivery.AliasRecord)
 	return nil
 }
 
-// ensurePartitions makes sure the partitions of the day of at exist before
-// rows received then are written: the partition worker creates them ahead of
-// time, and this covers a day it has not reached yet, such as the first
-// minutes of a new instance. Each day is checked once per process.
-func (s *Store) ensurePartitions(ctx context.Context, at time.Time) error {
+// EnsureEventPartitions makes sure the partitions of the day of at exist
+// before rows received then are written: the partition worker creates them
+// ahead of time, and this covers a day it has not reached yet, such as the
+// first minutes of a new instance. Each day is checked once per process.
+func (s *Store) EnsureEventPartitions(ctx context.Context, at time.Time) error {
 	day := at.UTC().Format(time.DateOnly)
 	if _, ok := s.partitions.Load(day); ok {
 		return nil
@@ -176,6 +176,14 @@ func (s *Store) CreateEventPartitions(ctx context.Context, from time.Time, ahead
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('event_partitions', 0))`); err != nil {
+		return fmt.Errorf("creating event partitions: %w", err)
+	}
+	// Attaching a partition locks its parent table against every reader and
+	// writer, and while it waits for a long reader to finish, every insert
+	// queues behind it. Giving up after a few seconds bounds that stall: the
+	// worker tries again at its next round, days ahead of need, and a batch
+	// that needed the day now fails rather than hangs, and is retried.
+	if _, err = tx.Exec(ctx, `SET LOCAL lock_timeout = '5s'`); err != nil {
 		return fmt.Errorf("creating event partitions: %w", err)
 	}
 	var days []string

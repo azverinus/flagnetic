@@ -89,7 +89,7 @@ type Config struct {
 
 	// RateLimits are the limits of the SDK API.
 	RateLimits RateLimits
-	// EventsRetentionDays is how many days raw events are kept: the window
+	// EventsRetentionDays is how many days the raw events window spans: the window
 	// within which an event ID is recognised as a retry and an event's
 	// time is accepted.
 	EventsRetentionDays int
@@ -458,7 +458,7 @@ func Settings() []Setting {
 			Key:     "events_retention_days",
 			Default: "30",
 			Unit:    "days",
-			Description: "How long raw events SDKs post are kept. An event whose ID was received within it is recognised as a retry and stored once; " +
+			Description: "The window of the raw events SDKs post. An event whose ID was received within it is recognised as a retry and stored once; " +
 				"an event whose time is older is rejected `out_of_window`.",
 			Example: "30",
 			apply:   wholeNumber(func(c *Config, n int) { c.EventsRetentionDays = n }),
