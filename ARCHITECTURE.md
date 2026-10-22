@@ -16,7 +16,7 @@ eval/           The reference evaluator: its own Go module, standard library onl
 conformance/    Language-neutral evaluation fixtures and SDK protocol scenarios every SDK must pass.
 sdks/           SDKs, one directory per language, each released on its own tag.
 web/            The console (React), built into the binary.
-e2e/            End-to-end harness that runs the real binary against each SDK.
+e2e/            The SDK end-to-end harness: its own Go module, released by nothing, that runs SDKs against two replicas of the real binary.
 docs/           User and operator documentation.
 ```
 
@@ -113,6 +113,8 @@ The server writes no language. A problem's `detail` is English, for logs and scr
 - **PostgreSQL adapters and application handlers**: against a real PostgreSQL (testcontainers locally, a service container in CI), one migrated schema per package. Repositories are never faked.
 - **HTTP APIs**: black-box acceptance tests through the generated clients against an in-process server.
 - **Evaluators**: the conformance fixtures. **SDKs**: a mock server per the protocol scenarios, plus one end-to-end run against the real binary.
+
+The SDK end to end lives in `e2e/`, a Go module of its own in the workspace so that the server module never requires an SDK; it is never released. It builds `flagnetic` from the checkout, applies the migrations once, starts two replicas on one PostgreSQL (testcontainers, or `DATABASE_URL`), bootstraps an instance admin through the CLI and seeds a project through the management API: a private segment, flags that are on, in a rollout, behind the segment and off, a server key and a client key. Seeding is idempotent. Its own test runs the Go SDK and its OpenFeature provider against the replicas: every seeded case, the client key's masked answers, a kill switch through one replica reaching an SDK streaming from the other within 2 seconds, a revocation through one replica refusing the SDK on the other, and the SDK in the inventory. `task e2e` runs it; CI runs it on every pull request.
 - **Console**: Vitest for components, Playwright against a running server.
 
 Tests observe state through the API or a repository's query, never by reading tables. Coverage floors per layer are enforced in CI.

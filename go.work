@@ -4,6 +4,7 @@ toolchain go1.26.10
 
 use (
 	.
+	./e2e
 	./eval
 	./sdks/go
 	./sdks/go-openfeature
@@ -14,6 +15,8 @@ use (
 // workspace does not resolve v0.0.0 to its own directory on its own, so
 // these replacements do; go.work is never part of a published module.
 replace (
+	github.com/azverinus/flagnetic v0.0.0 => ./
 	github.com/azverinus/flagnetic/eval v0.0.0 => ./eval
 	github.com/azverinus/flagnetic/sdks/go v0.0.0 => ./sdks/go
+	github.com/azverinus/flagnetic/sdks/go-openfeature v0.0.0 => ./sdks/go-openfeature
 )

@@ -112,6 +112,14 @@ tasks:
     cmds:
       - pnpm --dir web i18n:extract
 
+  # --- SDK end to end (e2e/, needs Docker) ---
+
+  e2e:
+    desc: Run the SDK end to end against two replicas of the real binary and a throwaway PostgreSQL
+    dir: e2e
+    cmds:
+      - env -u DATABASE_URL FLAGNETIC_E2E=1 {{.GOTESTSUM}} --format testname -- -count=1 ./...
+
   # --- Checks (what CI runs) ---
 
   check:

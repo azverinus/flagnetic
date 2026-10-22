@@ -265,7 +265,8 @@ jobs:
 
   # The Go modules of go.work besides the root one (the evaluator and the
   # SDKs). The list is read from go.work, so a module joins CI through its
-  # `use` line alone.
+  # `use` line alone. The end-to-end harness is left out: it is published
+  # nowhere, builds the server, and runs in the sdk-e2e job.
   modules:
     name: list go modules
     runs-on: ubuntu-latest
@@ -279,7 +280,7 @@ jobs:
           cache: false
       - id: list
         run: |
-          dirs="$(go work edit -json | jq -c '[.Use[].DiskPath | ltrimstr("./") | select(. != ".")]')"
+          dirs="$(go work edit -json | jq -c '[.Use[].DiskPath | ltrimstr("./") | select(. != "." and . != "e2e")]')"
           echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
           echo "Modules: $dirs"
 
@@ -396,12 +397,59 @@ jobs:
         env:
           DIR: ${{ matrix.dir }}
 
+  # The SDK end to end, on every pull request: the real binary built from
+  # the checkout, two replicas on one PostgreSQL, a project seeded through
+  # the management API, and the Go SDK and its OpenFeature provider run
+  # against them; the kill-switch propagation it measures goes to the job
+  # summary. The harness module is linted, tidied and scanned here, since
+  # the module matrix leaves it out.
+  sdk-e2e:
+    name: SDK end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: flagnetic
+          POSTGRES_USER: flagnetic
+          POSTGRES_PASSWORD: flagnetic
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flagnetic -d flagnetic"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      DATABASE_URL: postgres://flagnetic:flagnetic@localhost:5432/flagnetic?sslmode=disable
+      FLAGNETIC_E2E: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            e2e/go.sum
+      - name: go.mod is tidy
+        run: .github/scripts/check-tidy.sh e2e
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14.0
+          working-directory: e2e
+          args: --config=${{ github.workspace }}/.golangci.yml
+      - name: Scan reachable code
+        working-directory: e2e
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: Run the harness and the Go SDK against two replicas
+        working-directory: e2e
+        run: go test -count=1 -v ./...
+
   # The one check branch protection requires. A job above may be skipped (a
   # module matrix with nothing to run, a job behind a condition), which is
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, tidy, console, changes, e2e, workflows, docker, modules, module, released]
+    needs: [lint, test, vuln, tidy, console, changes, e2e, sdk-e2e, workflows, docker, modules, module, released]
     if: always()
     runs-on: ubuntu-latest
     steps:
