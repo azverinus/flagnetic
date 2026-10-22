@@ -451,7 +451,7 @@ type SDKIdentity struct {
 
 // Violation defines model for Violation.
 type Violation struct {
-	// Code The rule broken, such as `too_long` or `too_many`.
+	// Code The rule broken, such as `too_long`, `too_many` or `duplicate`.
 	Code   string `json:"code"`
 	Detail string `json:"detail"`
 
@@ -625,8 +625,10 @@ type ClientInterface interface {
 	// kept. A context over the limits (64 attributes, 256 characters per
 	// string, 64 items per list, 256 bytes per unit ID) is
 	// `422 invalid_context`, every violation pointing into the body with
-	// `too_long` or `too_many` and `params.max`. The body is at most
-	// 32 KiB after decompression.
+	// `too_long` or `too_many` and `params.max`. A unit type given twice
+	// is `422 invalid_context` too, with `duplicate` at that unit type,
+	// since which of its IDs to evaluate for would be a guess. The body
+	// is at most 32 KiB after decompression.
 	//
 	// A client key's answer never says how a value was reached: the
 	// reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`
@@ -654,8 +656,10 @@ type ClientInterface interface {
 	// kept. A context over the limits (64 attributes, 256 characters per
 	// string, 64 items per list, 256 bytes per unit ID) is
 	// `422 invalid_context`, every violation pointing into the body with
-	// `too_long` or `too_many` and `params.max`. The body is at most
-	// 32 KiB after decompression.
+	// `too_long` or `too_many` and `params.max`. A unit type given twice
+	// is `422 invalid_context` too, with `duplicate` at that unit type,
+	// since which of its IDs to evaluate for would be a guess. The body
+	// is at most 32 KiB after decompression.
 	//
 	// A client key's answer never says how a value was reached: the
 	// reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`
@@ -795,8 +799,10 @@ type ClientInterface interface {
 // kept. A context over the limits (64 attributes, 256 characters per
 // string, 64 items per list, 256 bytes per unit ID) is
 // `422 invalid_context`, every violation pointing into the body with
-// `too_long` or `too_many` and `params.max`. The body is at most
-// 32 KiB after decompression.
+// `too_long` or `too_many` and `params.max`. A unit type given twice
+// is `422 invalid_context` too, with `duplicate` at that unit type,
+// since which of its IDs to evaluate for would be a guess. The body
+// is at most 32 KiB after decompression.
 //
 // A client key's answer never says how a value was reached: the
 // reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`
@@ -834,8 +840,10 @@ func (c *Client) EvaluateWithBody(ctx context.Context, params *EvaluateParams, c
 // kept. A context over the limits (64 attributes, 256 characters per
 // string, 64 items per list, 256 bytes per unit ID) is
 // `422 invalid_context`, every violation pointing into the body with
-// `too_long` or `too_many` and `params.max`. The body is at most
-// 32 KiB after decompression.
+// `too_long` or `too_many` and `params.max`. A unit type given twice
+// is `422 invalid_context` too, with `duplicate` at that unit type,
+// since which of its IDs to evaluate for would be a guess. The body
+// is at most 32 KiB after decompression.
 //
 // A client key's answer never says how a value was reached: the
 // reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`
@@ -1322,8 +1330,10 @@ type ClientWithResponsesInterface interface {
 	// kept. A context over the limits (64 attributes, 256 characters per
 	// string, 64 items per list, 256 bytes per unit ID) is
 	// `422 invalid_context`, every violation pointing into the body with
-	// `too_long` or `too_many` and `params.max`. The body is at most
-	// 32 KiB after decompression.
+	// `too_long` or `too_many` and `params.max`. A unit type given twice
+	// is `422 invalid_context` too, with `duplicate` at that unit type,
+	// since which of its IDs to evaluate for would be a guess. The body
+	// is at most 32 KiB after decompression.
 	//
 	// A client key's answer never says how a value was reached: the
 	// reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`
@@ -1351,8 +1361,10 @@ type ClientWithResponsesInterface interface {
 	// kept. A context over the limits (64 attributes, 256 characters per
 	// string, 64 items per list, 256 bytes per unit ID) is
 	// `422 invalid_context`, every violation pointing into the body with
-	// `too_long` or `too_many` and `params.max`. The body is at most
-	// 32 KiB after decompression.
+	// `too_long` or `too_many` and `params.max`. A unit type given twice
+	// is `422 invalid_context` too, with `duplicate` at that unit type,
+	// since which of its IDs to evaluate for would be a guess. The body
+	// is at most 32 KiB after decompression.
 	//
 	// A client key's answer never says how a value was reached: the
 	// reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`
@@ -1980,8 +1992,10 @@ func (r StreamRulesetResponse) ContentType() string {
 // kept. A context over the limits (64 attributes, 256 characters per
 // string, 64 items per list, 256 bytes per unit ID) is
 // `422 invalid_context`, every violation pointing into the body with
-// `too_long` or `too_many` and `params.max`. The body is at most
-// 32 KiB after decompression.
+// `too_long` or `too_many` and `params.max`. A unit type given twice
+// is `422 invalid_context` too, with `duplicate` at that unit type,
+// since which of its IDs to evaluate for would be a guess. The body
+// is at most 32 KiB after decompression.
 //
 // A client key's answer never says how a value was reached: the
 // reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`
@@ -2015,8 +2029,10 @@ func (c *ClientWithResponses) EvaluateWithBodyWithResponse(ctx context.Context, 
 // kept. A context over the limits (64 attributes, 256 characters per
 // string, 64 items per list, 256 bytes per unit ID) is
 // `422 invalid_context`, every violation pointing into the body with
-// `too_long` or `too_many` and `params.max`. The body is at most
-// 32 KiB after decompression.
+// `too_long` or `too_many` and `params.max`. A unit type given twice
+// is `422 invalid_context` too, with `duplicate` at that unit type,
+// since which of its IDs to evaluate for would be a guess. The body
+// is at most 32 KiB after decompression.
 //
 // A client key's answer never says how a value was reached: the
 // reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`

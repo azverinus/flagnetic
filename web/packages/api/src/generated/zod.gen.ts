@@ -443,6 +443,31 @@ export const zUnitTypePatch = z.object({
  */
 export const zAttributeType = z.enum(["string", "number", "boolean", "semver", "date", "list"]);
 
+export const zDiscoveredAttribute = z.object({
+  key: z.string(),
+  observed_types: z.array(z.string()),
+  first_seen: z.iso.datetime(),
+  last_seen: z.iso.datetime(),
+  count: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zDiscoveredAttributeList = z.object({
+  items: z.array(zDiscoveredAttribute),
+});
+
+export const zDiscoveredAttributeDeclaration = z.object({
+  type: zAttributeType,
+  name: zName.optional(),
+  description: zDescription.optional(),
+});
+
 export const zAttributeCreate = z.object({
   key: zKey,
   type: zAttributeType,
@@ -1422,6 +1447,37 @@ export const zCreateAttributePath = z.object({
  * Created.
  */
 export const zCreateAttributeResponse = zAttribute;
+
+export const zListDiscoveredAttributesPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The discovered attributes, by key.
+ */
+export const zListDiscoveredAttributesResponse = zDiscoveredAttributeList;
+
+export const zDismissDiscoveredAttributePath = z.object({
+  project: z.string(),
+  attribute: z.string(),
+});
+
+/**
+ * Dismissed.
+ */
+export const zDismissDiscoveredAttributeResponse = z.void();
+
+export const zDeclareDiscoveredAttributeBody = zDiscoveredAttributeDeclaration;
+
+export const zDeclareDiscoveredAttributePath = z.object({
+  project: z.string(),
+  attribute: z.string(),
+});
+
+/**
+ * Declared.
+ */
+export const zDeclareDiscoveredAttributeResponse = zAttribute;
 
 export const zDeleteAttributeHeaders = z.object({
   "If-Match": z.string().optional(),

@@ -26,6 +26,7 @@ type Handlers struct {
 	Authenticate *appdelivery.AuthenticateSDKKey
 	ServeRuleset *appdelivery.ServeRuleset
 	WatchRuleset *appdelivery.WatchRuleset
+	Evaluate     *appdelivery.EvaluateRemotely
 }
 
 // Options are what the SDK API runs on besides its use cases.
@@ -49,6 +50,9 @@ type operation struct {
 	queryKey bool
 	// stream marks a long-lived operation.
 	stream bool
+	// maxBodyBytes is the operation's body limit, after decompression; the
+	// edge's default when 0.
+	maxBodyBytes int64
 }
 
 // operations are the operations served so far, by the pattern the
@@ -60,10 +64,17 @@ var operations = map[string]operation{
 		endpoint: endpointStream, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient},
 		queryKey: true, stream: true,
 	},
+	"POST " + BaseURL + "/evaluate": {
+		endpoint: endpointEvaluate, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient},
+		maxBodyBytes: maxEvaluateBody,
+	},
 }
 
 // api serves the operations of the SDK API.
 type api struct {
+	// paths are the paths of the operations mounted, which a preflight is
+	// answered on.
+	paths  map[string]bool
 	edge   *flaghttp.Server
 	h      Handlers
 	clock  clock.Clock
@@ -74,8 +85,9 @@ type api struct {
 // not, through the API's compression, and each operation behind the
 // authentication of its SDK key.
 func Mount(edge *flaghttp.Server, h Handlers, o Options) {
-	a := &api{edge: edge, h: h, clock: o.Clock, limits: newLimiter(o.RateLimits, o.Clock, o.Registerer)}
-	edge.Wrap(BaseURL+"/", compression(edge))
+	a := &api{paths: map[string]bool{}, edge: edge, h: h, clock: o.Clock, limits: newLimiter(o.RateLimits, o.Clock, o.Registerer)}
+	routed := func(path string) bool { return a.paths[path] }
+	edge.Wrap(BaseURL+"/", func(next http.Handler) http.Handler { return compression(edge)(cors(routed)(next)) })
 	HandlerWithOptions(a, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},
@@ -92,9 +104,14 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 	if !ok {
 		return
 	}
+	_, path, _ := strings.Cut(pattern, " ")
+	rt.a.paths[path] = true
 	var opts []flaghttp.RouteOption
 	if op.stream {
 		opts = append(opts, flaghttp.Stream())
+	}
+	if op.maxBodyBytes > 0 {
+		opts = append(opts, flaghttp.MaxBodyBytes(op.maxBodyBytes))
 	}
 	rt.a.edge.Handle(pattern, rt.a.guard(op, http.HandlerFunc(h)), opts...)
 }
@@ -121,7 +138,8 @@ func presentedOf(ctx context.Context) presented {
 
 // guard admits a request to op: it refuses a client IP that presented too
 // many refused keys before its key is looked up, authenticates the key,
-// refuses a key of a kind op does not serve, and counts the request against
+// applies the key's allowed origins, refuses a key of a kind op does not
+// serve, and counts the request against
 // the key's limits, holding a stream slot for a stream until it ends. The
 // key then travels in the request's context.
 func (a *api) guard(op operation, next http.Handler) http.Handler {
@@ -137,6 +155,9 @@ func (a *api) guard(op operation, next http.Handler) http.Handler {
 			if refusesPresentedKey(err) {
 				a.limits.failed(ip)
 			}
+		}
+		if err == nil {
+			err = admitOrigin(w, r, key.AdmitOrigin)
 		}
 		if err == nil {
 			err = key.CheckKind(op.kinds...)
@@ -269,7 +290,7 @@ func writeRuleset(w http.ResponseWriter, r *http.Request, rs appdelivery.Ruleset
 	h := w.Header()
 	h.Set("ETag", `"`+version+`"`)
 	h.Set("Cache-Control", "private, no-cache")
-	h.Set("Vary", "Authorization, Accept-Encoding")
+	h.Add("Vary", "Authorization, Accept-Encoding")
 	if noneMatch(r.Header.Values("If-None-Match"), version) {
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -300,10 +321,6 @@ func noneMatch(values []string, version string) bool {
 }
 
 // The operations of the contract still to be served.
-
-func (a *api) Evaluate(w http.ResponseWriter, r *http.Request, _ EvaluateParams) {
-	a.edge.WriteError(w, r, errors.New("sdk: evaluate is not served yet"))
-}
 
 func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, _ PostEventsParams) {
 	a.edge.WriteError(w, r, errors.New("sdk: events are not served yet"))

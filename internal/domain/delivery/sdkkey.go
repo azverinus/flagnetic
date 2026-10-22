@@ -222,6 +222,42 @@ func (k SDKKey) CheckKind(served ...SDKKeyKind) error {
 	return errKeyKindNotAllowed
 }
 
+var (
+	errServerKeyFromBrowser = apperrors.Forbidden("server_key_from_browser",
+		"a server key must never be used from a browser; use a client key there")
+	errOriginNotAllowed = apperrors.Forbidden("origin_not_allowed",
+		"the SDK key does not allow requests from this origin")
+)
+
+// AdmitOrigin judges the browser origin a request comes from, sent telling
+// whether the request carries an Origin header at all. A server key sent
+// with one is refused server_key_from_browser, whatever the origin: a
+// server key in a web page is readable by anyone, and failing loudly makes
+// the mistake found before the key leaks further. A client key listing no
+// origins admits any. One listing origins admits a request without an
+// Origin header, which is not a browser's, and one from a listed origin,
+// compared normalized; any other, "null" included, is origin_not_allowed.
+// restricted reports a key whose answers depend on the origin, so that a
+// cache keeps them apart.
+func (k SDKKey) AdmitOrigin(origin string, sent bool) (restricted bool, err error) {
+	if k.Kind == SDKKeyServer {
+		if sent {
+			return false, errServerKeyFromBrowser
+		}
+		return false, nil
+	}
+	if len(k.AllowedOrigins) == 0 {
+		return false, nil
+	}
+	if !sent {
+		return true, nil
+	}
+	if n, ok := NormalizeOrigin(origin); ok && slices.Contains(k.AllowedOrigins, n) {
+		return true, nil
+	}
+	return true, errOriginNotAllowed
+}
+
 // SDKKeyUseInterval is how often at most a key's last use is recorded: often
 // enough for a member to see whether a key is still in use, rarely enough
 // that an SDK polling every few seconds costs no write per request.

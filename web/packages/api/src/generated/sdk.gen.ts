@@ -48,6 +48,9 @@ import type {
   DeactivateMemberData,
   DeactivateMemberErrors,
   DeactivateMemberResponses,
+  DeclareDiscoveredAttributeData,
+  DeclareDiscoveredAttributeErrors,
+  DeclareDiscoveredAttributeResponses,
   DeleteAttributeData,
   DeleteAttributeErrors,
   DeleteAttributeResponses,
@@ -69,6 +72,9 @@ import type {
   DeleteUnitTypeData,
   DeleteUnitTypeErrors,
   DeleteUnitTypeResponses,
+  DismissDiscoveredAttributeData,
+  DismissDiscoveredAttributeErrors,
+  DismissDiscoveredAttributeResponses,
   EvaluateData,
   EvaluateErrors,
   EvaluateResponses,
@@ -129,6 +135,9 @@ import type {
   ListAuditEntriesData,
   ListAuditEntriesErrors,
   ListAuditEntriesResponses,
+  ListDiscoveredAttributesData,
+  ListDiscoveredAttributesErrors,
+  ListDiscoveredAttributesResponses,
   ListEnvironmentsData,
   ListEnvironmentsErrors,
   ListEnvironmentsResponses,
@@ -1247,6 +1256,105 @@ export const createAttribute = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/attributes",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Attributes SDKs sent that the project does not declare
+ *
+ * The attributes that contexts evaluated through the SDK API and the
+ * tester carried without the project declaring them, by key, with the
+ * JSON types seen and when they were first and last seen. Only an
+ * attribute's key and type are recorded, never a value. A dismissed
+ * attribute is left out until it is seen with a type not seen before;
+ * an attribute declared since is left out. A project records at most
+ * 500, dismissed ones included.
+ *
+ */
+export const listDiscoveredAttributes = <ThrowOnError extends boolean = false>(
+  options: Options<ListDiscoveredAttributesData, ThrowOnError>,
+): RequestResult<ListDiscoveredAttributesResponses, ListDiscoveredAttributesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListDiscoveredAttributesResponses,
+    ListDiscoveredAttributesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/attributes/discovered",
+    ...options,
+  });
+
+/**
+ * Dismiss a discovered attribute
+ *
+ * Leaves the attribute out of the discovered ones until it is seen
+ * with a type not seen before. An attribute not listed is `not_found`.
+ *
+ */
+export const dismissDiscoveredAttribute = <ThrowOnError extends boolean = false>(
+  options: Options<DismissDiscoveredAttributeData, ThrowOnError>,
+): RequestResult<
+  DismissDiscoveredAttributeResponses,
+  DismissDiscoveredAttributeErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DismissDiscoveredAttributeResponses,
+    DismissDiscoveredAttributeErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/attributes/discovered/{attribute}",
+    ...options,
+  });
+
+/**
+ * Declare a discovered attribute
+ *
+ * Declares the attribute with the type given, named after its key
+ * unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+ * An attribute not listed is `not_found`.
+ *
+ */
+export const declareDiscoveredAttribute = <ThrowOnError extends boolean = false>(
+  options: Options<DeclareDiscoveredAttributeData, ThrowOnError>,
+): RequestResult<
+  DeclareDiscoveredAttributeResponses,
+  DeclareDiscoveredAttributeErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    DeclareDiscoveredAttributeResponses,
+    DeclareDiscoveredAttributeErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/attributes/discovered/{attribute}/declare",
     ...options,
     headers: {
       "Content-Type": "application/json",

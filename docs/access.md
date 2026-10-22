@@ -11,7 +11,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `project.read` | every ordinary read in a project, its audit log included | `read` | |
 | `project.update` | renaming a project and changing its description | `project:admin` | |
 | `environment.manage` | creating, renaming and deleting environments | `project:admin` | |
-| `declaration.manage` | declaring, renaming and deleting unit types and attributes | `flags:write` | |
+| `declaration.manage` | declaring, renaming and deleting unit types and attributes; declaring and dismissing discovered attributes | `flags:write` | |
 | `grant.manage` | making and removing grants | `project:admin` | ✓ |
 | `project_token.manage` | listing, creating and revoking project tokens | `project:admin` | ✓ |
 | `flag.edit` | creating flags and changing their definition | `flags:write` | |

@@ -84,3 +84,10 @@ func (f *fields) err() error {
 var errKeyImmutable = apperrors.Invalid("key_immutable", "a key never changes", apperrors.Violation{
 	Pointer: "/key", Code: "key_immutable", Detail: "a key never changes; create a new entity under the new key instead",
 })
+
+// DiscoverableAttributeKey reports whether key could be declared as an
+// attribute: a key of the workspace, not the reserved one. Only such keys
+// are worth showing as discovered, since nothing else can be declared.
+func DiscoverableAttributeKey(key string) bool {
+	return keyPattern.MatchString(key) && key != reservedAttributeKey
+}

@@ -153,8 +153,10 @@ paths:
         kept. A context over the limits (64 attributes, 256 characters per
         string, 64 items per list, 256 bytes per unit ID) is
         `422 invalid_context`, every violation pointing into the body with
-        `too_long` or `too_many` and `params.max`. The body is at most
-        32 KiB after decompression.
+        `too_long` or `too_many` and `params.max`. A unit type given twice
+        is `422 invalid_context` too, with `duplicate` at that unit type,
+        since which of its IDs to evaluate for would be a guess. The body
+        is at most 32 KiB after decompression.
 
         A client key's answer never says how a value was reached: the
         reasons `rule`, `rollout`, `fallthrough` and `prerequisite_failed`
@@ -501,7 +503,7 @@ components:
           description: JSON Pointer into the request body.
         code:
           type: string
-          description: The rule broken, such as `too_long` or `too_many`.
+          description: The rule broken, such as `too_long`, `too_many` or `duplicate`.
         detail:
           type: string
         params:

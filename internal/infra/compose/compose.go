@@ -5,6 +5,7 @@
 package compose
 
 import (
+	"context"
 	"crypto/rand"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,6 +17,7 @@ import (
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/console"
@@ -126,6 +128,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Token uses are gathered per replica and written in rounds, so no
 	// request waits on recording one.
 	tokenUses := appaccess.NewTokenUses(accessStore)
+	// The attributes evaluated contexts carry undeclared are gathered per
+	// replica and written in rounds, so no evaluation waits on recording.
+	discoveries := appdelivery.NewDiscoveries(tx, deliveryStore)
+	createAttribute := appworkspace.NewCreateAttribute(tx, ws, rulesets, rec)
 	management.Mount(edge, management.Handlers{
 		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
 		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
@@ -187,7 +193,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 
 		ListAttributes:  appworkspace.NewListAttributes(tx, ws, declarationUsages),
 		GetAttribute:    appworkspace.NewGetAttribute(ws),
-		CreateAttribute: appworkspace.NewCreateAttribute(tx, ws, rulesets, rec),
+		CreateAttribute: createAttribute,
 		UpdateAttribute: appworkspace.NewUpdateAttribute(tx, ws, rec),
 		DeleteAttribute: appworkspace.NewDeleteAttribute(tx, ws, declarationGuard, rulesets, rec),
 
@@ -231,9 +237,21 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		// the flags context to check a draft as a write would.
 		Evaluate: appdelivery.NewEvaluate(appdelivery.EvaluateDeps{
 			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
-			Drafts: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
+			Drafts:      appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
+			Discoveries: discoveries, Clock: d.Clock,
 		}),
 		ReadRuleset: appdelivery.NewReadRuleset(deliveryStore, rulesetCache.Unmeasured()),
+
+		ListDiscoveredAttributes:   appdelivery.NewListDiscoveredAttributes(deliveryStore),
+		DismissDiscoveredAttribute: appdelivery.NewDismissDiscoveredAttribute(tx, deliveryStore),
+		// A discovered attribute is declared through the workspace context,
+		// as a member creating it would.
+		DeclareDiscoveredAttribute: appdelivery.NewDeclareDiscoveredAttribute(tx, deliveryStore,
+			func(ctx context.Context, a appdelivery.AttributeDeclaration) (workspace.Attribute, error) {
+				return createAttribute.Handle(ctx, appworkspace.CreateAttributeCommand{
+					Project: a.Project, Key: a.Key, Name: a.Name, Description: a.Description, Type: a.Type, Request: a.Request,
+				})
+			}),
 
 		ListSDKKeys:  appdelivery.NewListSDKKeys(deliveryStore, d.Clock),
 		CreateSDKKey: appdelivery.NewCreateSDKKey(sdkKeys),
@@ -268,12 +286,14 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Authenticate: appdelivery.NewAuthenticateSDKKey(sdkKeyCache, sdkKeyUses, d.Clock),
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
 		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
+		Evaluate:     appdelivery.NewEvaluateRemotely(rulesetCache, discoveries, d.Clock),
 	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
 		Workers: []worker.Worker{
 			worker.AuthRetention(appaccess.NewPurgeAuthRecords(tx, accessStore, settings, d.Clock), reg),
 			worker.TokenLastUse(tokenUses),
 			worker.SDKKeyLastUse(sdkKeyUses),
+			worker.DiscoveredAttributes(discoveries, edge.Logger()),
 		},
 		Listeners: []Listener{
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},
