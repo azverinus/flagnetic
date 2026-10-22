@@ -15,6 +15,8 @@ Only the attribute's key and the type of its value are recorded, never the value
 - **Declare** it with a type in one step: `POST …/attributes/discovered/{attribute}/declare` with `{"type": "string"}` and optionally a `name` (the key otherwise) and a `description` (`declaration.manage`). It is declared exactly as `POST …/attributes` would, audited as `attribute.created`, and leaves the list. An attribute declared any other way leaves it too.
 - **Dismiss** it: `DELETE …/attributes/discovered/{attribute}` (`declaration.manage`) hides it until it is seen with a type not seen before, which may be a change worth a look.
 
+In the console, the **Discovered** tab of a project's Attributes lists them with the JSON types seen, when each was first and last seen and how many contexts carried it. Anyone who can view the project sees the list; whoever holds `declaration.manage` declares one with a type chosen among the types seen (chosen already when only one was seen; an attribute seen only as an object cannot be declared, since no attribute type holds one) or dismisses it after a confirmation. A declared attribute moves to the **Declared** tab.
+
 A project keeps at most 500 discovered attributes, dismissed ones included; a new key beyond them is not recorded until one is declared. Between two writes, each replica holds at most 1,024 new keys in all and 1,000 per project. It drops what does not fit, and what it could not write, and logs the count as one warning a second; they are recorded when contexts carry them again.
 
 ## Conditions

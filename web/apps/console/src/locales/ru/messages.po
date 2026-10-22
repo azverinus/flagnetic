@@ -640,6 +640,10 @@ msgstr "Атрибут объявлен"
 msgid "Attribute deleted"
 msgstr "Атрибут удалён"
 
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Attribute lists"
+msgstr "Списки атрибутов"
+
 #: src/lib/audit.ts
 msgid "Attribute updated"
 msgstr "Атрибут изменён"
@@ -649,6 +653,14 @@ msgstr "Атрибут изменён"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Attributes"
 msgstr "Атрибуты"
+
+#: src/components/discovered-attributes.tsx
+msgid "Attributes in the contexts SDKs evaluate or the tester sends, that the project has not declared, are listed here within a few seconds."
+msgstr "Атрибуты из контекстов, которые вычисляют SDK или отправляет тестер и которые проект не объявил, появляются здесь в течение нескольких секунд."
+
+#: src/components/discovered-attributes.tsx
+msgid "Attributes SDKs sent in evaluated contexts that this project has not declared. Only the key and the type of each value are kept, never the value. A dismissed attribute comes back if it is seen with a type not seen before."
+msgstr "Атрибуты, которые SDK передали в контекстах и которые проект не объявил. Сохраняются только ключ и тип значения, само значение — никогда. Скрытый атрибут возвращается, если его увидят с типом, которого раньше не было."
 
 #: src/components/audit-log.tsx
 msgid "Audit entries, newest first"
@@ -699,8 +711,8 @@ msgid "Before and after"
 msgstr "До и после"
 
 #. An attribute type.
+#: src/lib/attribute-types.ts
 #: src/lib/flags.ts
-#: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Boolean"
 msgstr "Логический"
 
@@ -813,10 +825,12 @@ msgstr "Выберите более надёжный пароль."
 msgid "Choose a time in the future."
 msgstr "Выберите момент в будущем."
 
+#: src/components/discovered-attributes.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type"
 msgstr "Выберите тип"
 
+#: src/components/discovered-attributes.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type."
 msgstr "Выберите тип."
@@ -1057,7 +1071,7 @@ msgid "Dark"
 msgstr "Тёмная"
 
 #. An attribute type.
-#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/lib/attribute-types.ts
 msgid "Date"
 msgstr "Дата"
 
@@ -1081,9 +1095,25 @@ msgstr "Деактивация сразу завершает все сеансы
 msgid "Deactivation ends every session and API token of yours at once, this one included, and you cannot sign in until another instance admin reactivates you."
 msgstr "Деактивация сразу завершает все ваши сеансы, включая этот, и отзывает все ваши API-токены. Войти вы сможете, только когда другой администратор экземпляра активирует вас снова."
 
+#: src/components/discovered-attributes.tsx
+msgid "Declare {key}"
+msgstr "Объявить {key}"
+
+#: src/components/discovered-attributes.tsx
+msgid "Declare attribute"
+msgstr "Объявить атрибут"
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Declare the kinds of unit its flags are served to."
 msgstr "Объявите виды единиц, которым отдаются его флаги."
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Declared"
+msgstr "Объявленные"
+
+#: src/components/discovered-attributes.tsx
+msgid "Declaring {key} makes it usable in rules. Its type is fixed once declared."
+msgstr "После объявления {key} его можно использовать в правилах. Тип атрибута после объявления не меняется."
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
@@ -1170,6 +1200,26 @@ msgstr "Отменить изменения"
 #: src/components/configuration-editor.tsx
 msgid "Discard my draft"
 msgstr "Отбросить мой черновик"
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+msgid "Discovered"
+msgstr "Обнаруженные"
+
+#: src/components/discovered-attributes.tsx
+msgid "Discovered attributes"
+msgstr "Обнаруженные атрибуты"
+
+#: src/components/discovered-attributes.tsx
+msgid "Dismiss {dismissedKey}"
+msgstr "Скрыть {dismissedKey}"
+
+#: src/components/discovered-attributes.tsx
+msgid "Dismiss {key}"
+msgstr "Скрыть {key}"
+
+#: src/components/discovered-attributes.tsx
+msgid "Dismiss attribute"
+msgstr "Скрыть атрибут"
 
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
@@ -1526,6 +1576,7 @@ msgstr "Фильтр флагов"
 msgid "Filter the segments"
 msgstr "Фильтр сегментов"
 
+#: src/components/discovered-attributes.tsx
 #: src/components/sdk-inventory.tsx
 msgid "First seen"
 msgstr "Впервые замечен"
@@ -1865,6 +1916,7 @@ msgstr "Сохранять работу старого ключа"
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr "Хранится в этом браузере и применяется и на странице входа. Вариант «Как в системе» следует настройке устройства."
 
+#: src/components/discovered-attributes.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/sdk-inventory.tsx
@@ -1918,6 +1970,7 @@ msgstr "Язык"
 msgid "Last ruleset version"
 msgstr "Последняя версия набора правил"
 
+#: src/components/discovered-attributes.tsx
 #: src/components/sdk-inventory.tsx
 #: src/components/session-list.tsx
 msgid "Last seen"
@@ -1986,7 +2039,7 @@ msgid "Light"
 msgstr "Светлая"
 
 #. An attribute type.
-#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/lib/attribute-types.ts
 msgid "List"
 msgstr "Список"
 
@@ -2317,6 +2370,10 @@ msgstr "Пока ни один SDK не обращался к этому окр�
 msgid "No segment matches these filters."
 msgstr "Нет сегментов, подходящих под эти фильтры."
 
+#: src/components/discovered-attributes.tsx
+msgid "No undeclared attribute has been seen."
+msgstr "Необъявленных атрибутов пока не встречалось."
+
 #: src/components/tester-panel.tsx
 msgid "No value"
 msgstr "Нет значения"
@@ -2398,10 +2455,15 @@ msgid "Nothing that a member edits changed."
 msgstr "Ничего из того, что редактируют участники, не изменилось."
 
 #. An attribute type.
+#: src/lib/attribute-types.ts
 #: src/lib/flags.ts
-#: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Number"
 msgstr "Число"
+
+#. A JSON type an SDK sent.
+#: src/lib/attribute-types.ts
+msgid "Object"
+msgstr "Объект"
 
 #: src/components/compare-environments.tsx
 #: src/components/tester-panel.tsx
@@ -2432,6 +2494,10 @@ msgstr "Включён"
 #: src/components/compare-environments.tsx
 msgid "On or off"
 msgstr "Включён или выключен"
+
+#: src/components/discovered-attributes.tsx
+msgid "One of the types SDKs sent it with."
+msgstr "Один из типов, с которыми его передавали SDK."
 
 #: src/lib/problem-messages.ts
 msgid "One with this key already exists."
@@ -3114,7 +3180,7 @@ msgid "Segments"
 msgstr "Сегменты"
 
 #. An attribute type.
-#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/lib/attribute-types.ts
 msgid "Semantic version"
 msgstr "Семантическая версия"
 
@@ -3285,8 +3351,8 @@ msgid "Status"
 msgstr "Статус"
 
 #. An attribute type.
+#: src/lib/attribute-types.ts
 #: src/lib/flags.ts
-#: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
 msgstr "Строка"
 
@@ -3377,6 +3443,10 @@ msgstr "Это не ваш текущий пароль."
 #: src/components/member-credentials.tsx
 msgid "The API tokens of {name}"
 msgstr "API-токены участника {name}"
+
+#: src/components/discovered-attributes.tsx
+msgid "The attribute {dismissedKey} leaves this list. It comes back if SDKs send it with a type not seen before."
+msgstr "Атрибут {dismissedKey} исчезнет из этого списка. Он вернётся, если SDK передадут его с типом, которого раньше не было."
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "The attribute {key} is no longer declared, and its key can be declared again."
@@ -3932,6 +4002,10 @@ msgstr "Здесь это значение недопустимо."
 msgid "Time"
 msgstr "Время"
 
+#: src/components/discovered-attributes.tsx
+msgid "Times seen"
+msgstr "Раз встречался"
+
 #: src/components/audit-log.tsx
 msgid "To"
 msgstr "По"
@@ -3977,6 +4051,7 @@ msgstr "Слишком много."
 msgid "Try again"
 msgstr "Попробовать ещё раз"
 
+#: src/components/discovered-attributes.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
@@ -3987,6 +4062,10 @@ msgstr "Тип"
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Введите {typeToConfirm} для подтверждения"
+
+#: src/components/discovered-attributes.tsx
+msgid "Types seen"
+msgstr "Встречавшиеся типы"
 
 #: src/components/overrides-section.tsx
 msgid "Unit ID"
