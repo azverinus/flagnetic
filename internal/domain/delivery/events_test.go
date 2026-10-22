@@ -119,15 +119,12 @@ func TestEachEventIsRejectedWithItsCode(t *testing.T) {
 		"many faults": {map[string]any{"type": "alias", "event_id": id}, delivery.RejectEventInvalid,
 			"occurred_at is missing; from_unit_type is missing; from_unit_id is missing; to_unit_type is missing; to_unit_id is missing"},
 		"occurred_at not a time": {with(alias(id), map[string]any{"occurred_at": "yesterday"}), delivery.RejectEventInvalid, "occurred_at must be an RFC 3339 time"},
-		"exposure faults": {with(exposure(id), map[string]any{"override": "no", "ruleset_version": -1, "platform": 3}), delivery.RejectEventInvalid,
-			"platform must be a string or null; override must be a boolean; ruleset_version must be a non-negative integer"},
-		"more faults than shown": {map[string]any{"type": "exposure", "event_id": id}, delivery.RejectEventInvalid,
-			"occurred_at is missing; experiment_key is missing; flag_key is missing; variation_key is missing; unit_type is missing; and 4 more"},
-		"exposure override missing": {with(exposure(id), map[string]any{"override": nil}), delivery.RejectEventInvalid, "override is missing"},
-		"old exposure":              {with(exposure(id), map[string]any{"occurred_at": "2026-08-01T00:00:00Z"}), delivery.RejectOutOfWindow, "occurred_at is older than the raw retention"},
-		"summary without counts":    {with(summary(id), map[string]any{"counts": nil, "ruleset_version": nil}), delivery.RejectEventInvalid, "ruleset_version is missing; counts is missing"},
-		"counts not a list":         {with(summary(id), map[string]any{"counts": "many"}), delivery.RejectEventInvalid, "counts must be a list of objects"},
-		"a row not an object":       {with(summary(id), map[string]any{"counts": []any{"checkout"}}), delivery.RejectEventInvalid, "counts[0] must be an object"},
+		"more faults than shown": {map[string]any{"type": "evaluation_summary", "event_id": id, "counts": []any{map[string]any{}}},
+			delivery.RejectEventInvalid,
+			"interval_start is missing; interval_end is missing; ruleset_version is missing; counts[0].flag is missing; counts[0].reason is missing; and 1 more"},
+		"summary without counts": {with(summary(id), map[string]any{"counts": nil, "ruleset_version": nil}), delivery.RejectEventInvalid, "ruleset_version is missing; counts is missing"},
+		"counts not a list":      {with(summary(id), map[string]any{"counts": "many"}), delivery.RejectEventInvalid, "counts must be a list of objects"},
+		"a row not an object":    {with(summary(id), map[string]any{"counts": []any{"checkout"}}), delivery.RejectEventInvalid, "counts[0] must be an object"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var e delivery.JudgedEvent
@@ -154,11 +151,31 @@ func exposure(id string) map[string]any {
 	}
 }
 
-func TestAValidExposureIsReadWhole(t *testing.T) {
-	e := judge(t, with(exposure(eventIDAt(received, 1)), map[string]any{"occurred_at": "2026-09-23T00:00:00Z", "platform": "ios"}))
-	if e.Rejection != nil || e.Exposure == nil || e.Exposure.ExperimentKey != "onboarding_test" || e.Exposure.Platform != "ios" ||
-		e.Exposure.AppVersion != "" || !e.Exposure.OccurredAt.Equal(received) || e.Exposure.RulesetVersion != 1 {
-		t.Errorf("exposure = %+v %+v", e.Exposure, e.Rejection)
+func TestEveryExposureIsRejectedUnknownExperimentWhateverItsForm(t *testing.T) {
+	id := eventIDAt(received, 1)
+	for name, event := range map[string]map[string]any{
+		"well formed":               exposure(id),
+		"members missing":           {"type": "exposure", "event_id": id},
+		"members of the wrong type": with(exposure(id), map[string]any{"override": "no", "ruleset_version": -1, "platform": 3}),
+		"event_id not a UUIDv7":     exposure("not-a-uuid"),
+		"no event_id":               with(exposure(id), map[string]any{"event_id": nil}),
+		"old event_id":              exposure(eventIDAt(received.Add(-31*24*time.Hour), 2)),
+		"old occurred_at":           with(exposure(id), map[string]any{"occurred_at": "2026-08-01T00:00:00Z"}),
+		"no experiment_key":         with(exposure(id), map[string]any{"experiment_key": nil}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			e := judge(t, event)
+			if e.Rejection == nil || e.Rejection.Code != delivery.RejectUnknownExperiment {
+				t.Fatalf("rejection = %+v, want %s", e.Rejection, delivery.RejectUnknownExperiment)
+			}
+			want := `no running experiment is keyed "onboarding_test"`
+			if _, ok := event["experiment_key"]; !ok {
+				want = `no running experiment is keyed ""`
+			}
+			if e.Rejection.Detail != want {
+				t.Errorf("detail = %q, want %q", e.Rejection.Detail, want)
+			}
+		})
 	}
 }
 

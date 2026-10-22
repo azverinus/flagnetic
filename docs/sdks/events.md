@@ -43,7 +43,7 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `event_id_invalid` | `event_id` is not a lowercase UUIDv7. |
 | `out_of_window` | The time in `event_id`, or `occurred_at` (`interval_end` for a summary), is older than the retention window. |
 | `undeclared_unit_type` | An alias names a unit type the project does not declare. |
-| `unknown_experiment` | An exposure names no running experiment. No experiment runs yet in this version, so every exposure is refused this way. |
+| `unknown_experiment` | An exposure names no running experiment. No experiment runs yet in this version, so every exposure is refused this way, whatever its members: an exposure is never refused `event_invalid`, `event_id_invalid` or `out_of_window` here. |
 
 A summary row's `reason` is a true reason (`rule`, `rollout`, `fallthrough`, `prerequisite_failed`, `off`, `override`, `experiment`, `error`), the SDK's own `fallback` or `local_override`, or `targeting_match`, which a client SDK counts from the answers it receives. A row naming a flag the project does not have (an archived flag is still one) is dropped and counted in `dropped_rows`; the rest of its summary is stored.
 

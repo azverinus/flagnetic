@@ -104,22 +104,6 @@ type Alias struct {
 	ToUnitID     string
 }
 
-// Exposure is a unit encountering behaviour that depends on its experiment
-// assignment.
-type Exposure struct {
-	OccurredAt       time.Time
-	ExperimentKey    string
-	FlagKey          string
-	VariationKey     string
-	UnitType         string
-	UnitID           string
-	Platform         string
-	AppVersion       string
-	EvaluationReason string
-	Override         bool
-	RulesetVersion   int64
-}
-
 // JudgedEvent is one event of a batch as judged on its own: of a known
 // type with valid members, or rejected.
 type JudgedEvent struct {
@@ -130,15 +114,14 @@ type JudgedEvent struct {
 	ID   EventID
 	Type EventType
 	// One of these is set for an event not rejected, after its type.
-	Summary  *EvaluationSummary
-	Alias    *Alias
-	Exposure *Exposure
+	Summary *EvaluationSummary
+	Alias   *Alias
 	// Rejection is set when the event is refused.
 	Rejection *Rejection
 }
 
 func (e JudgedEvent) reject(code RejectionCode, detail string) JudgedEvent {
-	e.Summary, e.Alias, e.Exposure = nil, nil, nil
+	e.Summary, e.Alias = nil, nil
 	e.Rejection = &Rejection{Code: code, Detail: detail}
 	return e
 }
@@ -163,7 +146,13 @@ var summaryReasons = map[string]bool{
 // JudgeEvent judges one event of a batch received at receivedAt, against a
 // retention window of retention: its type, its event_id, its members, then
 // its time. Whatever only the stored state can tell (duplicates, declared
-// unit types, known flags and experiments) is left to the caller.
+// unit types, known flags) is left to the caller.
+//
+// Every exposure is refused unknown_experiment as soon as its type is read,
+// whatever the rest of it holds: no experiment can run yet, so none can be
+// known, and an SDK must get the same answer for an exposure whether or not
+// it is well formed, rather than one code today and another once experiments
+// exist.
 func JudgeEvent(raw json.RawMessage, receivedAt time.Time, retention time.Duration) JudgedEvent {
 	var e JudgedEvent
 	dec := json.NewDecoder(bytes.NewReader(raw))
@@ -182,7 +171,10 @@ func JudgeEvent(raw json.RawMessage, receivedAt time.Time, retention time.Durati
 	}
 	e.Type = EventType(typ)
 	switch e.Type {
-	case EventEvaluationSummary, EventAlias, EventExposure:
+	case EventEvaluationSummary, EventAlias:
+	case EventExposure:
+		key, _ := members["experiment_key"].(string)
+		return e.reject(RejectUnknownExperiment, fmt.Sprintf("no running experiment is keyed %q", cut(key)))
 	default:
 		return e.reject(RejectEventTypeUnknown, fmt.Sprintf("this server does not know events of type %q", typ))
 	}
@@ -225,23 +217,6 @@ func JudgeEvent(raw json.RawMessage, receivedAt time.Time, retention time.Durati
 		}
 		a.OccurredAt = clampAhead(a.OccurredAt, receivedAt)
 		e.Alias = &a
-	case EventExposure:
-		x := Exposure{
-			OccurredAt: r.time("occurred_at"), ExperimentKey: r.requiredString("experiment_key"),
-			FlagKey: r.requiredString("flag_key"), VariationKey: r.requiredString("variation_key"),
-			UnitType: r.requiredString("unit_type"), UnitID: r.requiredString("unit_id"),
-			Platform: r.optionalString("platform"), AppVersion: r.optionalString("app_version"),
-			EvaluationReason: r.requiredString("evaluation_reason"), Override: r.boolean("override"),
-			RulesetVersion: r.integer("ruleset_version", 0),
-		}
-		if len(r.faults) > 0 {
-			return e.reject(RejectEventInvalid, r.detail())
-		}
-		if x.OccurredAt.Before(oldest) {
-			return e.reject(RejectOutOfWindow, "occurred_at is older than the raw retention")
-		}
-		x.OccurredAt = clampAhead(x.OccurredAt, receivedAt)
-		e.Exposure = &x
 	}
 	return e
 }
@@ -337,19 +312,6 @@ func (r *reader) optionalString(name string) string {
 	}
 	r.checkString(name, s)
 	return s
-}
-
-func (r *reader) boolean(name string) bool {
-	v, ok := r.members[name]
-	if !ok || v == nil {
-		r.fault(name, "is missing")
-		return false
-	}
-	b, ok := v.(bool)
-	if !ok {
-		r.fault(name, "must be a boolean")
-	}
-	return b
 }
 
 // integer reads a whole number of at least least.

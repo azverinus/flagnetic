@@ -173,6 +173,46 @@ func TestAMixedBatchIsJudgedPerEvent(t *testing.T) {
 	}
 }
 
+func TestEveryExposureIsRefusedUnknownExperimentWhateverItsForm(t *testing.T) {
+	srv, _, value := eventsServer(t)
+	exposure := func(changes map[string]any) map[string]any {
+		e := map[string]any{
+			"type": "exposure", "event_id": eventID(protocolTime, 1), "occurred_at": protocolTime.Format(time.RFC3339),
+			"experiment_key": "onboarding_test", "flag_key": "onboarding", "variation_key": "guided", "unit_type": "user",
+			"unit_id": "u-1001", "evaluation_reason": "experiment", "override": false, "ruleset_version": 1,
+		}
+		for k, v := range changes {
+			if v == nil {
+				delete(e, k)
+				continue
+			}
+			e[k] = v
+		}
+		return e
+	}
+	sentIDs := []string{
+		eventID(protocolTime, 1), eventID(protocolTime, 2), "not-a-uuid",
+		eventID(protocolTime.Add(-60*24*time.Hour), 3), eventID(protocolTime, 4), eventID(protocolTime, 5),
+	}
+	got := batchResult(t, srv, value, batch(
+		exposure(nil),
+		exposure(map[string]any{"event_id": sentIDs[1], "flag_key": nil, "override": "no", "ruleset_version": -1}),
+		exposure(map[string]any{"event_id": sentIDs[2]}),
+		exposure(map[string]any{"event_id": sentIDs[3]}),
+		exposure(map[string]any{"event_id": sentIDs[4], "occurred_at": protocolTime.Add(-60 * 24 * time.Hour).Format(time.RFC3339)}),
+		exposure(map[string]any{"event_id": sentIDs[5], "unit_id": strings.Repeat("u", 300)}),
+	))
+	if got.Accepted != 0 || got.Duplicates != 0 || len(got.Rejected) != len(sentIDs) {
+		t.Fatalf("batch = %+v, want every exposure rejected", got)
+	}
+	for i, r := range got.Rejected {
+		if r.Index != i || r.Code != "unknown_experiment" || r.Detail != `no running experiment is keyed "onboarding_test"` ||
+			r.EventId == nil || *r.EventId != sentIDs[i] {
+			t.Errorf("rejection %d = %+v, want unknown_experiment echoing %s", i, r, sentIDs[i])
+		}
+	}
+}
+
 func TestAcceptedSummariesAndAliasesAreStoredOnce(t *testing.T) {
 	srv, p, value := eventsServer(t)
 	body := batch(aliasEvent(eventID(protocolTime, 1)), summaryEvent(eventID(protocolTime, 2),

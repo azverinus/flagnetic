@@ -94,18 +94,13 @@ func (r BatchResult) AcceptedTotal() int {
 // the SDK may drop the batch. An event whose ID was received before, in this
 // batch or within the retention window, is a duplicate and stored once. A
 // summary row naming a flag the project does not have is dropped: nobody
-// could read it. Every exposure is refused unknown_experiment, since no
-// experiment runs yet that an exposure could belong to.
+// could read it. Every exposure is refused unknown_experiment, whatever its
+// form, since no experiment runs yet that an exposure could belong to.
 func (h *IngestEvents) Handle(ctx context.Context, key delivery.SDKKey, b EventBatch) (BatchResult, error) {
 	now := h.clock.Now()
 	judged := make([]delivery.JudgedEvent, len(b.Events))
 	for i, raw := range b.Events {
-		e := delivery.JudgeEvent(raw, now, h.retention)
-		if e.Rejection == nil && e.Exposure != nil {
-			e = e.Reject(delivery.RejectUnknownExperiment,
-				fmt.Sprintf("no running experiment is keyed %q", e.Exposure.ExperimentKey))
-		}
-		judged[i] = e
+		judged[i] = delivery.JudgeEvent(raw, now, h.retention)
 	}
 	// The day's partitions are made sure of before the unit of work begins:
 	// creating one takes a connection of its own, and doing it while the
