@@ -19,8 +19,11 @@ import (
 )
 
 // keyNotifications listens on the SDK keys' channel on its own connection
-// and returns a function answering the payloads delivered within wait.
-func keyNotifications(t *testing.T, pool *pgxpool.Pool) func(wait time.Duration) []string {
+// and returns a function answering the payloads delivered within wait for
+// the keys in own. The channel is shared by the whole database, and packages
+// run their tests against it at the same time, so a payload for a key another
+// test changed is not this test's to judge.
+func keyNotifications(t *testing.T, pool *pgxpool.Pool, own map[string]bool) func(wait time.Duration) []string {
 	t.Helper()
 	conn, err := pool.Acquire(t.Context())
 	if err != nil {
@@ -42,7 +45,9 @@ func keyNotifications(t *testing.T, pool *pgxpool.Pool) func(wait time.Duration)
 			if err != nil {
 				t.Fatal(err)
 			}
-			out = append(out, n.Payload)
+			if own[n.Payload] {
+				out = append(out, n.Payload)
+			}
 		}
 	}
 }
@@ -68,10 +73,12 @@ func TestAChangeDecidingWhetherAKeyIsAcceptedNotifiesItsIdentifier(t *testing.T)
 	pool := testkit.Pool(t)
 	store := pgdelivery.NewStore(pool)
 	p, envs := project(t, "keys")
-	notified := keyNotifications(t, pool)
+	own := map[string]bool{}
+	notified := keyNotifications(t, pool, own)
 	const quiet = 200 * time.Millisecond
 
 	k := storedKey(t, store, p, envs[0], delivery.SDKKeyClient)
+	own[k.ID.String()] = true
 	renamed, _, err := k.Update(delivery.SDKKeyChange{Name: ptr("storefront"), AllowedOrigins: []string{}})
 	if err != nil {
 		t.Fatal(err)
@@ -96,6 +103,7 @@ func TestAChangeDecidingWhetherAKeyIsAcceptedNotifiesItsIdentifier(t *testing.T)
 	}
 
 	other := storedKey(t, store, p, envs[0], delivery.SDKKeyServer)
+	own[other.ID.String()] = true
 	if err := pgworkspace.NewStore(pool).DeleteEnvironment(t.Context(), envs[0].ID); err != nil {
 		t.Fatal(err)
 	}
