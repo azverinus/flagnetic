@@ -31,6 +31,10 @@ import {
   listAttributes,
   listEnvironments,
   listFlags,
+  getFlag,
+  listSegments,
+  type Flag,
+  type Segment,
   listUnitTypes,
   type Attribute,
   type AuthMethods,
@@ -143,6 +147,23 @@ export function flagsQuery(project: string, search: FlagsSearch) {
   });
 }
 
+/** One flag with its configuration in every environment. */
+export function flagQuery(project: string, flag: string) {
+  return queryOptions<Flag>({
+    queryKey: [...flagsQueryKey(project), "detail", flag],
+    queryFn: () => unwrap(getFlag({ path: { project, flag } })),
+    retry: false,
+  });
+}
+
+/** A project's segments, which a rule's conditions name. */
+export function segmentsQuery(project: string) {
+  return queryOptions<Segment[]>({
+    queryKey: ["projects", project, "segments"],
+    queryFn: async () => (await unwrap(listSegments({ path: { project } }))).items,
+  });
+}
+
 /** A project's declared attributes, the standard ones among them. */
 export function attributesQuery(project: string) {
   return queryOptions<Attribute[]>({
@@ -250,6 +271,35 @@ export function auditEntriesQuery(scope: AuditScope, search: AuditSearch, limit?
       );
     },
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * The newest audit entries of one flag, in one environment or in all:
+ * what tells a member who made the version they ran into, and when.
+ */
+export function flagEntriesQuery(
+  project: string,
+  flag: string,
+  { environment, killSwitch, limit }: { environment?: string; killSwitch?: true; limit: number },
+) {
+  return queryOptions<AuditEntry[]>({
+    queryKey: [...auditQueryKey, { project }, "flag", flag, { environment, killSwitch, limit }],
+    queryFn: async () =>
+      (
+        await unwrap(
+          listProjectAuditEntries({
+            path: { project },
+            query: {
+              entity_kind: "flag",
+              entity_id: flag,
+              ...(environment ? { environment } : {}),
+              ...(killSwitch ? { kill_switch: true } : {}),
+              limit,
+            },
+          }),
+        )
+      ).items,
   });
 }
 

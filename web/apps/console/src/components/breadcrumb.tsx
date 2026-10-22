@@ -11,6 +11,12 @@ import { useProjectInAddress } from "@/lib/use-project-in-address";
 export const projectNameCrumb: unique symbol = Symbol();
 
 /**
+ * The crumb of a route of one entity named in code by its key, such as a
+ * flag: the breadcrumb calls it by the path parameter holding that key.
+ */
+export type ParamCrumb = { param: string };
+
+/**
  * Where the member is, from the crumb each matched route declares in its
  * static data; the last crumb is the page itself.
  */
@@ -20,7 +26,12 @@ export function Breadcrumb() {
   const crumbs = useMatches().flatMap((match) => {
     const crumb = match.staticData.crumb;
     if (crumb === undefined) return [];
-    const label = crumb === projectNameCrumb ? (project?.name ?? key ?? "") : i18n._(crumb);
+    const label =
+      crumb === projectNameCrumb
+        ? (project?.name ?? key ?? "")
+        : "param" in crumb
+          ? String((match.params as Record<string, unknown>)[crumb.param] ?? "")
+          : i18n._(crumb);
     return [{ id: match.id, to: match.pathname, label }];
   });
   if (crumbs.length === 0) return null;

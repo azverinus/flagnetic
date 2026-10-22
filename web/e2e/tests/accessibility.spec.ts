@@ -12,6 +12,7 @@ import {
   seedProject,
   signIn,
 } from "../support/console";
+import { seedFlag, stringFlag } from "../support/flags";
 
 /**
  * The accessibility sweep: axe on every routed screen in light and dark
@@ -22,9 +23,13 @@ import {
 
 /**
  * What the sweep's screens are about: a project, an invited member, their
- * invitation's path and an audit entry of the project.
+ * invitation's path and an audit entry of the project, whose flag is
+ * {@link sweepFlag}.
  */
 type Seeded = { project: string; member: string; invitation: string; auditEntry: string };
+
+/** The key of the flag the sweep creates in its project. */
+const sweepFlag = "sweep_flag";
 
 /** A screen to visit: the route of the console it is, and its address. */
 type Route = { name: string; route: string; path: (seeded: Seeded) => string };
@@ -88,6 +93,11 @@ const signedIn: Route[] = [
     path: (s: Seeded) => `/projects/${s.project}/${screen}`,
   })),
   {
+    name: "project flag",
+    route: "/projects/$project/flags/$flag",
+    path: (s) => `/projects/${s.project}/flags/${sweepFlag}`,
+  },
+  {
     name: "project audit entry",
     route: "/projects/$project/audit/$entry",
     path: (s) => `/projects/${s.project}/audit/${s.auditEntry}`,
@@ -121,6 +131,7 @@ function routedPaths(): string[] {
 async function seed(): Promise<Seeded> {
   const project = await seedProject("sweep");
   const invited = await seedInvitation("sweep", "Sweep Invitee");
+  await seedFlag(project, stringFlag(sweepFlag));
   const audit = must(
     `listing the audit log of ${project}`,
     await listProjectAuditEntries({ client: managementClient(), path: { project } }),

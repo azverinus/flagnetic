@@ -22,6 +22,13 @@ export type TabsProps = {
   /** What the row of tabs is called for a screen reader. */
   label: string;
   className?: string;
+  /**
+   * The open tab and how to open another, for a screen whose tabs are not
+   * one search parameter, such as a flag's environments beside its
+   * history; `param` is then unused.
+   */
+  value?: string;
+  onValueChange?: (value: string) => void;
 };
 
 /**
@@ -31,17 +38,28 @@ export type TabsProps = {
  * scrolls sideways rather than widen the page; one line marks the open
  * tab. Arrow keys move between tabs, as screen readers announce them.
  */
-export function Tabs({ param = "tab", tabs, label, className }: TabsProps) {
+export function Tabs({
+  param = "tab",
+  tabs,
+  label,
+  className,
+  value: controlled,
+  onValueChange,
+}: TabsProps) {
   const search = useSearch({ strict: false }) as Record<string, unknown>;
   const navigate = useNavigate();
   const first = tabs[0]?.value ?? "";
-  const asked = search[param];
+  const asked = controlled ?? search[param];
   const value = tabs.some((tab) => tab.value === asked) ? (asked as string) : first;
 
   return (
     <TabsPrimitive.Root
       value={value}
       onValueChange={(next) => {
+        if (onValueChange) {
+          onValueChange(next);
+          return;
+        }
         void navigate({
           to: ".",
           search: (prev: Record<string, unknown>) => ({

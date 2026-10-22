@@ -24,6 +24,14 @@ async function openNewFlag(page: Page, projectKey: string) {
   await expect(page.getByRole("heading", { name: "New flag", level: 1 })).toBeVisible();
 }
 
+/** The console has opened the page of the flag it just created. */
+async function expectFlagPage(page: Page, projectKey: string, key: string, name: string) {
+  await expect(page).toHaveURL(
+    new RegExp(`/projects/${projectKey}/flags/${key.replace(".", "\\.")}$`),
+  );
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+}
+
 /** Picks an option of one of the console's selects. */
 async function choose(page: Page, field: string, option: string) {
   await page.getByRole("combobox", { name: field }).click();
@@ -78,7 +86,8 @@ test.describe("creating a flag", () => {
     await variation(page, 2).getByLabel("Value").fill('{"items": 30}');
     await page.getByRole("button", { name: "Create flag" }).click();
 
-    await expect(page).toHaveURL(new RegExp(`/projects/${projectKey}/flags$`));
+    await expectFlagPage(page, projectKey, "checkout.limits", "Checkout limits");
+    await page.goto(`/projects/${projectKey}/flags`);
     await expect(rowFor(page, "checkout.limits")).toContainText("Checkout limits");
     await expect(rowFor(page, "checkout.limits")).toContainText("JSON");
 
@@ -106,6 +115,8 @@ test.describe("creating a flag", () => {
     await page.getByLabel("Name", { exact: true }).fill("New checkout");
     await page.getByRole("button", { name: "Create flag" }).click();
 
+    await expectFlagPage(page, projectKey, "newCheckout", "New checkout");
+    await page.goto(`/projects/${projectKey}/flags`);
     await expect(rowFor(page, "newCheckout")).toContainText("Boolean");
     const flag = await readFlag(projectKey, "newCheckout");
     expect(flag.variations.map((v) => v.key)).toEqual(["true", "false"]);
@@ -169,6 +180,8 @@ test.describe("creating a flag", () => {
     await expect(page.getByLabel("Expected removal")).toHaveCount(0);
     await page.getByRole("button", { name: "Create flag" }).click();
 
+    await expectFlagPage(page, projectKey, "search.ranking", "Search ranking");
+    await page.goto(`/projects/${projectKey}/flags`);
     await expect(rowFor(page, "search.ranking")).toContainText(grace.name);
     const flag = await readFlag(projectKey, "search.ranking");
     expect(flag.owner).toBe(grace.id);

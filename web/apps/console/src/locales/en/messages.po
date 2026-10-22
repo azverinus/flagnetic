@@ -27,6 +27,10 @@ msgstr "{count, plural, one {minute} other {minutes}}"
 msgid "{count, plural, one {second} other {seconds}}"
 msgstr "{count, plural, one {second} other {seconds}}"
 
+#: src/lib/conditions.ts
+msgid "{flag} serves {variation}"
+msgstr "{flag} serves {variation}"
+
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "{holder} no longer holds {role} in this project and keeps their other roles here."
 msgstr "{holder} no longer holds {role} in this project and keeps their other roles here."
@@ -34,6 +38,19 @@ msgstr "{holder} no longer holds {role} in this project and keeps their other ro
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "{holder} no longer holds any role in this project and leaves its members. They stay a member of the instance."
 msgstr "{holder} no longer holds any role in this project and leaves its members. They stay a member of the instance."
+
+#: src/components/kill-switch-dialog.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "{key} is off in {name}."
+msgstr "{key} is off in {name}."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "{key} is on in {name}."
+msgstr "{key} is on in {name}."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "{key} was already off in {name}. Nothing changed."
+msgstr "{key} was already off in {name}. Nothing changed."
 
 #: src/components/grant-form.tsx
 msgid "{label}: {status}"
@@ -100,15 +117,43 @@ msgstr "{others, plural, one {Revoke # session} other {Revoke # sessions}}"
 msgid "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
 msgstr "{revoked, plural, one {Revoked # session.} other {Revoked # sessions.}}"
 
+#: src/lib/conditions.ts
+msgid "{variation} to {percent}% of {unitType} units"
+msgstr "{variation} to {percent}% of {unitType} units"
+
+#: src/lib/problem-messages.ts
+msgid "{what} in {environment}"
+msgstr "{what} in {environment}"
+
 #: src/components/token-list.tsx
 msgid "{when} from {ip}"
 msgstr "{when} from {ip}"
+
+#: src/components/conflict-banner.tsx
+msgid "{who} saved a change on {when}, after you opened this."
+msgstr "{who} saved a change on {when}, after you opened this."
+
+#: src/components/conflict-banner.tsx
+msgid "{who} saved this configuration on {when}, after this draft was loaded."
+msgstr "{who} saved this configuration on {when}, after this draft was loaded."
+
+#: src/components/structural-diff-view.tsx
+msgid "<0>{variation}</0> (note: {note})"
+msgstr "<0>{variation}</0> (note: {note})"
 
 #: src/components/variations-editor.tsx
 msgid "A boolean flag always has exactly the variations true and false."
 msgstr "A boolean flag always has exactly the variations true and false."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/lib/flag-detail.ts
+msgid "A chain of prerequisites has at most 5 steps: {path}."
+msgstr "A chain of prerequisites has at most 5 steps: {path}."
+
+#: src/lib/flag-detail.ts
+msgid "A chain of prerequisites has at most 5 steps."
+msgstr "A chain of prerequisites has at most 5 steps."
+
+#: src/lib/flags.ts
 msgid "A flag has at most 50 tags."
 msgstr "A flag has at most 50 tags."
 
@@ -141,6 +186,10 @@ msgstr "A new project starts with the environments development, staging and prod
 msgid "A project owner or an instance admin can grant you a role in it."
 msgstr "A project owner or an instance admin can grant you a role in it."
 
+#: src/components/overrides-section.tsx
+msgid "A project token"
+msgstr "A project token"
+
 #: src/components/project-token-list.tsx
 msgid "A project token belongs to the project, not to whoever created it: it keeps working when they leave. Only a signed-in session creates one."
 msgstr "A project token belongs to the project, not to whoever created it: it keeps working when they leave. Only a signed-in session creates one."
@@ -162,7 +211,7 @@ msgstr "A session ends this long after it opened, however much it is used. Lower
 msgid "A session ends this long after its last request."
 msgstr "A session ends this long after its last request."
 
-#: src/routes/_signed-in/projects/$project/flags/new.tsx
+#: src/lib/flags.ts
 msgid "A tag has at most 64 characters."
 msgstr "A tag has at most 64 characters."
 
@@ -182,6 +231,14 @@ msgstr "A token does only what you can do yourself, narrowed to its scopes. Ever
 msgid "A token lets a script act for you, narrowed to its scopes. Only a signed-in session creates or revokes one."
 msgstr "A token lets a script act for you, narrowed to its scopes. Only a signed-in session creates or revokes one."
 
+#: src/lib/flag-detail.ts
+msgid "A unit ID has at most 256 bytes."
+msgstr "A unit ID has at most 256 bytes."
+
+#: src/components/overrides-section.tsx
+msgid "A variation pinned for one unit, checked before any rule. An override is saved as soon as it is added or removed."
+msgstr "A variation pinned for one unit, checked before any rule. An override is saved as soon as it is added or removed."
+
 #: src/components/token-create-form.tsx
 msgid "A year"
 msgstr "A year"
@@ -199,6 +256,7 @@ msgstr "Accept your invitation"
 msgid "Action"
 msgstr "Action"
 
+#: src/components/overrides-section.tsx
 #: src/components/row-dialogs.tsx
 msgid "Actions"
 msgstr "Actions"
@@ -217,9 +275,21 @@ msgstr "Actor"
 msgid "Actor kind"
 msgstr "Actor kind"
 
+#: src/components/overrides-section.tsx
+msgid "Add an override"
+msgstr "Add an override"
+
+#: src/components/overrides-section.tsx
+msgid "Add override"
+msgstr "Add override"
+
 #: src/components/variations-editor.tsx
 msgid "Add variation"
 msgstr "Add variation"
+
+#: src/components/overrides-section.tsx
+msgid "Added by"
+msgstr "Added by"
 
 #: src/lib/personal-tokens.ts
 msgid "Administer projects: environments, members and tokens."
@@ -294,17 +364,45 @@ msgstr "API tokens"
 msgid "Appearance"
 msgstr "Appearance"
 
+#: src/components/flag-definition-sheet.tsx
+msgid "Applies to the flag in every environment."
+msgstr "Applies to the flag in every environment."
+
 #: src/components/audit-log.tsx
 msgid "Apply filters"
 msgstr "Apply filters"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Archive"
+msgstr "Archive"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Archive {key}"
+msgstr "Archive {key}"
 
 #: src/lib/access-names.ts
 msgid "archive and delete flags"
 msgstr "archive and delete flags"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Archive flag"
+msgstr "Archive flag"
+
+#: src/lib/problem-messages.ts
+msgid "Archive the flag first; only an archived flag can be deleted."
+msgstr "Archive the flag first; only an archived flag can be deleted."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Archived"
+msgstr "Archived"
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Archived flags instead"
 msgstr "Archived flags instead"
+
+#: src/components/structural-diff-view.tsx
+msgid "Archived."
+msgstr "Archived."
 
 #: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
@@ -369,6 +467,18 @@ msgstr "Authentication settings"
 msgid "Authentication settings updated"
 msgstr "Authentication settings updated"
 
+#: src/components/flag-definition-sheet.tsx
+msgid "Automatic exposure"
+msgstr "Automatic exposure"
+
+#: src/components/structural-diff-view.tsx
+msgid "Automatic exposure switched off."
+msgstr "Automatic exposure switched off."
+
+#: src/components/structural-diff-view.tsx
+msgid "Automatic exposure switched on."
+msgstr "Automatic exposure switched on."
+
 #: src/components/audit-entry-sheet.tsx
 msgid "Before"
 msgstr "Before"
@@ -387,6 +497,7 @@ msgstr "Boolean"
 msgid "Breadcrumb"
 msgstr "Breadcrumb"
 
+#: src/components/kill-switch-dialog.tsx
 #: src/components/ui/confirm-dialog.tsx
 #: src/components/ui/form-page.tsx
 msgid "Cancel"
@@ -411,6 +522,14 @@ msgstr "Change password"
 #: src/components/audit-entry-sheet.tsx
 msgid "changed"
 msgstr "changed"
+
+#: src/components/structural-diff-view.tsx
+msgid "Changes to the configuration"
+msgstr "Changes to the configuration"
+
+#: src/components/structural-diff-view.tsx
+msgid "Changes to the definition"
+msgstr "Changes to the definition"
 
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
@@ -497,6 +616,18 @@ msgstr "Collapse the sidebar"
 msgid "Command line"
 msgstr "Command line"
 
+#: src/components/structural-diff-view.tsx
+msgid "Condition {position} added: <0/>."
+msgstr "Condition {position} added: <0/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Condition {position} changed from <0/> to <1/>."
+msgstr "Condition {position} changed from <0/> to <1/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Condition {position} removed: <0/>."
+msgstr "Condition {position} removed: <0/>."
+
 #: src/components/password-form.tsx
 msgid "Confirm the new password"
 msgstr "Confirm the new password"
@@ -504,6 +635,22 @@ msgstr "Confirm the new password"
 #: src/components/invitation-acceptance.tsx
 msgid "Confirm the password"
 msgstr "Confirm the password"
+
+#: src/lib/conditions.ts
+msgid "contains"
+msgstr "contains"
+
+#: src/lib/conditions.ts
+msgid "contains all of"
+msgstr "contains all of"
+
+#: src/lib/conditions.ts
+msgid "contains any of"
+msgstr "contains any of"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Contexts are served by the overrides, rules and fallthrough below."
+msgstr "Contexts are served by the overrides, rules and fallthrough below."
 
 #: src/components/ui/reveal-secret.tsx
 msgid "Copied to the clipboard."
@@ -587,8 +734,13 @@ msgstr "Deactivation ends every session and API token of yours at once, this one
 msgid "Declare the kinds of unit its flags are served to."
 msgstr "Declare the kinds of unit its flags are served to."
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Delete"
+msgstr "Delete"
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete {key}"
 msgstr "Delete {key}"
@@ -601,6 +753,10 @@ msgstr "Delete attribute"
 msgid "Delete environment"
 msgstr "Delete environment"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Delete flag"
+msgstr "Delete flag"
+
 #: src/lib/access-names.ts
 msgid "delete segments"
 msgstr "delete segments"
@@ -609,14 +765,24 @@ msgstr "delete segments"
 msgid "Delete unit type"
 msgstr "Delete unit type"
 
+#: src/components/flag-definition-sheet.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Description"
 msgstr "Description"
+
+#: src/components/structural-diff-view.tsx
+msgid "Description changed from “{before}” to “{after}”."
+msgstr "Description changed from “{before}” to “{after}”."
+
+#: src/components/structural-diff-view.tsx
+msgid "Description changed."
+msgstr "Description changed."
 
 #. The name of a built-in role.
 #: src/lib/access-names.ts
@@ -636,6 +802,14 @@ msgstr "Discard"
 msgid "Display name"
 msgstr "Display name"
 
+#: src/lib/conditions.ts
+msgid "does not contain"
+msgstr "does not contain"
+
+#: src/lib/conditions.ts
+msgid "does not equal"
+msgstr "does not equal"
+
 #: src/components/member-actions.tsx
 msgid "Edit"
 msgstr "Edit"
@@ -648,6 +822,11 @@ msgstr "Edit {key}"
 #: src/components/member-actions.tsx
 msgid "Edit {name}"
 msgstr "Edit {name}"
+
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Edit definition"
+msgstr "Edit definition"
 
 #: src/lib/access-names.ts
 msgid "edit flags"
@@ -670,6 +849,10 @@ msgstr "Email"
 #: src/components/session-list.tsx
 msgid "Ends at the latest"
 msgstr "Ends at the latest"
+
+#: src/lib/conditions.ts
+msgid "ends with"
+msgstr "ends with"
 
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
@@ -717,6 +900,10 @@ msgstr "Enter an email address."
 msgid "Enter JSON other than null."
 msgstr "Enter JSON other than null."
 
+#: src/lib/flag-detail.ts
+msgid "Enter the unit's ID."
+msgstr "Enter the unit's ID."
+
 #: src/components/password-form.tsx
 msgid "Enter your current password."
 msgstr "Enter your current password."
@@ -759,6 +946,14 @@ msgstr "Environment updated"
 msgid "Environments"
 msgstr "Environments"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Environments and history"
+msgstr "Environments and history"
+
+#: src/lib/conditions.ts
+msgid "equals"
+msgstr "equals"
+
 #: src/routes/_signed-in/projects/$project/audit.tsx
 msgid "Every change made in this project, newest first, with its values before and after."
 msgstr "Every change made in this project, newest first, with its values before and after."
@@ -766,6 +961,14 @@ msgstr "Every change made in this project, newest first, with its values before 
 #: src/routes/_signed-in/admin/audit.tsx
 msgid "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
 msgstr "Every change on this instance, in every project and outside them, such as members, sign-ins and settings."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Every change to this flag, its definition and its configurations, is recorded in the project's audit log."
+msgstr "Every change to this flag, its definition and its configurations, is recorded in the project's audit log."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Every context receives the off variation."
+msgstr "Every context receives the off variation."
 
 #: src/components/member-credentials.tsx
 msgid "Every device {name} is signed in on is signed out at its next request. Their API tokens keep working."
@@ -799,6 +1002,10 @@ msgstr "Every new API token must have an expiry; none may live forever."
 msgid "Every status"
 msgstr "Every status"
 
+#: src/components/kill-switch-dialog.tsx
+msgid "Everyone receives the off variation in {name}, whatever the rules and overrides say. Switching the flag back on is an ordinary configuration change."
+msgstr "Everyone receives the off variation in {name}, whatever the rules and overrides say. Switching the flag back on is an ordinary configuration change."
+
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
 msgstr "Everyone who can sign in to this instance. What they may do in a project comes from their grants there."
@@ -807,9 +1014,18 @@ msgstr "Everyone who can sign in to this instance. What they may do in a project
 msgid "Expand the sidebar"
 msgstr "Expand the sidebar"
 
+#: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Expected removal"
 msgstr "Expected removal"
+
+#: src/components/structural-diff-view.tsx
+msgid "Expected removal changed from {before} to {after}."
+msgstr "Expected removal changed from {before} to {after}."
+
+#: src/lib/flag-detail.ts
+msgid "Experiments are not available yet."
+msgstr "Experiments are not available yet."
 
 #: src/components/token-list.tsx
 msgid "Expired"
@@ -819,6 +1035,14 @@ msgstr "Expired"
 #: src/components/token-list.tsx
 msgid "Expires"
 msgstr "Expires"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Fallthrough variation"
+msgstr "Fallthrough variation"
+
+#: src/components/structural-diff-view.tsx
+msgid "Fallthrough variation changed from <0>{before}</0> to <1>{after}</1>."
+msgstr "Fallthrough variation changed from <0>{before}</0> to <1>{after}</1>."
 
 #: src/components/audit-entry-sheet.tsx
 msgid "Field"
@@ -845,6 +1069,10 @@ msgstr "Fixed once the project is created, since SDKs and scripts use it."
 msgid "Flag"
 msgstr "Flag"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Flag not found"
+msgstr "Flag not found"
+
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/route.tsx
@@ -867,6 +1095,10 @@ msgstr "Format variation {n}"
 #: src/components/audit-log.tsx
 msgid "From"
 msgstr "From"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Go to the flags"
+msgstr "Go to the flags"
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Go to the members"
@@ -905,6 +1137,10 @@ msgstr "Grant role"
 msgid "Grants"
 msgstr "Grants"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "History"
+msgstr "History"
+
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
 msgstr "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
@@ -928,6 +1164,10 @@ msgstr "I have stored it somewhere safe"
 #: src/components/audit-log.tsx
 msgid "In the action, the entity's key and the actor's name."
 msgstr "In the action, the entity's key and the actor's name."
+
+#: src/lib/conditions.ts
+msgid "in the segment {segment}"
+msgstr "in the segment {segment}"
 
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
@@ -974,6 +1214,50 @@ msgstr "Invited"
 msgid "IP address"
 msgstr "IP address"
 
+#: src/lib/conditions.ts
+msgid "is after"
+msgstr "is after"
+
+#: src/lib/conditions.ts
+msgid "is at least"
+msgstr "is at least"
+
+#: src/lib/conditions.ts
+msgid "is at most"
+msgstr "is at most"
+
+#: src/lib/conditions.ts
+msgid "is before"
+msgstr "is before"
+
+#: src/lib/conditions.ts
+msgid "is empty"
+msgstr "is empty"
+
+#: src/lib/conditions.ts
+msgid "is greater than"
+msgstr "is greater than"
+
+#: src/lib/conditions.ts
+msgid "is less than"
+msgstr "is less than"
+
+#: src/lib/conditions.ts
+msgid "is not one of"
+msgstr "is not one of"
+
+#: src/lib/conditions.ts
+msgid "is not set"
+msgstr "is not set"
+
+#: src/lib/conditions.ts
+msgid "is one of"
+msgstr "is one of"
+
+#: src/lib/conditions.ts
+msgid "is set"
+msgstr "is set"
+
 #: src/components/member-actions.tsx
 msgid "Issue a new invitation link"
 msgstr "Issue a new invitation link"
@@ -990,6 +1274,14 @@ msgstr "Issue link"
 msgid "It does not exist, or it was deleted."
 msgstr "It does not exist, or it was deleted."
 
+#: src/lib/problem-messages.ts
+msgid "It is still in use by {references}."
+msgstr "It is still in use by {references}."
+
+#: src/lib/problem-messages.ts
+msgid "It is still in use."
+msgstr "It is still in use."
+
 #: src/components/invitation-acceptance.tsx
 msgid "Joining…"
 msgstr "Joining…"
@@ -998,10 +1290,15 @@ msgstr "Joining…"
 msgid "JSON"
 msgstr "JSON"
 
+#: src/components/flag-definition-sheet.tsx
+msgid "Keep my edits"
+msgstr "Keep my edits"
+
 #: src/components/theme-choice.tsx
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 
+#: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
@@ -1021,6 +1318,14 @@ msgstr "Key <0>{key}</0>"
 msgid "Key or name"
 msgstr "Key or name"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Kill switch"
+msgstr "Kill switch"
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Kill switch: {flagKey} in {name}"
+msgstr "Kill switch: {flagKey} in {name}"
+
 #: src/components/personal-menu.tsx
 #: src/components/profile-form.tsx
 msgid "Language"
@@ -1039,6 +1344,14 @@ msgstr "Last sign-in"
 msgid "Last used"
 msgstr "Last used"
 
+#: src/components/kill-switch-dialog.tsx
+msgid "Last used by {who} on {when}, with no reason."
+msgstr "Last used by {who} on {when}, with no reason."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Last used by {who} on {when}: “{lastReason}”"
+msgstr "Last used by {who} on {when}: “{lastReason}”"
+
 #: src/components/ui/unsaved-changes-bar.tsx
 msgid "Leave"
 msgstr "Leave"
@@ -1047,6 +1360,7 @@ msgstr "Leave"
 msgid "Leave without saving?"
 msgstr "Leave without saving?"
 
+#: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Left empty, 90 days from today."
 msgstr "Left empty, 90 days from today."
@@ -1063,9 +1377,15 @@ msgstr "Lets the holder do nothing yet."
 msgid "Letters, digits, ., - and _, at most 64."
 msgstr "Letters, digits, ., - and _, at most 64."
 
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Lifetime"
 msgstr "Lifetime"
+
+#: src/components/structural-diff-view.tsx
+msgid "Lifetime changed from {before} to {after}."
+msgstr "Lifetime changed from {before} to {after}."
 
 #: src/components/personal-menu.tsx
 #: src/components/theme-choice.tsx
@@ -1139,6 +1459,10 @@ msgstr "Manual, granted on {when}"
 msgid "Manual, granted on {when} by a member without a grant here"
 msgstr "Manual, granted on {when} by a member without a grant here"
 
+#: src/lib/conditions.ts
+msgid "matches the pattern"
+msgstr "matches the pattern"
+
 #: src/components/auth-settings-form.tsx
 msgid "Maximum token lifetime"
 msgstr "Maximum token lifetime"
@@ -1198,6 +1522,7 @@ msgstr "Members"
 msgid "Members of the project"
 msgstr "Members of the project"
 
+#: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
@@ -1210,6 +1535,10 @@ msgstr "Members of the project"
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Name"
 msgstr "Name"
+
+#: src/components/structural-diff-view.tsx
+msgid "Name changed from “{before}” to “{after}”."
+msgstr "Name changed from “{before}” to “{after}”."
 
 #: src/components/search-field.tsx
 msgid "Name or email"
@@ -1229,6 +1558,10 @@ msgstr "Needs the permission to {name}."
 #: src/routes/_signed-in/admin/members/index.tsx
 msgid "Never"
 msgstr "Never"
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Never used on this flag in {name}."
+msgstr "Never used on this flag in {name}."
 
 #: src/components/token-list.tsx
 msgid "New API token"
@@ -1300,6 +1633,10 @@ msgstr "No member matches the search and the status filter."
 msgid "No members yet."
 msgstr "No members yet."
 
+#: src/components/overrides-section.tsx
+msgid "No overrides in this environment."
+msgstr "No overrides in this environment."
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "No project has this key. It may be mistyped, or the link may point to another instance."
 msgstr "No project has this key. It may be mistyped, or the link may point to another instance."
@@ -1323,8 +1660,13 @@ msgstr "Nobody holds a role in this project yet."
 
 #. An audit entry's value before a creation or after a deletion.
 #: src/components/audit-entry-sheet.tsx
+#: src/components/structural-diff-view.tsx
 msgid "none"
 msgstr "none"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "None"
+msgstr "None"
 
 #. The project switcher, when no project is open.
 #: src/components/project-switcher.tsx
@@ -1335,9 +1677,21 @@ msgstr "none chosen"
 msgid "Not found"
 msgstr "Not found"
 
+#: src/lib/conditions.ts
+msgid "not in the segment {segment}"
+msgstr "not in the segment {segment}"
+
 #: src/lib/project-members.ts
 msgid "Not recorded"
 msgstr "Not recorded"
+
+#: src/components/overrides-section.tsx
+msgid "Note"
+msgstr "Note"
+
+#: src/components/overrides-section.tsx
+msgid "Note (optional)"
+msgstr "Note (optional)"
 
 #: src/components/audit-log.tsx
 msgid "Nothing has been recorded yet."
@@ -1351,15 +1705,35 @@ msgstr "Nothing has changed in this project yet."
 msgid "Nothing here yet."
 msgstr "Nothing here yet."
 
+#: src/components/structural-diff-view.tsx
+msgid "Nothing that a member edits changed."
+msgstr "Nothing that a member edits changed."
+
 #. An attribute type.
 #: src/lib/flags.ts
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Number"
 msgstr "Number"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Off"
+msgstr "Off"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Off variation"
+msgstr "Off variation"
+
+#: src/components/structural-diff-view.tsx
+msgid "Off variation changed from <0>{before}</0> to <1>{after}</1>."
+msgstr "Off variation changed from <0>{before}</0> to <1>{after}</1>."
+
 #: src/components/audit-log.tsx
 msgid "Older entries"
 msgstr "Older entries"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "On"
+msgstr "On"
 
 #: src/lib/problem-messages.ts
 msgid "One with this key already exists."
@@ -1368,6 +1742,10 @@ msgstr "One with this key already exists."
 #: src/components/member-credentials.tsx
 msgid "Only {name} creates their tokens. Project tokens they created belong to their projects, not to them."
 msgstr "Only {name} creates their tokens. Project tokens they created belong to their projects, not to them."
+
+#: src/lib/problem-messages.ts
+msgid "Only a rule serving a rollout has a salt."
+msgstr "Only a rule serving a rollout has a salt."
 
 #: src/lib/problem-messages.ts
 msgid "Only a signed-in session can do this, not an API token."
@@ -1381,16 +1759,46 @@ msgstr "Only an instance admin can open it."
 msgid "Only an invited member has an invitation to replace."
 msgstr "Only an invited member has an invitation to replace."
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Open the audit log"
+msgstr "Open the audit log"
+
+#: src/components/structural-diff-view.tsx
+msgid "Override added: {unit} receives <0/>."
+msgstr "Override added: {unit} receives <0/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Override of {unit} changed from <0/> to <1/>."
+msgstr "Override of {unit} changed from <0/> to <1/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Override removed: {unit} received <0/>."
+msgstr "Override removed: {unit} received <0/>."
+
+#: src/components/overrides-section.tsx
+msgid "Overrides"
+msgstr "Overrides"
+
+#: src/components/overrides-section.tsx
+msgid "Overrides in this environment"
+msgstr "Overrides in this environment"
+
 #: src/components/navigation.tsx
 msgid "Overview"
 msgstr "Overview"
 
 #. The name of a built-in role.
+#: src/components/flag-definition-sheet.tsx
 #: src/lib/access-names.ts
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Owner"
 msgstr "Owner"
+
+#: src/components/structural-diff-view.tsx
+msgid "Owner changed from {before} to {after}."
+msgstr "Owner changed from {before} to {after}."
 
 #: src/components/not-found.tsx
 msgid "Page not found"
@@ -1418,6 +1826,12 @@ msgstr "Password changed"
 msgid "Password minimum length"
 msgstr "Password minimum length"
 
+#: src/components/structural-diff-view.tsx
+msgid "permanent"
+msgstr "permanent"
+
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Permanent"
 msgstr "Permanent"
@@ -1427,6 +1841,19 @@ msgstr "Permanent"
 msgid "Personal settings"
 msgstr "Personal settings"
 
+#: src/components/structural-diff-view.tsx
+msgid "Prerequisite <0>{flag}</0> requires <1>{after}</1> instead of <2>{before}</2>."
+msgstr "Prerequisite <0>{flag}</0> requires <1>{after}</1> instead of <2>{before}</2>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Prerequisite added: <0>{flag}</0> serves <1>{after}</1>."
+msgstr "Prerequisite added: <0>{flag}</0> serves <1>{after}</1>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Prerequisite removed: <0>{flag}</0> serves <1>{before}</1>."
+msgstr "Prerequisite removed: <0>{flag}</0> serves <1>{before}</1>."
+
+#: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Press Enter after each tag."
 msgstr "Press Enter after each tag."
@@ -1495,9 +1922,25 @@ msgstr "Read everything you can read."
 msgid "Reading the members…"
 msgstr "Reading the members…"
 
+#: src/components/kill-switch-dialog.tsx
+msgid "Reason"
+msgstr "Reason"
+
 #: src/components/project-audit.tsx
 msgid "Recent activity"
 msgstr "Recent activity"
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Recorded in the audit log."
+msgstr "Recorded in the audit log."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Recorded in the audit log. Characters still needed: {missing}."
+msgstr "Recorded in the audit log. Characters still needed: {missing}."
+
+#: src/components/flag-definition-sheet.tsx
+msgid "Reload and lose my edits"
+msgstr "Reload and lose my edits"
 
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Remove {role} from {holder}"
@@ -1510,6 +1953,10 @@ msgstr "Remove grant"
 #: src/components/tags-input.tsx
 msgid "Remove tag {tag}"
 msgstr "Remove tag {tag}"
+
+#: src/components/overrides-section.tsx
+msgid "Remove the override of {unit}"
+msgstr "Remove the override of {unit}"
 
 #: src/components/variations-editor.tsx
 msgid "Remove variation {n}"
@@ -1531,6 +1978,22 @@ msgstr "Request ID: {requestId}"
 #: src/lib/problem-messages.ts
 msgid "Required."
 msgstr "Required."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Restore"
+msgstr "Restore"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Restore {key}"
+msgstr "Restore {key}"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Restore flag"
+msgstr "Restore flag"
+
+#: src/components/structural-diff-view.tsx
+msgid "Restored."
+msgstr "Restored."
 
 #: src/lib/access-names.ts
 msgid "revert flag configurations to earlier versions"
@@ -1589,6 +2052,26 @@ msgstr "Role"
 msgid "Role granted"
 msgstr "Role granted"
 
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} added: <0/>."
+msgstr "Rule {position} added: <0/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} changed."
+msgstr "Rule {position} changed."
+
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} moved here from position {movedFrom} and changed."
+msgstr "Rule {position} moved here from position {movedFrom} and changed."
+
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} moved here from position {movedFrom}."
+msgstr "Rule {position} moved here from position {movedFrom}."
+
+#: src/components/structural-diff-view.tsx
+msgid "Rule {position} removed: <0/>."
+msgstr "Rule {position} removed: <0/>."
+
 #: src/components/auth-settings-form.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
@@ -1600,10 +2083,26 @@ msgstr "Role granted"
 msgid "Save"
 msgstr "Save"
 
+#: src/components/flag-definition-sheet.tsx
+msgid "Save definition"
+msgstr "Save definition"
+
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 msgid "Scopes"
 msgstr "Scopes"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "SDKs receive the flag again, configured in every environment as it was left."
+msgstr "SDKs receive the flag again, configured in every environment as it was left."
+
+#: src/components/flag-definition-sheet.tsx
+msgid "SDKs record an exposure after every evaluation whose result carries an experiment."
+msgstr "SDKs record an exposure after every evaluation whose result carries an experiment."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "SDKs stop receiving the flag in every environment and code falls back to its default. It can be restored later; refused while another flag requires it."
+msgstr "SDKs stop receiving the flag in every environment and code falls back to its default. It can be restored later; refused while another flag requires it."
 
 #: src/components/audit-log.tsx
 #: src/components/search-field.tsx
@@ -1626,6 +2125,10 @@ msgstr "Send it as a bearer token in the Authorization header. Keep it where onl
 #: src/components/token-list.tsx
 msgid "Send it as a bearer token in the Authorization header. Keep it where only what uses it can read it."
 msgstr "Send it as a bearer token in the Authorization header. Keep it where only what uses it can read it."
+
+#: src/components/structural-diff-view.tsx
+msgid "Serves <0/> instead of <1/>."
+msgstr "Serves <0/> instead of <1/>."
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
@@ -1702,9 +2205,21 @@ msgstr "Skip to content"
 msgid "Some fields need correcting."
 msgstr "Some fields need correcting."
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
+msgstr "Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to."
+
 #: src/lib/problem-messages.ts
 msgid "Someone else changed this since you opened it. Reload to see their changes, then make yours again."
 msgstr "Someone else changed this since you opened it. Reload to see their changes, then make yours again."
+
+#: src/components/conflict-banner.tsx
+msgid "Someone saved a change after you opened this."
+msgstr "Someone saved a change after you opened this."
+
+#: src/components/conflict-banner.tsx
+msgid "Someone saved this configuration after this draft was loaded."
+msgstr "Someone saved this configuration after this draft was loaded."
 
 #: src/lib/problem-messages.ts
 msgid "Something went wrong on the server."
@@ -1726,6 +2241,10 @@ msgstr "Start with a letter; then letters, digits, ., - and _, at most 128 in al
 msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
 msgstr "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
 
+#: src/lib/conditions.ts
+msgid "starts with"
+msgstr "starts with"
+
 #: src/components/token-list.tsx
 msgid "State"
 msgstr "State"
@@ -1741,9 +2260,33 @@ msgstr "Status"
 msgid "String"
 msgstr "String"
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Switch {key} off in {name}"
+msgstr "Switch {key} off in {name}"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Switch {key} on in {name}"
+msgstr "Switch {key} on in {name}"
+
 #: src/lib/access-names.ts
 msgid "switch flags off with the kill switch"
 msgstr "switch flags off with the kill switch"
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Switch off"
+msgstr "Switch off"
+
+#: src/components/structural-diff-view.tsx
+msgid "Switched off."
+msgstr "Switched off."
+
+#: src/components/structural-diff-view.tsx
+msgid "Switched on."
+msgstr "Switched on."
+
+#: src/components/kill-switch-dialog.tsx
+msgid "Switching off…"
+msgstr "Switching off…"
 
 #. A kind of actor in the audit log.
 #: src/lib/audit.ts
@@ -1760,14 +2303,34 @@ msgstr "System"
 msgid "Tag"
 msgstr "Tag"
 
+#: src/components/structural-diff-view.tsx
+msgid "Tag added: <0>{tag}</0>."
+msgstr "Tag added: <0>{tag}</0>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Tag removed: <0>{tag}</0>."
+msgstr "Tag removed: <0>{tag}</0>."
+
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Tags"
 msgstr "Tags"
 
+#: src/components/structural-diff-view.tsx
+msgid "temporary"
+msgstr "temporary"
+
+#: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Temporary"
 msgstr "Temporary"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Temporary, to be removed by {expected}"
+msgstr "Temporary, to be removed by {expected}"
 
 #: src/components/session-list.tsx
 msgid "That device is signed out at its next request and must sign in again."
@@ -1797,6 +2360,10 @@ msgstr "The browser refused the clipboard. Select the value and copy it by hand.
 msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
 msgstr "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
 
+#: src/components/flag-definition-sheet.tsx
+msgid "The definition is saved."
+msgstr "The definition is saved."
+
 #: src/components/member-credentials.tsx
 msgid "The devices {name} is signed in on"
 msgstr "The devices {name} is signed in on"
@@ -1821,13 +2388,50 @@ msgstr "The environment {key} is deleted. This cannot be undone."
 msgid "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
 msgstr "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
 
+#: src/lib/problem-messages.ts
+msgid "the flag {key}"
+msgstr "the flag {key}"
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag {key} is archived."
+msgstr "The flag {key} is archived."
+
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "The flag {key} is created."
 msgstr "The flag {key} is created."
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag {key} is deleted."
+msgstr "The flag {key} is deleted."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag {key} is restored."
+msgstr "The flag {key} is restored."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag and its configuration in every environment are deleted. This cannot be taken back; its audit entries stay."
+msgstr "The flag and its configuration in every environment are deleted. This cannot be taken back; its audit entries stay."
+
+#: src/lib/flag-detail.ts
+msgid "The flag has no such variation."
+msgstr "The flag has no such variation."
+
+#: src/lib/problem-messages.ts
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The flag is archived. Restore it to change its configurations."
+msgstr "The flag is archived. Restore it to change its configurations."
+
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "The flag is created off in every environment, serving its off variation until it is switched on."
 msgstr "The flag is created off in every environment, serving its off variation until it is switched on."
+
+#: src/lib/flag-detail.ts
+msgid "The flags would require each other in a cycle: {path}."
+msgstr "The flags would require each other in a cycle: {path}."
+
+#: src/lib/flag-detail.ts
+msgid "The flags would require each other in a cycle."
+msgstr "The flags would require each other in a cycle."
 
 #: src/components/auth-settings-form.tsx
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
@@ -1841,6 +2445,7 @@ msgstr "The idle timeout cannot be longer than the absolute timeout."
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 msgstr "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 
+#: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "The member accountable for the flag."
 msgstr "The member accountable for the flag."
@@ -1877,6 +2482,14 @@ msgstr "The new passwords do not match."
 msgid "The new project token"
 msgstr "The new project token"
 
+#: src/components/overrides-section.tsx
+msgid "The override of {unit} is removed."
+msgstr "The override of {unit} is removed."
+
+#: src/components/overrides-section.tsx
+msgid "The override of {unit} is saved."
+msgstr "The override of {unit} is saved."
+
 #: src/lib/problem-messages.ts
 msgid "The owner must be an active member holding a role in the project, or an instance admin."
 msgstr "The owner must be an active member holding a role in the project, or an instance admin."
@@ -1892,6 +2505,26 @@ msgstr "The password must not contain your email address."
 #: src/components/invitation-acceptance.tsx
 msgid "The passwords do not match."
 msgstr "The passwords do not match."
+
+#: src/lib/flag-detail.ts
+msgid "The project does not declare this attribute."
+msgstr "The project does not declare this attribute."
+
+#: src/lib/flag-detail.ts
+msgid "The project does not declare this unit type."
+msgstr "The project does not declare this unit type."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The project has no flag with this key. It may have been deleted."
+msgstr "The project has no flag with this key. It may have been deleted."
+
+#: src/lib/flag-detail.ts
+msgid "The project has no such flag."
+msgstr "The project has no such flag."
+
+#: src/lib/flag-detail.ts
+msgid "The project has no such segment."
+msgstr "The project has no such segment."
 
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "The project is saved."
@@ -1924,6 +2557,10 @@ msgstr "The role includes a permission you do not hold yourself here."
 #: src/lib/problem-messages.ts
 msgid "The role includes the permission to {name}, which you do not hold yourself here."
 msgstr "The role includes the permission to {name}, which you do not hold yourself here."
+
+#: src/lib/problem-messages.ts
+msgid "the segment {key}"
+msgstr "the segment {key}"
 
 #: src/lib/problem-messages.ts
 msgid "The server could not be reached. Check your connection and try again."
@@ -1977,6 +2614,10 @@ msgstr "The values the flag can serve. A key names a variation in rules and resu
 msgid "The whole tag"
 msgstr "The whole tag"
 
+#: src/components/conflict-banner.tsx
+msgid "Their change:"
+msgstr "Their change:"
+
 #: src/components/personal-menu.tsx
 #: src/components/theme-choice.tsx
 msgid "Theme"
@@ -1990,9 +2631,21 @@ msgstr "There is nothing at this address. The link may be old or mistyped."
 msgid "They get a link to set their password, shown to you once. What they may do in a project comes from the grants a project owner gives them."
 msgstr "They get a link to set their password, shown to you once. What they may do in a project comes from the grants a project owner gives them."
 
+#: src/lib/flag-detail.ts
+msgid "This appears twice."
+msgstr "This appears twice."
+
+#: src/lib/flag-detail.ts
+msgid "This cannot be changed here."
+msgstr "This cannot be changed here."
+
 #: src/components/session-list.tsx
 msgid "This device"
 msgstr "This device"
+
+#: src/lib/flag-detail.ts
+msgid "This flag is archived; restore it or choose another."
+msgstr "This flag is archived; restore it or choose another."
 
 #: src/components/token-create-form.tsx
 msgid "This instance allows a token at most {lifetime} ahead, and every token must expire."
@@ -2051,6 +2704,10 @@ msgstr "This is the project's last environment. A project always keeps one to se
 msgid "This key is reserved."
 msgstr "This key is reserved."
 
+#: src/lib/flag-detail.ts
+msgid "This operator does not apply to the attribute's type."
+msgstr "This operator does not apply to the attribute's type."
+
 #: src/lib/problem-messages.ts
 msgid "This password is too common. Choose another."
 msgstr "This password is too common. Choose another."
@@ -2083,6 +2740,10 @@ msgstr "This project has no token yet."
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "This project has no unit type yet."
 msgstr "This project has no unit type yet."
+
+#: src/lib/flag-detail.ts
+msgid "This rule is no longer in the configuration."
+msgstr "This rule is no longer in the configuration."
 
 #: src/lib/problem-messages.ts
 msgid "This value is not valid here."
@@ -2138,6 +2799,7 @@ msgstr "Too many."
 msgid "Try again"
 msgstr "Try again"
 
+#: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
@@ -2147,6 +2809,10 @@ msgstr "Type"
 #: src/components/ui/confirm-dialog.tsx
 msgid "Type {typeToConfirm} to confirm"
 msgstr "Type {typeToConfirm} to confirm"
+
+#: src/components/overrides-section.tsx
+msgid "Unit ID"
+msgstr "Unit ID"
 
 #: src/components/auth-settings-form.tsx
 msgid "Unit of the maximum token lifetime"
@@ -2161,6 +2827,7 @@ msgid "Unit of the session idle timeout"
 msgstr "Unit of the session idle timeout"
 
 #. A kind of entity in the audit log.
+#: src/components/overrides-section.tsx
 #: src/lib/audit.ts
 msgid "Unit type"
 msgstr "Unit type"
@@ -2206,13 +2873,45 @@ msgstr "Value"
 msgid "Values before and after the change"
 msgstr "Values before and after the change"
 
+#: src/components/overrides-section.tsx
+msgid "Variation"
+msgstr "Variation"
+
 #: src/components/variations-editor.tsx
 msgid "Variation {n}"
 msgstr "Variation {n}"
 
+#: src/components/structural-diff-view.tsx
+msgid "Variation <0>{key}</0> added, serving <1/>."
+msgstr "Variation <0>{key}</0> added, serving <1/>."
+
+#: src/components/structural-diff-view.tsx
+msgid "Variation <0>{key}</0> has a new name or description."
+msgstr "Variation <0>{key}</0> has a new name or description."
+
+#: src/components/structural-diff-view.tsx
+msgid "Variation <0>{key}</0> removed."
+msgstr "Variation <0>{key}</0> removed."
+
+#: src/components/structural-diff-view.tsx
+msgid "Variation <0>{key}</0> serves <1/> instead of <2/>."
+msgstr "Variation <0>{key}</0> serves <1/> instead of <2/>."
+
 #: src/components/variations-editor.tsx
 msgid "Variations"
 msgstr "Variations"
+
+#: src/components/structural-diff-view.tsx
+msgid "Variations reordered: <0>{order}</0>."
+msgstr "Variations reordered: <0>{order}</0>."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Version {version}, last saved by {updated}."
+msgstr "Version {version}, last saved by {updated}."
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "Version {version}."
+msgstr "Version {version}."
 
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "View all environments"
@@ -2258,6 +2957,10 @@ msgstr "Whatever uses the token is refused from now on. This cannot be undone."
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr "Where the project serves from. A key is fixed once created; the name can change."
+
+#: src/components/overrides-section.tsx
+msgid "Why the unit is pinned, such as the test it is for. Never sent to SDKs."
+msgstr "Why the unit is pinned, such as the test it is for. Never sent to SDKs."
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Yes"

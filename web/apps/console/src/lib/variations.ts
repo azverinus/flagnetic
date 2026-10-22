@@ -1,5 +1,6 @@
 import {
   type FlagType,
+  type Variation,
   type VariationInput,
   zDescription,
   zName,
@@ -43,6 +44,23 @@ function draft(key: string): VariationDraft {
  */
 export function startingVariations(): VariationDraft[] {
   return [draft("v1"), draft("v2")];
+}
+
+/**
+ * The rows of a flag's variations as it has them: a string as it is, a
+ * number as JavaScript writes it, and JSON laid out two spaces a level.
+ */
+export function variationDrafts(variations: readonly Variation[]): VariationDraft[] {
+  return variations.map((variation) => {
+    const row = draft(variation.key);
+    const value =
+      typeof variation.value === "string"
+        ? variation.value
+        : typeof variation.value === "number"
+          ? String(variation.value)
+          : JSON.stringify(variation.value, null, 2);
+    return { ...row, value, name: variation.name, description: variation.description };
+  });
 }
 
 /** A row to add below the others, keyed `vN` with the lowest N no row has. */
