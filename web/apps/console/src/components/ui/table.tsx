@@ -6,7 +6,7 @@ import {
   type RowData,
   useReactTable,
 } from "@tanstack/react-table";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
@@ -39,7 +39,9 @@ const loadingRows = 3;
  * A table of rows on TanStack Table. It scrolls sideways inside its own
  * positioned wrapper, so neither a wide row nor a long caption can widen
  * the page; while loading it shows placeholder rows and says it is busy,
- * and without rows it shows what would be here.
+ * and without rows it shows what would be here. While it is wider than its
+ * wrapper the wrapper takes the keyboard focus, named by the caption, so a
+ * keyboard user can scroll rows that hold nothing focusable.
  */
 export function Table<T extends RowData>({
   columns,
@@ -66,10 +68,30 @@ export function Table<T extends RowData>({
     stickyFirstColumn && index === 0 ? stickyClassName : undefined;
   const width = table.getVisibleLeafColumns().length;
 
+  const wrapper = useRef<HTMLDivElement>(null);
+  const captionId = useId();
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const element = wrapper.current;
+    if (!element) return;
+    const measure = () => setScrolls(element.scrollWidth > element.clientWidth);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className={cn("relative w-full max-w-full min-w-0 overflow-x-auto", className)}>
+    <div
+      ref={wrapper}
+      className={cn("relative w-full max-w-full min-w-0 overflow-x-auto", className)}
+      {...(scrolls ? { role: "region", tabIndex: 0, "aria-labelledby": captionId } : {})}
+    >
       <table aria-busy={loading || undefined} className="w-full border-collapse text-sm">
         <caption
+          id={captionId}
           className={cn("pb-2 text-left text-sm text-muted-foreground", hideCaption && "sr-only")}
         >
           {caption}

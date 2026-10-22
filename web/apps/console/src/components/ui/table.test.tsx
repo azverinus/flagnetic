@@ -1,6 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "@/test/render";
 
@@ -35,6 +35,32 @@ describe("a table", () => {
 
     const wrapper = screen.getByRole("table").parentElement!;
     expect(wrapper).toHaveClass("relative", "overflow-x-auto", "max-w-full");
+  });
+
+  it("takes the keyboard focus, named by its caption, while it is wider than its wrapper", () => {
+    const widths = { scrollWidth: 900, clientWidth: 400 };
+    const scrollWidth = vi
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockImplementation(() => widths.scrollWidth);
+    const clientWidth = vi
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockImplementation(() => widths.clientWidth);
+    try {
+      renderWithProviders(<Table caption="Projects" columns={columns} data={rows} />);
+
+      const region = screen.getByRole("region", { name: "Projects" });
+      expect(region).toHaveAttribute("tabindex", "0");
+      expect(region).toContainElement(screen.getByRole("table"));
+    } finally {
+      scrollWidth.mockRestore();
+      clientWidth.mockRestore();
+    }
+  });
+
+  it("is no tab stop while everything fits", () => {
+    renderWithProviders(<Table caption="Projects" columns={columns} data={rows} />);
+
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
   });
 
   it("keeps the first column in view when asked", () => {

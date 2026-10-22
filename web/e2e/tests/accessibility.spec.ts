@@ -111,6 +111,16 @@ const signedIn: Route[] = [
     path: (s) => `/projects/${s.project}/environments/${sweepEnvironment}`,
   },
   {
+    name: "project environment: SDKs",
+    route: "/projects/$project/environments/$environment",
+    path: (s) => `/projects/${s.project}/environments/${sweepEnvironment}?tab=sdks`,
+  },
+  {
+    name: "project attributes: discovered",
+    route: "/projects/$project/attributes",
+    path: (s) => `/projects/${s.project}/attributes?tab=discovered`,
+  },
+  {
     name: "project segment",
     route: "/projects/$project/segments/$segment",
     path: (s) => `/projects/${s.project}/segments/${sweepSegment}`,
