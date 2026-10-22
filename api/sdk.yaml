@@ -13,9 +13,10 @@ info:
     **Keys.** Every operation authenticates an SDK key of one environment as
     a bearer in `Authorization`: a server key (`fn_srv_…`) belongs in a
     backend, a client key (`fn_cli_…`) ships inside apps and browsers. A
-    browser's `EventSource` cannot set headers, so the stream also accepts a
-    client key as the query parameter `sdk_key`; a server key there is
-    refused `403 server_key_in_query`. No key is `401 sdk_key_missing` with
+    browser's `EventSource` cannot set headers, and neither can
+    `navigator.sendBeacon`, so the stream and `events` also accept a client
+    key as the query parameter `sdk_key`; a server key there is refused
+    `403 server_key_in_query`. No key is `401 sdk_key_missing` with
     a plain `WWW-Authenticate: Bearer`; a malformed or unknown key
     `sdk_key_invalid`, a revoked one `sdk_key_revoked` and one whose
     rotation overlap has ended `sdk_key_expired`, each `401` with
@@ -40,6 +41,18 @@ info:
     reads. Absent, or 1 and above, is served schema 1; below 1 or not an
     integer is `406 schema_version_unsupported`.
 
+    **SDK identity.** The server lists the SDKs that use an environment
+    and counts the evaluations it answers per SDK. An SDK that can set
+    `User-Agent` sends `flagnetic-<sdk>/<version> (<platform>)` on every
+    request, such as `flagnetic-go/1.4.0 (linux)`. A browser cannot set
+    `User-Agent` and `EventSource` no header at all, so an SDK names itself
+    in what it posts as well: on `evaluate` the context's standard
+    attributes `sdk`, `sdk_version` and `platform` (strings, `sdk` holding
+    the same name as the `User-Agent`, such as `flagnetic-js`), on `events`
+    the envelope's `sdk`. A `User-Agent` naming an SDK wins over both. A
+    request identified by neither is `unknown`, and so is a ruleset fetch
+    or a stream without such a `User-Agent`.
+
     **Rate limits.** Each operation is limited per key in fixed one-minute
     windows counted by each replica (a client key per key and client IP).
     A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`; a
@@ -50,8 +63,8 @@ info:
     **Bodies.** A request body may be gzip (`Content-Encoding: gzip`); every
     size limit counts the body after decompression. A body over its limit
     is `413 request_too_large`, one that is not JSON `400 invalid_request`,
-    one sent as another media type than `application/json`
-    `415 unsupported_media_type`. An answer is gzip when the request accepts
+    one sent as another media type than `application/json` (or, for
+    `events`, `text/plain`) `415 unsupported_media_type`. An answer is gzip when the request accepts
     it.
 
     **Problems.** Every error is a problem document (RFC 9457) in the same
@@ -301,16 +314,41 @@ paths:
         naming a variation its experiment does not have). An `occurred_at`
         more than 24 hours ahead is taken as the time the event was
         received.
+
+        **From a closing page.** A browser page that is closing hands its
+        last batch, exposures included, to `navigator.sendBeacon`, which
+        cannot set headers and is sent without a CORS preflight; a
+        `keepalive` fetch carrying `Authorization` and JSON would need one,
+        which browsers do not send for such a request, and the last
+        exposures of a visit would be lost. So a batch is also accepted with
+        a client key as the query parameter `sdk_key` and the envelope sent
+        as `text/plain` (any `charset`), read as JSON with the same limits
+        and answers. Such a request is a CORS simple request: answered with
+        the same CORS headers, the key's allowed origins enforced and the
+        client events rate limit applied. A server key in the query is
+        `403 server_key_in_query`; a key both in `Authorization` and in the
+        query is `400 invalid_request`.
       tags: [events]
       parameters:
         - $ref: "#/components/parameters/SchemaVersion"
         - $ref: "#/components/parameters/ContentEncoding"
+        - name: sdk_key
+          in: query
+          description: |
+            A client key, for `navigator.sendBeacon`, which cannot set
+            `Authorization`. Never together with `Authorization`.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/EventBatch"
+          text/plain:
+            schema:
+              type: string
+              description: The same envelope as `application/json`, read as JSON.
       responses:
         "202":
           description: The batch was judged; every accepted event is durable.
@@ -859,7 +897,10 @@ components:
       properties:
         name:
           type: string
-          description: The SDK's name, such as `flagnetic-go`.
+          description: |
+            The SDK's name, such as `flagnetic-go`, as its `User-Agent`
+            would name it. The SDK inventory takes the SDK from here when
+            the request's `User-Agent` names none.
         version:
           type: string
         platform:

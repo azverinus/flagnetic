@@ -49,8 +49,13 @@ type operation struct {
 	// kinds are the key kinds the operation serves.
 	kinds []delivery.SDKKeyKind
 	// queryKey lets a client key be presented as the query parameter
-	// sdk_key, for a browser's EventSource, which cannot set headers.
+	// sdk_key, for what a browser sends without headers: an EventSource,
+	// and navigator.sendBeacon from a closing page.
 	queryKey bool
+	// oneKey refuses a request presenting a key both in Authorization and
+	// in the query, rather than choosing one of two keys that may belong to
+	// different environments.
+	oneKey bool
 	// stream marks a long-lived operation.
 	stream bool
 	// maxBodyBytes is the operation's body limit, after decompression; the
@@ -73,7 +78,7 @@ var operations = map[string]operation{
 	},
 	"POST " + BaseURL + "/events": {
 		endpoint: endpointEvents, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient},
-		maxBodyBytes: delivery.MaxBatchBytes,
+		queryKey: true, oneKey: true, maxBodyBytes: delivery.MaxBatchBytes,
 	},
 }
 
@@ -195,7 +200,8 @@ func refusesPresentedKey(err error) bool {
 // Authorization header, or for an operation taking one, the query
 // parameter sdk_key when the header carries none. A server key in the query
 // is refused whether or not the header carries a key, since it has leaked
-// into a URL either way.
+// into a URL either way; then, for an operation taking one key only, a key
+// in both places is refused.
 func (a *api) keyValue(op operation, r *http.Request) (string, error) {
 	value := bearer(r.Header.Get("Authorization"))
 	if !op.queryKey {
@@ -205,11 +211,19 @@ func (a *api) keyValue(op operation, r *http.Request) (string, error) {
 	if err := delivery.CheckKeyInQuery(query); err != nil {
 		return "", err
 	}
+	if op.oneKey && value != "" && query != "" {
+		return "", errTwoKeys
+	}
 	if value == "" {
 		value = query
 	}
 	return value, nil
 }
+
+// errTwoKeys answers a request presenting a key both in Authorization and
+// in the query where only one is taken.
+var errTwoKeys = flaghttp.InvalidRequest("the SDK key must be sent either in Authorization or as the query parameter " +
+	queryKeyParameter + ", not both")
 
 // queryKeyParameter is the query parameter a client key may be presented
 // in.

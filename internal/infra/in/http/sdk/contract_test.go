@@ -171,7 +171,8 @@ func TestEveryRequestBodyIsOfTheContract(t *testing.T) {
 		if len(e.Request.Body) == 0 || slices.Contains([]int{400, 413, 415}, e.Response.Status) {
 			continue
 		}
-		switch e.Request.Path {
+		path, _, _ := strings.Cut(e.Request.Path, "?")
+		switch path {
 		case "/sdk/v1/evaluate":
 			strictly(t, e.Name, e.Request.Body, new(sdk.EvaluationRequest))
 		case "/sdk/v1/events":

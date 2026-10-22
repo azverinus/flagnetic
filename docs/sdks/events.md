@@ -49,6 +49,19 @@ A summary row's `reason` is a true reason (`rule`, `rollout`, `fallthrough`, `pr
 
 An event's time more than 24 hours ahead of the server clock is taken as the time the event was received.
 
+## From a closing page
+
+A browser page that is closing hands its last batch, exposures included, to `navigator.sendBeacon`. A beacon cannot set headers and is sent without a CORS preflight, while a `keepalive` fetch carrying `Authorization` and JSON would need one, which browsers do not send for such a request: the last exposures of a visit would be lost and bias an experiment. So a batch is also accepted with a client key as the query parameter `sdk_key` and the envelope sent as `text/plain`, which is what a beacon sends a string as:
+
+```
+POST /sdk/v1/events?sdk_key=fn_cli_…
+Content-Type: text/plain;charset=UTF-8
+
+{"schema_version": 1, "sdk": {"name": "flagnetic-js", "version": "1.0.0", "platform": "web"}, …}
+```
+
+The body is read as JSON, with the same limits and answers as above, and the request is judged like any other from a browser: the key's allowed origins apply and the client events rate limit counts it (see [Browsers](keys.md#browsers)). A server key in the query is refused `403 server_key_in_query`, since it would end up in logs; a key both in `Authorization` and in the query is refused `400 invalid_request`. Any other media type than `application/json` and `text/plain` is `415 unsupported_media_type`.
+
 ## Retries
 
 Each event is stored once by its `event_id`, per project, within the retention window (`FLAGNETIC_EVENTS_RETENTION_DAYS`, 30 days by default): an event received before, in an earlier batch, on any replica and on any day, or earlier in the same batch, is counted in `duplicates`. An SDK retrying a batch therefore resends it with the same IDs.
@@ -56,4 +69,4 @@ Each event is stored once by its `event_id`, per project, within the retention w
 
 ## Evaluations answered remotely
 
-The server counts the [remote evaluations](evaluate.md) it answers, per key, SDK, platform, app version, flag, variation and true reason (the reason before a client key's answer is masked), and writes the counts every minute, and once more when a replica stops, as evaluation summaries of its own. They are kept apart from the summaries SDKs post, so the evaluations a client SDK also counts from the answers it received are never added twice. The SDK is the one its `User-Agent` names (`flagnetic-<sdk>/<version> (<platform>)`), or `unknown`; the app version is the context's `app_version` attribute when it is a string.
+The server counts the [remote evaluations](evaluate.md) it answers, per key, SDK, platform, app version, flag, variation and true reason (the reason before a client key's answer is masked), and writes the counts every minute, and once more when a replica stops, as evaluation summaries of its own. They are kept apart from the summaries SDKs post, so the evaluations a client SDK also counts from the answers it received are never added twice. The SDK is the one the request names (see [How an SDK names itself](keys.md#how-an-sdk-names-itself)), or `unknown`; the app version is the context's `app_version` attribute when it is a string.
