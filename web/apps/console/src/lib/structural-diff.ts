@@ -4,6 +4,7 @@ import type {
   FlagDefinition,
   Prerequisite,
   Rule,
+  Segment,
   Serve,
   Variation,
 } from "@flagnetic/api";
@@ -106,6 +107,13 @@ export type DefinitionChange =
     }
   | { kind: "variation_order"; before: string[]; after: string[] };
 
+/** A condition added, removed or changed, by its place. */
+export type ConditionChange = Extract<RuleDetail, { kind: "condition" }>;
+
+export type SegmentChange =
+  | { kind: "field"; field: "name" | "description" | "private"; before: unknown; after: unknown }
+  | ConditionChange;
+
 /**
  * A value's JSON with every object's members in one order, so two values
  * that differ only in how their members were written compare equal.
@@ -173,9 +181,12 @@ function sameServe(before: Serve, after: Serve): boolean {
  * stayed the same; between two of those, the conditions removed and
  * added pair up as changed, in order, and the rest are added or removed.
  */
-function conditionDetails(before: readonly Condition[], after: readonly Condition[]): RuleDetail[] {
+function conditionDetails(
+  before: readonly Condition[],
+  after: readonly Condition[],
+): ConditionChange[] {
   const pairs = commonSubsequence(before.map(fingerprint), after.map(fingerprint));
-  const details: RuleDetail[] = [];
+  const details: ConditionChange[] = [];
   let i = 0;
   let j = 0;
   for (const [nextI, nextJ] of [...pairs, [before.length, after.length] as [number, number]]) {
@@ -376,5 +387,17 @@ export function diffDefinitions(before: FlagDefinition, after: FlagDefinition): 
   if (order[0].join("\n") !== order[1].join("\n")) {
     changes.push({ kind: "variation_order", before: order[0], after: order[1] });
   }
+  return changes;
+}
+
+/** What changed from one segment to another: its fields, then its conditions aligned as a rule's are. */
+export function diffSegments(before: Segment, after: Segment): SegmentChange[] {
+  const changes: SegmentChange[] = [];
+  for (const field of ["name", "description", "private"] as const) {
+    if (before[field] !== after[field]) {
+      changes.push({ kind: "field", field, before: before[field], after: after[field] });
+    }
+  }
+  changes.push(...conditionDetails(before.conditions, after.conditions));
   return changes;
 }

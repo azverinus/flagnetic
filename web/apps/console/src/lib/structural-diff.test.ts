@@ -1,7 +1,7 @@
-import type { FlagConfiguration, FlagDefinition, Rule } from "@flagnetic/api";
+import type { FlagConfiguration, FlagDefinition, Rule, Segment } from "@flagnetic/api";
 import { describe, expect, it } from "vitest";
 
-import { diffConfigurations, diffDefinitions } from "./structural-diff";
+import { diffConfigurations, diffDefinitions, diffSegments } from "./structural-diff";
 
 function configuration(over: Partial<FlagConfiguration> = {}): FlagConfiguration {
   return {
@@ -375,5 +375,63 @@ describe("diffDefinitions", () => {
         },
       ],
     );
+  });
+});
+
+function segment(over: Partial<Segment> = {}): Segment {
+  return {
+    id: "s-1",
+    key: "employees",
+    name: "Employees",
+    description: "",
+    private: false,
+    conditions: [],
+    created_at: "2026-10-01T10:00:00Z",
+    updated_at: "2026-10-01T10:00:00Z",
+    version: 1,
+    ...over,
+  };
+}
+
+describe("diffSegments", () => {
+  it("finds nothing between equal segments, whatever their versions and times", () => {
+    expect(
+      diffSegments(
+        segment({ conditions: [country("NL")] }),
+        segment({ conditions: [country("NL")], version: 3, updated_at: "2026-10-02T10:00:00Z" }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("reports the name, the description and the private switch", () => {
+    expect(
+      diffSegments(segment(), segment({ name: "Staff", description: "Ours", private: true })),
+    ).toEqual([
+      { kind: "field", field: "name", before: "Employees", after: "Staff" },
+      { kind: "field", field: "description", before: "", after: "Ours" },
+      { kind: "field", field: "private", before: false, after: true },
+    ]);
+  });
+
+  it("aligns the conditions, reporting those added, removed and changed by place", () => {
+    const plan = { kind: "attribute", attribute: "plan", op: "eq", value: "pro" };
+    expect(
+      diffSegments(
+        segment({ conditions: [country("NL"), plan] }),
+        segment({ conditions: [country("DE"), plan, country("FR")] }),
+      ),
+    ).toEqual([
+      {
+        kind: "condition",
+        change: "changed",
+        position: 1,
+        before: country("NL"),
+        after: country("DE"),
+      },
+      { kind: "condition", change: "added", position: 3, after: country("FR") },
+    ]);
+    expect(
+      diffSegments(segment({ conditions: [plan, country("NL")] }), segment({ conditions: [plan] })),
+    ).toEqual([{ kind: "condition", change: "removed", position: 2, before: country("NL") }]);
   });
 });

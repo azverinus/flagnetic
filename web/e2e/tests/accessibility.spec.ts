@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { listProjectAuditEntries } from "@flagnetic/api";
+import { createSegment, listProjectAuditEntries } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { seriousViolations, useTheme } from "../support/axe";
@@ -30,6 +30,9 @@ type Seeded = { project: string; member: string; invitation: string; auditEntry:
 
 /** The key of the flag the sweep creates in its project. */
 const sweepFlag = "sweep_flag";
+
+/** The key of the segment the sweep creates in its project. */
+const sweepSegment = "sweep_segment";
 
 /** A screen to visit: the route of the console it is, and its address. */
 type Route = { name: string; route: string; path: (seeded: Seeded) => string };
@@ -80,6 +83,8 @@ const signedIn: Route[] = [
   ...[
     "flags",
     "flags/-/new",
+    "segments",
+    "segments/-/new",
     "environments",
     "unit-types",
     "attributes",
@@ -96,6 +101,11 @@ const signedIn: Route[] = [
     name: "project flag",
     route: "/projects/$project/flags/$flag",
     path: (s) => `/projects/${s.project}/flags/${sweepFlag}`,
+  },
+  {
+    name: "project segment",
+    route: "/projects/$project/segments/$segment",
+    path: (s) => `/projects/${s.project}/segments/${sweepSegment}`,
   },
   {
     name: "project audit entry",
@@ -132,6 +142,18 @@ async function seed(): Promise<Seeded> {
   const project = await seedProject("sweep");
   const invited = await seedInvitation("sweep", "Sweep Invitee");
   await seedFlag(project, stringFlag(sweepFlag));
+  must(
+    `creating ${sweepSegment}`,
+    await createSegment({
+      client: managementClient(),
+      path: { project },
+      body: {
+        key: sweepSegment,
+        name: "Sweep segment",
+        conditions: [{ kind: "attribute", attribute: "country", op: "in", value: ["NL", "DE"] }],
+      },
+    }),
+  );
   const audit = must(
     `listing the audit log of ${project}`,
     await listProjectAuditEntries({ client: managementClient(), path: { project } }),

@@ -201,6 +201,10 @@ msgstr ""
 msgid "A member without a grant here"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
+msgid "A named set of attribute conditions that rules of every flag can target by name."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "A new flag is off in every environment until it is switched on."
 msgstr ""
@@ -244,6 +248,18 @@ msgstr ""
 
 #: src/components/rule-editor.tsx
 msgid "A rule has at most {maxConditionsText} conditions."
+msgstr ""
+
+#: src/components/segment-fields.tsx
+msgid "A segment compares declared attributes only; one without conditions holds every context."
+msgstr ""
+
+#: src/components/segment-fields.tsx
+msgid "A segment has at most {maxConditionsText} conditions."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "A segment names a group of contexts once, for the rules of every flag."
 msgstr ""
 
 #: src/components/auth-settings-form.tsx
@@ -334,6 +350,10 @@ msgstr ""
 msgid "Add attribute condition"
 msgstr ""
 
+#: src/components/segment-fields.tsx
+msgid "Add condition"
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "Add override"
 msgstr ""
@@ -400,6 +420,7 @@ msgid "Another variation has this key."
 msgstr ""
 
 #: src/components/audit-log.tsx
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Any"
 msgstr ""
 
@@ -606,6 +627,10 @@ msgstr ""
 msgid "Changes to the definition"
 msgstr ""
 
+#: src/components/structural-diff-view.tsx
+msgid "Changes to the segment"
+msgstr ""
+
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr ""
@@ -727,6 +752,7 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Clear filters"
 msgstr ""
 
@@ -761,7 +787,12 @@ msgstr ""
 msgid "Condition {position} removed: <0/>."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "Conditions"
+msgstr ""
+
 #: src/components/rule-editor.tsx
+#: src/components/segment-fields.tsx
 msgid "Conditions (all must hold)"
 msgstr ""
 
@@ -811,6 +842,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "Create project"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
+msgid "Create segment"
 msgstr ""
 
 #: src/routes/_signed-in/index.tsx
@@ -872,12 +907,14 @@ msgid "Declare the kinds of unit its flags are served to."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Delete"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete {key}"
 msgstr ""
@@ -894,6 +931,10 @@ msgstr ""
 msgid "Delete flag"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Delete segment"
+msgstr ""
+
 #: src/lib/access-names.ts
 msgid "delete segments"
 msgstr ""
@@ -903,6 +944,7 @@ msgid "Delete unit type"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/components/segment-fields.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -1230,7 +1272,12 @@ msgstr ""
 msgid "Filter the flags"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "Filter the segments"
+msgstr ""
+
 #: src/components/configuration-editor.tsx
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Fix what is marked above before saving."
 msgstr ""
 
@@ -1294,6 +1341,10 @@ msgstr ""
 msgid "Go to the members"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Go to the segments"
+msgstr ""
+
 #: src/components/not-found.tsx
 msgid "Go to the start page"
 msgstr ""
@@ -1339,6 +1390,10 @@ msgstr ""
 msgid "How long sessions last, how long API tokens may live, and how long passwords must be. Every replica of the instance applies a change within a second."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
+msgid "How rules name the segment. It never changes."
+msgstr ""
+
 #: src/routes/_signed-in/admin/projects.tsx
 msgid "How SDKs and scripts name the project: lowercase letters, digits, - and _. It never changes."
 msgstr ""
@@ -1349,6 +1404,10 @@ msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
 msgid "I have stored it somewhere safe"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "in {environment}"
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -1480,6 +1539,10 @@ msgstr ""
 msgid "It is still in use."
 msgstr ""
 
+#: src/components/segment-fields.tsx
+msgid "Its conditions never leave the server: only server-side evaluation uses it, and a client SDK key never receives it."
+msgstr ""
+
 #: src/components/invitation-acceptance.tsx
 msgid "Joining…"
 msgstr ""
@@ -1489,6 +1552,7 @@ msgid "JSON"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Keep my edits"
 msgstr ""
 
@@ -1503,6 +1567,7 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Key"
@@ -1513,6 +1578,7 @@ msgid "Key <0>{key}</0>"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Key or name"
 msgstr ""
 
@@ -1611,6 +1677,10 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Made an instance admin"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
+msgid "Made private."
 msgstr ""
 
 #. The name of a built-in role.
@@ -1734,6 +1804,7 @@ msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
+#: src/components/segment-fields.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/components/variations-editor.tsx
@@ -1803,6 +1874,11 @@ msgstr ""
 msgid "New project token"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "New segment"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "New unit type"
 msgstr ""
@@ -1831,8 +1907,16 @@ msgstr ""
 msgid "No flag matches these filters."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "No flag's rules use this segment."
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "No longer an instance admin"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
+msgid "No longer private."
 msgstr ""
 
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -1872,6 +1956,10 @@ msgstr ""
 msgid "No rules: every context receives the fallthrough variation."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "No segment matches these filters."
+msgstr ""
+
 #: src/components/condition-row.tsx
 msgid "No value needed."
 msgstr ""
@@ -1905,6 +1993,10 @@ msgstr ""
 
 #: src/lib/conditions.ts
 msgid "not in the segment {segment}"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "Not private"
 msgstr ""
 
 #: src/lib/project-members.ts
@@ -2108,6 +2200,15 @@ msgstr ""
 msgid "Previous"
 msgstr ""
 
+#: src/components/segment-fields.tsx
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "Private"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "Private only"
+msgstr ""
+
 #: src/components/condition-row.tsx
 msgid "Private: evaluated on the server only."
 msgstr ""
@@ -2202,6 +2303,7 @@ msgid "Regenerate the salt?"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Reload and lose my edits"
 msgstr ""
 
@@ -2284,6 +2386,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Restored."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "Reusable sets of attribute conditions; a rule targets a segment by name and follows every change to it."
 msgstr ""
 
 #: src/lib/access-names.ts
@@ -2387,6 +2493,10 @@ msgstr ""
 msgid "Rules"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Rules of these flags use the segment and evaluate by what it holds once saved:"
+msgstr ""
+
 #: src/components/rule-editor.tsx
 msgid "Salt (rule {position})"
 msgstr ""
@@ -2406,8 +2516,16 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Save anyway"
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 msgid "Save definition"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Save with usages?"
 msgstr ""
 
 #: src/components/token-create-form.tsx
@@ -2436,8 +2554,22 @@ msgstr ""
 msgid "Search projects"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "Segment"
+msgstr ""
+
 #: src/components/condition-row.tsx
 msgid "Segment (condition {position})"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Segment not found"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+#: src/routes/_signed-in/projects/$project/segments/route.tsx
+msgid "Segments"
 msgstr ""
 
 #. An attribute type.
@@ -2554,6 +2686,10 @@ msgstr ""
 
 #: src/components/conflict-banner.tsx
 msgid "Someone saved a change after you opened this."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Someone saved the segment meanwhile; reload the page to see their change."
 msgstr ""
 
 #: src/components/conflict-banner.tsx
@@ -2858,6 +2994,10 @@ msgstr ""
 msgid "The project has no flag with this key. It may have been deleted."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "The project has no segment with this key. It may have been deleted."
+msgstr ""
+
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
 msgid "The project has no such flag, or it is archived."
@@ -2911,6 +3051,18 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "the segment {key}"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "The segment {key} is deleted."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "The segment is deleted. This cannot be taken back; its audit entries stay. Refused while a rule of any flag, archived ones included, names it."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "The segment is saved."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -3072,6 +3224,10 @@ msgstr ""
 msgid "This project already has a flag with that key."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
+msgid "This project already has a segment with that key."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "This project already has a unit type or an attribute with that key."
@@ -3087,6 +3243,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "This project has no flag yet."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "This project has no segment yet."
 msgstr ""
 
 #: src/components/project-token-list.tsx
@@ -3227,6 +3387,14 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Use {min} to {max} characters."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Used by"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/segments/index.tsx
+msgid "Used by flags"
 msgstr ""
 
 #: src/components/variations-editor.tsx

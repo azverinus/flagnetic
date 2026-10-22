@@ -16,6 +16,7 @@ import {
   SettingsIcon,
   TagsIcon,
   UsersIcon,
+  UsersRoundIcon,
 } from "lucide-react";
 import { useId } from "react";
 
@@ -58,6 +59,12 @@ const projectScreens = [
     to: "/projects/$project/flags",
     label: msg`Flags`,
     icon: FlagIcon,
+    permission: "project.read",
+  },
+  {
+    to: "/projects/$project/segments",
+    label: msg`Segments`,
+    icon: UsersRoundIcon,
     permission: "project.read",
   },
   {
