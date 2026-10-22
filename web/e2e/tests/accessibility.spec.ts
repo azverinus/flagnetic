@@ -34,6 +34,9 @@ const sweepFlag = "sweep_flag";
 /** The key of the segment the sweep creates in its project. */
 const sweepSegment = "sweep_segment";
 
+/** The key of the environment every project starts with, whose page the sweep opens. */
+const sweepEnvironment = "staging";
+
 /** A screen to visit: the route of the console it is, and its address. */
 type Route = { name: string; route: string; path: (seeded: Seeded) => string };
 
@@ -101,6 +104,11 @@ const signedIn: Route[] = [
     name: "project flag",
     route: "/projects/$project/flags/$flag",
     path: (s) => `/projects/${s.project}/flags/${sweepFlag}`,
+  },
+  {
+    name: "project environment",
+    route: "/projects/$project/environments/$environment",
+    path: (s) => `/projects/${s.project}/environments/${sweepEnvironment}`,
   },
   {
     name: "project segment",
