@@ -21,6 +21,10 @@ The keys of an environment are under `/api/v1/projects/{project}/environments/{e
 
 An environment holds at most 10 active keys of each kind; one more is refused `409 sdk_key_limit_reached`. A rotated or revoked key does not count, so revoke or rotate one first. A body that breaks a rule is refused `422 invalid_sdk_key`, with a JSON Pointer to each field to fix.
 
+## In the console
+
+Open an environment from the Environments list; its **SDK keys** tab shows every key with its name, kind, key ID, status, creation, last use, expiry and allowed origins, never its value. A maintainer or an owner creates a key (its kind, its name and, for a client key, its allowed origins), rotates an active key with an overlap of none, 1 hour, 24 hours or 7 days (7 days is offered first), renames a key, edits its allowed origins and revokes it after a confirmation. A new key's value, and a rotation's replacement, is shown once, with a copy button, and the dialog stays open until you say you have stored it. Anyone else sees the keys with the actions disabled and the roles that would allow them. The console lowercases an origin and drops its default port as the server does, and names one that is not an origin before sending.
+
 ## Status
 
 Each listed key carries its status now:
