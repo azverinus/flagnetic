@@ -14,14 +14,17 @@ const DiscoveredAttributesName = "discovered_attributes"
 
 // DiscoveredAttributes returns the worker writing the undeclared attributes
 // the replica's evaluations noted, every second, so they show up for a
-// developer at once while no evaluation waits on a write. Sightings dropped
-// because the replica held too many are logged as a warning: discovery
-// lags, and the next contexts carrying them are seen again.
+// developer at once while no evaluation waits on a write. The sightings the
+// round dropped, because the replica held too many or because writing them
+// failed, are logged as one warning with their count: discovery lags, and
+// the next contexts carrying them are seen again.
 func DiscoveredAttributes(d *appdelivery.Discoveries, log *slog.Logger) Worker {
 	return Worker{Name: DiscoveredAttributesName, Interval: time.Second, Round: func(ctx context.Context) error {
-		if n := d.Dropped(); n > 0 {
-			log.WarnContext(ctx, "discovered attributes dropped: too many pending", "dropped", n)
+		err := d.Flush(ctx)
+		if n := d.Dropped(); n.Total() > 0 {
+			log.WarnContext(ctx, "discovered attributes dropped", "dropped", n.Total(),
+				"queue_full", n.QueueFull, "project_full", n.ProjectFull, "write_failed", n.WriteFailed)
 		}
-		return d.Flush(ctx)
+		return err
 	}}
 }

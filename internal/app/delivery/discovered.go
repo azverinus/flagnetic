@@ -32,13 +32,30 @@ type DiscoveredAttributeStore interface {
 
 // Bounds of what a replica gathers between two writes of discovered
 // attributes, so that contexts carrying ever new keys cannot grow its
-// memory: what is beyond is dropped, and seen again in a later context.
+// memory. A sighting is one key seen in one project, however often: what
+// does not fit is dropped, and seen again in a later context.
 const (
-	// maxDiscoveryProjects is how many projects' sightings are held.
-	maxDiscoveryProjects = 1024
-	// maxDiscoveryPending is how many keys of one project are held.
+	// maxDiscoverySightings is how many sightings are held in all.
+	maxDiscoverySightings = 1024
+	// maxDiscoveryPending is how many sightings of one project are held, so
+	// one project cannot take the whole queue.
 	maxDiscoveryPending = 1000
 )
+
+// DiscoveryDrops counts the sightings a replica dropped since the last
+// round, by why.
+type DiscoveryDrops struct {
+	// QueueFull counts sightings that found every place of the queue taken.
+	QueueFull int
+	// ProjectFull counts sightings whose project held its share already.
+	ProjectFull int
+	// WriteFailed counts sightings held but lost because writing their
+	// project's failed.
+	WriteFailed int
+}
+
+// Total is how many sightings were dropped, whatever why.
+func (d DiscoveryDrops) Total() int { return d.QueueFull + d.ProjectFull + d.WriteFailed }
 
 // Discoveries gathers the undeclared attributes evaluated contexts carry
 // and writes them in rounds, so an evaluation never waits on a write and a
@@ -49,7 +66,9 @@ type Discoveries struct {
 
 	mu      sync.Mutex
 	pending map[workspace.ProjectID]map[string]*delivery.Sighting
-	dropped int
+	// held counts the sightings in pending, across projects.
+	held    int
+	dropped DiscoveryDrops
 }
 
 // NewDiscoveries returns the replica's gatherer of discovered attributes.
@@ -58,31 +77,33 @@ func NewDiscoveries(tx Transactor, store DiscoveredAttributeStore) *Discoveries 
 }
 
 // Note keeps the attributes a context of project carried at at for the
-// next round, as far as the bounds allow.
+// next round, as far as the bounds allow. A key already held is merged
+// whatever the bounds, since it takes no new place.
 func (d *Discoveries) Note(project workspace.ProjectID, at time.Time, observed []delivery.ObservedAttribute) {
 	if d == nil || len(observed) == 0 {
 		return
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	seen, ok := d.pending[project]
-	if !ok {
-		if len(d.pending) >= maxDiscoveryProjects {
-			d.dropped += len(observed)
-			return
-		}
-		seen = map[string]*delivery.Sighting{}
-		d.pending[project] = seen
-	}
+	seen := d.pending[project]
 	for _, o := range observed {
 		s, ok := seen[o.Key]
 		if !ok {
-			if len(seen) >= maxDiscoveryPending {
-				d.dropped++
+			switch {
+			case len(seen) >= maxDiscoveryPending:
+				d.dropped.ProjectFull++
 				continue
+			case d.held >= maxDiscoverySightings:
+				d.dropped.QueueFull++
+				continue
+			}
+			if seen == nil {
+				seen = map[string]*delivery.Sighting{}
+				d.pending[project] = seen
 			}
 			s = &delivery.Sighting{Key: o.Key, First: at}
 			seen[o.Key] = s
+			d.held++
 		}
 		if !slices.Contains(s.Types, o.Type) {
 			s.Types = append(s.Types, o.Type)
@@ -97,29 +118,35 @@ func (d *Discoveries) Note(project workspace.ProjectID, at time.Time, observed [
 	}
 }
 
-// Dropped returns how many sightings were dropped since it was last asked,
-// for the round's warning.
-func (d *Discoveries) Dropped() int {
+// Dropped returns the sightings dropped since it was last asked, for the
+// round's warning.
+func (d *Discoveries) Dropped() DiscoveryDrops {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	n := d.dropped
-	d.dropped = 0
+	d.dropped = DiscoveryDrops{}
 	return n
 }
 
 // Flush writes what was gathered since the last round, one unit of work per
 // project. A project's sightings that cannot be written are dropped rather
-// than retried: the next contexts carrying them are seen again. It returns
-// the first failure.
+// than retried, and counted as dropped: the next contexts carrying them are
+// seen again. It returns the first failure.
 func (d *Discoveries) Flush(ctx context.Context) error {
 	d.mu.Lock()
 	pending := d.pending
 	d.pending = map[workspace.ProjectID]map[string]*delivery.Sighting{}
+	d.held = 0
 	d.mu.Unlock()
 	var first error
 	for project, seen := range pending {
-		if err := d.write(ctx, project, seen); err != nil && first == nil {
-			first = err
+		if err := d.write(ctx, project, seen); err != nil {
+			d.mu.Lock()
+			d.dropped.WriteFailed += len(seen)
+			d.mu.Unlock()
+			if first == nil {
+				first = err
+			}
 		}
 	}
 	return first

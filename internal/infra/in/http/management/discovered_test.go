@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -187,20 +189,82 @@ func TestDiscoveredAttributesAreCappedPerProject(t *testing.T) {
 	}
 }
 
-func TestAReplicaDropsWhatItCannotHoldWithAWarning(t *testing.T) {
+// attributeKeys returns a context's attributes keyed prefix0 to prefix<n-1>.
+func attributeKeys(prefix string, n int) string {
+	parts := []string{}
+	for i := range n {
+		parts = append(parts, `"`+prefix+strconv.Itoa(i)+`":"x"`)
+	}
+	return "{" + strings.Join(parts, ",") + "}"
+}
+
+// droppedWarning returns the one warning the round logged about dropped
+// sightings, failing the test unless there is exactly one.
+func droppedWarning(t *testing.T, srv *testkit.Server) map[string]any {
+	t.Helper()
+	warnings := srv.Logs.Find("discovered attributes dropped")
+	if len(warnings) != 1 || warnings[0].Level != slog.LevelWarn {
+		t.Fatalf("warnings = %+v, want one", warnings)
+	}
+	return warnings[0].Attrs
+}
+
+func TestAReplicaHoldsAtMostAThousandSightingsOfAProject(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
-	parts := []string{}
-	for i := range 1001 {
-		parts = append(parts, `"k`+strconv.Itoa(1000+i)+`":"x"`)
-	}
-	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, "{"+strings.Join(parts, ",")+"}")})
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 1001))})
 	if got := discovered(t, srv, admin, p.Key); len(got) != 500 {
 		t.Errorf("discovered %d, want the project's 500", len(got))
 	}
-	warnings := srv.Logs.Find("discovered attributes dropped: too many pending")
-	if len(warnings) != 1 || warnings[0].Level != slog.LevelWarn || warnings[0].Attrs["dropped"] != int64(1) {
-		t.Errorf("warnings = %+v, want one telling the one dropped", warnings)
+	if got := droppedWarning(t, srv); got["dropped"] != int64(1) || got["project_full"] != int64(1) || got["queue_full"] != int64(0) {
+		t.Errorf("warning = %v, want the one sighting beyond the project's thousand", got)
+	}
+}
+
+func TestAReplicaHoldsAtMost1024SightingsInAll(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	first, second := createProject(t, admin, projectKey()), createProject(t, admin, projectKey())
+	mustEvaluate(t, admin, first.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 1000))})
+	mustEvaluate(t, admin, second.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 30))})
+	// A key already held takes no new place, so it is merged however full
+	// the queue is.
+	mustEvaluate(t, admin, first.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, `{"k0":"x"}`)})
+
+	if got := discovered(t, srv, admin, second.Key); len(got) != 24 {
+		t.Errorf("second project: discovered %d, want the 24 places the first left", len(got))
+	}
+	if got := droppedWarning(t, srv); got["dropped"] != int64(6) || got["queue_full"] != int64(6) || got["project_full"] != int64(0) {
+		t.Errorf("warning = %v, want the six sightings beyond 1,024", got)
+	}
+	if got := discovered(t, srv, admin, first.Key); len(got) != 500 || got[0] != "k0 string 2" {
+		t.Errorf("first project: %d discovered, first %q; want k0 seen twice", len(got), got[0])
+	}
+}
+
+func TestAReplicaCountsTheSightingsAFailedWriteLost(t *testing.T) {
+	// A pool of the replica's own, closed once it has evaluated, so the
+	// round finds its database gone.
+	pool, err := pgxpool.New(t.Context(), testkit.DatabaseURL(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	srv := testkit.StartServer(t, testkit.WithPool(pool))
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	mustEvaluate(t, admin, p.Key, "staging", management.EvaluationRequest{Context: contextOf(nil, attributeKeys("k", 3))})
+	pool.Close()
+
+	if err := srv.Tick(t, worker.DiscoveredAttributesName); err == nil {
+		t.Fatal("the round wrote to a database it cannot reach")
+	}
+	if got := droppedWarning(t, srv); got["dropped"] != int64(3) || got["write_failed"] != int64(3) {
+		t.Errorf("warning = %v, want the three sightings the write lost", got)
+	}
+	other := testkit.StartServer(t)
+	if got := discovered(t, other, testkit.Client(t, other, testkit.InstanceAdminToken(t)), p.Key); len(got) != 0 {
+		t.Errorf("discovered %v, want nothing written", got)
 	}
 }
