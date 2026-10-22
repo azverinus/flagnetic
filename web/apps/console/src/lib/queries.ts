@@ -30,10 +30,12 @@ import {
   listRoles,
   listAttributes,
   listEnvironments,
+  listFlags,
   listUnitTypes,
   type Attribute,
   type AuthMethods,
   type Environment,
+  type FlagList,
   type Me,
   type Project,
   type ProjectMe,
@@ -44,6 +46,7 @@ import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
 import { type AuditSearch, auditQueryOf } from "./audit";
 import { unwrap } from "./errors";
+import type { FlagsSearch } from "./flags";
 
 /** The caller: who is signed in, and with which credential. */
 export const meQuery = queryOptions<Me>({
@@ -120,6 +123,23 @@ export function unitTypesQuery(project: string) {
   return queryOptions<UnitType[]>({
     queryKey: ["projects", project, "unit-types"],
     queryFn: async () => (await unwrap(listUnitTypes({ path: { project } }))).items,
+  });
+}
+
+/** What every read of a project's flags is cached under. */
+export function flagsQueryKey(project: string) {
+  return ["projects", project, "flags"] as const;
+}
+
+/**
+ * One page of a project's flags for a search. The page shown stays while
+ * the next one loads, so paging and filtering do not blank the table.
+ */
+export function flagsQuery(project: string, search: FlagsSearch) {
+  return queryOptions<FlagList>({
+    queryKey: [...flagsQueryKey(project), "list", search],
+    queryFn: () => unwrap(listFlags({ path: { project }, query: search })),
+    placeholderData: keepPreviousData,
   });
 }
 

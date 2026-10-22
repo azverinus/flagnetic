@@ -5,6 +5,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, type LinkProps } from "@tanstack/react-router";
 import {
   BoxesIcon,
+  FlagIcon,
   HistoryIcon,
   LayersIcon,
   KeyRoundIcon,
@@ -52,6 +53,12 @@ const projectScreens = [
     icon: LayoutDashboardIcon,
     permission: "project.read",
     exact: true,
+  },
+  {
+    to: "/projects/$project/flags",
+    label: msg`Flags`,
+    icon: FlagIcon,
+    permission: "project.read",
   },
   {
     to: "/projects/$project/environments",

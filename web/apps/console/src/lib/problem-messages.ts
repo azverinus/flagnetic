@@ -179,6 +179,18 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       }
       return i18n._(msg`This is further ahead than this instance allows.`);
     }
+    case "duplicate":
+      return i18n._(msg`This is already in the list.`);
+    case "too_many": {
+      const max = numberParam(i18n, violation, "max");
+      return max ? i18n._(msg`At most ${max}.`) : i18n._(msg`Too many.`);
+    }
+    case "invalid_value":
+      return i18n._(msg`This value is not valid here.`);
+    case "invalid_owner":
+      return i18n._(
+        msg`The owner must be an active member holding a role in the project, or an instance admin.`,
+      );
     case "idle_beyond_absolute":
       return i18n._(msg`The idle timeout cannot be longer than the absolute timeout.`);
     case "weak_password":

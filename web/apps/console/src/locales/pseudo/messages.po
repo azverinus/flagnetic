@@ -104,12 +104,25 @@ msgstr ""
 msgid "{when} from {ip}"
 msgstr ""
 
+#: src/components/variations-editor.tsx
+msgid "A boolean flag always has exactly the variations true and false."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "A flag has at most 50 tags."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "A key never changes once it is set."
 msgstr ""
 
 #: src/lib/project-members.ts
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "A member without a grant here"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "A new flag is off in every environment until it is switched on."
 msgstr ""
 
 #: src/components/invitation-link-dialog.tsx
@@ -147,6 +160,14 @@ msgstr ""
 
 #: src/components/auth-settings-form.tsx
 msgid "A session ends this long after its last request."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "A tag has at most 64 characters."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "A temporary flag is meant to be removed once its change is released; a permanent one stays."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -196,6 +217,10 @@ msgstr ""
 msgid "Actor kind"
 msgstr ""
 
+#: src/components/variations-editor.tsx
+msgid "Add variation"
+msgstr ""
+
 #: src/lib/personal-tokens.ts
 msgid "Administer projects: environments, members and tokens."
 msgstr ""
@@ -229,8 +254,21 @@ msgstr ""
 msgid "Another member already has this email address."
 msgstr ""
 
+#: src/lib/flags.ts
+#: src/lib/variations.ts
+msgid "Another variation has this key."
+msgstr ""
+
 #: src/components/audit-log.tsx
 msgid "Any"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Any owner"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Any type"
 msgstr ""
 
 #. A kind of actor in the audit log.
@@ -265,6 +303,10 @@ msgstr ""
 msgid "archive and delete flags"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Archived flags instead"
+msgstr ""
+
 #: src/components/invitation-acceptance.tsx
 #: src/components/password-form.tsx
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
@@ -272,6 +314,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "At most {max} characters."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "At most {max}."
 msgstr ""
 
 #. A kind of entity in the audit log.
@@ -333,6 +379,7 @@ msgid "Before and after"
 msgstr ""
 
 #. An attribute type.
+#: src/lib/flags.ts
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Boolean"
 msgstr ""
@@ -428,6 +475,7 @@ msgid "Choose one of the offered types."
 msgstr ""
 
 #: src/components/audit-log.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Clear filters"
 msgstr ""
 
@@ -468,6 +516,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments.tsx
 msgid "Create environment"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "Create flag"
 msgstr ""
 
 #: src/routes/_signed-in/admin/projects.tsx
@@ -554,8 +606,10 @@ msgstr ""
 msgid "Delete unit type"
 msgstr ""
 
+#: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Description"
@@ -632,6 +686,10 @@ msgstr ""
 msgid "Enter a new password."
 msgstr ""
 
+#: src/lib/variations.ts
+msgid "Enter a number."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Enter a valid email address."
 msgstr ""
@@ -640,12 +698,20 @@ msgstr ""
 msgid "Enter a value from {min} to {max}."
 msgstr ""
 
+#: src/lib/flags.ts
+msgid "Enter a value of the flag's type."
+msgstr ""
+
 #: src/lib/auth-settings.ts
 msgid "Enter a whole number."
 msgstr ""
 
 #: src/components/member-form.tsx
 msgid "Enter an email address."
+msgstr ""
+
+#: src/lib/variations.ts
+msgid "Enter JSON other than null."
 msgstr ""
 
 #: src/components/password-form.tsx
@@ -718,6 +784,10 @@ msgstr ""
 msgid "Every earlier link for {name} stops working. The new one is shown once."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Every flag exists in every environment of the project, each environment serving it by its own configuration."
+msgstr ""
+
 #: src/components/auth-settings-form.tsx
 msgid "Every new API token must have an expiry; none may live forever."
 msgstr ""
@@ -732,6 +802,10 @@ msgstr ""
 
 #: src/components/app-shell.tsx
 msgid "Expand the sidebar"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "Expected removal"
 msgstr ""
 
 #: src/components/token-list.tsx
@@ -751,6 +825,10 @@ msgstr ""
 msgid "Filter the audit log"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Filter the flags"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Fixed once declared."
@@ -758,6 +836,16 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Fixed once the project is created, since SDKs and scripts use it."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Flag"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/flags/route.tsx
+msgid "Flags"
 msgstr ""
 
 #: src/components/personal-menu.tsx
@@ -804,6 +892,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Grants"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
 msgstr ""
 
 #: src/routes/_signed-in/admin/auth-settings.tsx
@@ -891,14 +983,20 @@ msgstr ""
 msgid "Joining…"
 msgstr ""
 
+#: src/lib/flags.ts
+msgid "JSON"
+msgstr ""
+
 #: src/components/theme-choice.tsx
 msgid "Kept in this browser, and used on the sign-in page too. System follows your device's setting."
 msgstr ""
 
 #: src/components/projects-table.tsx
+#: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Key"
@@ -906,6 +1004,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "Key <0>{key}</0>"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Key or name"
 msgstr ""
 
 #: src/components/personal-menu.tsx
@@ -934,12 +1036,25 @@ msgstr ""
 msgid "Leave without saving?"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "Left empty, 90 days from today."
+msgstr ""
+
 #: src/lib/project-members.ts
 msgid "Lets the holder {list}."
 msgstr ""
 
 #: src/lib/project-members.ts
 msgid "Lets the holder do nothing yet."
+msgstr ""
+
+#: src/lib/flags.ts
+#: src/lib/variations.ts
+msgid "Letters, digits, ., - and _, at most 64."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "Lifetime"
 msgstr ""
 
 #: src/components/personal-menu.tsx
@@ -1018,6 +1133,10 @@ msgstr ""
 msgid "Maximum token lifetime"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "Me ({myName})"
+msgstr ""
+
 #. A kind of actor in the audit log.
 #. A kind of entity in the audit log.
 #: src/components/audit-log.tsx
@@ -1072,9 +1191,11 @@ msgstr ""
 #: src/components/projects-table.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
+#: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments.tsx
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Name"
@@ -1111,6 +1232,11 @@ msgstr ""
 msgid "New environment"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "New flag"
+msgstr ""
+
 #: src/components/password-form.tsx
 msgid "New password"
 msgstr ""
@@ -1132,12 +1258,20 @@ msgstr ""
 msgid "Newest entries"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Next"
+msgstr ""
+
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "No"
 msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "No entry matches these filters."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "No flag matches these filters."
 msgstr ""
 
 #: src/lib/audit.ts
@@ -1208,6 +1342,7 @@ msgid "Nothing here yet."
 msgstr ""
 
 #. An attribute type.
+#: src/lib/flags.ts
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Number"
 msgstr ""
@@ -1242,6 +1377,8 @@ msgstr ""
 
 #. The name of a built-in role.
 #: src/lib/access-names.ts
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Owner"
 msgstr ""
 
@@ -1251,6 +1388,10 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "Pages of entries"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Pages of flags"
 msgstr ""
 
 #: src/components/invitation-acceptance.tsx
@@ -1267,9 +1408,21 @@ msgstr ""
 msgid "Password minimum length"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "Permanent"
+msgstr ""
+
 #: src/components/personal-menu.tsx
 #: src/routes/_signed-in/settings/route.tsx
 msgid "Personal settings"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "Press Enter after each tag."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Previous"
 msgstr ""
 
 #: src/routes/_signed-in/settings/profile.tsx
@@ -1342,6 +1495,14 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Remove grant"
+msgstr ""
+
+#: src/components/tags-input.tsx
+msgid "Remove tag {tag}"
+msgstr ""
+
+#: src/components/variations-editor.tsx
+msgid "Remove variation {n}"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments.tsx
@@ -1547,6 +1708,10 @@ msgstr ""
 msgid "Standard attributes are part of every project, so they cannot be deleted."
 msgstr ""
 
+#: src/lib/flags.ts
+msgid "Start with a letter; then letters, digits, ., - and _, at most 128 in all."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
 msgstr ""
@@ -1561,6 +1726,7 @@ msgid "Status"
 msgstr ""
 
 #. An attribute type.
+#: src/lib/flags.ts
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
 msgstr ""
@@ -1578,6 +1744,20 @@ msgstr ""
 #: src/components/theme-choice.tsx
 msgctxt "theme"
 msgid "System"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Tag"
+msgstr ""
+
+#: src/components/tags-input.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "Tags"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "Temporary"
 msgstr ""
 
 #: src/components/session-list.tsx
@@ -1632,6 +1812,14 @@ msgstr ""
 msgid "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "The flag {key} is created."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "The flag is created off in every environment, serving its off variation until it is switched on."
+msgstr ""
+
 #: src/components/auth-settings-form.tsx
 msgid "The furthest ahead a new API token may expire. Tokens created before keep their expiry."
 msgstr ""
@@ -1642,6 +1830,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "The member accountable for the flag."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -1674,6 +1866,10 @@ msgstr ""
 
 #: src/components/project-token-list.tsx
 msgid "The new project token"
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The owner must be an active member holding a role in the project, or an instance admin."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -1752,12 +1948,24 @@ msgstr ""
 msgid "The token is revoked."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "The type of every value the flag serves. It never changes."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The unit type {key} is no longer declared, and its key can be declared again."
 msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "The value is out of range."
+msgstr ""
+
+#: src/components/variations-editor.tsx
+msgid "The values the flag can serve. A key names a variation in rules and results; a name defaults to the key."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "The whole tag"
 msgstr ""
 
 #: src/components/personal-menu.tsx
@@ -1807,6 +2015,10 @@ msgid "This invitation no longer works"
 msgstr ""
 
 #: src/lib/problem-messages.ts
+msgid "This is already in the list."
+msgstr ""
+
+#: src/lib/problem-messages.ts
 msgid "This is further ahead than this instance allows."
 msgstr ""
 
@@ -1834,6 +2046,10 @@ msgstr ""
 msgid "This password is too common. Choose another."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
+msgid "This project already has a flag with that key."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "This project already has a unit type or an attribute with that key."
@@ -1847,12 +2063,20 @@ msgstr ""
 msgid "This project has no attribute yet."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "This project has no flag yet."
+msgstr ""
+
 #: src/components/project-token-list.tsx
 msgid "This project has no token yet."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "This project has no unit type yet."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This value is not valid here."
 msgstr ""
 
 #: src/components/audit-entry-sheet.tsx
@@ -1896,12 +2120,18 @@ msgstr ""
 msgid "Too many sign-in attempts from your network. Try again later."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Too many."
+msgstr ""
+
 #: src/components/navigation.tsx
 #: src/components/query-error.tsx
 msgid "Try again"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Type"
 msgstr ""
 
@@ -1959,8 +2189,20 @@ msgstr ""
 msgid "Use {min} to {max} characters."
 msgstr ""
 
+#: src/components/variations-editor.tsx
+msgid "Value"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 msgid "Values before and after the change"
+msgstr ""
+
+#: src/components/variations-editor.tsx
+msgid "Variation {n}"
+msgstr ""
+
+#: src/components/variations-editor.tsx
+msgid "Variations"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/index.tsx
