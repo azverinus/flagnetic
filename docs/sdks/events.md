@@ -53,3 +53,7 @@ An event's time more than 24 hours ahead of the server clock is taken as the tim
 
 Each event is stored once by its `event_id`, per project, within the retention window (`FLAGNETIC_EVENTS_RETENTION_DAYS`, 30 days by default): an event received before, in an earlier batch, on any replica and on any day, or earlier in the same batch, is counted in `duplicates`. An SDK retrying a batch therefore resends it with the same IDs.
 
+
+## Evaluations answered remotely
+
+The server counts the [remote evaluations](evaluate.md) it answers, per key, SDK, platform, app version, flag, variation and true reason (the reason before a client key's answer is masked), and writes the counts every minute, and once more when a replica stops, as evaluation summaries of its own. They are kept apart from the summaries SDKs post, so the evaluations a client SDK also counts from the answers it received are never added twice. The SDK is the one its `User-Agent` names (`flagnetic-<sdk>/<version> (<platform>)`), or `unknown`; the app version is the context's `app_version` attribute when it is a string.
