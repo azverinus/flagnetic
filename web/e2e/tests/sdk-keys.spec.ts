@@ -304,6 +304,11 @@ test.describe("accessibility", () => {
       await expectNoSeriousViolations(page, `the new SDK key dialog (${theme})`);
       await page.keyboard.press("Escape");
 
+      await page.getByRole("button", { name: /^Edit storefront/ }).click();
+      await expect(page.getByRole("dialog", { name: "Edit key storefront" })).toBeVisible();
+      await expectNoSeriousViolations(page, `the edit dialog (${theme})`);
+      await page.keyboard.press("Escape");
+
       await page.getByRole("button", { name: /^Rotate backend/ }).click();
       await expect(page.getByRole("dialog", { name: "Rotate key backend" })).toBeVisible();
       await expectNoSeriousViolations(page, `the rotate dialog (${theme})`);

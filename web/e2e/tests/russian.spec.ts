@@ -13,6 +13,7 @@ import {
   submitSignIn,
 } from "../support/console";
 import { seedFlag, stringFlag, writeConfiguration } from "../support/flags";
+import { sdkRequest, seedSdkKey } from "../support/sdk";
 
 /**
  * A member who never chose a language, in a browser that asks for Russian:
@@ -30,10 +31,20 @@ test.describe("the console in Russian", () => {
   test.describe.configure({ mode: "serial" });
 
   let olga: Credentials & { id: string; name: string };
+  let anna: Credentials & { id: string; name: string };
   let project: string;
   test.beforeAll(async () => {
     olga = await seedMember("olga", "Ольга Ладыженская", password);
+    anna = await seedMember("anna", "Анна Берёзова", password);
     project = await seedProject("tula");
+    must(
+      `granting maintainer in ${project}`,
+      await createGrant({
+        client: managementClient(),
+        path: { project },
+        body: { member: anna.id, role: "maintainer" },
+      }),
+    );
     must(
       `granting viewer in ${project}`,
       await createGrant({
@@ -146,5 +157,95 @@ test.describe("the console in Russian", () => {
       "Конфигурация изменена",
     );
     await expectNoSeriousViolations(page, "the flag's history in Russian");
+  });
+
+  test("reads an environment's SDK keys and SDKs in Russian, with the reason a viewer cannot create a key", async ({
+    page,
+  }) => {
+    await seedSdkKey(project, "staging", { kind: "server", name: "бэкенд" });
+    await seedSdkKey(project, "staging", { kind: "client", name: "витрина" });
+    await signIn(page, olga, russian);
+    await page.goto(`/projects/${project}/environments/staging`);
+
+    await expect(page.getByRole("heading", { name: "staging", level: 1 })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Скачать набор правил" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "SDK-ключи", exact: true })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    const keys = page.getByRole("table", { name: "SDK-ключи" });
+    for (const header of [
+      "Название",
+      "Вид",
+      "Идентификатор ключа",
+      "Статус",
+      "Разрешённые источники",
+    ]) {
+      await expect(keys.getByRole("columnheader", { name: header })).toBeVisible();
+    }
+    await expect(keys.getByRole("row", { name: /бэкенд/ })).toContainText("Серверный");
+    await expect(keys.getByRole("row", { name: /витрина/ })).toContainText("Клиентский");
+    await expect(keys.getByRole("row", { name: /бэкенд/ })).toContainText("Действует");
+    const create = page.getByRole("button", { name: "Новый SDK-ключ" });
+    await expect(create).toHaveAttribute("aria-disabled", "true");
+    await expect(create).toHaveAccessibleDescription(/Нужно право управлять SDK-ключами/);
+    await expectNoSeriousViolations(page, "the SDK keys tab in Russian");
+
+    await page.getByRole("tab", { name: "SDK", exact: true }).click();
+    await expect(
+      page.getByText("Пока ни один SDK не обращался к этому окружению.", { exact: false }),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page, "the SDKs tab in Russian");
+  });
+
+  test("reads the keys dialogs in Russian", async ({ page }) => {
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${project}/environments/staging`);
+
+    await page.getByRole("button", { name: "Новый SDK-ключ" }).click();
+    const create = page.getByRole("dialog", { name: "Новый SDK-ключ" });
+    await expect(create).toBeVisible();
+    await expectNoSeriousViolations(page, "the new SDK key dialog in Russian");
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: /^Ротировать ключ бэкенд/ }).click();
+    await expect(page.getByRole("dialog")).toContainText("Ротировать");
+    await expectNoSeriousViolations(page, "the rotate dialog in Russian");
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: /^Отозвать ключ витрина/ }).click();
+    await expect(page.getByRole("dialog")).toContainText("Отозвать");
+    await expectNoSeriousViolations(page, "the revoke dialog in Russian");
+  });
+
+  test("reads the Discovered attributes in Russian, declare and dismiss included", async ({
+    page,
+  }) => {
+    const client = await seedSdkKey(project, "staging", { kind: "client", name: "приложение" });
+    const body = (attributes: Record<string, unknown>) => ({
+      body: { context: { units: { user: "u-1" }, attributes } },
+    });
+    await sdkRequest(client, "/evaluate", body({ plan: "pro", level: 3 }));
+    await sdkRequest(client, "/evaluate", body({ plan: "free", level: "gold" }));
+
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${project}/attributes`);
+    await page.getByRole("tab", { name: "Обнаруженные", exact: true }).click();
+    const level = page.getByRole("row", { name: /^level/ });
+    await expect(async () => {
+      await page.reload();
+      await expect(level).toContainText("Строка", { timeout: 1_000 });
+    }).toPass({ timeout: 20_000, intervals: [1_000] });
+    await expect(level).toContainText("Число, Строка");
+    await expectNoSeriousViolations(page, "the Discovered tab in Russian");
+
+    await page.getByRole("button", { name: "Объявить level" }).click();
+    await expect(page.getByRole("dialog", { name: "Объявить level" })).toBeVisible();
+    await expectNoSeriousViolations(page, "the declare dialog in Russian");
+    await page.keyboard.press("Escape");
+
+    await page.getByRole("button", { name: "Скрыть plan" }).click();
+    await expect(page.getByRole("dialog", { name: "Скрыть plan" })).toBeVisible();
+    await expectNoSeriousViolations(page, "the dismiss dialog in Russian");
   });
 });
