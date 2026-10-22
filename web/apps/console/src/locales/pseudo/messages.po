@@ -554,6 +554,10 @@ msgstr ""
 msgid "API tokens"
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
+msgid "App version"
+msgstr ""
+
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Appearance"
 msgstr ""
@@ -1180,6 +1184,10 @@ msgstr ""
 msgid "does not equal"
 msgstr ""
 
+#: src/components/download-ruleset.tsx
+msgid "Download ruleset"
+msgstr ""
+
 #: src/components/rule-editor.tsx
 msgid "Drag rule {position}"
 msgstr ""
@@ -1516,6 +1524,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Filter the segments"
+msgstr ""
+
+#: src/components/sdk-inventory.tsx
+msgid "First seen"
 msgstr ""
 
 #: src/components/configuration-editor.tsx
@@ -1855,6 +1867,7 @@ msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
+#: src/components/sdk-inventory.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -1901,6 +1914,11 @@ msgstr ""
 msgid "Language"
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
+msgid "Last ruleset version"
+msgstr ""
+
+#: src/components/sdk-inventory.tsx
 #: src/components/session-list.tsx
 msgid "Last seen"
 msgstr ""
@@ -2158,7 +2176,7 @@ msgstr ""
 msgid "Needs the permission to {name}."
 msgstr ""
 
-#: src/components/sdk-keys.tsx
+#: src/components/moment.tsx
 #: src/components/token-create-form.tsx
 #: src/components/token-list.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
@@ -2289,6 +2307,10 @@ msgstr ""
 
 #: src/components/rule-editor.tsx
 msgid "No rules: every context receives the fallthrough variation."
+msgstr ""
+
+#: src/components/sdk-inventory.tsx
+msgid "No SDK has used this environment yet. SDKs appear here after their first request, made with one of its SDK keys."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
@@ -2548,6 +2570,10 @@ msgstr ""
 #: src/components/personal-menu.tsx
 #: src/routes/_signed-in/settings/route.tsx
 msgid "Personal settings"
+msgstr ""
+
+#: src/components/sdk-inventory.tsx
+msgid "Platform"
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -3020,9 +3046,18 @@ msgstr ""
 msgid "Scopes"
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
+msgid "SDK"
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
 msgid "SDK keys"
+msgstr ""
+
+#: src/components/sdk-inventory.tsx
+#: src/routes/_signed-in/projects/$project/environments/$environment.tsx
+msgid "SDKs"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -3640,6 +3675,10 @@ msgstr ""
 msgid "The rollout has a new salt."
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
+msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "the segment {key}"
 msgstr ""
@@ -3872,6 +3911,14 @@ msgstr ""
 msgid "This rule is no longer in the configuration."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "This server cannot load the ruleset yet. Try again in {retry}."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "This server cannot load the ruleset yet. Try again in a moment."
+msgstr ""
+
 #: src/lib/tester.ts
 msgid "This unit type is in the context already."
 msgstr ""
@@ -4000,6 +4047,7 @@ msgstr ""
 msgid "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
 msgstr ""
 
+#: src/components/sdk-inventory.tsx
 #: src/components/session-list.tsx
 msgid "Unknown"
 msgstr ""
@@ -4094,6 +4142,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Variations reordered: <0>{order}</0>."
+msgstr ""
+
+#: src/components/sdk-inventory.tsx
+msgid "Version"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/index.tsx

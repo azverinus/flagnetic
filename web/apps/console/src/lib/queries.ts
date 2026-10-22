@@ -32,6 +32,10 @@ import {
   listEnvironments,
   getEnvironment,
   listSdkKeys,
+  listSdkInventory,
+  type SdkInventoryItem,
+  listDiscoveredAttributes,
+  type DiscoveredAttribute,
   type SdkKey,
   listFlags,
   getFlag,
@@ -143,6 +147,22 @@ export function sdkKeysQuery(project: string, environment: string) {
   return queryOptions<SdkKey[]>({
     queryKey: ["projects", project, "environments", environment, "sdk-keys"],
     queryFn: async () => (await unwrap(listSdkKeys({ path: { project, environment } }))).items,
+  });
+}
+
+/** The SDKs seen using an environment, the most recently seen first. */
+export function sdkInventoryQuery(project: string, environment: string) {
+  return queryOptions<SdkInventoryItem[]>({
+    queryKey: ["projects", project, "environments", environment, "sdk-inventory"],
+    queryFn: async () => (await unwrap(listSdkInventory({ path: { project, environment } }))).items,
+  });
+}
+
+/** The attributes SDKs sent that the project has not declared or dismissed. */
+export function discoveredAttributesQuery(project: string) {
+  return queryOptions<DiscoveredAttribute[]>({
+    queryKey: ["projects", project, "attributes", "discovered"],
+    queryFn: async () => (await unwrap(listDiscoveredAttributes({ path: { project } }))).items,
   });
 }
 

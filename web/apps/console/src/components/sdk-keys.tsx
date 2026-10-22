@@ -18,6 +18,7 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { Can } from "@/components/can";
+import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
 import { RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
 import { TagsInput } from "@/components/tags-input";
@@ -31,7 +32,6 @@ import { Input } from "@/components/ui/input";
 import { RevealSecretDialog } from "@/components/ui/reveal-secret";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Table } from "@/components/ui/table";
-import { formatDateTime } from "@/i18n/format";
 import { useCan } from "@/lib/access";
 import { ApiError, unwrap } from "@/lib/errors";
 import { nameSchema } from "@/lib/forms";
@@ -248,20 +248,6 @@ export function SdkKeys({ project, environment }: SdkKeysProps) {
         )}
       </RevealSecretDialog>
     </div>
-  );
-}
-
-/** A date and time, or that there is none to show. */
-function Moment({ value }: { value: string | null }) {
-  const { i18n } = useLingui();
-  return value === null ? (
-    <span className="text-muted-foreground">
-      <Trans>Never</Trans>
-    </span>
-  ) : (
-    <time dateTime={value} className="whitespace-nowrap">
-      {formatDateTime(i18n, value)}
-    </time>
   );
 }
 

@@ -2,7 +2,9 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
+import { DownloadRuleset } from "@/components/download-ruleset";
 import { QueryError } from "@/components/query-error";
+import { SdkInventory } from "@/components/sdk-inventory";
 import { SdkKeys } from "@/components/sdk-keys";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
@@ -48,6 +50,7 @@ function EnvironmentPage() {
       <PageHeader
         title={environment.data.name}
         description={<code className="font-mono text-xs">{environment.data.key}</code>}
+        actions={<DownloadRuleset project={project} environment={key} />}
       />
       <Tabs
         label={t`About ${key}`}
@@ -56,6 +59,11 @@ function EnvironmentPage() {
             value: "sdk-keys",
             label: <Trans>SDK keys</Trans>,
             content: <SdkKeys project={project} environment={key} />,
+          },
+          {
+            value: "sdks",
+            label: <Trans>SDKs</Trans>,
+            content: <SdkInventory project={project} environment={key} />,
           },
         ]}
       />
