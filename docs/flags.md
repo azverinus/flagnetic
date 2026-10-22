@@ -140,6 +140,8 @@ To compare, `GET /flags?differs_between=staging,production` lists the flags whos
 
 Pages hold `limit` flags; `next_cursor` fetches the next page under the same `sort`.
 
+In the console, **Flags** in the project navigation lists the project's flags with their type, owner and tags, filtered by text, type, tag, owner and archived, the filters and the page kept in the address so a view can be shared. **New flag**, offered to a member holding `flag.edit`, creates a flag of any type: a boolean flag is created with its `true` and `false`, any other starts with two variations to fill in, and the owner is the member creating it unless they choose another member of the project.
+
 ## Trying a configuration
 
 `POST /environments/{environment}/evaluate` evaluates flags for a context as the environment's SDKs would, with the full reason of each result: the served value and variation, the reason, the rule that served, an error code, and for a rollout the unit's bucket and the rollout's salt. It evaluates every flag that is not archived, or those `flags` names. With a `draft` (`{flag, configuration}`) it evaluates that flag's unsaved configuration in place of its saved one, validated as a replace would be and never stored. It answers the environment's `ruleset_version` beside the results, needs only `project.read`, and records no exposure.
