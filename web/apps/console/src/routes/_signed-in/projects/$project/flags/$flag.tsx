@@ -12,7 +12,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArchiveIcon, OctagonXIcon } from "lucide-react";
-import { useCallback, useId, useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/can";
@@ -35,7 +35,6 @@ import {
   configurationPut,
   type FlagDetailSearch,
   validateFlagDetailSearch,
-  withConfiguration,
 } from "@/lib/flag-detail";
 import { flagTypeName } from "@/lib/flags";
 import { ifMatch } from "@/lib/http";
@@ -50,6 +49,7 @@ import {
   segmentsQuery,
   unitTypesQuery,
 } from "@/lib/queries";
+import { useConfigurationAnswer } from "@/lib/use-configuration-answer";
 import { useKnownMembers } from "@/lib/use-known-members";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/flags/$flag")({
@@ -392,15 +392,13 @@ type PanelProps = {
  */
 function EnvironmentPanel(props: PanelProps) {
   const { t } = useLingui();
-  const { project, flag, configuration, environment, nameOf } = props;
+  const { project, flag, configuration, environment } = props;
   const archived = flag.archived_at !== null;
   const frozen = archived
     ? t`The flag is archived. Restore it to change its configurations.`
     : undefined;
   const can = useCan("flag_configuration.update");
   const missing = useMissingPermissionReason("flag_configuration.update");
-  const updated = configuration.updated_by ? nameOf(configuration.updated_by) : undefined;
-  const version = configuration.version;
   const attributes = useQuery(attributesQuery(project));
   const segments = useQuery(segmentsQuery(project));
   const flags = useQuery(flagChoicesQuery(project));
@@ -444,15 +442,6 @@ function EnvironmentPanel(props: PanelProps) {
           <Skeleton className="h-32 w-full" />
         </div>
       )}
-      <p className="text-xs text-muted-foreground">
-        {updated ? (
-          <Trans>
-            Version {version}, last saved by {updated}.
-          </Trans>
-        ) : (
-          <Trans>Version {version}.</Trans>
-        )}
-      </p>
     </div>
   );
 }
@@ -470,7 +459,7 @@ function OnOff({
 }: PanelProps & { frozen: boolean }) {
   const { i18n, t } = useLingui();
   const queryClient = useQueryClient();
-  const switchId = useId();
+  const answered = useConfigurationAnswer(project, flag.key);
   const [killing, setKilling] = useState(false);
   const name = environment?.name ?? configuration.environment;
   const key = flag.key;
@@ -486,11 +475,7 @@ function OnOff({
       ),
     meta: { toast: false },
     onSuccess: (next) => {
-      queryClient.setQueryData(
-        flagQuery(project, flag.key).queryKey,
-        (current: Flag | undefined) => (current ? withConfiguration(current, next) : current),
-      );
-      void queryClient.invalidateQueries({ queryKey: [...flagsQueryKey(project), "list"] });
+      answered(next);
       toast.success(next.on ? t`${key} is on in ${name}.` : t`${key} is off in ${name}.`);
     },
     onError: (error) => {
@@ -510,12 +495,10 @@ function OnOff({
       <div className="flex items-center gap-3">
         <Can permission="flag_configuration.update" whenMissing="disable">
           <Switch
-            id={switchId}
             checked={configuration.on}
             disabled={frozen || toggle.isPending}
-            aria-label={
-              configuration.on ? t`Switch ${key} off in ${name}` : t`Switch ${key} on in ${name}`
-            }
+            // One name whatever the state, which the switch announces itself.
+            aria-label={t`${key} on in ${name}`}
             onCheckedChange={(on) => toggle.mutate(on)}
           />
         </Can>

@@ -1,4 +1,4 @@
-import { updateFlag } from "@flagnetic/api";
+import { evaluate, updateFlag } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
@@ -184,7 +184,7 @@ test.describe("the configuration draft", () => {
     await seedFlag(project, stringFlag("checkout_variant"));
     await openFlag(page, project, "checkout_variant", { environment: "development" });
 
-    await page.getByRole("switch", { name: "Switch checkout_variant on in Development" }).click();
+    await page.getByRole("switch", { name: "checkout_variant on in Development" }).click();
     await expect(page.getByText("checkout_variant is on in Development.")).toBeVisible();
     expect((await readConfiguration(project, "checkout_variant", "development")).on).toBe(true);
 
@@ -194,6 +194,19 @@ test.describe("the configuration draft", () => {
     await expect(bar(page)).toHaveCount(0);
     const saved = await readConfiguration(project, "checkout_variant", "development");
     expect(saved).toMatchObject({ on: true, fallthrough: "treatment" });
+    // The environment's ruleset serves what was saved.
+    const evaluation = must(
+      "evaluating checkout_variant",
+      await evaluate({
+        client: managementClient(),
+        path: { project, environment: "development" },
+        body: { context: { units: { user: "u-1" } }, flags: ["checkout_variant"] },
+      }),
+    );
+    expect(evaluation.flags["checkout_variant"]).toMatchObject({
+      variation: "treatment",
+      reason: "fallthrough",
+    });
   });
 
   test("discards a draft back to the configuration as loaded", async ({ page }) => {

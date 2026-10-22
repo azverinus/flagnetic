@@ -4,6 +4,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { activateForTests } from "@/test/render";
 
+import type { AttributeTypes } from "./conditions";
+
 import {
   basisPoints,
   maxRules,
@@ -168,6 +170,23 @@ describe("what a rule still needs", () => {
       "Enter a percentage from 0 to 100, to two decimal places.",
     );
     expect(issues.get(`${broken[1]!.key}/unit_type`)).toBe("Choose a unit type.");
+  });
+
+  it("does not check again a condition the saved configuration has", () => {
+    const shorthand: Rule = {
+      id: "r9",
+      description: "",
+      conditions: [{ kind: "attribute", attribute: "app_version", op: "gte", value: "2.0" }],
+      serve: { kind: "variation", variation: "control" },
+    };
+    const versions: AttributeTypes = new Map([...types, ["app_version", "semver"] as const]);
+    const withVersion = { ...context, types: versions };
+    const [card] = ruleDrafts([shorthand], withVersion.types) as [RuleDraft];
+    expect(ruleIssues(i18n, [card], withVersion).size).toBe(1);
+    const saved = new Set([
+      '{"attribute":"app_version","kind":"attribute","op":"gte","value":"2.0"}',
+    ]);
+    expect(ruleIssues(i18n, [card], { ...withVersion, saved }).size).toBe(0);
   });
 
   it("refuses a variation the flag no longer has", () => {

@@ -2,6 +2,8 @@ import type { Rule, RuleInput, Serve } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
+import { formatNumber } from "@/i18n/format";
+
 import {
   type AttributeTypes,
   type ConditionContext,
@@ -10,6 +12,7 @@ import {
   conditionIssue,
   conditionOf,
 } from "./conditions";
+import { fingerprint } from "./structural-diff";
 
 /** How many rules a configuration has at most, and conditions a rule. */
 export const maxRules = 50;
@@ -151,6 +154,12 @@ export function moveRule(
 export type RuleContext = ConditionContext & {
   variations: readonly string[];
   unitTypes: ReadonlySet<string>;
+  /**
+   * The conditions the saved configuration has, by fingerprint: those are
+   * not checked again, so a condition the server took, such as a version
+   * written "2.0" through the API, never stops saving another change.
+   */
+  saved?: ReadonlySet<string>;
 };
 
 /**
@@ -167,9 +176,11 @@ export function ruleIssues(
   const issues = new Map<string, string>();
   for (const rule of rules) {
     if (rule.conditions.length > maxConditions) {
-      issues.set(`${rule.key}/conditions`, i18n._(msg`A rule has at most 20 conditions.`));
+      const max = formatNumber(i18n, maxConditions);
+      issues.set(`${rule.key}/conditions`, i18n._(msg`A rule has at most ${max} conditions.`));
     }
     for (const condition of rule.conditions) {
+      if (context.saved?.has(fingerprint(conditionOf(condition, context.types)))) continue;
       const issue = conditionIssue(i18n, condition, context);
       if (issue) issues.set(condition.key, issue);
     }

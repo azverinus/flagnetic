@@ -207,7 +207,7 @@ export function reapply(
  * key, and what a rule serves by the rule's key and `/serve`. Pointers
  * count places in the draft as it was sent; the rest is shown above Save.
  */
-export function pinRefusal(
+export function placeRefusal(
   violations: readonly Violation[],
   sent: ConfigurationDraft,
 ): { at: Map<string, Violation>; rest: Violation[] } {

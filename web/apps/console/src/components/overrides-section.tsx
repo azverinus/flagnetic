@@ -22,12 +22,12 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { Table } from "@/components/ui/table";
 import { useCan, useMissingPermissionReason } from "@/lib/access";
 import { ApiError, unwrap } from "@/lib/errors";
-import {
-  configurationViolationMessage,
-  overrideIssues,
-  withConfiguration,
-} from "@/lib/flag-detail";
-import { flagQuery, flagsQueryKey } from "@/lib/queries";
+import { configurationViolationMessage, overrideIssues } from "@/lib/flag-detail";
+import { flagQuery } from "@/lib/queries";
+import { useConfigurationAnswer } from "@/lib/use-configuration-answer";
+
+/** The fields of the override form, whose violations are shown under them. */
+const fieldPointers = ["/variation", "/note"];
 
 export type OverridesSectionProps = {
   project: string;
@@ -41,9 +41,9 @@ export type OverridesSectionProps = {
 };
 
 /**
- * The units pinned to a variation in one environment, checked before any
- * rule. Each one is written at once, on its own, rather than with the
- * rest of the configuration, so pinning a tester's account is one click
+ * The overrides of one environment, checked before any rule. Each one is
+ * written at once, on its own, rather than with the rest of the
+ * configuration, so giving a tester's account an override is one click
  * whatever else is being edited.
  */
 export function OverridesSection({
@@ -60,12 +60,7 @@ export function OverridesSection({
   const can = useCan("flag_configuration.update");
   const reason = useMissingPermissionReason("flag_configuration.update");
 
-  const answered = (next: FlagConfiguration) => {
-    queryClient.setQueryData(flagQuery(project, flag.key).queryKey, (current: Flag | undefined) =>
-      current ? withConfiguration(current, next) : current,
-    );
-    void queryClient.invalidateQueries({ queryKey: [...flagsQueryKey(project), "list"] });
-  };
+  const answered = useConfigurationAnswer(project, flag.key);
 
   const remove = useMutation({
     mutationFn: (override: Override) =>
@@ -94,6 +89,8 @@ export function OverridesSection({
     },
   });
 
+  const removing = remove.isPending;
+  const removeOverride = remove.mutate;
   const columns = useMemo<ColumnDef<Override, unknown>[]>(
     () => [
       { id: "unit_type", header: t`Unit type`, accessorKey: "unit_type" },
@@ -136,8 +133,8 @@ export function OverridesSection({
                 variant="ghost"
                 size="icon"
                 aria-label={t`Remove the override of ${unit}`}
-                disabled={remove.isPending}
-                onClick={() => remove.mutate(row.original)}
+                disabled={removing}
+                onClick={() => removeOverride(row.original)}
               >
                 <XIcon aria-hidden />
               </Button>
@@ -146,7 +143,7 @@ export function OverridesSection({
         },
       },
     ],
-    [t, nameOf, remove, frozen],
+    [t, nameOf, removing, removeOverride, frozen],
   );
 
   return (
@@ -243,9 +240,12 @@ function AddOverride({
     const violation = refusal.violations.find((candidate) => candidate.pointer === pointer);
     return violation && configurationViolationMessage(i18n, violation);
   };
-  const shownAtFields =
-    refusal instanceof ApiError &&
-    refusal.violations.some((violation) => ["/variation", "/note"].includes(violation.pointer));
+  // Violations of the fields are shown under them; any other above the button.
+  const elsewhere =
+    refusal instanceof ApiError
+      ? refusal.violations.filter((violation) => !fieldPointers.includes(violation.pointer))
+      : [];
+  const hasViolations = refusal instanceof ApiError && refusal.violations.length > 0;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -292,13 +292,23 @@ function AddOverride({
       <Field
         label={<Trans>Note (optional)</Trans>}
         hint={
-          <Trans>Why the unit is pinned, such as the test it is for. Never sent to SDKs.</Trans>
+          <Trans>
+            Why the unit has this override, such as the test it is for. Never sent to SDKs.
+          </Trans>
         }
         error={(checked ? issues.note : undefined) ?? at("/note")}
       >
         <Input autoComplete="off" value={note} onChange={(event) => setNote(event.target.value)} />
       </Field>
-      <FormRefusal refusal={shownAtFields ? undefined : refusal} />
+      {hasViolations ? (
+        elsewhere.map((violation) => (
+          <p key={violation.pointer} role="alert" className="text-sm text-destructive">
+            {configurationViolationMessage(i18n, violation)}
+          </p>
+        ))
+      ) : (
+        <FormRefusal refusal={refusal} />
+      )}
       <div className="flex justify-end">
         <Button type="submit" disabled={save.isPending}>
           <Trans>Add override</Trans>

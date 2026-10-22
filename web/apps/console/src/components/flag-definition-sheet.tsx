@@ -156,6 +156,7 @@ function DefinitionForm({
   const [base, setBase] = useState<FlagDefinition>(flag);
   const [version, setVersion] = useState(flag.version);
   const [conflict, setConflict] = useState<Conflict>();
+  const [unread, setUnread] = useState(false);
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: valuesOf(flag) });
 
   const patchOf = (values: Values): FlagPatch => {
@@ -206,10 +207,14 @@ function DefinitionForm({
     },
     onError: async (error) => {
       if (!(error instanceof ApiError) || error.code !== "version_mismatch") return;
-      const current = await queryClient.fetchQuery({
-        ...flagQuery(project, flag.key),
-        staleTime: 0,
-      });
+      let current: Flag;
+      try {
+        current = await queryClient.fetchQuery({ ...flagQuery(project, flag.key), staleTime: 0 });
+      } catch {
+        // The newer version could not be read: the refusal says to reload.
+        setUnread(true);
+        return;
+      }
       const entries = await queryClient
         .fetchQuery({ ...flagEntriesQuery(project, flag.id, { limit: 20 }), staleTime: 0 })
         .catch(() => []);
@@ -228,6 +233,7 @@ function DefinitionForm({
       return;
     }
     setConflict(undefined);
+    setUnread(false);
     save.mutate({ values, at: version });
   });
 
@@ -241,8 +247,9 @@ function DefinitionForm({
     return listed.sort((a, b) => a.label.localeCompare(b.label, i18n.locale));
   }, [members.data, base.owner, nameOf, i18n.locale]);
 
+  // A conflict is explained by its banner once the newer version is read.
   const refusal =
-    save.error instanceof ApiError && save.error.code === "version_mismatch"
+    save.error instanceof ApiError && save.error.code === "version_mismatch" && !unread
       ? undefined
       : save.error;
   const at = (pointer: string) => flagRefusalAt(i18n, refusal, pointer);
@@ -297,9 +304,11 @@ function DefinitionForm({
                 disabled={save.isPending}
                 onClick={() => {
                   const at = conflict.current.version;
-                  setVersion(at);
-                  setConflict(undefined);
-                  save.mutate({ values: form.getValues(), at });
+                  void form.handleSubmit((values) => {
+                    setVersion(at);
+                    setConflict(undefined);
+                    save.mutate({ values, at });
+                  })();
                 }}
               >
                 <Trans>Keep my edits</Trans>

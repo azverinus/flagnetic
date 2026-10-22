@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectItem } from "@/components/ui/select";
+import { formatNumber } from "@/i18n/format";
 import { cn } from "@/lib/cn";
 import {
   type AttributeOption,
@@ -75,18 +76,30 @@ export function RuleEditor({
   saltedRules,
   disabled = false,
 }: RuleEditorProps) {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
+  const maxRulesText = formatNumber(i18n, maxRules);
   const heading = useId();
   const [announcement, setAnnouncement] = useState("");
   const [dragged, setDragged] = useState<number>();
   // A moved card's DOM node is moved too, which drops focus from it; the
-  // element focused before the move gets it back once the cards are laid out.
+  // element focused before the move gets it back once the cards are laid
+  // out, or, when it is a move button that the move disabled (the card
+  // reached an end), the card's other move button. A removed card's focus
+  // goes to Add rule, so the keyboard stays in the rules.
   const refocus = useRef<HTMLElement | null>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => {
-    if (refocus.current && document.activeElement !== refocus.current) {
-      refocus.current.focus();
-    }
+    const target = refocus.current;
     refocus.current = null;
+    if (!target || document.activeElement === target) return;
+    if (target.isConnected && !target.matches(":disabled")) {
+      target.focus();
+      return;
+    }
+    const sibling = target.isConnected
+      ? target.closest("section")?.querySelector<HTMLElement>("[data-move]:not(:disabled)")
+      : undefined;
+    (sibling ?? addButton.current)?.focus();
   }, [rules]);
 
   const announceMove = (move: Move) => {
@@ -102,6 +115,7 @@ export function RuleEditor({
   };
   const remove = (index: number) => {
     const position = index + 1;
+    refocus.current = addButton.current;
     onChange(rules.filter((_, at) => at !== index));
     setAnnouncement(t`Rule ${position} removed.`);
   };
@@ -170,12 +184,18 @@ export function RuleEditor({
       )}
       {disabled ? null : (
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" variant="outline" onClick={add} disabled={rules.length >= maxRules}>
+          <Button
+            ref={addButton}
+            type="button"
+            variant="outline"
+            onClick={add}
+            disabled={rules.length >= maxRules}
+          >
             <Trans>Add rule</Trans>
           </Button>
           {rules.length >= maxRules ? (
             <p className="text-sm text-muted-foreground">
-              <Trans>A configuration has at most 50 rules.</Trans>
+              <Trans>A configuration has at most {maxRulesText} rules.</Trans>
             </p>
           ) : null}
         </div>
@@ -229,7 +249,8 @@ function RuleCard({
   onRegenerateSalt,
   disabled = false,
 }: RuleCardProps) {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
+  const maxConditionsText = formatNumber(i18n, maxConditions);
   const heading = useId();
   const descriptionId = useId();
   const ruleError = errors.get(rule.key) ?? errors.get(`${rule.key}/conditions`);
@@ -279,6 +300,9 @@ function RuleCard({
             <button
               type="button"
               draggable
+              // Dragging takes a pointer; the move buttons and Alt+arrows
+              // are the keyboard's way, so the handle is left out of the tab order.
+              tabIndex={-1}
               aria-label={t`Drag rule ${position}`}
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "move";
@@ -308,6 +332,7 @@ function RuleCard({
                 type="button"
                 variant="ghost"
                 size="icon"
+                data-move
                 aria-label={t`Move rule ${position} up`}
                 disabled={position === 1}
                 onClick={() => onMove(position - 1)}
@@ -318,6 +343,7 @@ function RuleCard({
                 type="button"
                 variant="ghost"
                 size="icon"
+                data-move
                 aria-label={t`Move rule ${position} down`}
                 disabled={last}
                 onClick={() => onMove(position + 1)}
@@ -438,7 +464,7 @@ function RuleCard({
               </Button>
               {full ? (
                 <p className="text-sm text-muted-foreground">
-                  <Trans>A rule has at most 20 conditions.</Trans>
+                  <Trans>A rule has at most {maxConditionsText} conditions.</Trans>
                 </p>
               ) : null}
             </div>
@@ -591,15 +617,19 @@ function ServeEditor({
             </Trans>
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Label htmlFor={ids.salt} className="text-sm">
-              <Trans>Salt (rule {position})</Trans>
-            </Label>
             {serve.salt ? (
-              <Input id={ids.salt} readOnly value={serve.salt} className="w-48 font-mono" />
+              <>
+                <Label htmlFor={ids.salt} className="text-sm">
+                  <Trans>Salt (rule {position})</Trans>
+                </Label>
+                <Input id={ids.salt} readOnly value={serve.salt} className="w-48 font-mono" />
+              </>
             ) : (
-              <span id={ids.salt} className="text-sm text-muted-foreground">
-                <Trans>Given by the server when the rule is saved as a rollout.</Trans>
-              </span>
+              <p className="text-sm text-muted-foreground">
+                <Trans>
+                  Salt (rule {position}): given by the server when the rule is saved as a rollout.
+                </Trans>
+              </p>
             )}
             {onRegenerateSalt && !disabled ? (
               <Button type="button" variant="outline" size="sm" onClick={onRegenerateSalt}>

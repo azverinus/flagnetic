@@ -10,6 +10,7 @@ import {
   type Segment,
   type UnitType,
 } from "@flagnetic/api";
+import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CircleAlertIcon } from "lucide-react";
@@ -33,21 +34,18 @@ import {
   configurationPutOf,
   type EditorState,
   isDraftDirty,
-  pinRefusal,
+  placeRefusal,
   prerequisiteIssues,
   reapply,
 } from "@/lib/configuration-draft";
 import { ApiError, unwrap } from "@/lib/errors";
-import {
-  configurationViolationMessage,
-  entryOfVersion,
-  withConfiguration,
-} from "@/lib/flag-detail";
+import { configurationViolationMessage, entryOfVersion } from "@/lib/flag-detail";
 import { ifMatch } from "@/lib/http";
 import { problemMessage } from "@/lib/problem-messages";
-import { flagEntriesQuery, flagQuery, flagsQueryKey } from "@/lib/queries";
+import { flagEntriesQuery } from "@/lib/queries";
 import { type RuleDraft, ruleIssues, withRule } from "@/lib/rule-editor";
-import { diffConfigurations } from "@/lib/structural-diff";
+import { diffConfigurations, fingerprint } from "@/lib/structural-diff";
+import { useConfigurationAnswer } from "@/lib/use-configuration-answer";
 
 /** What the project declares that a configuration names. */
 export type Declarations = {
@@ -100,7 +98,6 @@ export function ConfigurationEditor({
 }: ConfigurationEditorProps) {
   const { i18n, t } = useLingui();
   const queryClient = useQueryClient();
-  const detailKey = flagQuery(project, flag.key).queryKey;
   const name = environment.name;
 
   const types: AttributeTypes = useMemo(
@@ -154,6 +151,11 @@ export function ConfigurationEditor({
     self: flag.key,
     variations: flag.variations.map((variation) => variation.key),
     unitTypes: new Set(declarations.unitTypes.map((type) => type.key)),
+    saved: new Set(
+      state.base.rules.flatMap((rule) =>
+        rule.conditions.map((condition) => fingerprint(condition)),
+      ),
+    ),
   };
   const issues = new Map([
     ...ruleIssues(i18n, draft.rules, context),
@@ -164,20 +166,28 @@ export function ConfigurationEditor({
     ...(checked ? issues : new Map<string, string>()),
   ]);
 
-  const answered = (next: FlagConfiguration) => {
-    queryClient.setQueryData(detailKey, (current: Flag | undefined) =>
-      current ? withConfiguration(current, next) : current,
-    );
-    void queryClient.invalidateQueries({ queryKey: [...flagsQueryKey(project), "list"] });
-  };
+  const answered = useConfigurationAnswer(project, flag.key);
 
-  /** Reads the newer version a write met, and who saved it, for the banner. */
+  /**
+   * Reads the newer version a write met, and who saved it, for the banner;
+   * a failure to read it is explained where a refusal of Save is.
+   */
   const meetConflict = async (from: FlagConfiguration) => {
-    const fresh = await unwrap(
-      getFlagConfiguration({
-        path: { project, flag: flag.key, environment: configuration.environment },
-      }),
-    );
+    let fresh: FlagConfiguration;
+    try {
+      fresh = await unwrap(
+        getFlagConfiguration({
+          path: { project, flag: flag.key, environment: configuration.environment },
+        }),
+      );
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? problemMessage(i18n, error)
+          : i18n._(msg`The request was refused.`);
+      setRefusal({ at: new Map(), rest: [message] });
+      return;
+    }
     const entries = await queryClient
       .fetchQuery({
         ...flagEntriesQuery(project, flag.id, { environment: environment.id, limit: 20 }),
@@ -212,15 +222,15 @@ export function ConfigurationEditor({
         return;
       }
       if (error.violations.length > 0) {
-        const pinned = pinRefusal(error.violations, sent.draft);
+        const placed = placeRefusal(error.violations, sent.draft);
         setRefusal({
           at: new Map(
-            [...pinned.at].map(([key, violation]) => [
+            [...placed.at].map(([key, violation]) => [
               key,
               configurationViolationMessage(i18n, violation),
             ]),
           ),
-          rest: pinned.rest.map((violation) => configurationViolationMessage(i18n, violation)),
+          rest: placed.rest.map((violation) => configurationViolationMessage(i18n, violation)),
         });
         return;
       }

@@ -10,7 +10,7 @@ import {
   configurationPutOf,
   type EditorState,
   isDraftDirty,
-  pinRefusal,
+  placeRefusal,
   prerequisiteIssues,
   reapply,
 } from "./configuration-draft";
@@ -215,7 +215,7 @@ describe("a refusal of a save", () => {
       types,
     );
     const violation = (pointer: string) => ({ pointer, code: "invalid_value", detail: "" });
-    const pinned = pinRefusal(
+    const placed = placeRefusal(
       [
         violation("/fallthrough"),
         violation("/prerequisites/0/flag"),
@@ -226,14 +226,14 @@ describe("a refusal of a save", () => {
       ],
       sent,
     );
-    expect(pinned.at.get("fallthrough")?.pointer).toBe("/fallthrough");
-    expect(pinned.at.get(sent.prerequisites[0]!.key)?.pointer).toBe("/prerequisites/0/flag");
-    expect(pinned.at.get(sent.rules[1]!.key)?.pointer).toBe("/rules/1");
-    expect(pinned.at.get(sent.rules[0]!.conditions[0]!.key)?.pointer).toBe(
+    expect(placed.at.get("fallthrough")?.pointer).toBe("/fallthrough");
+    expect(placed.at.get(sent.prerequisites[0]!.key)?.pointer).toBe("/prerequisites/0/flag");
+    expect(placed.at.get(sent.rules[1]!.key)?.pointer).toBe("/rules/1");
+    expect(placed.at.get(sent.rules[0]!.conditions[0]!.key)?.pointer).toBe(
       "/rules/0/conditions/0/value",
     );
-    expect(pinned.at.get(`${sent.rules[1]!.key}/serve`)?.pointer).toBe("/rules/1/serve/percentage");
-    expect(pinned.rest.map((v) => v.pointer)).toEqual(["/overrides/0/unit_id"]);
+    expect(placed.at.get(`${sent.rules[1]!.key}/serve`)?.pointer).toBe("/rules/1/serve/percentage");
+    expect(placed.rest.map((v) => v.pointer)).toEqual(["/overrides/0/unit_id"]);
   });
 });
 

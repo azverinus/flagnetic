@@ -58,6 +58,10 @@ msgstr ""
 msgid "{key} is on in {name}."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "{key} on in {name}"
+msgstr ""
+
 #: src/components/kill-switch-dialog.tsx
 msgid "{key} was already off in {name}. Nothing changed."
 msgstr ""
@@ -176,7 +180,7 @@ msgid "A chain of prerequisites has at most 5 steps."
 msgstr ""
 
 #: src/components/rule-editor.tsx
-msgid "A configuration has at most 50 rules."
+msgid "A configuration has at most {maxRulesText} rules."
 msgstr ""
 
 #: src/lib/conditions.ts
@@ -234,9 +238,12 @@ msgstr ""
 msgid "A revoked device is signed out at its next request."
 msgstr ""
 
-#: src/components/rule-editor.tsx
 #: src/lib/rule-editor.ts
-msgid "A rule has at most 20 conditions."
+msgid "A rule has at most {max} conditions."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "A rule has at most {maxConditionsText} conditions."
 msgstr ""
 
 #: src/components/auth-settings-form.tsx
@@ -268,7 +275,7 @@ msgid "A token lets a script act for you, narrowed to its scopes. Only a signed-
 msgstr ""
 
 #: src/lib/flag-detail.ts
-msgid "A unit ID has at most 256 bytes."
+msgid "A unit ID has at most {max} bytes."
 msgstr ""
 
 #: src/components/condition-row.tsx
@@ -1277,10 +1284,6 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "From"
-msgstr ""
-
-#: src/components/rule-editor.tsx
-msgid "Given by the server when the rule is saved as a rollout."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -2388,6 +2391,10 @@ msgstr ""
 msgid "Salt (rule {position})"
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "Salt (rule {position}): given by the server when the rule is saved as a rollout."
+msgstr ""
+
 #: src/components/auth-settings-form.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
@@ -2590,14 +2597,6 @@ msgstr ""
 #: src/lib/flags.ts
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
-msgstr ""
-
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Switch {key} off in {name}"
-msgstr ""
-
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Switch {key} on in {name}"
 msgstr ""
 
 #: src/lib/access-names.ts
@@ -2893,6 +2892,7 @@ msgstr ""
 msgid "The request was not sent as JSON."
 msgstr ""
 
+#: src/components/configuration-editor.tsx
 #: src/lib/problem-messages.ts
 msgid "The request was refused."
 msgstr ""
@@ -3282,14 +3282,6 @@ msgstr ""
 msgid "Variations reordered: <0>{order}</0>."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Version {version}, last saved by {updated}."
-msgstr ""
-
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Version {version}."
-msgstr ""
-
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "View all environments"
 msgstr ""
@@ -3336,7 +3328,7 @@ msgid "Where the project serves from. A key is fixed once created; the name can 
 msgstr ""
 
 #: src/components/overrides-section.tsx
-msgid "Why the unit is pinned, such as the test it is for. Never sent to SDKs."
+msgid "Why the unit has this override, such as the test it is for. Never sent to SDKs."
 msgstr ""
 
 #: src/routes/_signed-in/admin/members/$member.tsx

@@ -297,16 +297,17 @@ export function auditEntriesQuery(scope: AuditScope, search: AuditSearch, limit?
 }
 
 /**
- * The newest audit entries of one flag, in one environment or in all:
+ * The newest audit entries of one flag, by its identifier, which follows
+ * it whatever its key, in one environment or in all:
  * what tells a member who made the version they ran into, and when.
  */
 export function flagEntriesQuery(
   project: string,
-  flag: string,
+  flagId: string,
   { environment, killSwitch, limit }: { environment?: string; killSwitch?: true; limit: number },
 ) {
   return queryOptions<AuditEntry[]>({
-    queryKey: [...auditQueryKey, { project }, "flag", flag, { environment, killSwitch, limit }],
+    queryKey: [...auditQueryKey, { project }, "flag", flagId, { environment, killSwitch, limit }],
     queryFn: async () =>
       (
         await unwrap(
@@ -314,7 +315,7 @@ export function flagEntriesQuery(
             path: { project },
             query: {
               entity_kind: "flag",
-              entity_id: flag,
+              entity_id: flagId,
               ...(environment ? { environment } : {}),
               ...(killSwitch ? { kill_switch: true } : {}),
               limit,

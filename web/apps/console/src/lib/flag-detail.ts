@@ -8,6 +8,8 @@ import type {
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
+import { formatNumber } from "@/i18n/format";
+
 import { flagViolationMessage } from "./flags";
 
 /**
@@ -126,7 +128,8 @@ export function overrideIssues(i18n: I18n, unitId: string, note: string): Overri
   const issues: OverrideIssues = {};
   if (unitId === "") issues.unitId = i18n._(msg`Enter the unit's ID.`);
   else if (new TextEncoder().encode(unitId).length > unitIdMaxBytes) {
-    issues.unitId = i18n._(msg`A unit ID has at most 256 bytes.`);
+    const max = formatNumber(i18n, unitIdMaxBytes);
+    issues.unitId = i18n._(msg`A unit ID has at most ${max} bytes.`);
   }
   if (note.trim().length > overrideNoteMax) {
     issues.note = configurationViolationMessage(i18n, {

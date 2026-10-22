@@ -11,13 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTime } from "@/i18n/format";
 import { unwrap } from "@/lib/errors";
-import {
-  killReasonMinimum,
-  killReasonReady,
-  lastKillOf,
-  withConfiguration,
-} from "@/lib/flag-detail";
-import { auditQueryKey, flagEntriesQuery, flagQuery, flagsQueryKey } from "@/lib/queries";
+import { killReasonMinimum, killReasonReady, lastKillOf } from "@/lib/flag-detail";
+import { auditQueryKey, flagEntriesQuery } from "@/lib/queries";
+import { useConfigurationAnswer } from "@/lib/use-configuration-answer";
 
 export type KillSwitchDialogProps = {
   project: string;
@@ -67,6 +63,7 @@ function KillSwitch({
   const queryClient = useQueryClient();
   const field = useId();
   const [reason, setReason] = useState("");
+  const answered = useConfigurationAnswer(project, flag.key);
   const lastUse = useQuery(
     flagEntriesQuery(project, flag.id, { environment: environment.id, killSwitch: true, limit: 1 }),
   );
@@ -88,12 +85,7 @@ function KillSwitch({
     meta: { toast: false },
     onSuccess: (result) => {
       const key = flag.key;
-      queryClient.setQueryData(
-        flagQuery(project, flag.key).queryKey,
-        (current: Flag | undefined) =>
-          current ? withConfiguration(current, result.configuration) : current,
-      );
-      void queryClient.invalidateQueries({ queryKey: [...flagsQueryKey(project), "list"] });
+      answered(result.configuration);
       void queryClient.invalidateQueries({ queryKey: auditQueryKey });
       if (result.changed) toast.success(t`${key} is off in ${name}.`);
       else toast.info(t`${key} was already off in ${name}. Nothing changed.`);

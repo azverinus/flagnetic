@@ -58,6 +58,10 @@ msgstr "{key} выключен в окружении {name}."
 msgid "{key} is on in {name}."
 msgstr "{key} включён в окружении {name}."
 
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "{key} on in {name}"
+msgstr "{key} включён в окружении {name}"
+
 #: src/components/kill-switch-dialog.tsx
 msgid "{key} was already off in {name}. Nothing changed."
 msgstr "{key} уже был выключен в окружении {name}. Ничего не изменилось."
@@ -176,8 +180,8 @@ msgid "A chain of prerequisites has at most 5 steps."
 msgstr "Цепочка предусловий — не длиннее 5 шагов."
 
 #: src/components/rule-editor.tsx
-msgid "A configuration has at most 50 rules."
-msgstr "В конфигурации — не более 50 правил."
+msgid "A configuration has at most {maxRulesText} rules."
+msgstr "В конфигурации — не более {maxRulesText} правил."
 
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
@@ -234,10 +238,13 @@ msgstr "Токен проекта может то, что разрешает е�
 msgid "A revoked device is signed out at its next request."
 msgstr "Устройство с отозванным сеансом выходит из системы при следующем запросе."
 
-#: src/components/rule-editor.tsx
 #: src/lib/rule-editor.ts
-msgid "A rule has at most 20 conditions."
-msgstr "В правиле — не более 20 условий."
+msgid "A rule has at most {max} conditions."
+msgstr "В правиле — не более {max} условий."
+
+#: src/components/rule-editor.tsx
+msgid "A rule has at most {maxConditionsText} conditions."
+msgstr "В правиле — не более {maxConditionsText} условий."
 
 #: src/components/auth-settings-form.tsx
 msgid "A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older."
@@ -268,8 +275,8 @@ msgid "A token lets a script act for you, narrowed to its scopes. Only a signed-
 msgstr "Токен позволяет скрипту действовать от вашего имени в пределах его областей доступа. Создать или отозвать токен можно только в сеансе входа."
 
 #: src/lib/flag-detail.ts
-msgid "A unit ID has at most 256 bytes."
-msgstr "ID единицы — не более 256 байт."
+msgid "A unit ID has at most {max} bytes."
+msgstr "ID единицы — не более {max} байт."
 
 #: src/components/condition-row.tsx
 msgid "A value, then Enter"
@@ -1278,10 +1285,6 @@ msgstr "Отформатировать вариант {n}"
 #: src/components/audit-log.tsx
 msgid "From"
 msgstr "С"
-
-#: src/components/rule-editor.tsx
-msgid "Given by the server when the rule is saved as a rollout."
-msgstr "Сервер назначит её, когда правило сохранится как раскатка."
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Go to the flags"
@@ -2388,6 +2391,10 @@ msgstr "Правила"
 msgid "Salt (rule {position})"
 msgstr "Соль (правило {position})"
 
+#: src/components/rule-editor.tsx
+msgid "Salt (rule {position}): given by the server when the rule is saved as a rollout."
+msgstr "Соль (правило {position}): сервер назначит её, когда правило сохранится как раскатка."
+
 #: src/components/auth-settings-form.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
@@ -2591,14 +2598,6 @@ msgstr "Статус"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "String"
 msgstr "Строка"
-
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Switch {key} off in {name}"
-msgstr "Выключить {key} в окружении {name}"
-
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Switch {key} on in {name}"
-msgstr "Включить {key} в окружении {name}"
 
 #: src/lib/access-names.ts
 msgid "switch flags off with the kill switch"
@@ -2893,6 +2892,7 @@ msgstr "Запрос слишком большой."
 msgid "The request was not sent as JSON."
 msgstr "Запрос отправлен не в формате JSON."
 
+#: src/components/configuration-editor.tsx
 #: src/lib/problem-messages.ts
 msgid "The request was refused."
 msgstr "Запрос отклонён."
@@ -3282,14 +3282,6 @@ msgstr "Варианты"
 msgid "Variations reordered: <0>{order}</0>."
 msgstr "Порядок вариантов изменён: <0>{order}</0>."
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Version {version}, last saved by {updated}."
-msgstr "Версия {version}, последним сохранил(а) {updated}."
-
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
-msgid "Version {version}."
-msgstr "Версия {version}."
-
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "View all environments"
 msgstr "Все окружения"
@@ -3336,8 +3328,8 @@ msgid "Where the project serves from. A key is fixed once created; the name can 
 msgstr "Откуда проект отдаёт значения. Ключ после создания не меняется, название можно изменить."
 
 #: src/components/overrides-section.tsx
-msgid "Why the unit is pinned, such as the test it is for. Never sent to SDKs."
-msgstr "Зачем закреплена единица, например для какого теста. В SDK не передаётся."
+msgid "Why the unit has this override, such as the test it is for. Never sent to SDKs."
+msgstr "Зачем у единицы это переопределение, например для какого теста. В SDK не передаётся."
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Yes"

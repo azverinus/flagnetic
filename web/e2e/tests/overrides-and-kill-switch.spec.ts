@@ -30,7 +30,7 @@ const overrides = (page: Page) =>
   page.getByRole("table", { name: "Overrides in this environment" });
 
 test.describe("overrides", () => {
-  test("pins a variation for a unit ID with a note, evaluates to it, and removes it", async ({
+  test("gives a unit ID an override with a note, evaluates to it, and removes it", async ({
     page,
   }) => {
     const project = await seedProject("overrides");
@@ -99,7 +99,7 @@ test.describe("the kill switch", () => {
 
     await expect(page.getByText("payments_v2 is off in Production.")).toBeVisible();
     await expect(
-      page.getByRole("switch", { name: "Switch payments_v2 on in Production" }),
+      page.getByRole("switch", { name: "payments_v2 on in Production" }),
     ).not.toBeChecked();
     await expect(page.getByRole("button", { name: "Kill switch" })).toHaveCount(0);
 
@@ -115,7 +115,7 @@ test.describe("the kill switch", () => {
     expect(entries.items[0]).toMatchObject({ action: "flag.killed", kill_switch: true });
     expect(entries.items[0]?.after).toMatchObject({ reason: "Payments failing at the provider" });
 
-    await page.getByRole("switch", { name: "Switch payments_v2 on in Production" }).click();
+    await page.getByRole("switch", { name: "payments_v2 on in Production" }).click();
     await expect(page.getByText("payments_v2 is on in Production.")).toBeVisible();
     await page.getByRole("button", { name: "Kill switch" }).click();
     await expect(page.getByRole("dialog")).toContainText(`Last used by ${admin.name} on`);
@@ -144,9 +144,7 @@ test.describe("the kill switch", () => {
     await expect(
       page.getByText("payments_v2 was already off in Development. Nothing changed."),
     ).toBeVisible();
-    await expect(
-      page.getByRole("switch", { name: "Switch payments_v2 on in Development" }),
-    ).toBeVisible();
+    await expect(page.getByRole("switch", { name: "payments_v2 on in Development" })).toBeVisible();
   });
 
   test("is disabled, with why, for a member who may not use it", async ({ page }) => {
@@ -162,9 +160,10 @@ test.describe("the kill switch", () => {
     );
     await kill.click({ force: true });
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(
-      page.getByRole("switch", { name: `Switch ${key} off in Development` }),
-    ).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByRole("switch", { name: `${key} on in Development` })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
     await expect(page.getByRole("form", { name: "Add an override" })).toHaveCount(0);
     await expect(
       page
