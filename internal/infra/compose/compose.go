@@ -59,6 +59,8 @@ type Options struct {
 	// RulesetLoadFault lets a test stall the replica's ruleset
 	// materializations; nil in production.
 	RulesetLoadFault *pgdelivery.RulesetLoadFault
+	// RateLimits are the limits of the SDK API.
+	RateLimits config.RateLimits
 	management.Options
 }
 
@@ -266,7 +268,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Authenticate: appdelivery.NewAuthenticateSDKKey(sdkKeyCache, sdkKeyUses, d.Clock),
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
 		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
-	}, sdk.Options{Clock: d.Clock})
+	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
 		Workers: []worker.Worker{
 			worker.AuthRetention(appaccess.NewPurgeAuthRecords(tx, accessStore, settings, d.Clock), reg),

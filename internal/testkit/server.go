@@ -104,6 +104,7 @@ type serverOptions struct {
 	console string
 	listen  pglisten.Options
 	fault   *pgdelivery.RulesetLoadFault
+	limits  []func(*config.RateLimits)
 }
 
 type route struct {
@@ -142,6 +143,12 @@ func WithListenerOptions(o pglisten.Options) ServerOption {
 // WithRulesetLoadFault lets f stall the replica's ruleset materializations.
 func WithRulesetLoadFault(f *pgdelivery.RulesetLoadFault) ServerOption {
 	return func(o *serverOptions) { o.fault = f }
+}
+
+// WithRateLimits changes the SDK API's limits, which otherwise are the
+// defaults of the configuration.
+func WithRateLimits(change func(*config.RateLimits)) ServerOption {
+	return func(o *serverOptions) { o.limits = append(o.limits, change) }
 }
 
 // WithClock serves with c as the application clock instead of the wall clock.
@@ -195,7 +202,12 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		o.pool = Pool(t)
 	}
 	logs := NewLogSink()
-	edge := flaghttp.OptionsFrom(defaults(t))
+	cfg := defaults(t)
+	edge := flaghttp.OptionsFrom(cfg)
+	limits := cfg.RateLimits
+	for _, change := range o.limits {
+		change(&limits)
+	}
 	reg := metrics.NewRegistry()
 	reg.MustRegister(postgres.NewPoolCollector(o.pool))
 	edge.Logger, edge.DB, edge.Metrics = logs.Logger(), o.pool, flaghttp.NewMetrics(reg)
@@ -215,7 +227,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	}
 	background := compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Options{
 		Keyring: secret.NewKeyring(secret.New(SecretKey)), PasswordHashConcurrency: defaultHashConcurrency, Options: o.web,
-		RulesetLoadFault: o.fault,
+		RulesetLoadFault: o.fault, RateLimits: limits,
 	})
 	// Registered first, so it runs once the server below has stopped.
 	t.Cleanup(background.Close)

@@ -8,8 +8,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
+	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -27,12 +30,18 @@ type Handlers struct {
 
 // Options are what the SDK API runs on besides its use cases.
 type Options struct {
-	// Clock times the streams.
+	// Clock times the streams and the rate limits' windows.
 	Clock clock.Clock
+	// RateLimits are the API's limits.
+	RateLimits config.RateLimits
+	// Registerer receives the API's metrics.
+	Registerer prometheus.Registerer
 }
 
 // operation is how the adapter guards one operation of the contract.
 type operation struct {
+	// endpoint is what the rate limits count the operation's requests as.
+	endpoint endpoint
 	// kinds are the key kinds the operation serves.
 	kinds []delivery.SDKKeyKind
 	// queryKey lets a client key be presented as the query parameter
@@ -46,24 +55,26 @@ type operation struct {
 // generated router mounts them on. An operation of the contract missing
 // here is not mounted, and its path answers 404 like any unknown one.
 var operations = map[string]operation{
-	"GET " + BaseURL + "/ruleset": {kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer}},
+	"GET " + BaseURL + "/ruleset": {endpoint: endpointRuleset, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer}},
 	"GET " + BaseURL + "/stream": {
-		kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient}, queryKey: true, stream: true,
+		endpoint: endpointStream, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient},
+		queryKey: true, stream: true,
 	},
 }
 
 // api serves the operations of the SDK API.
 type api struct {
-	edge  *flaghttp.Server
-	h     Handlers
-	clock clock.Clock
+	edge   *flaghttp.Server
+	h      Handlers
+	clock  clock.Clock
+	limits *limiter
 }
 
 // Mount serves the SDK API on edge: every request under BaseURL, routed or
 // not, through the API's compression, and each operation behind the
 // authentication of its SDK key.
 func Mount(edge *flaghttp.Server, h Handlers, o Options) {
-	a := &api{edge: edge, h: h, clock: o.Clock}
+	a := &api{edge: edge, h: h, clock: o.Clock, limits: newLimiter(o.RateLimits, o.Clock, o.Registerer)}
 	edge.Wrap(BaseURL+"/", compression(edge))
 	HandlerWithOptions(a, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
@@ -108,24 +119,46 @@ func presentedOf(ctx context.Context) presented {
 	return p
 }
 
-// guard authenticates the request's SDK key and refuses a key of a kind op
-// does not serve; the key then travels in the request's context.
+// guard admits a request to op: it refuses a client IP that presented too
+// many refused keys before its key is looked up, authenticates the key,
+// refuses a key of a kind op does not serve, and counts the request against
+// the key's limits, holding a stream slot for a stream until it ends. The
+// key then travels in the request's context.
 func (a *api) guard(op operation, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := flaghttp.ClientOf(r.Context()).IP
 		value, err := a.keyValue(op, r)
+		if err == nil && value != "" {
+			err = a.limits.guessing(w, op.endpoint, ip)
+		}
 		var key delivery.SDKKey
 		if err == nil {
 			key, err = a.h.Authenticate.Handle(r.Context(), value)
+			if refusesPresentedKey(err) {
+				a.limits.failed(ip)
+			}
 		}
 		if err == nil {
 			err = key.CheckKind(op.kinds...)
+		}
+		release := func() {}
+		if err == nil {
+			release, err = a.limits.take(w, op.endpoint, key, ip)
 		}
 		if err != nil {
 			a.writeError(w, r, err)
 			return
 		}
+		defer release()
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyKey{}, presented{key: key, value: value})))
 	})
+}
+
+// refusesPresentedKey reports whether err refuses a key that was presented:
+// what guessing keys looks like, unlike sending none.
+func refusesPresentedKey(err error) bool {
+	e, ok := apperrors.From(err)
+	return ok && e.Kind == apperrors.KindUnauthenticated && e.Code != delivery.ErrSDKKeyMissing.Code
 }
 
 // keyValue returns the SDK key value r presents: the bearer of its
