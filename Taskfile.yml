@@ -120,6 +120,12 @@ tasks:
     cmds:
       - env -u DATABASE_URL FLAGNETIC_E2E=1 {{.GOTESTSUM}} --format testname -- -count=1 ./...
 
+  e2e:up:
+    desc: Bring up two seeded replicas for an SDK's smoke and serve until interrupted (see e2e/README.md)
+    interactive: true
+    cmds:
+      - env -u DATABASE_URL go run ./e2e/cmd/flagnetic-e2e up
+
   # --- Checks (what CI runs) ---
 
   check:
