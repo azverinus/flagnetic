@@ -115,6 +115,19 @@ func TestEachEventIsRejectedWithItsCode(t *testing.T) {
 			"interval_start": "2026-09-19T10:00:00Z", "interval_end": "2026-09-19T09:00:00Z",
 		}), delivery.RejectEventInvalid, "interval_start is after interval_end"},
 		"not an object": {nil, delivery.RejectEventInvalid, "an event is a JSON object"},
+		"empty string":  {with(alias(id), map[string]any{"from_unit_id": ""}), delivery.RejectEventInvalid, "from_unit_id must not be empty"},
+		"many faults": {map[string]any{"type": "alias", "event_id": id}, delivery.RejectEventInvalid,
+			"occurred_at is missing; from_unit_type is missing; from_unit_id is missing; to_unit_type is missing; to_unit_id is missing"},
+		"occurred_at not a time": {with(alias(id), map[string]any{"occurred_at": "yesterday"}), delivery.RejectEventInvalid, "occurred_at must be an RFC 3339 time"},
+		"exposure faults": {with(exposure(id), map[string]any{"override": "no", "ruleset_version": -1, "platform": 3}), delivery.RejectEventInvalid,
+			"platform must be a string or null; override must be a boolean; ruleset_version must be a non-negative integer"},
+		"more faults than shown": {map[string]any{"type": "exposure", "event_id": id}, delivery.RejectEventInvalid,
+			"occurred_at is missing; experiment_key is missing; flag_key is missing; variation_key is missing; unit_type is missing; and 4 more"},
+		"exposure override missing": {with(exposure(id), map[string]any{"override": nil}), delivery.RejectEventInvalid, "override is missing"},
+		"old exposure":              {with(exposure(id), map[string]any{"occurred_at": "2026-08-01T00:00:00Z"}), delivery.RejectOutOfWindow, "occurred_at is older than the raw retention"},
+		"summary without counts":    {with(summary(id), map[string]any{"counts": nil, "ruleset_version": nil}), delivery.RejectEventInvalid, "ruleset_version is missing; counts is missing"},
+		"counts not a list":         {with(summary(id), map[string]any{"counts": "many"}), delivery.RejectEventInvalid, "counts must be a list of objects"},
+		"a row not an object":       {with(summary(id), map[string]any{"counts": []any{"checkout"}}), delivery.RejectEventInvalid, "counts[0] must be an object"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var e delivery.JudgedEvent
@@ -130,6 +143,22 @@ func TestEachEventIsRejectedWithItsCode(t *testing.T) {
 				t.Errorf("rejection = %s %q, want %s %q", e.Rejection.Code, e.Rejection.Detail, c.code, c.detail)
 			}
 		})
+	}
+}
+
+func exposure(id string) map[string]any {
+	return map[string]any{
+		"type": "exposure", "event_id": id, "occurred_at": "2026-09-19T09:00:00Z", "experiment_key": "onboarding_test",
+		"flag_key": "onboarding", "variation_key": "guided", "unit_type": "user", "unit_id": "u-1001",
+		"evaluation_reason": "experiment", "override": false, "ruleset_version": 1,
+	}
+}
+
+func TestAValidExposureIsReadWhole(t *testing.T) {
+	e := judge(t, with(exposure(eventIDAt(received, 1)), map[string]any{"occurred_at": "2026-09-23T00:00:00Z", "platform": "ios"}))
+	if e.Rejection != nil || e.Exposure == nil || e.Exposure.ExperimentKey != "onboarding_test" || e.Exposure.Platform != "ios" ||
+		e.Exposure.AppVersion != "" || !e.Exposure.OccurredAt.Equal(received) || e.Exposure.RulesetVersion != 1 {
+		t.Errorf("exposure = %+v %+v", e.Exposure, e.Rejection)
 	}
 }
 
