@@ -20,13 +20,7 @@ import { z } from "zod";
 import { Can } from "@/components/can";
 import { NamedConflictBanner } from "@/components/conflict-banner";
 import { QueryError } from "@/components/query-error";
-import {
-  DeleteRowDialog,
-  listedIfMatch,
-  RowAction,
-  RowDialog,
-  withRowActions,
-} from "@/components/row-dialogs";
+import { DeleteRowDialog, RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { DialogForm } from "@/components/ui/dialog-form";
@@ -161,7 +155,7 @@ function UnitTypes() {
           unwrap(
             deleteUnitType({
               path: { project, unit_type: key },
-              headers: listedIfMatch(unitTypes.data, key, deleting),
+              headers: deleting && ifMatch(deleting.version),
             }),
           )
         }
@@ -206,16 +200,13 @@ function UnitTypeForm({
       description: unitType?.description ?? "",
     },
   });
-  // The unit type the form was filled from and the version a save names,
-  // apart: keeping one's edits saves onto a newer version what was
-  // changed from this one.
-  const [base, setBase] = useState(unitType);
-  const [version, setVersion] = useState(unitType?.version);
   const conflicts = useFormConflict({
     project,
     kind: "unit_type",
+    initial: unitType,
     read: () => unwrap(getUnitType({ path: { project, unit_type: unitType?.key ?? "" } })),
   });
+  const { base, conflict } = conflicts;
   const list = unitTypesQuery(project).queryKey;
   const save = useListMutation(
     ({ values: { key, name, description }, at }: { values: Values; at?: number }) =>
@@ -239,13 +230,12 @@ function UnitTypeForm({
       conflicts.clear();
       save.mutate({ values, at }, { onError: (error) => conflicts.meet(error) });
     });
-  const conflict = conflicts.conflict;
   const taken = save.error instanceof ApiError && save.error.code === "already_exists";
   const { errors } = form.formState;
 
   return (
     <DialogForm
-      onSubmit={send(version)}
+      onSubmit={send(conflicts.version)}
       onCancel={onDone}
       submitLabel={unitType ? <Trans>Save</Trans> : <Trans>Create unit type</Trans>}
       pending={save.isPending}
@@ -259,16 +249,11 @@ function UnitTypeForm({
           onReload={() => {
             const { current } = conflict;
             form.reset({ key: current.key, name: current.name, description: current.description });
-            setBase(current);
-            setVersion(current.version);
-            conflicts.clear();
+            conflicts.restart(current);
             save.reset();
             void queryClient.invalidateQueries({ queryKey: list });
           }}
-          onKeep={() => {
-            setVersion(conflict.current.version);
-            void send(conflict.current.version)();
-          }}
+          onKeep={() => void send(conflicts.keep(conflict.current))()}
         />
       ) : null}
       <Field

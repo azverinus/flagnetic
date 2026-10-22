@@ -23,13 +23,7 @@ import { z } from "zod";
 import { Can } from "@/components/can";
 import { NamedConflictBanner } from "@/components/conflict-banner";
 import { QueryError } from "@/components/query-error";
-import {
-  DeleteRowDialog,
-  listedIfMatch,
-  RowAction,
-  RowDialog,
-  withRowActions,
-} from "@/components/row-dialogs";
+import { DeleteRowDialog, RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -200,7 +194,7 @@ function Attributes() {
           unwrap(
             deleteAttribute({
               path: { project, attribute: key },
-              headers: listedIfMatch(attributes.data, key, deleting),
+              headers: deleting && ifMatch(deleting.version),
             }),
           )
         }
@@ -250,16 +244,13 @@ function AttributeForm({
       description: attribute?.description ?? "",
     },
   });
-  // The attribute the form was filled from and the version a save names,
-  // apart: keeping one's edits saves onto a newer version what was
-  // changed from this one.
-  const [base, setBase] = useState(attribute);
-  const [version, setVersion] = useState(attribute?.version);
   const conflicts = useFormConflict({
     project,
     kind: "attribute",
+    initial: attribute,
     read: () => unwrap(getAttribute({ path: { project, attribute: attribute?.key ?? "" } })),
   });
+  const { base, conflict } = conflicts;
   const list = attributesQuery(project).queryKey;
   const save = useListMutation(
     ({ values: { key, type, name, description }, at }: { values: Values; at?: number }) =>
@@ -287,14 +278,13 @@ function AttributeForm({
       conflicts.clear();
       save.mutate({ values, at }, { onError: (error) => conflicts.meet(error) });
     });
-  const conflict = conflicts.conflict;
   const taken = save.error instanceof ApiError && save.error.code === "already_exists";
   const { errors } = form.formState;
   const fixed = <Trans>Fixed once declared.</Trans>;
 
   return (
     <DialogForm
-      onSubmit={send(version)}
+      onSubmit={send(conflicts.version)}
       onCancel={onDone}
       submitLabel={editing ? <Trans>Save</Trans> : <Trans>Create attribute</Trans>}
       pending={save.isPending}
@@ -313,16 +303,11 @@ function AttributeForm({
               name: current.name,
               description: current.description,
             });
-            setBase(current);
-            setVersion(current.version);
-            conflicts.clear();
+            conflicts.restart(current);
             save.reset();
             void queryClient.invalidateQueries({ queryKey: list });
           }}
-          onKeep={() => {
-            setVersion(conflict.current.version);
-            void send(conflict.current.version)();
-          }}
+          onKeep={() => void send(conflicts.keep(conflict.current))()}
         />
       ) : null}
       <Field

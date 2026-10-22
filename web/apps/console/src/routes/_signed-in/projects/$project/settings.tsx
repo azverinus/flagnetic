@@ -4,7 +4,6 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -52,24 +51,16 @@ function SettingsForm() {
     resolver: zodResolver(schema),
     defaultValues: { name: project.name, description: project.description },
   });
-  // The project the form was filled from, which a save compares it with
-  // to send only what the member changed, and the version the save names:
-  // apart, since keeping one's edits over a newer version saves onto that
-  // version what was changed from the older one, and apart from the query,
-  // since a refetch that brings someone else's change must not make a save
-  // overwrite it unseen.
-  const [base, setBase] = useState(project);
-  const [version, setVersion] = useState(project.version);
   const conflicts = useFormConflict({
     project: key,
     kind: "project",
+    initial: project,
     read: () => queryClient.fetchQuery({ ...projectQuery(key), staleTime: 0 }),
   });
+  const { base, conflict } = conflicts;
   const restart = (from: Project) => {
     form.reset({ name: from.name, description: from.description });
-    setBase(from);
-    setVersion(from.version);
-    conflicts.clear();
+    conflicts.restart(from);
   };
   const save = useMutation({
     mutationFn: ({ values, at }: { values: Values; at: number }) =>
@@ -95,8 +86,6 @@ function SettingsForm() {
       conflicts.clear();
       save.mutate({ values, at });
     });
-  const submit = send(version);
-  const conflict = conflicts.conflict;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
@@ -114,14 +103,11 @@ function SettingsForm() {
             save.reset();
             restart(conflict.current);
           }}
-          onKeep={() => {
-            setVersion(conflict.current.version);
-            void send(conflict.current.version)();
-          }}
+          onKeep={() => void send(conflicts.keep(conflict.current))()}
         />
       ) : null}
       <FormPage
-        onSubmit={submit}
+        onSubmit={send(conflicts.version)}
         submitLabel={<Trans>Save</Trans>}
         pending={save.isPending}
         refusal={conflicts.refusal(save.error)}

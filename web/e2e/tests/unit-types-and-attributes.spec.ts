@@ -242,6 +242,7 @@ test.describe("what names a declaration", () => {
 
     const account = rowFor(page, "account");
     await expect(account.getByRole("cell", { name: "1", exact: true })).toBeVisible();
+    await expectNoSeriousViolations(page, "the unit types with their usage counts");
     await account.getByRole("button", { name: "Delete account" }).click();
     const remove = page.getByRole("dialog", { name: "Delete account" });
     await remove.getByRole("button", { name: "Delete unit type" }).click();

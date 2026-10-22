@@ -104,7 +104,7 @@ export function NamedConflictBanner({
       diff={<NamedDiff changes={diffNamed(base, conflict.current)} />}
       actions={
         <>
-          <Button type="button" variant="outline" onClick={onReload}>
+          <Button type="button" variant="outline" disabled={pending} onClick={onReload}>
             <Trans>Reload and lose my edits</Trans>
           </Button>
           <Button type="button" disabled={pending} onClick={onKeep}>

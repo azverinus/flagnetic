@@ -1,5 +1,5 @@
 import { Trans } from "@lingui/react/macro";
-import { type QueryKey, useQueryClient } from "@tanstack/react-query";
+import type { QueryKey } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -7,23 +7,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
-import { ApiError } from "@/lib/errors";
-import { ifMatch } from "@/lib/http";
 import { useListMutation } from "@/lib/mutations";
-
-/**
- * The `If-Match` of deleting the row with this key: the version the list
- * holds now, which a refused deletion read again, else the version of the
- * row the dialog was opened for.
- */
-export function listedIfMatch<Row extends { key: string; version: number }>(
-  rows: readonly Row[] | undefined,
-  key: string,
-  opened: Row | undefined,
-): { "If-Match": string } | undefined {
-  const row = rows?.find((candidate) => candidate.key === key) ?? opened;
-  return row && ifMatch(row.version);
-}
 
 /**
  * A table's columns, followed by the column of each row's actions for a
@@ -123,7 +107,6 @@ export function DeleteRowDialog({
   list,
   children,
 }: DeleteRowDialogProps) {
-  const queryClient = useQueryClient();
   const deletion = useListMutation(remove, list, onDone);
   const key = rowKey ?? "";
   return (
@@ -141,18 +124,7 @@ export function DeleteRowDialog({
       pending={deletion.isPending}
       refusal={deletion.error}
       typeToConfirm={typeToConfirm ? key : undefined}
-      onConfirm={() =>
-        deletion.mutate(key, {
-          // Someone changed the row since the list was read: the list is
-          // read again, so confirming once more names the version the
-          // refusal told the member about.
-          onError: (error) => {
-            if (error instanceof ApiError && error.code === "version_mismatch") {
-              void queryClient.invalidateQueries({ queryKey: list });
-            }
-          },
-        })
-      }
+      onConfirm={() => deletion.mutate(key)}
     >
       {children(key)}
     </ConfirmDialog>

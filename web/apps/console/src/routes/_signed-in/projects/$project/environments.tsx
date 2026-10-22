@@ -19,13 +19,7 @@ import { z } from "zod";
 import { Can } from "@/components/can";
 import { NamedConflictBanner } from "@/components/conflict-banner";
 import { QueryError } from "@/components/query-error";
-import {
-  DeleteRowDialog,
-  listedIfMatch,
-  RowAction,
-  RowDialog,
-  withRowActions,
-} from "@/components/row-dialogs";
+import { DeleteRowDialog, RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { DialogForm } from "@/components/ui/dialog-form";
@@ -139,7 +133,7 @@ function Environments() {
           unwrap(
             deleteEnvironment({
               path: { project, environment: key },
-              headers: listedIfMatch(environments.data, key, deleting),
+              headers: deleting && ifMatch(deleting.version),
             }),
           )
         }
@@ -220,16 +214,13 @@ function RenameEnvironment({
     resolver: zodResolver(schema),
     defaultValues: { name: environment.name },
   });
-  // The environment the form was filled from and the version a save
-  // names, apart: keeping one's edits saves onto a newer version what was
-  // changed from this one.
-  const [base, setBase] = useState(environment);
-  const [version, setVersion] = useState(environment.version);
   const conflicts = useFormConflict({
     project,
     kind: "environment",
+    initial: environment,
     read: () => unwrap(getEnvironment({ path: { project, environment: environment.key } })),
   });
+  const { base, conflict } = conflicts;
   const list = environmentsQuery(project).queryKey;
   const rename = useListMutation(
     ({ values, at }: { values: Values; at: number }) =>
@@ -248,11 +239,10 @@ function RenameEnvironment({
       conflicts.clear();
       rename.mutate({ values, at }, { onError: (error) => conflicts.meet(error) });
     });
-  const conflict = conflicts.conflict;
 
   return (
     <DialogForm
-      onSubmit={send(version)}
+      onSubmit={send(conflicts.version)}
       onCancel={onDone}
       submitLabel={<Trans>Save</Trans>}
       pending={rename.isPending}
@@ -265,16 +255,11 @@ function RenameEnvironment({
           pending={rename.isPending}
           onReload={() => {
             form.reset({ name: conflict.current.name });
-            setBase(conflict.current);
-            setVersion(conflict.current.version);
-            conflicts.clear();
+            conflicts.restart(conflict.current);
             rename.reset();
             void queryClient.invalidateQueries({ queryKey: list });
           }}
-          onKeep={() => {
-            setVersion(conflict.current.version);
-            void send(conflict.current.version)();
-          }}
+          onKeep={() => void send(conflicts.keep(conflict.current))()}
         />
       ) : null}
       <Field
