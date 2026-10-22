@@ -90,11 +90,18 @@ func TestAReplicaWhoseListenerIsSilentRefusesARevokedKeyAtOnce(t *testing.T) {
 		t.Fatalf("b before the fault: %d %s", res.StatusCode(), res.Body)
 	}
 
+	// The gauge reads 0 before the listener first connects too: wait for it
+	// to come up, so the wait for it to be found deaf below is not met by a
+	// listener that has yet to connect and would then trust its keys again.
+	const sdkKeysListenerUp = `flagnetic_listener_up{channel="sdk_keys"}`
+	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, b.Scrape(t), sdkKeysListenerUp) == 1 }) {
+		t.Fatal("b's listener never came up")
+	}
 	// Silenced, b's listener misses every notification, the revocation's
 	// included, until its ping finds it deaf.
 	fault.Silence()
 	if !eventually(5*time.Second, func() bool {
-		return testkit.Metric(t, b.Scrape(t), `flagnetic_listener_up{channel="sdk_keys"}`) == 0
+		return testkit.Metric(t, b.Scrape(t), sdkKeysListenerUp) == 0
 	}) {
 		t.Fatal("b's listener was never found deaf")
 	}

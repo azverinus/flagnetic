@@ -38,6 +38,18 @@ const materializations = "flagnetic_ruleset_materializations_total"
 
 const rulesetsListenerUp = `flagnetic_listener_up{channel="rulesets"}`
 
+// listening waits until the rulesets listener of srv is up. A replica starts
+// listening a moment after it starts serving, and when it does it drops what
+// it held and the propagation series with it, since a bump may have been
+// missed before: a test that reads those series, or relies on the cache,
+// waits for it first so that moment does not fall inside the test.
+func listening(t *testing.T, srv *testkit.Server) {
+	t.Helper()
+	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, srv.Scrape(t), rulesetsListenerUp) == 1 }) {
+		t.Fatal("the rulesets listener never came up")
+	}
+}
+
 // deafen silences the rulesets listener of srv through fault and waits until
 // srv finds it deaf. It waits for the listener to come up first: the gauge
 // reads 0 before the listener first connects too, and a listener that comes
@@ -45,9 +57,7 @@ const rulesetsListenerUp = `flagnetic_listener_up{channel="rulesets"}`
 // find itself deaf.
 func deafen(t *testing.T, srv *testkit.Server, fault *pglisten.Fault) {
 	t.Helper()
-	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, srv.Scrape(t), rulesetsListenerUp) == 1 }) {
-		t.Fatal("the rulesets listener never came up")
-	}
+	listening(t, srv)
 	fault.Silence()
 	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, srv.Scrape(t), rulesetsListenerUp) == 0 }) {
 		t.Fatal("the listener was never found deaf")
@@ -73,6 +83,7 @@ func TestAWriteIsServedByTheReplicaThatTookItAtOnce(t *testing.T) {
 
 func TestTheReplicaThatTookAWriteObservesItsPropagationOnce(t *testing.T) {
 	srv := testkit.StartServer(t)
+	listening(t, srv)
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	series := `flagnetic_ruleset_propagation_seconds_count{environment="` + p.environmentID(t, "production").String() + `"}`
@@ -107,11 +118,7 @@ func TestAnUnchangedRulesetIsMaterializedOnceHoweverManyAskAtOnce(t *testing.T) 
 	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(fault))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
-	if !eventually(5*time.Second, func() bool {
-		return testkit.Metric(t, srv.Scrape(t), rulesetsListenerUp) == 1
-	}) {
-		t.Fatal("the rulesets listener never came up")
-	}
+	listening(t, srv)
 
 	fault.Stall()
 	var wg sync.WaitGroup
@@ -253,6 +260,7 @@ func TestAfterARestoreTheReplicaServesWhatTheDatabaseHoldsAndTheNextWriteIsNumbe
 
 func TestDeletingAnEnvironmentDropsItsPropagationSeries(t *testing.T) {
 	a, b := testkit.StartServer(t), testkit.StartServer(t)
+	listening(t, b)
 	p := newProject(t, a)
 	if res := do(p.admin.CreateEnvironmentWithResponse(t.Context(), p.key, management.EnvironmentCreate{Key: "qa", Name: "QA"})); res.JSON201 == nil {
 		t.Fatalf("create qa = %d: %s", res.StatusCode(), res.Body)
@@ -288,6 +296,7 @@ func TestAnEnvironmentDeletedWhileAReplicaWasNotListeningLosesItsPropagationSeri
 	b := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
 		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
 	}))
+	listening(t, b)
 	p := newProject(t, a)
 	if res := do(p.admin.CreateEnvironmentWithResponse(t.Context(), p.key, management.EnvironmentCreate{Key: "qa", Name: "QA"})); res.JSON201 == nil {
 		t.Fatalf("create qa = %d: %s", res.StatusCode(), res.Body)
@@ -304,12 +313,7 @@ func TestAnEnvironmentDeletedWhileAReplicaWasNotListeningLosesItsPropagationSeri
 		t.Fatal("b never served the write and observed its propagation")
 	}
 
-	fault.Silence()
-	if !eventually(5*time.Second, func() bool {
-		return testkit.Metric(t, b.Scrape(t), `flagnetic_listener_up{channel="rulesets"}`) == 0
-	}) {
-		t.Fatal("b's listener was never found deaf")
-	}
+	deafen(t, b, fault)
 	envVersion := do(p.admin.GetEnvironmentWithResponse(t.Context(), p.key, "qa")).JSON200.Version
 	deleted := do(p.admin.DeleteEnvironmentWithResponse(t.Context(), p.key, "qa",
 		&management.DeleteEnvironmentParams{IfMatch: ptr(`"` + strconv.Itoa(int(envVersion)) + `"`)}))
@@ -318,7 +322,7 @@ func TestAnEnvironmentDeletedWhileAReplicaWasNotListeningLosesItsPropagationSeri
 	}
 	fault.Restore()
 	if !eventually(5*time.Second, func() bool {
-		return testkit.Metric(t, b.Scrape(t), `flagnetic_listener_up{channel="rulesets"}`) == 1 &&
+		return testkit.Metric(t, b.Scrape(t), rulesetsListenerUp) == 1 &&
 			testkit.Metric(t, b.Scrape(t), series) == -1
 	}) {
 		t.Error("b still reports the propagation of an environment deleted while it was not listening")
@@ -327,6 +331,7 @@ func TestAnEnvironmentDeletedWhileAReplicaWasNotListeningLosesItsPropagationSeri
 
 func TestAMemberDownloadingTheRulesetLeavesItsPropagationToTheFirstSDK(t *testing.T) {
 	srv := testkit.StartServer(t)
+	listening(t, srv)
 	p := newProject(t, srv)
 	p.flag(t, "search.ranking")
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
