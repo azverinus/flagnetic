@@ -20,8 +20,9 @@ export type TagsInputProps = {
 /**
  * A list of tags typed one at a time: Enter or a comma adds what is
  * typed, as does leaving the field, so a tag typed and not yet added is
- * never lost; a blank or repeated tag is not added. Each tag carries a
- * button that removes it.
+ * never lost; a blank or repeated tag is not added, and Enter never
+ * submits the form the field is in. Each tag carries a button that
+ * removes it.
  */
 export function TagsInput({ value, onChange, onBlur, ...input }: TagsInputProps) {
   const { t } = useLingui();
@@ -33,7 +34,12 @@ export function TagsInput({ value, onChange, onBlur, ...input }: TagsInputProps)
     if (tag !== "" && !value.includes(tag)) onChange([...value, tag]);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if ((event.key === "Enter" || event.key === ",") && typed.trim() !== "") {
+    // Enter never submits the enclosing form, even with nothing typed:
+    // leaving the field adds what was typed and empties it, so an Enter
+    // pressed after focus came back (a closing menu returns focus to its
+    // trigger, a person clicks back in) would otherwise submit the form
+    // instead of finishing the tag.
+    if (event.key === "Enter" || (event.key === "," && typed.trim() !== "")) {
       event.preventDefault();
       add();
     }

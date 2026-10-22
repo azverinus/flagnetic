@@ -415,3 +415,33 @@ export function diffSegments(before: Segment, after: Segment): SegmentChange[] {
   changes.push(...conditionDetails(before.conditions, after.conditions));
   return changes;
 }
+
+/** What a project, an environment, a unit type or an attribute is edited by. */
+export type NamedLike = { name: string; description?: string };
+
+export type NamedChange = {
+  kind: "field";
+  field: "name" | "description";
+  before: string;
+  after: string;
+};
+
+/**
+ * What changed from one version of a named workspace entity to another:
+ * its name, then its description when it has one.
+ */
+export function diffNamed(before: NamedLike, after: NamedLike): NamedChange[] {
+  const changes: NamedChange[] = [];
+  if (before.name !== after.name) {
+    changes.push({ kind: "field", field: "name", before: before.name, after: after.name });
+  }
+  if (before.description !== after.description) {
+    changes.push({
+      kind: "field",
+      field: "description",
+      before: before.description ?? "",
+      after: after.description ?? "",
+    });
+  }
+  return changes;
+}

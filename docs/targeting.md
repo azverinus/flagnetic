@@ -55,6 +55,8 @@ Every condition is checked when a configuration or segment is written, and refus
 
 A unit type or attribute that a rule, rollout, override or segment names, an archived flag's included, is not deleted (`409 in_use`, `references` naming each segment, or flag and environment, that names it). `GET /unit-types` and `GET /attributes` give each declaration a `usage_count`: the flags naming it, each counted once whatever its environments and archived ones included, plus the segments naming it.
 
+In the console, **Unit types** and **Attributes** show each declaration's count in **Used by flags and segments**, and a refused deletion names every flag, with its environment, and every segment that still names it.
+
 ## Limits
 
 | What | At most |

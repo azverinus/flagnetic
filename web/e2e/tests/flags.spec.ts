@@ -171,10 +171,14 @@ test.describe("creating a flag", () => {
     await page.getByLabel("Name", { exact: true }).fill("Search ranking");
     await expect(page.getByRole("combobox", { name: "Owner" })).toHaveText(`Me (${admin.name})`);
     await choose(page, "Owner", grace.name);
+    // The select hands the focus back to itself once closed; typing waits
+    // for that, so the tags are typed where the member would type them.
+    await expect(page.getByRole("combobox", { name: "Owner" })).toBeFocused();
     await page.getByLabel("Tags", { exact: true }).fill("search");
     await page.getByLabel("Tags", { exact: true }).press("Enter");
     await page.getByLabel("Tags", { exact: true }).fill("web");
     await page.getByLabel("Tags", { exact: true }).press("Enter");
+    await expect(page.getByRole("button", { name: "Remove tag web" })).toBeVisible();
     await page.getByRole("button", { name: "Remove tag search" }).click();
     await page.getByLabel("Tags", { exact: true }).fill("ranking");
     await choose(page, "Lifetime", "Permanent");

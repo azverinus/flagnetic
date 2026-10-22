@@ -1,8 +1,10 @@
 import {
   type Attribute,
+  type AttributeListItem,
   type AttributeType,
   createAttribute,
   deleteAttribute,
+  getAttribute,
   updateAttribute,
   zAttributeType,
 } from "@flagnetic/api";
@@ -10,7 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { I18n, MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon, PlusIcon, TagsIcon, Trash2Icon } from "lucide-react";
@@ -19,6 +21,7 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Can } from "@/components/can";
+import { NamedConflictBanner } from "@/components/conflict-banner";
 import { QueryError } from "@/components/query-error";
 import { DeleteRowDialog, RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
 import { Badge } from "@/components/ui/badge";
@@ -32,13 +35,15 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Table } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { formatNumber } from "@/i18n/format";
 import { useCan } from "@/lib/access";
 import type { Permission } from "@/lib/access-names";
 import { ApiError, unwrap } from "@/lib/errors";
-import { descriptionSchema, keySchema, nameSchema } from "@/lib/forms";
+import { changedFields, descriptionSchema, keySchema, nameSchema } from "@/lib/forms";
 import { ifMatch } from "@/lib/http";
 import { useListMutation } from "@/lib/mutations";
 import { attributesQuery } from "@/lib/queries";
+import { useFormConflict } from "@/lib/use-form-conflict";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/attributes")({
   staticData: { crumb: msg`Attributes` },
@@ -74,7 +79,7 @@ function Attributes() {
   const canManage = useCan(permission);
 
   const columns = useMemo(() => {
-    const columns: ColumnDef<Attribute, unknown>[] = [
+    const columns: ColumnDef<AttributeListItem, unknown>[] = [
       {
         id: "key",
         header: t`Key`,
@@ -101,6 +106,11 @@ function Attributes() {
         cell: ({ row }) => (
           <span className="text-muted-foreground">{row.original.description}</span>
         ),
+      },
+      {
+        id: "usage",
+        header: t`Used by flags and segments`,
+        cell: ({ row }) => formatNumber(i18n, row.original.usage_count),
       },
     ];
     return withRowActions(columns, canManage, (row) => {
@@ -213,6 +223,7 @@ function AttributeForm({
   onDone: () => void;
 }) {
   const { i18n, t } = useLingui();
+  const queryClient = useQueryClient();
   const editing = attribute !== undefined;
   const schema = z.object({
     // A disabled field submits no value: what is fixed is shown, not sent.
@@ -233,14 +244,25 @@ function AttributeForm({
       description: attribute?.description ?? "",
     },
   });
+  const conflicts = useFormConflict({
+    project,
+    kind: "attribute",
+    initial: attribute,
+    read: () => unwrap(getAttribute({ path: { project, attribute: attribute?.key ?? "" } })),
+  });
+  const { base, conflict } = conflicts;
+  const list = attributesQuery(project).queryKey;
   const save = useListMutation(
-    ({ key, type, name, description }: Values) =>
+    ({ values: { key, type, name, description }, at }: { values: Values; at?: number }) =>
       unwrap(
-        attribute
+        base && at !== undefined
           ? updateAttribute({
-              path: { project, attribute: attribute.key },
-              body: { name, description },
-              headers: ifMatch(attribute.version),
+              path: { project, attribute: base.key },
+              body: changedFields(
+                { name: base.name, description: base.description },
+                { name, description },
+              ),
+              headers: ifMatch(at),
             })
           : createAttribute({
               path: { project },
@@ -248,21 +270,46 @@ function AttributeForm({
               body: { key: key ?? "", type: zAttributeType.parse(type), name, description },
             }),
       ),
-    attributesQuery(project).queryKey,
+    list,
     onDone,
   );
+  const send = (at: number | undefined) =>
+    form.handleSubmit((values) => {
+      conflicts.clear();
+      save.mutate({ values, at }, { onError: (error) => conflicts.meet(error) });
+    });
   const taken = save.error instanceof ApiError && save.error.code === "already_exists";
   const { errors } = form.formState;
   const fixed = <Trans>Fixed once declared.</Trans>;
 
   return (
     <DialogForm
-      onSubmit={form.handleSubmit((values) => save.mutate(values))}
+      onSubmit={send(conflicts.version)}
       onCancel={onDone}
       submitLabel={editing ? <Trans>Save</Trans> : <Trans>Create attribute</Trans>}
       pending={save.isPending}
-      refusal={taken ? undefined : save.error}
+      refusal={taken ? undefined : conflicts.refusal(save.error)}
     >
+      {base && conflict ? (
+        <NamedConflictBanner
+          base={base}
+          conflict={conflict}
+          pending={save.isPending}
+          onReload={() => {
+            const { current } = conflict;
+            form.reset({
+              key: current.key,
+              type: current.type,
+              name: current.name,
+              description: current.description,
+            });
+            conflicts.restart(current);
+            save.reset();
+            void queryClient.invalidateQueries({ queryKey: list });
+          }}
+          onKeep={() => void send(conflicts.keep(conflict.current))()}
+        />
+      ) : null}
       <Field
         label={<Trans>Key</Trans>}
         hint={

@@ -1,8 +1,9 @@
-import { deleteUnitType } from "@flagnetic/api";
+import { createAttribute, createSegment, createUnitType, deleteUnitType } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
 import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
+import { seedFlag, stringFlag, writeConfiguration } from "../support/flags";
 import { admin, seededProject, viewer } from "../support/instance";
 
 async function openUnitTypes(page: Page, projectKey: string, who: Credentials = admin) {
@@ -155,6 +156,99 @@ test.describe("attributes", () => {
     await edit.getByRole("button", { name: "Save" }).click();
     await expect(edit).toBeHidden();
     await expect(platform).toContainText("Platform name");
+  });
+});
+
+test.describe("what names a declaration", () => {
+  test("counts the flags and segments naming an attribute and lists them when its deletion is refused", async ({
+    page,
+  }) => {
+    const projectKey = await seedProject("decl-attr-used");
+    const client = managementClient();
+    must(
+      "declaring plan",
+      await createAttribute({
+        client,
+        path: { project: projectKey },
+        body: { key: "plan", type: "string", name: "Plan" },
+      }),
+    );
+    must(
+      "declaring tier",
+      await createAttribute({
+        client,
+        path: { project: projectKey },
+        body: { key: "tier", type: "string", name: "Tier" },
+      }),
+    );
+    const plan = [
+      { kind: "attribute" as const, attribute: "plan", op: "eq" as const, value: "pro" },
+    ];
+    must(
+      "creating paying",
+      await createSegment({
+        client,
+        path: { project: projectKey },
+        body: { key: "paying", name: "Paying", conditions: plan },
+      }),
+    );
+    await seedFlag(projectKey, stringFlag("upsell"));
+    await writeConfiguration(projectKey, "upsell", "development", () => ({
+      rules: [
+        {
+          description: "Pro",
+          conditions: plan,
+          serve: { kind: "variation", variation: "treatment" },
+        },
+      ],
+    }));
+    await openAttributes(page, projectKey);
+
+    const used = rowFor(page, "plan");
+    await expect(used.getByRole("cell", { name: "2", exact: true })).toBeVisible();
+    await expect(rowFor(page, "tier").getByRole("cell", { name: "0", exact: true })).toBeVisible();
+    await expectNoSeriousViolations(page, "the attributes with their usage counts");
+
+    await used.getByRole("button", { name: "Delete plan" }).click();
+    const remove = page.getByRole("dialog", { name: "Delete plan" });
+    await remove.getByRole("button", { name: "Delete attribute" }).click();
+    const refusal = remove.getByRole("alert");
+    await expect(refusal).toContainText("It is still in use by");
+    await expect(refusal).toContainText("the flag upsell in development");
+    await expect(refusal).toContainText("the segment paying");
+    await page.keyboard.press("Escape");
+    await expect(rowFor(page, "plan")).toBeVisible();
+  });
+
+  test("counts the flags naming a unit type in an override and lists them when its deletion is refused", async ({
+    page,
+  }) => {
+    const projectKey = await seedProject("decl-unit-used");
+    must(
+      "declaring account",
+      await createUnitType({
+        client: managementClient(),
+        path: { project: projectKey },
+        body: { key: "account", name: "Account" },
+      }),
+    );
+    await seedFlag(projectKey, stringFlag("upsell"));
+    await writeConfiguration(projectKey, "upsell", "production", () => ({
+      overrides: [
+        { unit_type: "account", unit_id: "acme", variation: "treatment", note: "Pilot customer" },
+      ],
+    }));
+    await openUnitTypes(page, projectKey);
+
+    const account = rowFor(page, "account");
+    await expect(account.getByRole("cell", { name: "1", exact: true })).toBeVisible();
+    await expectNoSeriousViolations(page, "the unit types with their usage counts");
+    await account.getByRole("button", { name: "Delete account" }).click();
+    const remove = page.getByRole("dialog", { name: "Delete account" });
+    await remove.getByRole("button", { name: "Delete unit type" }).click();
+    await expect(remove.getByRole("alert")).toHaveText(
+      "It is still in use by the flag upsell in production.",
+    );
   });
 });
 

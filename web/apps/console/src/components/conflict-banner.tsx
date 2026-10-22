@@ -3,7 +3,11 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { TriangleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { NamedDiff } from "@/components/structural-diff-view";
+import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/i18n/format";
+import { diffNamed, type NamedLike } from "@/lib/structural-diff";
+import type { FormConflict } from "@/lib/use-form-conflict";
 
 export type ConflictBannerProps = {
   /**
@@ -65,5 +69,49 @@ export function ConflictBanner({ subject, entry, diff, actions }: ConflictBanner
       </div>
       <div className="flex flex-wrap gap-2">{actions}</div>
     </div>
+  );
+}
+
+export type NamedConflictBannerProps = {
+  /** What the form was filled from. */
+  base: NamedLike;
+  /** The newer version the save met, and the entry that made it. */
+  conflict: FormConflict<NamedLike>;
+  /** Whether a save is under way, which keeping one's edits starts. */
+  pending: boolean;
+  /** Fills the form from the newer version, dropping the member's edits. */
+  onReload: () => void;
+  /** Saves the fields the member changed onto the newer version. */
+  onKeep: () => void;
+};
+
+/**
+ * The conflict banner of a form editing a project, an environment, a
+ * unit type or an attribute: who saved and when, what they changed, and
+ * the same two ways out every form offers.
+ */
+export function NamedConflictBanner({
+  base,
+  conflict,
+  pending,
+  onReload,
+  onKeep,
+}: NamedConflictBannerProps) {
+  return (
+    <ConflictBanner
+      subject="form"
+      entry={conflict.entry}
+      diff={<NamedDiff changes={diffNamed(base, conflict.current)} />}
+      actions={
+        <>
+          <Button type="button" variant="outline" disabled={pending} onClick={onReload}>
+            <Trans>Reload and lose my edits</Trans>
+          </Button>
+          <Button type="button" disabled={pending} onClick={onKeep}>
+            <Trans>Keep my edits</Trans>
+          </Button>
+        </>
+      }
+    />
   );
 }

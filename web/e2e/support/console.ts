@@ -61,11 +61,12 @@ export function must<T>(what: string, result: { data?: T; error?: unknown }): T 
 
 /**
  * A project of one test's own, so that what the test changes never
- * reaches another test's project; the key carries the time, so a retried
- * run does not meet its own project.
+ * reaches another test's project; the key carries the time and a random
+ * suffix, so neither a retried run nor a repeat running at the same
+ * moment in another worker meets a project already seeded.
  */
 export async function seedProject(prefix: string): Promise<string> {
-  const key = `${prefix}-${Date.now().toString(36)}`;
+  const key = `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   must(
     `seeding ${key}`,
     await createProject({ client: managementClient(), body: { key, name: `Project ${prefix}` } }),
@@ -75,14 +76,15 @@ export async function seedProject(prefix: string): Promise<string> {
 
 /**
  * Someone invited by the instance admin who has not accepted yet, with
- * the invitation's one-time link. The email carries the time, so a
- * retried run does not meet its own member.
+ * the invitation's one-time link. The email carries the time and a random
+ * suffix, so neither a retried run nor a repeat running at the same
+ * moment in another worker meets a member already invited.
  */
 export async function seedInvitation(
   prefix: string,
   name: string,
 ): Promise<{ id: string; email: string; name: string; link: string }> {
-  const email = `${prefix}-${Date.now().toString(36)}@flagnetic.test`;
+  const email = `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@flagnetic.test`;
   const invited = must(
     `inviting ${email}`,
     await inviteMember({ client: managementClient(), body: { email, display_name: name } }),

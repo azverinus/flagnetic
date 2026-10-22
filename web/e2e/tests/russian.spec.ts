@@ -12,6 +12,7 @@ import {
   type SignInWords,
   submitSignIn,
 } from "../support/console";
+import { seedFlag, stringFlag, writeConfiguration } from "../support/flags";
 
 /**
  * A member who never chose a language, in a browser that asks for Russian:
@@ -109,5 +110,41 @@ test.describe("the console in Russian", () => {
     await expect(page.getByText("Это не ваш текущий пароль.")).toBeVisible();
     await expect(current).toHaveAttribute("aria-invalid", "true");
     await expectNoSeriousViolations(page, "the profile with a refusal in Russian");
+  });
+
+  test("reads a flag's page in Russian, with its rule, its history and why a viewer cannot edit it", async ({
+    page,
+  }) => {
+    await seedFlag(project, stringFlag("promo_banner", { name: "Промобаннер" }));
+    await writeConfiguration(project, "promo_banner", "development", () => ({
+      rules: [
+        {
+          description: "Россия",
+          conditions: [{ kind: "attribute", attribute: "country", op: "eq", value: "RU" }],
+          serve: { kind: "variation", variation: "treatment" },
+        },
+      ],
+    }));
+    await signIn(page, olga, russian);
+    await page.goto(`/projects/${project}/flags/promo_banner?environment=development`);
+
+    await expect(page.getByRole("heading", { name: "Промобаннер", level: 1 })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", "ru");
+    const edit = page.getByRole("button", { name: "Изменить определение" });
+    await expect(edit).toHaveAttribute("aria-disabled", "true");
+    await expect(edit).toHaveAccessibleDescription(/Нужно право изменять флаги/);
+    await expect(page.getByRole("combobox", { name: "Вариант без совпадений" })).toBeDisabled();
+    await expect(page.getByRole("region", { name: "Правило 1", exact: true })).toBeVisible();
+    await expectNoSeriousViolations(page, "the flag's page in Russian");
+
+    await page.getByRole("tab", { name: "История" }).click();
+    await expect(page.getByRole("tab", { name: "История" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.getByRole("table", { name: "История флага" })).toContainText(
+      "Конфигурация изменена",
+    );
+    await expectNoSeriousViolations(page, "the flag's history in Russian");
   });
 });
