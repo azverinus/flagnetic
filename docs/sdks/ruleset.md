@@ -37,8 +37,8 @@ An SDK sending `Accept-Encoding: gzip` receives the ruleset in gzip. Every answe
 
 ## Errors
 
-Every error is a problem document (`application/problem+json`) in the same shape as the management API's. A path the SDK API does not serve is `404 not_found`; a method a path does not accept `405 method_not_allowed`, with `Allow`. The answers to a key that does not work are in [SDK keys](keys.md#presenting-a-key).
+Every error is a problem document (`application/problem+json`) in the same shape as the management API's. A path the SDK API does not serve is `404 not_found`; a method a path does not accept `405 method_not_allowed`, with `Allow` naming the path's methods and `OPTIONS`, which every path answers as a preflight. The answers to a key that does not work are in [SDK keys](keys.md#presenting-a-key).
 
 ## Rate limits
 
-Each key's requests are limited by every replica (see [Rate limits on the SDK API](../operations.md#rate-limits-on-the-sdk-api)). A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`; a refused one is `429 rate_limited` with `Retry-After` and `RateLimit-Reset` in whole seconds, after which the SDK tries again.
+Each key's requests are limited by every replica (see [Rate limits on the SDK API](../operations.md#rate-limits-on-the-sdk-api)). A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`, and so does a refusal of the request once its key is judged, a body over its size limit included; a refused one is `429 rate_limited` with `Retry-After` and `RateLimit-Reset` in whole seconds, after which the SDK tries again.

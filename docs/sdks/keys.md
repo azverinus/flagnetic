@@ -65,7 +65,7 @@ A client key may list the browser origins it is accepted from, at most 50. Each 
 
 An update replaces the whole list and must name it, so a script that sends only a new name cannot lift a restriction by accident; send `[]` to allow any origin.
 
-The server enforces the list, not the browser: a request from an origin the key does not list is refused `403 origin_not_allowed`, and an answer from a listed one names that origin in `Access-Control-Allow-Origin` with `Vary: Origin`. A request without an `Origin` header, which is no browser's, is served without the header. A change to the list applies on every replica within a second.
+The server enforces the list, not the browser: a request from an origin the key does not list is refused `403 origin_not_allowed`, and an answer from a listed one names that origin in `Access-Control-Allow-Origin`. Every answer to such a key, its refusals included, carries `Vary: Origin`. A request without an `Origin` header, which is no browser's, is served without the header. A change to the list applies on every replica within a second.
 
 ## Browsers
 
