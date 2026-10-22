@@ -43,4 +43,15 @@ describe("a segment's fields in a form", () => {
     expect(screen.getByRole("button", { name: "Remove FR" })).toBeInTheDocument();
     expect(submitted).not.toHaveBeenCalled();
   });
+
+  it("does not submit the form on Enter once a value typed was added on leaving the field", async () => {
+    const submitted = vi.fn();
+    renderWithProviders(<Form onSubmit={submitted} />);
+    const value = screen.getByRole("textbox", { name: "Value (condition 1)" });
+    await userEvent.type(value, "DE");
+    await userEvent.tab();
+    await userEvent.type(value, "{Enter}");
+    expect(screen.getByRole("button", { name: "Remove DE" })).toBeInTheDocument();
+    expect(submitted).not.toHaveBeenCalled();
+  });
 });

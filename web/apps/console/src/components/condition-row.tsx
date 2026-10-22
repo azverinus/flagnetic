@@ -366,7 +366,12 @@ export function ListValueInput({
     if (!value.includes(entry)) onChange([...value, entry]);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if ((event.key === "Enter" || event.key === ",") && typed.trim() !== "") {
+    // Enter never submits the enclosing form, even with nothing typed:
+    // leaving the field adds what was typed and empties it, so an Enter
+    // pressed after focus came back (a closing menu returns focus to its
+    // trigger, a person clicks back in) would otherwise submit the form
+    // instead of finishing the value.
+    if (event.key === "Enter" || (event.key === "," && typed.trim() !== "")) {
       event.preventDefault();
       add();
     }
