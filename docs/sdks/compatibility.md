@@ -55,6 +55,8 @@ Every SDK follows these rules, so an additive change never needs a new `schema_v
 | Unknown rejection code (in an events answer) | A rejection like any other: the event is never sent again. The codes are an open set a later server may add to. |
 | `schema_version` outside the SDK's range | A failure of the fallback chain, as above. |
 
+The same holds the other way round. The server ignores what it does not know in a request, so a later SDK that sends a new optional member or query parameter is answered as if it had not: a member at any level of a request body (the evaluate body and its `context`, the events envelope and its `sdk`, each event, each summary row) and a query parameter of any operation. Context attributes keep their own rule: one the project does not declare is listed in `ignored_attributes` and has no effect.
+
 ## What the Go SDK declares
 
 `sdks/go/version.go` holds `Version`, which every request's User-Agent (`flagnetic-go/<version> (<os>)`) and every events envelope report and which release-please keeps equal to the module's tag, and the unexported `schema_version` range and SDK API path the SDK uses for every request. A test of the SDK fails when the range is not the one the evaluator reads, and the release workflow checks `Version` against the tag.
