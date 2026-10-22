@@ -83,6 +83,20 @@ export type ConfigurationLike = Pick<FlagConfiguration, "on" | "off_variation" |
   rules: readonly RuleLike[];
 };
 
+/** The parts of a flag's definition a member changes, as the API answers them or the audit log records them. */
+export type DefinitionLike = Pick<
+  FlagDefinition,
+  | "name"
+  | "description"
+  | "owner"
+  | "lifetime"
+  | "expected_removal_at"
+  | "automatic_exposure"
+  | "archived_at"
+  | "tags"
+  | "variations"
+>;
+
 export type DefinitionChange =
   | {
       kind: "field";
@@ -339,7 +353,7 @@ export function diffConfigurations(
 }
 
 /** What changed from one flag definition to another. */
-export function diffDefinitions(before: FlagDefinition, after: FlagDefinition): DefinitionChange[] {
+export function diffDefinitions(before: DefinitionLike, after: DefinitionLike): DefinitionChange[] {
   const changes: DefinitionChange[] = [];
   const fields = [
     "name",

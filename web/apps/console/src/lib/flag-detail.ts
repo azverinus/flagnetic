@@ -11,20 +11,47 @@ import { msg } from "@lingui/core/macro";
 import { formatNumber } from "@/i18n/format";
 
 import { flagViolationMessage } from "./flags";
+import { fingerprint } from "./structural-diff";
 
 /**
  * The flag detail's search parameters: the environment whose tab is open,
- * by key (the first environment when absent), or the History tab.
+ * by key (the first environment when absent), or the History tab with the
+ * entry open in its drawer; and whether the tester is open beside an
+ * environment's tab.
  */
-export type FlagDetailSearch = { environment?: string; tab?: "history" };
+export type FlagDetailSearch = {
+  environment?: string;
+  tab?: "history";
+  entry?: string;
+  tester?: true;
+};
 
 export function validateFlagDetailSearch(search: Record<string, unknown>): FlagDetailSearch {
   const out: FlagDetailSearch = {};
   if (typeof search.environment === "string" && search.environment.trim() !== "") {
     out.environment = search.environment.trim();
   }
-  if (search.tab === "history") out.tab = "history";
+  if (search.tab === "history") {
+    out.tab = "history";
+    if (typeof search.entry === "string" && search.entry.trim() !== "") {
+      out.entry = search.entry.trim();
+    }
+  }
+  if (search.tester === true || search.tester === "true") out.tester = true;
   return out;
+}
+
+/**
+ * Whether a navigation only opens or closes the tester, which sits beside
+ * the editor: the draft stays on screen, so leaving it is not asked about.
+ */
+export function onlyTesterToggled(
+  from: { pathname: string; search: object },
+  to: { pathname: string; search: object },
+): boolean {
+  const { tester: _was, ...before } = from.search as Record<string, unknown>;
+  const { tester: _is, ...after } = to.search as Record<string, unknown>;
+  return from.pathname === to.pathname && fingerprint(before) === fingerprint(after);
 }
 
 /** The flag with one environment's configuration replaced by a newer one the server answered. */

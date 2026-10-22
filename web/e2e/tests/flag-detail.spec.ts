@@ -132,7 +132,9 @@ test.describe("archiving and deleting", () => {
     await page.getByLabel("Type checkout_variant to confirm").fill("checkout_variant");
     await confirm.click();
 
-    await expect(page).toHaveURL(new RegExp(`/projects/${project}/flags$`));
+    await expect(page).toHaveURL(
+      new RegExp(`/projects/${project}/flags\\?environment=development$`),
+    );
     await expect(page.getByText("The flag checkout_variant is deleted.")).toBeVisible();
   });
 
@@ -352,7 +354,7 @@ test.describe("tabs", () => {
     await expect(page).toHaveURL(/environment=staging/);
     await page.getByRole("tab", { name: "History" }).click();
     await expect(page).toHaveURL(/tab=history/);
-    await expect(page.getByRole("link", { name: "Open the audit log" })).toBeVisible();
+    await expect(page.getByRole("table", { name: "History of the flag" })).toBeVisible();
     await page.getByRole("tab", { name: "Development" }).click();
     await expect(page).not.toHaveURL(/environment=|tab=/);
   });

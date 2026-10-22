@@ -11,25 +11,27 @@ import {
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArchiveIcon, OctagonXIcon } from "lucide-react";
-import { useCallback, useState } from "react";
+import { ArchiveIcon, FlaskConicalIcon, GitCompareArrowsIcon, OctagonXIcon } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/can";
+import { CompareEnvironments } from "@/components/compare-environments";
 import { ConfigurationEditor } from "@/components/configuration-editor";
 import { FlagDefinitionSheet } from "@/components/flag-definition-sheet";
+import { FlagHistory } from "@/components/flag-history";
 import { KillSwitchDialog } from "@/components/kill-switch-dialog";
 import { OverridesSection } from "@/components/overrides-section";
 import { QueryError } from "@/components/query-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs } from "@/components/ui/tabs";
 import { formatDateTime } from "@/i18n/format";
+import { cn } from "@/lib/cn";
 import { ApiError, unwrap } from "@/lib/errors";
 import {
   configurationPut,
@@ -115,6 +117,18 @@ function useNameOf(project: string): (member: string) => string {
   return useCallback((member: string) => names?.get(member) ?? member, [names]);
 }
 
+/** Where a key press is typing or choosing, which a page's shortcut leaves alone. */
+const typingPlaces = [
+  "input",
+  "textarea",
+  "select",
+  "[contenteditable='']",
+  "[contenteditable=true]",
+  "[role=dialog]",
+  "[role=listbox]",
+  "[role=combobox]",
+].join(", ");
+
 function FlagPage({ project, flag }: { project: string; flag: Flag }) {
   const { i18n, t } = useLingui();
   const search = Route.useSearch();
@@ -123,13 +137,48 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
   const unitTypes = useQuery(unitTypesQuery(project));
   const nameOf = useNameOf(project);
   const [editing, setEditing] = useState(false);
+  const [comparing, setComparing] = useState(false);
+  const testerButton = useRef<HTMLButtonElement>(null);
+  // Closing the tester returns the keyboard to the button that opens it.
+  const closeTester = () => {
+    setTester(false);
+    testerButton.current?.focus();
+  };
 
   const first = flag.environments[0]?.environment;
   const environment =
     flag.environments.find((configuration) => configuration.environment === search.environment)
       ?.environment ?? first;
   const open = search.tab === "history" ? historyTab : environment;
+  const testerOpen = search.tester === true && search.tab !== "history";
   const archived = flag.archived_at !== null;
+  const setTester = useCallback(
+    (tester: boolean) =>
+      void navigate({
+        search: (prev) => ({
+          ...prev,
+          tester: tester ? (true as const) : undefined,
+          ...(tester ? { tab: undefined, entry: undefined } : {}),
+        }),
+        replace: true,
+      }),
+    [navigate],
+  );
+
+  // `t` opens the tester from anywhere on the page but where it would be
+  // typed: a field, a list, or a dialog over the page.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "t" || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.defaultPrevented) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(typingPlaces)) return;
+      event.preventDefault();
+      setTester(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [setTester]);
   const expected = flag.expected_removal_at
     ? formatDateTime(i18n, flag.expected_removal_at)
     : undefined;
@@ -148,6 +197,7 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
             environment={known}
             unitTypes={unitTypes.data ?? []}
             nameOf={nameOf}
+            tester={testerOpen ? { onClose: closeTester } : undefined}
           />
         ),
       };
@@ -155,12 +205,29 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
     {
       value: historyTab,
       label: t`History`,
-      content: <HistoryPlaceholder project={project} flag={flag} />,
+      content: (
+        <FlagHistory
+          project={project}
+          flag={flag}
+          entry={search.entry}
+          onCloseEntry={() =>
+            void navigate({ search: (prev) => ({ ...prev, entry: undefined }), replace: true })
+          }
+          nameOf={nameOf}
+        />
+      ),
     },
   ];
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <div
+      className={cn(
+        "mx-auto flex max-w-5xl flex-col gap-6 p-6",
+        // The tester sits over the bottom of a narrow screen and beside the
+        // page on a wide one, so the editor stays in reach under or beside it.
+        testerOpen && "pb-[62dvh] lg:pr-[27rem] lg:pb-6",
+      )}
+    >
       <PageHeader
         title={flag.name}
         description={
@@ -178,6 +245,22 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
         }
         actions={
           <>
+            <Button
+              variant="outline"
+              ref={testerButton}
+              aria-keyshortcuts="t"
+              aria-pressed={testerOpen}
+              onClick={() => setTester(!testerOpen)}
+            >
+              <FlaskConicalIcon aria-hidden />
+              <Trans>Tester</Trans>
+            </Button>
+            {flag.environments.length > 1 ? (
+              <Button variant="outline" onClick={() => setComparing(true)}>
+                <GitCompareArrowsIcon aria-hidden />
+                <Trans>Compare environments</Trans>
+              </Button>
+            ) : null}
             <FlagLifecycleActions project={project} flag={flag} />
             <Can permission="flag.edit" whenMissing="disable">
               <Button variant="outline" onClick={() => setEditing(true)}>
@@ -243,8 +326,8 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
           void navigate({
             search: (prev) =>
               next === historyTab
-                ? { ...prev, tab: "history" as const }
-                : { environment: next === first ? undefined : next, tab: undefined },
+                ? { ...prev, tab: "history" as const, tester: undefined }
+                : { environment: next === first ? undefined : next, tester: prev.tester },
             replace: true,
           });
         }}
@@ -255,6 +338,14 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
         open={editing}
         onOpenChange={setEditing}
         nameOf={nameOf}
+      />
+      <CompareEnvironments
+        project={project}
+        flag={flag}
+        environments={environments.data ?? []}
+        open={comparing}
+        onOpenChange={setComparing}
+        initial={environment}
       />
     </div>
   );
@@ -383,6 +474,8 @@ type PanelProps = {
   environment: Environment | undefined;
   unitTypes: readonly UnitType[];
   nameOf: (member: string) => string;
+  /** The tester beside the configuration, while it is open. */
+  tester?: { onClose: () => void };
 };
 
 /**
@@ -435,6 +528,7 @@ function EnvironmentPanel(props: PanelProps) {
           }}
           overrides={<OverridesSection {...props} frozen={frozen} />}
           readOnly={frozen ?? (can ? undefined : missing)}
+          tester={props.tester}
         />
       ) : (
         <div className="flex flex-col gap-3" aria-busy>
@@ -533,31 +627,5 @@ function OnOff({
         </>
       ) : null}
     </section>
-  );
-}
-
-function HistoryPlaceholder({ project, flag }: { project: string; flag: Flag }) {
-  const { t } = useLingui();
-  return (
-    <EmptyState
-      title={t`History`}
-      description={
-        <Trans>
-          Every change to this flag, its definition and its configurations, is recorded in the
-          project's audit log.
-        </Trans>
-      }
-      action={
-        <Button asChild variant="outline">
-          <Link
-            to="/projects/$project/audit"
-            params={{ project }}
-            search={{ entity_kind: "flag", q: flag.key }}
-          >
-            <Trans>Open the audit log</Trans>
-          </Link>
-        </Button>
-      }
-    />
   );
 }

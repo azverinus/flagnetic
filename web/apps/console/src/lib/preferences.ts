@@ -8,6 +8,7 @@ import { readStored, writeStored } from "./storage";
 const keys = {
   sidebarCollapsed: "flagnetic.sidebar-collapsed",
   lastProject: "flagnetic.last-project",
+  lastEnvironment: (project: string) => `flagnetic.last-environment.${project}`,
 } as const;
 
 export function sidebarCollapsed(): boolean {
@@ -25,4 +26,16 @@ export function lastProject(): string | null {
 
 export function rememberLastProject(project: string): void {
   writeStored(keys.lastProject, project);
+}
+
+/**
+ * The key of the environment this browser showed last in a project's
+ * flags list, which the list opens in again; each project keeps its own.
+ */
+export function lastEnvironment(project: string): string | null {
+  return readStored(keys.lastEnvironment(project));
+}
+
+export function rememberLastEnvironment(project: string, environment: string): void {
+  writeStored(keys.lastEnvironment(project), environment);
 }

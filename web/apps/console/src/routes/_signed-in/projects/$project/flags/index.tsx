@@ -1,10 +1,12 @@
-import { type FlagListItem, zFlagType } from "@flagnetic/api";
+import { type Environment, type FlagListItem, type FlagState, zFlagType } from "@flagnetic/api";
+import type { I18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { FlagIcon, PlusIcon } from "lucide-react";
-import { type ReactNode, useId, useMemo, useState } from "react";
+import { FlagIcon, ListChecksIcon, PercentIcon, PlusIcon } from "lucide-react";
+import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 
 import { Can } from "@/components/can";
 import { QueryError } from "@/components/query-error";
@@ -17,15 +19,24 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table } from "@/components/ui/table";
+import { formatInstant } from "@/i18n/format";
+import { cn } from "@/lib/cn";
 import {
+  comparedEnvironments,
+  type FlagStateFilter,
+  flagStateFilters,
   flagTypeName,
   flagTypes,
   type FlagsSearch,
+  type FlagsSort,
+  flagsSorts,
   isFlagsFiltered,
+  resolveEnvironment,
   validateFlagsSearch,
 } from "@/lib/flags";
+import { lastEnvironment, rememberLastEnvironment } from "@/lib/preferences";
 import { madeBy } from "@/lib/project-members";
-import { flagsQuery } from "@/lib/queries";
+import { environmentsQuery, flagsQuery } from "@/lib/queries";
 import { useKnownMembers } from "@/lib/use-known-members";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/flags/")({
@@ -36,9 +47,35 @@ export const Route = createFileRoute("/_signed-in/projects/$project/flags/")({
 /** The select's value for a filter left unset: Radix keeps the empty string for itself. */
 const any = "any";
 
+function stateFilterName(i18n: I18n, state: FlagStateFilter): string {
+  switch (state) {
+    case "on":
+      return i18n._(msg`On`);
+    case "off":
+      return i18n._(msg`Off`);
+    case "rules":
+      return i18n._(msg`Has rules`);
+    case "rollout":
+      return i18n._(msg`Has a rollout`);
+  }
+}
+
+function sortName(i18n: I18n, sort: FlagsSort): string {
+  switch (sort) {
+    case "key":
+      return i18n._(msg`Key`);
+    case "name":
+      return i18n._(msg`Name`);
+    case "updated":
+      return i18n._(msg`Last updated`);
+  }
+}
+
 /**
  * A project's flags, filtered by what the address holds and read a page
- * at a time; creating one is offered to those who may.
+ * at a time; creating one is offered to those who may. The address
+ * always names the environment the list shows: the one asked for, else
+ * the one this browser showed last in the project, else the first.
  */
 function Flags() {
   const { t } = useLingui();
@@ -46,12 +83,29 @@ function Flags() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const { names } = useKnownMembers(project);
+  const environments = useQuery(environmentsQuery(project));
+  const environment = environments.data
+    ? resolveEnvironment(
+        environments.data.map((env) => env.key),
+        search.environment,
+        lastEnvironment(project),
+      )
+    : undefined;
+
+  useEffect(() => {
+    if (environment === undefined) return;
+    rememberLastEnvironment(project, environment);
+    if (environment !== search.environment) {
+      void navigate({ search: (prev) => ({ ...prev, environment }), replace: true });
+    }
+  }, [environment, navigate, project, search.environment]);
 
   // Filters and pages replace the address rather than adding to the
   // history, since the pages seen are remembered on the screen: going
   // back leaves the list instead of walking through its pages.
   const apply = (next: FlagsSearch) => void navigate({ search: next, replace: true });
   const filter = (patch: Partial<FlagsSearch>) => apply({ ...search, ...patch, cursor: undefined });
+  const shown = { ...search, environment };
 
   const newFlag = (
     <Can permission="flag.edit" whenMissing="disable">
@@ -76,15 +130,30 @@ function Flags() {
         }
         actions={newFlag}
       />
-      <FlagFilters search={search} onFilter={filter} owners={names} />
-      <FlagsPages
-        project={project}
-        search={search}
-        onPage={(cursor) => apply({ ...search, cursor })}
-        onClear={() => apply({})}
-        newFlag={newFlag}
-        owners={names}
-      />
+      {environments.isError ? (
+        <QueryError error={environments.error} onRetry={() => void environments.refetch()} />
+      ) : (
+        <>
+          <FlagFilters
+            search={shown}
+            onFilter={filter}
+            owners={names}
+            environments={environments.data ?? []}
+          />
+          <FlagsPages
+            project={project}
+            search={shown}
+            ready={environment !== undefined}
+            onPage={(cursor) => apply({ ...search, cursor })}
+            // The environment and the order are how the flags are shown,
+            // not which: clearing the filters keeps both.
+            onClear={() => apply({ environment, sort: search.sort })}
+            newFlag={newFlag}
+            owners={names}
+            environments={environments.data ?? []}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -93,10 +162,12 @@ function FlagFilters({
   search,
   onFilter,
   owners,
+  environments,
 }: {
   search: FlagsSearch;
   onFilter: (patch: Partial<FlagsSearch>) => void;
   owners: ReadonlyMap<string, string> | undefined;
+  environments: readonly Environment[];
 }) {
   const { i18n, t } = useLingui();
   const archived = useId();
@@ -107,9 +178,50 @@ function FlagFilters({
         .sort((a, b) => a.label.localeCompare(b.label, i18n.locale)),
     [owners, i18n.locale],
   );
+  // Every pair of environments once, in the environments' order.
+  const pairs = environments.flatMap((a, i) =>
+    environments.slice(i + 1).map((b) => {
+      const [first, second] = [a.name, b.name];
+      return { value: `${a.key},${b.key}`, label: t`${first} and ${second}` };
+    }),
+  );
+  // The pair the address names, in whichever order, as the select offers it.
+  const named = comparedEnvironments(search);
+  const compared = named
+    ? (pairs.find((pair) => named.every((key) => pair.value.split(",").includes(key)))?.value ??
+      named.join(","))
+    : undefined;
 
   return (
     <div role="search" aria-label={t`Filter the flags`} className="flex flex-wrap items-end gap-4">
+      <Field label={<Trans>Environment</Trans>} className="w-44">
+        <Select
+          value={search.environment ?? ""}
+          disabled={environments.length === 0}
+          onValueChange={(environment) => onFilter({ environment })}
+        >
+          {environments.map((environment) => (
+            <SelectItem key={environment.key} value={environment.key}>
+              {environment.name}
+            </SelectItem>
+          ))}
+        </Select>
+      </Field>
+      <Field label={<Trans>State</Trans>} className="w-40">
+        <Select
+          value={search.state ?? any}
+          onValueChange={(value) =>
+            onFilter({ state: flagStateFilters.find((state) => state === value) })
+          }
+        >
+          <SelectItem value={any}>{t`Any state`}</SelectItem>
+          {flagStateFilters.map((state) => (
+            <SelectItem key={state} value={state}>
+              {stateFilterName(i18n, state)}
+            </SelectItem>
+          ))}
+        </Select>
+      </Field>
       <SearchField
         value={search.q ?? ""}
         placeholder={t`Key or name`}
@@ -153,6 +265,41 @@ function FlagFilters({
           ))}
         </Select>
       </Field>
+      <Field
+        label={<Trans>Differs between</Trans>}
+        hint={<Trans>In what SDKs receive.</Trans>}
+        className="w-64"
+      >
+        <Select
+          value={compared ?? any}
+          disabled={pairs.length === 0}
+          onValueChange={(value) =>
+            onFilter({ differs_between: value === any ? undefined : value })
+          }
+        >
+          <SelectItem value={any}>{t`Any environments`}</SelectItem>
+          {pairs.map((pair) => (
+            <SelectItem key={pair.value} value={pair.value}>
+              {pair.label}
+            </SelectItem>
+          ))}
+        </Select>
+      </Field>
+      <Field label={<Trans>Sort by</Trans>} className="w-40">
+        <Select
+          value={search.sort ?? "key"}
+          onValueChange={(value) => {
+            const sort = flagsSorts.find((candidate) => candidate === value);
+            onFilter({ sort: sort === "key" ? undefined : sort });
+          }}
+        >
+          {flagsSorts.map((sort) => (
+            <SelectItem key={sort} value={sort}>
+              {sortName(i18n, sort)}
+            </SelectItem>
+          ))}
+        </Select>
+      </Field>
       <div className="flex h-9 items-center gap-2">
         <Switch
           id={archived}
@@ -175,20 +322,25 @@ function FlagFilters({
 function FlagsPages({
   project,
   search,
+  ready,
   onPage,
   onClear,
   newFlag,
   owners,
+  environments,
 }: {
   project: string;
   search: FlagsSearch;
+  /** Whether the environment the list shows is known, which a state filter is judged in. */
+  ready: boolean;
   onPage: (cursor: string | undefined) => void;
   onClear: () => void;
   newFlag: ReactNode;
   owners: ReadonlyMap<string, string> | undefined;
+  environments: readonly Environment[];
 }) {
   const { t } = useLingui();
-  const page = useQuery(flagsQuery(project, search));
+  const page = useQuery({ ...flagsQuery(project, search), enabled: ready });
   // The cursor of every page before this one, the first page's as none;
   // an address opened on a later page has seen none, and goes back to
   // the first. The pages seen belong to one set of filters, so other
@@ -233,7 +385,14 @@ function FlagsPages({
   const busy = page.isFetching;
   return (
     <>
-      <FlagsTable flags={page.data?.items ?? []} loading={page.isPending} owners={owners} />
+      <FlagsTable
+        project={project}
+        environment={search.environment}
+        flags={page.data?.items ?? []}
+        loading={page.isPending}
+        owners={owners}
+        environments={environments}
+      />
       <nav aria-label={t`Pages of flags`} className="flex flex-wrap justify-end gap-2">
         <Button
           variant="outline"
@@ -260,14 +419,51 @@ function FlagsPages({
   );
 }
 
+/** What a flag serves in one environment at a glance: on or off, rules, a rollout. */
+function StateCell({ state }: { state: FlagState | undefined }) {
+  const { t } = useLingui();
+  if (!state) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        className={cn(
+          "rounded-sm px-1.5 py-0.5 text-xs font-medium",
+          state.on ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+        )}
+      >
+        {state.on ? <Trans>On</Trans> : <Trans>Off</Trans>}
+      </span>
+      {state.has_rules ? (
+        <span title={t`Has rules`} className="text-muted-foreground">
+          <ListChecksIcon aria-hidden className="size-4" />
+          <span className="sr-only">{t`Has rules`}</span>
+        </span>
+      ) : null}
+      {state.has_rollout ? (
+        <span title={t`Has a rollout`} className="text-muted-foreground">
+          <PercentIcon aria-hidden className="size-4" />
+          <span className="sr-only">{t`Has a rollout`}</span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function FlagsTable({
+  project,
+  environment,
   flags,
   loading,
   owners,
+  environments,
 }: {
+  project: string;
+  /** The environment the list shows, whose tab a flag opens in. */
+  environment: string | undefined;
   flags: FlagListItem[];
   loading: boolean;
   owners: ReadonlyMap<string, string> | undefined;
+  environments: readonly Environment[];
 }) {
   const { i18n, t } = useLingui();
   const columns = useMemo<ColumnDef<FlagListItem, unknown>[]>(
@@ -276,13 +472,25 @@ function FlagsTable({
         id: "flag",
         header: t`Flag`,
         cell: ({ row }) => (
-          <span className="flex flex-col">
+          <Link
+            to="/projects/$project/flags/$flag"
+            params={{ project, flag: row.original.key }}
+            search={{ environment }}
+            className="flex flex-col hover:underline"
+          >
             <code className="font-mono text-xs">{row.original.key}</code>
             <span className="text-muted-foreground">{row.original.name}</span>
-          </span>
+          </Link>
         ),
       },
       { id: "type", header: t`Type`, cell: ({ row }) => flagTypeName(i18n, row.original.type) },
+      ...environments.map((env): ColumnDef<FlagListItem, unknown> => ({
+        id: `state-${env.key}`,
+        header: env.name,
+        cell: ({ row }) => (
+          <StateCell state={row.original.states.find((state) => state.environment === env.key)} />
+        ),
+      })),
       {
         id: "owner",
         header: t`Owner`,
@@ -302,13 +510,27 @@ function FlagsTable({
             </ul>
           ) : null,
       },
+      {
+        id: "updated",
+        header: t`Updated`,
+        cell: ({ row }) => (
+          <time
+            dateTime={row.original.updated_at}
+            title={row.original.updated_at}
+            className="whitespace-nowrap"
+          >
+            {formatInstant(i18n, row.original.updated_at)}
+          </time>
+        ),
+      },
     ],
-    [i18n, owners, t],
+    [environment, environments, i18n, owners, project, t],
   );
   return (
     <Table
       caption={t`Flags`}
       hideCaption
+      stickyFirstColumn
       columns={columns}
       data={flags}
       loading={loading}

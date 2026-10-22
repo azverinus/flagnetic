@@ -126,8 +126,11 @@ test.describe("the rule editor", () => {
       await click(page.locator("main"), "Add rule");
       await click(rule(page, 3), "Add prerequisite condition");
       await rule(page, 3).getByRole("combobox", { name: "Flag (condition 1)" }).click();
+      // The list is open before what it lacks is judged, and closed before going on.
+      await expect(page.getByRole("option", { name: "payments_v2" })).toBeVisible();
       await expect(page.getByRole("option", { name: "checkout_variant" })).toHaveCount(0);
       await page.keyboard.press("Escape");
+      await expect(page.getByRole("listbox")).toHaveCount(0);
       await choose(page, rule(page, 3), "Flag (condition 1)", "payments_v2");
       await choose(page, rule(page, 3), "Required variation (condition 1)", "treatment");
       const third = rule(page, 3).getByLabel("Description (rule 3, optional)");

@@ -249,7 +249,7 @@ export function ConditionRow({
   );
 }
 
-type ValueInputProps<T> = {
+export type ValueInputProps<T> = {
   label: string;
   type: AttributeType;
   value: T;
@@ -260,7 +260,7 @@ type ValueInputProps<T> = {
 };
 
 /** One value typed for the attribute: a choice for a boolean, a date and time for a date. */
-function ScalarValueInput({
+export function ScalarValueInput({
   label,
   type,
   value,
@@ -335,7 +335,7 @@ function ScalarValueInput({
  * as a chip with a button removing it; a value already in the list, or
  * one that is not of the attribute's type, is not added.
  */
-function ListValueInput({
+export function ListValueInput({
   label,
   type,
   value,
