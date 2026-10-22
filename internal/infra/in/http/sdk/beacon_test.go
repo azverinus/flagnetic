@@ -73,6 +73,9 @@ func TestAClosingPagesBeaconIsStoredLikeAnyBatch(t *testing.T) {
 	// A text/plain body is held to the same rules as JSON.
 	notJSON := beacon(t, srv, keyInQuery(client), beaconContentType, []byte("events=1"))
 	refused(t, "a text/plain body that is not JSON", notJSON.status, notJSON.body, http.StatusBadRequest, "invalid_request")
+	big := batch(map[string]any{"type": "alias", "padding": strings.Repeat("x", 1<<20)})
+	tooBig := beacon(t, srv, keyInQuery(client), beaconContentType, big)
+	refused(t, "a text/plain body over 1 MiB", tooBig.status, tooBig.body, http.StatusRequestEntityTooLarge, "request_too_large")
 	form := beacon(t, srv, keyInQuery(client), "application/x-www-form-urlencoded", body)
 	refused(t, "a form", form.status, form.body, http.StatusUnsupportedMediaType, "unsupported_media_type")
 }
