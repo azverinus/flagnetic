@@ -506,8 +506,15 @@ type EvaluateParams struct {
 	ContentEncoding *ContentEncoding `json:"Content-Encoding,omitempty"`
 }
 
+// PostEventsTextBody defines parameters for PostEvents.
+type PostEventsTextBody = string
+
 // PostEventsParams defines parameters for PostEvents.
 type PostEventsParams struct {
+	// SdkKey A client key, for `navigator.sendBeacon`, which cannot set
+	// `Authorization`. Never together with `Authorization`.
+	SdkKey *string `form:"sdk_key,omitempty" json:"sdk_key,omitempty"`
+
 	// FlagneticSchemaVersion The highest document schema the SDK reads; absent is 1.
 	FlagneticSchemaVersion *SchemaVersion `json:"Flagnetic-Schema-Version,omitempty"`
 
@@ -538,6 +545,9 @@ type EvaluateJSONRequestBody = EvaluationRequest
 
 // PostEventsJSONRequestBody defines body for PostEvents for application/json ContentType.
 type PostEventsJSONRequestBody = EventBatch
+
+// PostEventsTextRequestBody defines body for PostEvents for text/plain ContentType.
+type PostEventsTextRequestBody = PostEventsTextBody
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -707,6 +717,20 @@ type ClientInterface interface {
 	// more than 24 hours ahead is taken as the time the event was
 	// received.
 	//
+	// **From a closing page.** A browser page that is closing hands its
+	// last batch, exposures included, to `navigator.sendBeacon`, which
+	// cannot set headers and is sent without a CORS preflight; a
+	// `keepalive` fetch carrying `Authorization` and JSON would need one,
+	// which browsers do not send for such a request, and the last
+	// exposures of a visit would be lost. So a batch is also accepted with
+	// a client key as the query parameter `sdk_key` and the envelope sent
+	// as `text/plain` (any `charset`), read as JSON with the same limits
+	// and answers. Such a request is a CORS simple request: answered with
+	// the same CORS headers, the key's allowed origins enforced and the
+	// client events rate limit applied. A server key in the query is
+	// `403 server_key_in_query`; a key both in `Authorization` and in the
+	// query is `400 invalid_request`.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /events (the `PostEvents` operationId).
@@ -744,10 +768,75 @@ type ClientInterface interface {
 	// more than 24 hours ahead is taken as the time the event was
 	// received.
 	//
+	// **From a closing page.** A browser page that is closing hands its
+	// last batch, exposures included, to `navigator.sendBeacon`, which
+	// cannot set headers and is sent without a CORS preflight; a
+	// `keepalive` fetch carrying `Authorization` and JSON would need one,
+	// which browsers do not send for such a request, and the last
+	// exposures of a visit would be lost. So a batch is also accepted with
+	// a client key as the query parameter `sdk_key` and the envelope sent
+	// as `text/plain` (any `charset`), read as JSON with the same limits
+	// and answers. Such a request is a CORS simple request: answered with
+	// the same CORS headers, the key's allowed origins enforced and the
+	// client events rate limit applied. A server key in the query is
+	// `403 server_key_in_query`; a key both in `Authorization` and in the
+	// query is `400 invalid_request`.
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /events (the `PostEvents` operationId).
 	PostEvents(ctx context.Context, params *PostEventsParams, body PostEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostEventsWithTextBody A batch of evaluation summaries, aliases and exposures
+	//
+	// Accepts a batch of events from either key. The batch is refused as a
+	// whole only for its envelope (`400 invalid_request` with violations),
+	// its key, its size (`413 request_too_large`: over 500 events or
+	// 1 MiB after decompression), a rate limit or a server error; an SDK
+	// retries those with the same event IDs, except a `4xx` other than
+	// `401`, `403` and `429`, which it drops.
+	//
+	// Otherwise each event is judged on its own and the batch is answered
+	// `202` once every accepted event is durable, so the SDK can drop what
+	// it sent. Each event is idempotent by its `event_id`, a lowercase
+	// UUIDv7, within the retention window: one already received is
+	// counted in `duplicates`, never twice. A summary row naming a flag
+	// the environment does not have is dropped and counted in
+	// `dropped_rows`. A refused event is listed in `rejected` with its
+	// index, its `event_id` when it has one, a `code` and a `detail`; the
+	// SDK never sends it again.
+	//
+	// The rejection codes are an open set, which a later server may add
+	// to: an SDK treats a code it does not know like any other rejection
+	// and never resends the event. The codes today: `event_invalid` (a
+	// member missing, of the wrong type, a string over 256 bytes or
+	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
+	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
+	// time older than the retention window), `undeclared_unit_type`,
+	// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
+	// type is not its experiment's) and `unknown_variation` (an exposure
+	// naming a variation its experiment does not have). An `occurred_at`
+	// more than 24 hours ahead is taken as the time the event was
+	// received.
+	//
+	// **From a closing page.** A browser page that is closing hands its
+	// last batch, exposures included, to `navigator.sendBeacon`, which
+	// cannot set headers and is sent without a CORS preflight; a
+	// `keepalive` fetch carrying `Authorization` and JSON would need one,
+	// which browsers do not send for such a request, and the last
+	// exposures of a visit would be lost. So a batch is also accepted with
+	// a client key as the query parameter `sdk_key` and the envelope sent
+	// as `text/plain` (any `charset`), read as JSON with the same limits
+	// and answers. Such a request is a CORS simple request: answered with
+	// the same CORS headers, the key's allowed origins enforced and the
+	// client events rate limit applied. A server key in the query is
+	// `403 server_key_in_query`; a key both in `Authorization` and in the
+	// query is `400 invalid_request`.
+	//
+	// Takes a body of the `text/plain` content type.
+	//
+	// Corresponds with POST /events (the `PostEvents` operationId).
+	PostEventsWithTextBody(ctx context.Context, params *PostEventsParams, body PostEventsTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRuleset The environment's whole ruleset, for a server key
 	//
@@ -901,6 +990,20 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // more than 24 hours ahead is taken as the time the event was
 // received.
 //
+// **From a closing page.** A browser page that is closing hands its
+// last batch, exposures included, to `navigator.sendBeacon`, which
+// cannot set headers and is sent without a CORS preflight; a
+// `keepalive` fetch carrying `Authorization` and JSON would need one,
+// which browsers do not send for such a request, and the last
+// exposures of a visit would be lost. So a batch is also accepted with
+// a client key as the query parameter `sdk_key` and the envelope sent
+// as `text/plain` (any `charset`), read as JSON with the same limits
+// and answers. Such a request is a CORS simple request: answered with
+// the same CORS headers, the key's allowed origins enforced and the
+// client events rate limit applied. A server key in the query is
+// `403 server_key_in_query`; a key both in `Authorization` and in the
+// query is `400 invalid_request`.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /events (the `PostEvents` operationId).
@@ -948,11 +1051,86 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // more than 24 hours ahead is taken as the time the event was
 // received.
 //
+// **From a closing page.** A browser page that is closing hands its
+// last batch, exposures included, to `navigator.sendBeacon`, which
+// cannot set headers and is sent without a CORS preflight; a
+// `keepalive` fetch carrying `Authorization` and JSON would need one,
+// which browsers do not send for such a request, and the last
+// exposures of a visit would be lost. So a batch is also accepted with
+// a client key as the query parameter `sdk_key` and the envelope sent
+// as `text/plain` (any `charset`), read as JSON with the same limits
+// and answers. Such a request is a CORS simple request: answered with
+// the same CORS headers, the key's allowed origins enforced and the
+// client events rate limit applied. A server key in the query is
+// `403 server_key_in_query`; a key both in `Authorization` and in the
+// query is `400 invalid_request`.
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /events (the `PostEvents` operationId).
 func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body PostEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostEventsRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostEventsWithTextBody A batch of evaluation summaries, aliases and exposures
+//
+// Accepts a batch of events from either key. The batch is refused as a
+// whole only for its envelope (`400 invalid_request` with violations),
+// its key, its size (`413 request_too_large`: over 500 events or
+// 1 MiB after decompression), a rate limit or a server error; an SDK
+// retries those with the same event IDs, except a `4xx` other than
+// `401`, `403` and `429`, which it drops.
+//
+// Otherwise each event is judged on its own and the batch is answered
+// `202` once every accepted event is durable, so the SDK can drop what
+// it sent. Each event is idempotent by its `event_id`, a lowercase
+// UUIDv7, within the retention window: one already received is
+// counted in `duplicates`, never twice. A summary row naming a flag
+// the environment does not have is dropped and counted in
+// `dropped_rows`. A refused event is listed in `rejected` with its
+// index, its `event_id` when it has one, a `code` and a `detail`; the
+// SDK never sends it again.
+//
+// The rejection codes are an open set, which a later server may add
+// to: an SDK treats a code it does not know like any other rejection
+// and never resends the event. The codes today: `event_invalid` (a
+// member missing, of the wrong type, a string over 256 bytes or
+// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
+// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
+// time older than the retention window), `undeclared_unit_type`,
+// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
+// type is not its experiment's) and `unknown_variation` (an exposure
+// naming a variation its experiment does not have). An `occurred_at`
+// more than 24 hours ahead is taken as the time the event was
+// received.
+//
+// **From a closing page.** A browser page that is closing hands its
+// last batch, exposures included, to `navigator.sendBeacon`, which
+// cannot set headers and is sent without a CORS preflight; a
+// `keepalive` fetch carrying `Authorization` and JSON would need one,
+// which browsers do not send for such a request, and the last
+// exposures of a visit would be lost. So a batch is also accepted with
+// a client key as the query parameter `sdk_key` and the envelope sent
+// as `text/plain` (any `charset`), read as JSON with the same limits
+// and answers. Such a request is a CORS simple request: answered with
+// the same CORS headers, the key's allowed origins enforced and the
+// client events rate limit applied. A server key in the query is
+// `403 server_key_in_query`; a key both in `Authorization` and in the
+// query is `400 invalid_request`.
+//
+// Takes a body of the `text/plain` content type.
+//
+// Corresponds with POST /events (the `PostEvents` operationId).
+func (c *Client) PostEventsWithTextBody(ctx context.Context, params *PostEventsParams, body PostEventsTextRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostEventsRequestWithTextBody(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1097,6 +1275,17 @@ func NewPostEventsRequest(server string, params *PostEventsParams, body PostEven
 	return NewPostEventsRequestWithBody(server, params, "application/json", bodyReader)
 }
 
+// NewPostEventsRequestWithTextBody calls the generic PostEvents builder with text/plain body
+func NewPostEventsRequestWithTextBody(server string, params *PostEventsParams, body PostEventsTextRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	if stringer, ok := interface{}(body).(fmt.Stringer); ok {
+		bodyReader = strings.NewReader(stringer.String())
+	} else {
+		bodyReader = strings.NewReader(fmt.Sprint(body))
+	}
+	return NewPostEventsRequestWithBody(server, params, "text/plain", bodyReader)
+}
+
 // NewPostEventsRequestWithBody constructs an http.Request for the PostEvents method, with any body, and a specified content type
 func NewPostEventsRequestWithBody(server string, params *PostEventsParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -1114,6 +1303,33 @@ func NewPostEventsRequestWithBody(server string, params *PostEventsParams, conte
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.SdkKey != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "sdk_key", *params.SdkKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
@@ -1412,6 +1628,20 @@ type ClientWithResponsesInterface interface {
 	// more than 24 hours ahead is taken as the time the event was
 	// received.
 	//
+	// **From a closing page.** A browser page that is closing hands its
+	// last batch, exposures included, to `navigator.sendBeacon`, which
+	// cannot set headers and is sent without a CORS preflight; a
+	// `keepalive` fetch carrying `Authorization` and JSON would need one,
+	// which browsers do not send for such a request, and the last
+	// exposures of a visit would be lost. So a batch is also accepted with
+	// a client key as the query parameter `sdk_key` and the envelope sent
+	// as `text/plain` (any `charset`), read as JSON with the same limits
+	// and answers. Such a request is a CORS simple request: answered with
+	// the same CORS headers, the key's allowed origins enforced and the
+	// client events rate limit applied. A server key in the query is
+	// `403 server_key_in_query`; a key both in `Authorization` and in the
+	// query is `400 invalid_request`.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /events (the `PostEvents` operationId).
@@ -1449,10 +1679,75 @@ type ClientWithResponsesInterface interface {
 	// more than 24 hours ahead is taken as the time the event was
 	// received.
 	//
+	// **From a closing page.** A browser page that is closing hands its
+	// last batch, exposures included, to `navigator.sendBeacon`, which
+	// cannot set headers and is sent without a CORS preflight; a
+	// `keepalive` fetch carrying `Authorization` and JSON would need one,
+	// which browsers do not send for such a request, and the last
+	// exposures of a visit would be lost. So a batch is also accepted with
+	// a client key as the query parameter `sdk_key` and the envelope sent
+	// as `text/plain` (any `charset`), read as JSON with the same limits
+	// and answers. Such a request is a CORS simple request: answered with
+	// the same CORS headers, the key's allowed origins enforced and the
+	// client events rate limit applied. A server key in the query is
+	// `403 server_key_in_query`; a key both in `Authorization` and in the
+	// query is `400 invalid_request`.
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /events (the `PostEvents` operationId).
 	PostEventsWithResponse(ctx context.Context, params *PostEventsParams, body PostEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostEventsResponse, error)
+
+	// PostEventsWithTextBodyWithResponse A batch of evaluation summaries, aliases and exposures
+	//
+	// Accepts a batch of events from either key. The batch is refused as a
+	// whole only for its envelope (`400 invalid_request` with violations),
+	// its key, its size (`413 request_too_large`: over 500 events or
+	// 1 MiB after decompression), a rate limit or a server error; an SDK
+	// retries those with the same event IDs, except a `4xx` other than
+	// `401`, `403` and `429`, which it drops.
+	//
+	// Otherwise each event is judged on its own and the batch is answered
+	// `202` once every accepted event is durable, so the SDK can drop what
+	// it sent. Each event is idempotent by its `event_id`, a lowercase
+	// UUIDv7, within the retention window: one already received is
+	// counted in `duplicates`, never twice. A summary row naming a flag
+	// the environment does not have is dropped and counted in
+	// `dropped_rows`. A refused event is listed in `rejected` with its
+	// index, its `event_id` when it has one, a `code` and a `detail`; the
+	// SDK never sends it again.
+	//
+	// The rejection codes are an open set, which a later server may add
+	// to: an SDK treats a code it does not know like any other rejection
+	// and never resends the event. The codes today: `event_invalid` (a
+	// member missing, of the wrong type, a string over 256 bytes or
+	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
+	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
+	// time older than the retention window), `undeclared_unit_type`,
+	// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
+	// type is not its experiment's) and `unknown_variation` (an exposure
+	// naming a variation its experiment does not have). An `occurred_at`
+	// more than 24 hours ahead is taken as the time the event was
+	// received.
+	//
+	// **From a closing page.** A browser page that is closing hands its
+	// last batch, exposures included, to `navigator.sendBeacon`, which
+	// cannot set headers and is sent without a CORS preflight; a
+	// `keepalive` fetch carrying `Authorization` and JSON would need one,
+	// which browsers do not send for such a request, and the last
+	// exposures of a visit would be lost. So a batch is also accepted with
+	// a client key as the query parameter `sdk_key` and the envelope sent
+	// as `text/plain` (any `charset`), read as JSON with the same limits
+	// and answers. Such a request is a CORS simple request: answered with
+	// the same CORS headers, the key's allowed origins enforced and the
+	// client events rate limit applied. A server key in the query is
+	// `403 server_key_in_query`; a key both in `Authorization` and in the
+	// query is `400 invalid_request`.
+	//
+	// Takes a body of the `text/plain` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /events (the `PostEvents` operationId).
+	PostEventsWithTextBodyWithResponse(ctx context.Context, params *PostEventsParams, body PostEventsTextRequestBody, reqEditors ...RequestEditorFn) (*PostEventsResponse, error)
 
 	// GetRulesetWithResponse The environment's whole ruleset, for a server key
 	//
@@ -2086,6 +2381,20 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // more than 24 hours ahead is taken as the time the event was
 // received.
 //
+// **From a closing page.** A browser page that is closing hands its
+// last batch, exposures included, to `navigator.sendBeacon`, which
+// cannot set headers and is sent without a CORS preflight; a
+// `keepalive` fetch carrying `Authorization` and JSON would need one,
+// which browsers do not send for such a request, and the last
+// exposures of a visit would be lost. So a batch is also accepted with
+// a client key as the query parameter `sdk_key` and the envelope sent
+// as `text/plain` (any `charset`), read as JSON with the same limits
+// and answers. Such a request is a CORS simple request: answered with
+// the same CORS headers, the key's allowed origins enforced and the
+// client events rate limit applied. A server key in the query is
+// `403 server_key_in_query`; a key both in `Authorization` and in the
+// query is `400 invalid_request`.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /events (the `PostEvents` operationId).
@@ -2129,11 +2438,82 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // more than 24 hours ahead is taken as the time the event was
 // received.
 //
+// **From a closing page.** A browser page that is closing hands its
+// last batch, exposures included, to `navigator.sendBeacon`, which
+// cannot set headers and is sent without a CORS preflight; a
+// `keepalive` fetch carrying `Authorization` and JSON would need one,
+// which browsers do not send for such a request, and the last
+// exposures of a visit would be lost. So a batch is also accepted with
+// a client key as the query parameter `sdk_key` and the envelope sent
+// as `text/plain` (any `charset`), read as JSON with the same limits
+// and answers. Such a request is a CORS simple request: answered with
+// the same CORS headers, the key's allowed origins enforced and the
+// client events rate limit applied. A server key in the query is
+// `403 server_key_in_query`; a key both in `Authorization` and in the
+// query is `400 invalid_request`.
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /events (the `PostEvents` operationId).
 func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params *PostEventsParams, body PostEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*PostEventsResponse, error) {
 	rsp, err := c.PostEvents(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostEventsResponse(rsp)
+}
+
+// PostEventsWithTextBodyWithResponse A batch of evaluation summaries, aliases and exposures
+//
+// Accepts a batch of events from either key. The batch is refused as a
+// whole only for its envelope (`400 invalid_request` with violations),
+// its key, its size (`413 request_too_large`: over 500 events or
+// 1 MiB after decompression), a rate limit or a server error; an SDK
+// retries those with the same event IDs, except a `4xx` other than
+// `401`, `403` and `429`, which it drops.
+//
+// Otherwise each event is judged on its own and the batch is answered
+// `202` once every accepted event is durable, so the SDK can drop what
+// it sent. Each event is idempotent by its `event_id`, a lowercase
+// UUIDv7, within the retention window: one already received is
+// counted in `duplicates`, never twice. A summary row naming a flag
+// the environment does not have is dropped and counted in
+// `dropped_rows`. A refused event is listed in `rejected` with its
+// index, its `event_id` when it has one, a `code` and a `detail`; the
+// SDK never sends it again.
+//
+// The rejection codes are an open set, which a later server may add
+// to: an SDK treats a code it does not know like any other rejection
+// and never resends the event. The codes today: `event_invalid` (a
+// member missing, of the wrong type, a string over 256 bytes or
+// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
+// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
+// time older than the retention window), `undeclared_unit_type`,
+// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
+// type is not its experiment's) and `unknown_variation` (an exposure
+// naming a variation its experiment does not have). An `occurred_at`
+// more than 24 hours ahead is taken as the time the event was
+// received.
+//
+// **From a closing page.** A browser page that is closing hands its
+// last batch, exposures included, to `navigator.sendBeacon`, which
+// cannot set headers and is sent without a CORS preflight; a
+// `keepalive` fetch carrying `Authorization` and JSON would need one,
+// which browsers do not send for such a request, and the last
+// exposures of a visit would be lost. So a batch is also accepted with
+// a client key as the query parameter `sdk_key` and the envelope sent
+// as `text/plain` (any `charset`), read as JSON with the same limits
+// and answers. Such a request is a CORS simple request: answered with
+// the same CORS headers, the key's allowed origins enforced and the
+// client events rate limit applied. A server key in the query is
+// `403 server_key_in_query`; a key both in `Authorization` and in the
+// query is `400 invalid_request`.
+//
+// Takes a body of the `text/plain` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /events (the `PostEvents` operationId).
+func (c *ClientWithResponses) PostEventsWithTextBodyWithResponse(ctx context.Context, params *PostEventsParams, body PostEventsTextRequestBody, reqEditors ...RequestEditorFn) (*PostEventsResponse, error) {
+	rsp, err := c.PostEventsWithTextBody(ctx, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2933,6 +3313,19 @@ func (siw *ServerInterfaceWrapper) PostEvents(w http.ResponseWriter, r *http.Req
 	// Parameter object where we will unmarshal all parameters from the context
 	var params PostEventsParams
 
+	// ------------- Optional query parameter "sdk_key" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sdk_key", r.URL.Query(), &params.SdkKey, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sdk_key"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sdk_key", Err: err})
+		}
+		return
+	}
+
 	headers := r.Header
 
 	// ------------- Optional header parameter "Flagnetic-Schema-Version" -------------
@@ -3472,8 +3865,9 @@ func (response Evaluate503ApplicationProblemPlusJSONResponse) VisitEvaluateRespo
 }
 
 type PostEventsRequestObject struct {
-	Params PostEventsParams
-	Body   *PostEventsJSONRequestBody
+	Params   PostEventsParams
+	JSONBody *PostEventsJSONRequestBody
+	TextBody *PostEventsTextRequestBody
 }
 
 type PostEventsResponseObject interface {
@@ -4078,13 +4472,25 @@ func (sh *strictHandler) PostEvents(w http.ResponseWriter, r *http.Request, para
 	var request PostEventsRequestObject
 
 	request.Params = params
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 
-	var body PostEventsJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
+		var body PostEventsJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
+
 	}
-	request.Body = &body
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "text/plain") {
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't read body: %w", err))
+			return
+		}
+		body := PostEventsTextRequestBody(data)
+		request.TextBody = &body
+	}
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.PostEvents(ctx, request.(PostEventsRequestObject))

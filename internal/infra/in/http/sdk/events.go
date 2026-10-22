@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -173,6 +174,23 @@ func sdkString(sdk map[string]json.RawMessage, name string, required bool,
 	return s
 }
 
+// errNotABatchMedia answers an events batch sent as another media type than
+// JSON or plain text.
+var errNotABatchMedia = flaghttp.UnsupportedMediaType("the body must be sent as application/json or text/plain")
+
+// requireBatchMedia refuses an events batch whose body is declared neither
+// JSON nor plain text. A closing page hands its last batch to
+// navigator.sendBeacon, which sends a string as text/plain and so needs no
+// CORS preflight, which browsers do not send for such a request; the body
+// is read as JSON either way. A parameter such as charset is accepted.
+func requireBatchMedia(r *http.Request) error {
+	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || (media != "application/json" && media != "text/plain") {
+		return errNotABatchMedia
+	}
+	return nil
+}
+
 // PostEvents judges a batch of events and stores those accepted, answering
 // 202 once they are durable.
 func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, params PostEventsParams) {
@@ -180,7 +198,7 @@ func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, params PostEven
 		a.writeError(w, r, err)
 		return
 	}
-	if err := requireJSON(r); err != nil {
+	if err := requireBatchMedia(r); err != nil {
 		a.writeError(w, r, err)
 		return
 	}

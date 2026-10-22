@@ -9,7 +9,7 @@ A key's value is the kind's prefix and 40 random characters. It is shown once, w
 
 ## Presenting a key
 
-An SDK sends its key as a bearer token on every request to the SDK API, `/sdk/v1`: `Authorization: Bearer fn_srv_…`. A key that does not work is refused `401`, with a problem whose `code` says why and the challenge of RFC 6750 in `WWW-Authenticate`:
+An SDK sends its key as a bearer token on every request to the SDK API, `/sdk/v1`: `Authorization: Bearer fn_srv_…`. A browser's `EventSource` and `navigator.sendBeacon` cannot set headers, so the [ruleset stream](stream.md) and a batch of [events](events.md#from-a-closing-page) also take a client key as the query parameter `sdk_key`; a server key there is refused `403 server_key_in_query`. A key that does not work is refused `401`, with a problem whose `code` says why and the challenge of RFC 6750 in `WWW-Authenticate`:
 
 | Code | When | `WWW-Authenticate` |
 |---|---|---|

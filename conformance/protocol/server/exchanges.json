@@ -485,6 +485,48 @@
     }
   },
   {
+    "name": "events from a closing page",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/events?sdk_key=<client key>",
+      "headers": {
+        "Content-Type": "text/plain;charset=UTF-8",
+        "Origin": "https://app.example.com"
+      },
+      "body": {
+        "events": [
+          {
+            "type": "alias",
+            "event_id": "01a0b91b-c500-7000-8000-00000000000e",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "from_unit_type": "anonymous",
+            "from_unit_id": "d-8f1c",
+            "to_unit_type": "user",
+            "to_unit_id": "u-1001"
+          }
+        ],
+        "schema_version": 1,
+        "sdk": {
+          "name": "flagnetic-js",
+          "platform": "web",
+          "version": "1.0.0"
+        },
+        "sent_at": "2026-09-19T10:00:00Z"
+      }
+    },
+    "response": {
+      "status": 202,
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Content-Type": "application/json",
+        "RateLimit-Limit": "60",
+        "RateLimit-Remaining": "55",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/events-accepted.json"
+    }
+  },
+  {
     "name": "truncated JSON",
     "request": {
       "method": "POST",
