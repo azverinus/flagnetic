@@ -6,6 +6,7 @@ import { managementClient, must, seedProject } from "../support/console";
 import {
   choose,
   openFlag,
+  readConfiguration,
   readFlag,
   seedFlag,
   stringFlag,
@@ -167,6 +168,160 @@ test.describe("a member who may only read", () => {
     await expect(archive).toHaveAccessibleDescription(
       /Needs the permission to archive and delete flags/,
     );
+    await expect(page.getByRole("combobox", { name: "Fallthrough variation" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Add rule" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Unsaved changes" })).toHaveCount(0);
+  });
+});
+
+const bar = (page: Page) => page.getByRole("region", { name: "Unsaved changes" });
+
+test.describe("the configuration draft", () => {
+  test("switches a flag on at once, then saves a new fallthrough from the draft", async ({
+    page,
+  }) => {
+    const project = await seedProject("draft-save");
+    await seedFlag(project, stringFlag("checkout_variant"));
+    await openFlag(page, project, "checkout_variant", { environment: "development" });
+
+    await page.getByRole("switch", { name: "Switch checkout_variant on in Development" }).click();
+    await expect(page.getByText("checkout_variant is on in Development.")).toBeVisible();
+    expect((await readConfiguration(project, "checkout_variant", "development")).on).toBe(true);
+
+    await choose(page, "Fallthrough variation", "treatment");
+    await expect(bar(page)).toBeVisible();
+    await bar(page).getByRole("button", { name: "Save" }).click();
+    await expect(bar(page)).toHaveCount(0);
+    const saved = await readConfiguration(project, "checkout_variant", "development");
+    expect(saved).toMatchObject({ on: true, fallthrough: "treatment" });
+  });
+
+  test("discards a draft back to the configuration as loaded", async ({ page }) => {
+    const project = await seedProject("draft-discard");
+    await seedFlag(project, stringFlag("checkout_variant"));
+    await openFlag(page, project, "checkout_variant");
+
+    await choose(page, "Fallthrough variation", "treatment");
+    await bar(page).getByRole("button", { name: "Discard" }).click();
+    await expect(bar(page)).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "Fallthrough variation" })).toHaveText(
+      "control",
+    );
+  });
+
+  test("asks before leaving an environment with a draft", async ({ page }) => {
+    const project = await seedProject("draft-leave");
+    await seedFlag(project, stringFlag("checkout_variant"));
+    await openFlag(page, project, "checkout_variant");
+
+    await choose(page, "Fallthrough variation", "treatment");
+    await page.getByRole("tab", { name: "Staging" }).click();
+    const leave = page.getByRole("dialog", { name: "Leave without saving?" });
+    await expect(leave).toBeVisible();
+    await leave.getByRole("button", { name: "Leave" }).click();
+    await expect(page.getByRole("tab", { name: "Staging" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(bar(page)).toHaveCount(0);
+  });
+
+  test("shows who saved meanwhile with their change, and reapplies the draft onto it", async ({
+    page,
+  }) => {
+    const project = await seedProject("draft-conflict");
+    await seedFlag(project, stringFlag("checkout_variant"));
+    await openFlag(page, project, "checkout_variant", { environment: "development" });
+    await choose(page, "Fallthrough variation", "treatment");
+
+    await writeConfiguration(project, "checkout_variant", "development", () => ({
+      on: true,
+      rules: [
+        {
+          description: "Germany",
+          conditions: [{ kind: "attribute", attribute: "country", op: "eq", value: "DE" }],
+          serve: { kind: "variation", variation: "treatment" },
+        },
+      ],
+    }));
+    await bar(page).getByRole("button", { name: "Save" }).click();
+
+    const banner = page.getByRole("alert").filter({ hasText: "saved this configuration" });
+    await expect(banner).toContainText("bootstrap saved this configuration on");
+    await expect(banner).toContainText("Switched on.");
+    await expect(banner).toContainText("Rule 1 added: “Germany”.");
+    await banner.getByRole("button", { name: "Reload and reapply my draft" }).click();
+    await expect(banner).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "Fallthrough variation" })).toHaveText(
+      "treatment",
+    );
+    await expect(page.getByRole("region", { name: "Rule 1", exact: true })).toBeVisible();
+
+    await bar(page).getByRole("button", { name: "Save" }).click();
+    await expect(bar(page)).toHaveCount(0);
+    const saved = await readConfiguration(project, "checkout_variant", "development");
+    expect(saved).toMatchObject({ on: true, fallthrough: "treatment" });
+    expect(saved.rules.map((rule) => rule.description)).toEqual(["Germany"]);
+  });
+
+  test("an own override after someone else's rule leaves Save a conflict, not an overwrite", async ({
+    page,
+  }) => {
+    const project = await seedProject("draft-override-conflict");
+    await seedFlag(project, stringFlag("checkout_variant"));
+    await openFlag(page, project, "checkout_variant", { environment: "development" });
+    await choose(page, "Fallthrough variation", "treatment");
+    await writeConfiguration(project, "checkout_variant", "development", () => ({
+      rules: [{ description: "theirs", serve: { kind: "variation", variation: "treatment" } }],
+    }));
+
+    const form = page.getByRole("form", { name: "Add an override" });
+    await form.getByLabel("Unit ID").fill("qa-7");
+    await form.getByRole("button", { name: "Add override" }).click();
+    await expect(page.getByRole("table", { name: "Overrides in this environment" })).toContainText(
+      "qa-7",
+    );
+    await expect(bar(page)).toBeVisible();
+
+    await bar(page).getByRole("button", { name: "Save" }).click();
+    const banner = page.getByRole("alert").filter({ hasText: "saved this configuration" });
+    await expect(banner).toBeVisible();
+    expect((await readConfiguration(project, "checkout_variant", "development")).fallthrough).toBe(
+      "control",
+    );
+    await banner.getByRole("button", { name: "Reload and reapply my draft" }).click();
+    await bar(page).getByRole("button", { name: "Save" }).click();
+    await expect(bar(page)).toHaveCount(0);
+
+    const saved = await readConfiguration(project, "checkout_variant", "development");
+    expect(saved.fallthrough).toBe("treatment");
+    expect(saved.rules.map((rule) => rule.description)).toEqual(["theirs"]);
+    expect(saved.overrides.map((override) => override.unit_id)).toEqual(["qa-7"]);
+  });
+
+  test("saves a draft after an own override with no one else's change in between", async ({
+    page,
+  }) => {
+    const project = await seedProject("draft-override");
+    await seedFlag(project, stringFlag("checkout_variant"));
+    await openFlag(page, project, "checkout_variant", { environment: "development" });
+    await choose(page, "Fallthrough variation", "treatment");
+
+    const form = page.getByRole("form", { name: "Add an override" });
+    await form.getByLabel("Unit ID").fill("qa-7");
+    await form.getByRole("button", { name: "Add override" }).click();
+    await expect(page.getByRole("table", { name: "Overrides in this environment" })).toContainText(
+      "qa-7",
+    );
+
+    await bar(page).getByRole("button", { name: "Save" }).click();
+    await expect(bar(page)).toHaveCount(0);
+    await expect(
+      page.getByRole("alert").filter({ hasText: "saved this configuration" }),
+    ).toHaveCount(0);
+    const saved = await readConfiguration(project, "checkout_variant", "development");
+    expect(saved.fallthrough).toBe("treatment");
+    expect(saved.overrides.map((override) => override.unit_id)).toEqual(["qa-7"]);
   });
 });
 

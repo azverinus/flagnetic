@@ -27,6 +27,16 @@ msgstr ""
 msgid "{count, plural, one {second} other {seconds}}"
 msgstr ""
 
+#: src/components/condition-row.tsx
+#: src/lib/conditions.ts
+msgid "{entry} is not a full semantic version, such as 1.41.0."
+msgstr ""
+
+#: src/components/condition-row.tsx
+#: src/lib/conditions.ts
+msgid "{entry} is not a number."
+msgstr ""
+
 #: src/lib/conditions.ts
 msgid "{flag} serves {variation}"
 msgstr ""
@@ -62,6 +72,10 @@ msgstr ""
 
 #: src/components/grant-form.tsx
 msgid "{name} ({email})"
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "{name} (unit ID)"
 msgstr ""
 
 #: src/components/member-actions.tsx
@@ -141,6 +155,14 @@ msgstr ""
 msgid "<0>{variation}</0> (note: {note})"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "1.41.0"
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "1.41.0, then Enter"
+msgstr ""
+
 #: src/components/variations-editor.tsx
 msgid "A boolean flag always has exactly the variations true and false."
 msgstr ""
@@ -151,6 +173,15 @@ msgstr ""
 
 #: src/lib/flag-detail.ts
 msgid "A chain of prerequisites has at most 5 steps."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "A configuration has at most 50 rules."
+msgstr ""
+
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
+msgid "A flag cannot require itself."
 msgstr ""
 
 #: src/lib/flags.ts
@@ -203,6 +234,11 @@ msgstr ""
 msgid "A revoked device is signed out at its next request."
 msgstr ""
 
+#: src/components/rule-editor.tsx
+#: src/lib/rule-editor.ts
+msgid "A rule has at most 20 conditions."
+msgstr ""
+
 #: src/components/auth-settings-form.tsx
 msgid "A session ends this long after it opened, however much it is used. Lowering it ends the sessions already older."
 msgstr ""
@@ -233,6 +269,10 @@ msgstr ""
 
 #: src/lib/flag-detail.ts
 msgid "A unit ID has at most 256 bytes."
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "A value, then Enter"
 msgstr ""
 
 #: src/components/overrides-section.tsx
@@ -279,8 +319,32 @@ msgstr ""
 msgid "Add an override"
 msgstr ""
 
+#: src/lib/conditions.ts
+msgid "Add at least one value."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Add attribute condition"
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "Add override"
+msgstr ""
+
+#: src/components/prerequisites-section.tsx
+msgid "Add prerequisite"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Add prerequisite condition"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Add rule"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Add segment condition"
 msgstr ""
 
 #: src/components/variations-editor.tsx
@@ -422,6 +486,10 @@ msgstr ""
 msgid "Attribute"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Attribute (condition {position})"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Attribute declared"
 msgstr ""
@@ -535,6 +603,20 @@ msgstr ""
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "Checked top to bottom; the first whose conditions all hold serves. Reorder by dragging, with the arrows, or with Alt+Arrow Up and Down."
+msgstr ""
+
+#: src/components/condition-row.tsx
+#: src/components/prerequisites-section.tsx
+msgid "Choose a flag"
+msgstr ""
+
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
+msgid "Choose a flag."
+msgstr ""
+
 #: src/components/grant-form.tsx
 msgid "Choose a member"
 msgstr ""
@@ -556,6 +638,14 @@ msgstr ""
 msgid "Choose a role."
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Choose a segment"
+msgstr ""
+
+#: src/lib/conditions.ts
+msgid "Choose a segment."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
 msgstr ""
@@ -570,6 +660,34 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Choose a type."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Choose a unit type"
+msgstr ""
+
+#: src/lib/rule-editor.ts
+msgid "Choose a unit type."
+msgstr ""
+
+#: src/components/condition-row.tsx
+#: src/components/prerequisites-section.tsx
+#: src/components/rule-editor.tsx
+msgid "Choose a variation"
+msgstr ""
+
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
+#: src/lib/rule-editor.ts
+msgid "Choose a variation."
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "Choose an attribute"
+msgstr ""
+
+#: src/lib/conditions.ts
+msgid "Choose an attribute."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -590,6 +708,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered types."
+msgstr ""
+
+#: src/lib/conditions.ts
+msgid "Choose true or false."
 msgstr ""
 
 #: src/components/tags-input.tsx
@@ -616,6 +738,10 @@ msgstr ""
 msgid "Command line"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Condition {position}"
+msgstr ""
+
 #: src/components/structural-diff-view.tsx
 msgid "Condition {position} added: <0/>."
 msgstr ""
@@ -626,6 +752,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Condition {position} removed: <0/>."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Conditions (all must hold)"
 msgstr ""
 
 #: src/components/password-form.tsx
@@ -776,6 +906,10 @@ msgstr ""
 msgid "Description"
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "Description (rule {position}, optional)"
+msgstr ""
+
 #: src/components/structural-diff-view.tsx
 msgid "Description changed from “{before}” to “{after}”."
 msgstr ""
@@ -797,6 +931,10 @@ msgstr ""
 msgid "Discard"
 msgstr ""
 
+#: src/components/configuration-editor.tsx
+msgid "Discard my draft"
+msgstr ""
+
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Display name"
@@ -808,6 +946,10 @@ msgstr ""
 
 #: src/lib/conditions.ts
 msgid "does not equal"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Drag rule {position}"
 msgstr ""
 
 #: src/components/member-actions.tsx
@@ -854,6 +996,10 @@ msgstr ""
 msgid "ends with"
 msgstr ""
 
+#: src/lib/conditions.ts
+msgid "Enter a date and time."
+msgstr ""
+
 #: src/components/member-form.tsx
 #: src/components/profile-form.tsx
 msgid "Enter a display name."
@@ -861,6 +1007,10 @@ msgstr ""
 
 #: src/lib/auth-settings.ts
 msgid "Enter a duration from {from} to {to}."
+msgstr ""
+
+#: src/lib/conditions.ts
+msgid "Enter a full semantic version, such as 1.41.0."
 msgstr ""
 
 #: src/lib/forms.ts
@@ -872,8 +1022,17 @@ msgstr ""
 msgid "Enter a new password."
 msgstr ""
 
+#: src/lib/conditions.ts
 #: src/lib/variations.ts
 msgid "Enter a number."
+msgstr ""
+
+#: src/lib/conditions.ts
+msgid "Enter a pattern in RE2 syntax, which has no look-around or back-references."
+msgstr ""
+
+#: src/lib/rule-editor.ts
+msgid "Enter a percentage from 0 to 100, to two decimal places."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -886,6 +1045,10 @@ msgstr ""
 
 #: src/lib/flags.ts
 msgid "Enter a value of the flag's type."
+msgstr ""
+
+#: src/lib/conditions.ts
+msgid "Enter a value."
 msgstr ""
 
 #: src/lib/auth-settings.ts
@@ -1002,6 +1165,10 @@ msgstr ""
 msgid "Every status"
 msgstr ""
 
+#: src/components/configuration-editor.tsx
+msgid "Every unit is bucketed afresh: units now in the rollout may fall out of it and others come in. The new salt is saved at once, apart from the rest of the draft."
+msgstr ""
+
 #: src/components/kill-switch-dialog.tsx
 msgid "Everyone receives the off variation in {name}, whatever the rules and overrides say. Switching the flag back on is an ordinary configuration change."
 msgstr ""
@@ -1036,7 +1203,7 @@ msgstr ""
 msgid "Expires"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/configuration-editor.tsx
 msgid "Fallthrough variation"
 msgstr ""
 
@@ -1056,6 +1223,10 @@ msgstr ""
 msgid "Filter the flags"
 msgstr ""
 
+#: src/components/configuration-editor.tsx
+msgid "Fix what is marked above before saving."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Fixed once declared."
@@ -1069,6 +1240,14 @@ msgstr ""
 msgid "Flag"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Flag (condition {position})"
+msgstr ""
+
+#: src/components/prerequisites-section.tsx
+msgid "Flag (prerequisite {position})"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Flag not found"
 msgstr ""
@@ -1077,6 +1256,10 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/route.tsx
 msgid "Flags"
+msgstr ""
+
+#: src/components/prerequisites-section.tsx
+msgid "Flags that must serve a variation for this flag to be evaluated here; otherwise it serves its off variation."
 msgstr ""
 
 #: src/components/personal-menu.tsx
@@ -1094,6 +1277,10 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "From"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Given by the server when the rule is saved as a rollout."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -1238,8 +1425,16 @@ msgstr ""
 msgid "is greater than"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "is in the segment"
+msgstr ""
+
 #: src/lib/conditions.ts
 msgid "is less than"
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "is not in the segment"
 msgstr ""
 
 #: src/lib/conditions.ts
@@ -1522,6 +1717,18 @@ msgstr ""
 msgid "Members of the project"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Membership (condition {position})"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Move rule {position} down"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Move rule {position} up"
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/token-create-form.tsx
@@ -1609,6 +1816,10 @@ msgstr ""
 msgid "No"
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "No conditions: matches every context."
+msgstr ""
+
 #: src/components/audit-log.tsx
 msgid "No entry matches these filters."
 msgstr ""
@@ -1637,6 +1848,10 @@ msgstr ""
 msgid "No overrides in this environment."
 msgstr ""
 
+#: src/components/prerequisites-section.tsx
+msgid "No prerequisites."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "No project has this key. It may be mistyped, or the link may point to another instance."
 msgstr ""
@@ -1648,6 +1863,14 @@ msgstr ""
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/index.tsx
 msgid "No projects yet"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "No rules: every context receives the fallthrough variation."
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "No value needed."
 msgstr ""
 
 #: src/components/sign-in-form.tsx
@@ -1719,7 +1942,7 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/components/configuration-editor.tsx
 msgid "Off variation"
 msgstr ""
 
@@ -1761,6 +1984,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Open the audit log"
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "Operator (condition {position})"
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
@@ -1826,6 +2053,10 @@ msgstr ""
 msgid "Password minimum length"
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "Percentage (rule {position})"
+msgstr ""
+
 #: src/components/structural-diff-view.tsx
 msgid "permanent"
 msgstr ""
@@ -1841,6 +2072,10 @@ msgstr ""
 msgid "Personal settings"
 msgstr ""
 
+#: src/components/prerequisites-section.tsx
+msgid "Prerequisite {position}"
+msgstr ""
+
 #: src/components/structural-diff-view.tsx
 msgid "Prerequisite <0>{flag}</0> requires <1>{after}</1> instead of <2>{before}</2>."
 msgstr ""
@@ -1853,13 +2088,25 @@ msgstr ""
 msgid "Prerequisite removed: <0>{flag}</0> serves <1>{before}</1>."
 msgstr ""
 
+#: src/components/prerequisites-section.tsx
+msgid "Prerequisites"
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Press Enter after each tag."
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Press Enter after each value."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Previous"
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "Private: evaluated on the server only."
 msgstr ""
 
 #: src/routes/_signed-in/settings/profile.tsx
@@ -1922,6 +2169,10 @@ msgstr ""
 msgid "Reading the members…"
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "Reapplied after a conflict: saves as a new rule"
+msgstr ""
+
 #: src/components/kill-switch-dialog.tsx
 msgid "Reason"
 msgstr ""
@@ -1938,16 +2189,45 @@ msgstr ""
 msgid "Recorded in the audit log. Characters still needed: {missing}."
 msgstr ""
 
+#: src/components/configuration-editor.tsx
+#: src/components/rule-editor.tsx
+msgid "Regenerate salt"
+msgstr ""
+
+#: src/components/configuration-editor.tsx
+msgid "Regenerate the salt?"
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 msgid "Reload and lose my edits"
+msgstr ""
+
+#: src/components/configuration-editor.tsx
+msgid "Reload and reapply my draft"
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "Remove {entry}"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Remove {role} from {holder}"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Remove condition {position}"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "Remove grant"
+msgstr ""
+
+#: src/components/prerequisites-section.tsx
+msgid "Remove prerequisite {position}"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Remove rule {position}"
 msgstr ""
 
 #: src/components/tags-input.tsx
@@ -1973,6 +2253,14 @@ msgstr ""
 #: src/components/query-error.tsx
 #: src/lib/toast.ts
 msgid "Request ID: {requestId}"
+msgstr ""
+
+#: src/components/condition-row.tsx
+msgid "Required variation (condition {position})"
+msgstr ""
+
+#: src/components/prerequisites-section.tsx
+msgid "Required variation (prerequisite {position})"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -2052,8 +2340,24 @@ msgstr ""
 msgid "Role granted"
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "Rollout"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Rule {from} moved to position {to}."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Rule {position}"
+msgstr ""
+
 #: src/components/structural-diff-view.tsx
 msgid "Rule {position} added: <0/>."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Rule {position} added."
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
@@ -2070,6 +2374,18 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Rule {position} removed: <0/>."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Rule {position} removed."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Rules"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Salt (rule {position})"
 msgstr ""
 
 #: src/components/auth-settings-form.tsx
@@ -2113,6 +2429,10 @@ msgstr ""
 msgid "Search projects"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Segment (condition {position})"
+msgstr ""
+
 #. An attribute type.
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Semantic version"
@@ -2124,6 +2444,18 @@ msgstr ""
 
 #: src/components/token-list.tsx
 msgid "Send it as a bearer token in the Authorization header. Keep it where only what uses it can read it."
+msgstr ""
+
+#: src/components/configuration-editor.tsx
+msgid "Served while the flag is off, and when a prerequisite fails."
+msgstr ""
+
+#: src/components/configuration-editor.tsx
+msgid "Served while the flag is on and no rule matches."
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Serves (rule {position})"
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
@@ -2356,6 +2688,10 @@ msgstr ""
 msgid "The browser refused the clipboard. Select the value and copy it by hand."
 msgstr ""
 
+#: src/components/configuration-editor.tsx
+msgid "The configuration in {name} is saved."
+msgstr ""
+
 #: src/components/profile-form.tsx
 msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
 msgstr ""
@@ -2412,7 +2748,10 @@ msgstr ""
 msgid "The flag and its configuration in every environment are deleted. This cannot be taken back; its audit entries stay."
 msgstr ""
 
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
 #: src/lib/flag-detail.ts
+#: src/lib/rule-editor.ts
 msgid "The flag has no such variation."
 msgstr ""
 
@@ -2506,11 +2845,13 @@ msgstr ""
 msgid "The passwords do not match."
 msgstr ""
 
+#: src/lib/conditions.ts
 #: src/lib/flag-detail.ts
 msgid "The project does not declare this attribute."
 msgstr ""
 
 #: src/lib/flag-detail.ts
+#: src/lib/rule-editor.ts
 msgid "The project does not declare this unit type."
 msgstr ""
 
@@ -2518,10 +2859,16 @@ msgstr ""
 msgid "The project has no flag with this key. It may have been deleted."
 msgstr ""
 
+#: src/lib/conditions.ts
+#: src/lib/configuration-draft.ts
+msgid "The project has no such flag, or it is archived."
+msgstr ""
+
 #: src/lib/flag-detail.ts
 msgid "The project has no such flag."
 msgstr ""
 
+#: src/lib/conditions.ts
 #: src/lib/flag-detail.ts
 msgid "The project has no such segment."
 msgstr ""
@@ -2556,6 +2903,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "The role includes the permission to {name}, which you do not hold yourself here."
+msgstr ""
+
+#: src/components/configuration-editor.tsx
+msgid "The rollout has a new salt."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -2643,6 +2994,10 @@ msgstr ""
 msgid "This device"
 msgstr ""
 
+#: src/lib/configuration-draft.ts
+msgid "This flag is already a prerequisite."
+msgstr ""
+
 #: src/lib/flag-detail.ts
 msgid "This flag is archived; restore it or choose another."
 msgstr ""
@@ -2704,6 +3059,7 @@ msgstr ""
 msgid "This key is reserved."
 msgstr ""
 
+#: src/lib/conditions.ts
 #: src/lib/flag-detail.ts
 msgid "This operator does not apply to the attribute's type."
 msgstr ""
@@ -2832,6 +3188,10 @@ msgstr ""
 msgid "Unit type"
 msgstr ""
 
+#: src/components/rule-editor.tsx
+msgid "Unit type (rule {position})"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Unit type declared"
 msgstr ""
@@ -2847,6 +3207,10 @@ msgstr ""
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Unit types"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
 msgstr ""
 
 #: src/components/session-list.tsx
@@ -2869,12 +3233,25 @@ msgstr ""
 msgid "Value"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Value (condition {position})"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 msgid "Values before and after the change"
 msgstr ""
 
+#: src/components/condition-row.tsx
+msgid "Values of {label}"
+msgstr ""
+
 #: src/components/overrides-section.tsx
+#: src/components/rule-editor.tsx
 msgid "Variation"
+msgstr ""
+
+#: src/components/rule-editor.tsx
+msgid "Variation (rule {position})"
 msgstr ""
 
 #: src/components/variations-editor.tsx

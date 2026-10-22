@@ -16,6 +16,7 @@ import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/can";
+import { ConfigurationEditor } from "@/components/configuration-editor";
 import { FlagDefinitionSheet } from "@/components/flag-definition-sheet";
 import { KillSwitchDialog } from "@/components/kill-switch-dialog";
 import { OverridesSection } from "@/components/overrides-section";
@@ -39,7 +40,16 @@ import {
 import { flagTypeName } from "@/lib/flags";
 import { ifMatch } from "@/lib/http";
 import { problemMessage } from "@/lib/problem-messages";
-import { environmentsQuery, flagQuery, flagsQueryKey, unitTypesQuery } from "@/lib/queries";
+import { useCan, useMissingPermissionReason } from "@/lib/access";
+import {
+  attributesQuery,
+  environmentsQuery,
+  flagChoicesQuery,
+  flagQuery,
+  flagsQueryKey,
+  segmentsQuery,
+  unitTypesQuery,
+} from "@/lib/queries";
 import { useKnownMembers } from "@/lib/use-known-members";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/flags/$flag")({
@@ -382,13 +392,20 @@ type PanelProps = {
  */
 function EnvironmentPanel(props: PanelProps) {
   const { t } = useLingui();
-  const { flag, configuration, nameOf } = props;
+  const { project, flag, configuration, environment, nameOf } = props;
   const archived = flag.archived_at !== null;
   const frozen = archived
     ? t`The flag is archived. Restore it to change its configurations.`
     : undefined;
+  const can = useCan("flag_configuration.update");
+  const missing = useMissingPermissionReason("flag_configuration.update");
   const updated = configuration.updated_by ? nameOf(configuration.updated_by) : undefined;
   const version = configuration.version;
+  const attributes = useQuery(attributesQuery(project));
+  const segments = useQuery(segmentsQuery(project));
+  const flags = useQuery(flagChoicesQuery(project));
+  const reads = [attributes, segments, flags];
+  const failed = reads.find((read) => read.isError);
 
   return (
     <div className="flex flex-col gap-8">
@@ -396,23 +413,37 @@ function EnvironmentPanel(props: PanelProps) {
         <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">
           {frozen}
         </p>
+      ) : !can ? (
+        <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">
+          {missing}
+        </p>
       ) : null}
       <OnOff {...props} frozen={frozen !== undefined} />
-      <section className="grid gap-4 text-sm sm:grid-cols-2">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-muted-foreground">
-            <Trans>Off variation</Trans>
-          </span>
-          <span className="font-mono">{configuration.off_variation}</span>
+      {failed ? (
+        <QueryError error={failed.error} onRetry={() => void failed.refetch()} />
+      ) : environment && attributes.data && segments.data && flags.data ? (
+        <ConfigurationEditor
+          // A configuration of another environment starts a draft of its own.
+          key={configuration.environment}
+          project={project}
+          flag={flag}
+          configuration={configuration}
+          environment={environment}
+          declarations={{
+            attributes: attributes.data,
+            unitTypes: props.unitTypes,
+            segments: segments.data,
+            flags: flags.data,
+          }}
+          overrides={<OverridesSection {...props} frozen={frozen} />}
+          readOnly={frozen ?? (can ? undefined : missing)}
+        />
+      ) : (
+        <div className="flex flex-col gap-3" aria-busy>
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-32 w-full" />
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-muted-foreground">
-            <Trans>Fallthrough variation</Trans>
-          </span>
-          <span className="font-mono">{configuration.fallthrough}</span>
-        </div>
-      </section>
-      <OverridesSection {...props} frozen={frozen} />
+      )}
       <p className="text-xs text-muted-foreground">
         {updated ? (
           <Trans>

@@ -156,6 +156,28 @@ export function flagQuery(project: string, flag: string) {
   });
 }
 
+/**
+ * Every flag of a project that is not archived, read page by page: the
+ * flags a prerequisite can name, with their variations.
+ */
+export function flagChoicesQuery(project: string) {
+  return queryOptions<FlagList["items"]>({
+    queryKey: [...flagsQueryKey(project), "choices"],
+    queryFn: async () => {
+      const items: FlagList["items"] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await unwrap(
+          listFlags({ path: { project }, query: { limit: 200, ...(cursor ? { cursor } : {}) } }),
+        );
+        items.push(...page.items);
+        cursor = page.next_cursor ?? undefined;
+      } while (cursor);
+      return items;
+    },
+  });
+}
+
 /** A project's segments, which a rule's conditions name. */
 export function segmentsQuery(project: string) {
   return queryOptions<Segment[]>({

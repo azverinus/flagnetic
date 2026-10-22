@@ -202,9 +202,13 @@ function AddOverride({
   onAnswered: (next: FlagConfiguration) => void;
 }) {
   const { i18n, t } = useLingui();
-  const [unitType, setUnitType] = useState(unitTypes[0]?.key ?? "");
+  // Until the member chooses, the first unit type and variation, as they
+  // are once read: the unit types may arrive after the form is shown.
+  const [chosenType, setUnitType] = useState("");
+  const unitType = chosenType || (unitTypes[0]?.key ?? "");
   const [unitId, setUnitId] = useState("");
-  const [variation, setVariation] = useState(flag.variations[0]?.key ?? "");
+  const [chosenVariation, setVariation] = useState("");
+  const variation = chosenVariation || (flag.variations[0]?.key ?? "");
   const [note, setNote] = useState("");
   const [checked, setChecked] = useState(false);
   const issues = overrideIssues(i18n, unitId, note);
