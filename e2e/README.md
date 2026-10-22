@@ -5,10 +5,13 @@ Every SDK proves itself once against the real `flagnetic` binary. This directory
 ## Bringing it up
 
 ```bash
-FLAGNETIC_E2E_SEED="$RUNNER_TEMP/seed.json" go run ./e2e/cmd/flagnetic-e2e up &
+go build -o "$RUNNER_TEMP/flagnetic-e2e" ./e2e/cmd/flagnetic-e2e
+FLAGNETIC_E2E_SEED="$RUNNER_TEMP/seed.json" "$RUNNER_TEMP/flagnetic-e2e" up &
 ```
 
-`up` builds `flagnetic` from the checkout (or takes `FLAGNETIC_E2E_BINARY`), applies the migrations once, starts replicas A and B on loopback, bootstraps the instance admin, seeds the project and writes the seed to `FLAGNETIC_E2E_SEED` (stdout when unset) within 120 seconds, or exits 1. It then serves until interrupted (SIGINT or SIGTERM stops both replicas and the database it started). The database is `DATABASE_URL`, or a throwaway PostgreSQL in Docker when unset. The replicas' logs go to `FLAGNETIC_E2E_LOGS`, next to the state by default. `task e2e:up` does the same with a throwaway database.
+Run the built command rather than `go run`: `go run` does not pass SIGTERM on to the program it started, so stopping it would leave the replicas running.
+
+`up` builds `flagnetic` from the checkout (or takes `FLAGNETIC_E2E_BINARY`), applies the migrations once, starts replicas A and B on loopback, bootstraps the instance admin, seeds the project and writes the seed to `FLAGNETIC_E2E_SEED` (stdout when unset) within 120 seconds, or exits 1. It then serves until interrupted (SIGINT or SIGTERM stops both replicas and the database it started). The database is `DATABASE_URL`, or a throwaway PostgreSQL in Docker when unset; `up` migrates, bootstraps and seeds whatever database `DATABASE_URL` names, so point it only at a test database of its own. The replicas' logs go to `FLAGNETIC_E2E_LOGS`, next to the state by default. `task e2e:up` does the same with a throwaway database.
 
 Running `up` again on the same database is idempotent: the project, segment and flags are found by key and written only where they differ from the seed; the SDK keys are new, and the earlier ones named `sdk-e2e` are revoked.
 

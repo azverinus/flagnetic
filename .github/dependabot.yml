@@ -32,13 +32,17 @@ updates:
     commit-message:
       prefix: "deps(sdk-go-openfeature)"
   # The end-to-end harness, released by nothing; its requirements on this
-  # repository's modules stay v0.0.0 and resolve through the workspace.
+  # repository's modules stay v0.0.0 and resolve through the workspace, so
+  # a release of one of them is no update here.
   - package-ecosystem: gomod
     directory: /e2e
     schedule:
       interval: weekly
     commit-message:
       prefix: "deps(e2e)"
+    ignore:
+      - dependency-name: "github.com/azverinus/flagnetic"
+      - dependency-name: "github.com/azverinus/flagnetic/*"
   - package-ecosystem: github-actions
     directory: /
     schedule:

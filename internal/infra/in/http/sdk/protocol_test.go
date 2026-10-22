@@ -301,6 +301,9 @@ func answers(t *testing.T, ex exchange, res *http.Response, body []byte, version
 			t.Errorf("%s = %q, want %q", name, got, want)
 		}
 	}
+	if len(pending) > 0 && (ex.Response.Body == "" || strings.HasSuffix(ex.Response.Body, ".txt")) {
+		t.Errorf("%s replaces members of %q, whose answer has no JSON body to replace them in", pendingFile, ex.Name)
+	}
 	if ex.Response.Body == "" {
 		if len(body) != 0 {
 			t.Errorf("body = %s, want none", body)
@@ -442,6 +445,9 @@ func withPending(t *testing.T, want any, pending json.RawMessage) any {
 		replaced := false
 		for i, r := range rejected {
 			if m, ok := r.(map[string]any); ok && m["index"] == instead["index"] {
+				if reflect.DeepEqual(m, instead) {
+					t.Errorf("%s replaces the rejection at index %v with what the document holds already", pendingFile, instead["index"])
+				}
 				rejected[i] = instead
 				replaced = true
 			}
@@ -456,9 +462,13 @@ func withPending(t *testing.T, want any, pending json.RawMessage) any {
 		for _, part := range parts[:len(parts)-1] {
 			parent, _ = parent[part].(map[string]any)
 		}
-		if _, ok := parent[parts[len(parts)-1]]; !ok {
+		held, ok := parent[parts[len(parts)-1]]
+		if !ok {
 			t.Errorf("%s sets %s, which the document does not hold", pendingFile, pointer)
 			continue
+		}
+		if reflect.DeepEqual(held, value) {
+			t.Errorf("%s sets %s to what the document holds already", pendingFile, pointer)
 		}
 		parent[parts[len(parts)-1]] = value
 	}
