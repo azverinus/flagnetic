@@ -63,7 +63,9 @@ type RulesetCache struct {
 	// generation counts the listener going up or down. A load is kept only
 	// when it did not change while the load was under way.
 	generation uint64
-	entries    map[workspace.EnvironmentID]*rulesetEntry
+	// started counts the materializations started, numbering each.
+	started uint64
+	entries map[workspace.EnvironmentID]*rulesetEntry
 }
 
 type rulesetEntry struct {
@@ -85,6 +87,8 @@ type pendingVersion struct {
 }
 
 type rulesetLoad struct {
+	// seq numbers the load among those the cache started.
+	seq  uint64
 	done chan struct{}
 	rs   appdelivery.Ruleset
 	err  error
@@ -152,8 +156,28 @@ func (c *RulesetCache) entry(environment workspace.EnvironmentID) *rulesetEntry 
 // from memory when it can be trusted, otherwise from a materialization it
 // starts or joins. It waits for the materialization as long as ctx lasts,
 // then answers appdelivery.ErrRulesetUnavailable; the materialization goes
-// on for the requests after it.
+// on for the requests after it. The answer counts towards the propagation
+// of its version: it is an SDK's.
 func (c *RulesetCache) Ruleset(ctx context.Context, environment workspace.EnvironmentID) (appdelivery.Ruleset, error) {
+	return c.ruleset(ctx, environment, true)
+}
+
+// Unmeasured returns the cache as a source of rulesets whose answers do not
+// count towards their version's propagation, for a member downloading one:
+// the propagation measured is to SDKs, and a download answered first would
+// hide the time the first SDK waited.
+func (c *RulesetCache) Unmeasured() appdelivery.Rulesets { return unmeasuredRulesets{c} }
+
+type unmeasuredRulesets struct{ c *RulesetCache }
+
+func (u unmeasuredRulesets) Ruleset(ctx context.Context, environment workspace.EnvironmentID) (appdelivery.Ruleset, error) {
+	return u.c.ruleset(ctx, environment, false)
+}
+
+func (c *RulesetCache) ruleset(ctx context.Context, environment workspace.EnvironmentID, measured bool) (appdelivery.Ruleset, error) {
+	c.mu.Lock()
+	arrived := c.started
+	c.mu.Unlock()
 	for {
 		c.mu.Lock()
 		if c.closed {
@@ -163,12 +187,18 @@ func (c *RulesetCache) Ruleset(ctx context.Context, environment workspace.Enviro
 		e := c.entry(environment)
 		if c.listening && e.doc != nil && e.doc.Version >= e.latest {
 			rs := *e.doc
-			c.served(environment, e, rs.Version)
+			if measured {
+				c.served(environment, e, rs.Version)
+			}
 			c.mu.Unlock()
 			return rs, nil
 		}
 		l := e.loading
-		if l == nil {
+		// While the listener is down no notification tells of a write
+		// another replica committed, so a load started before this request
+		// may have read the database before that write: only a load started
+		// since is joined.
+		if l == nil || (!c.listening && l.seq <= arrived) {
 			l = c.start(environment, e)
 		}
 		want := e.latest
@@ -187,7 +217,7 @@ func (c *RulesetCache) Ruleset(ctx context.Context, environment workspace.Enviro
 		}
 		if l.rs.Version >= want {
 			c.mu.Lock()
-			if e, ok := c.entries[environment]; ok {
+			if e, ok := c.entries[environment]; ok && measured {
 				c.served(environment, e, l.rs.Version)
 			}
 			c.mu.Unlock()
@@ -201,7 +231,8 @@ func (c *RulesetCache) Ruleset(ctx context.Context, environment workspace.Enviro
 // start begins the materialization of environment, shared by every request
 // asking for it until it ends. c.mu is held.
 func (c *RulesetCache) start(environment workspace.EnvironmentID, e *rulesetEntry) *rulesetLoad {
-	l := &rulesetLoad{done: make(chan struct{})}
+	c.started++
+	l := &rulesetLoad{seq: c.started, done: make(chan struct{})}
 	e.loading = l
 	generation := c.generation
 	c.loads.Add(1)
@@ -275,13 +306,16 @@ func (c *RulesetCache) Committed(environment workspace.EnvironmentID, version in
 }
 
 // Listening is told when the listener starts or stops listening: either way
-// a bump may have been missed, so everything held is dropped.
+// a bump may have been missed, so everything held is dropped. The
+// propagation series go too: the deletion of an environment may have been
+// missed with the rest, and its series would otherwise stay forever.
 func (c *RulesetCache) Listening(up bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.listening = up
 	c.generation++
 	clear(c.entries)
+	c.propagation.Reset()
 }
 
 // Received is told each bump, as "<environment>:<version>:<bumped at in
@@ -297,6 +331,7 @@ func (c *RulesetCache) Received(payload string) {
 		// tell apart: trusting nothing it holds is the only safe reading.
 		c.log.Warn("unreadable ruleset notification; dropping every cached ruleset", "payload", payload)
 		clear(c.entries)
+		c.propagation.Reset()
 	case version == 0:
 		delete(c.entries, environment)
 		c.propagation.DeleteLabelValues(environment.String())

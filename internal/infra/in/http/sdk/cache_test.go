@@ -143,6 +143,35 @@ func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 	}
 }
 
+func TestWhileTheListenerIsDownARequestDoesNotJoinALoadStartedBeforeIt(t *testing.T) {
+	listen, stall := &pglisten.Fault{}, &pgdelivery.RulesetLoadFault{}
+	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(stall), testkit.WithListenerOptions(pglisten.Options{
+		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: listen,
+		MinBackoff: time.Minute, MaxBackoff: time.Minute,
+	}))
+	p := newProject(t, srv)
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	listen.Silence()
+	if !eventually(5*time.Second, func() bool {
+		return testkit.Metric(t, srv.Scrape(t), `flagnetic_listener_up{channel="rulesets"}`) == 0
+	}) {
+		t.Fatal("the listener was never found deaf")
+	}
+	stall.Stall()
+	t.Cleanup(stall.Release)
+	// Each request finds the load before it under way; it may have read the
+	// database before a write another replica committed, which no
+	// notification announces while the listener is down.
+	for range 2 {
+		if res := ruleset(t, srv, value); res.StatusCode() != http.StatusServiceUnavailable {
+			t.Fatalf("while it cannot load: %d %s", res.StatusCode(), res.Body)
+		}
+	}
+	if got := stall.Stalled(); got != 2 {
+		t.Errorf("loads under way = %d, want 2: the second request reads the database afresh", got)
+	}
+}
+
 func TestAReplicaThatCannotLoadTheRulesetAnswers503UntilItCan(t *testing.T) {
 	fault := &pgdelivery.RulesetLoadFault{}
 	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(fault))
@@ -242,6 +271,71 @@ func TestDeletingAnEnvironmentDropsItsPropagationSeries(t *testing.T) {
 	}
 	if !eventually(time.Second, func() bool { return testkit.Metric(t, b.Scrape(t), series) == -1 }) {
 		t.Error("b still reports the propagation of the deleted environment a second later")
+	}
+}
+
+func TestAnEnvironmentDeletedWhileAReplicaWasNotListeningLosesItsPropagationSeriesThere(t *testing.T) {
+	fault := &pglisten.Fault{}
+	a := testkit.StartServer(t)
+	b := testkit.StartServer(t, testkit.WithListenerOptions(pglisten.Options{
+		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: fault,
+	}))
+	p := newProject(t, a)
+	if res := do(p.admin.CreateEnvironmentWithResponse(t.Context(), p.key, management.EnvironmentCreate{Key: "qa", Name: "QA"})); res.JSON201 == nil {
+		t.Fatalf("create qa = %d: %s", res.StatusCode(), res.Body)
+	}
+	p.flag(t, "search.ranking")
+	p.switchOn(t, "search.ranking", "qa")
+	_, value := p.sdkKey(t, "qa", management.SdkKeyKindServer)
+	series := `flagnetic_ruleset_propagation_seconds_count{environment="` + p.environmentID(t, "qa").String() + `"}`
+	before := served(t, b, value)
+	p.kill(t, "search.ranking", "qa")
+	if !eventually(time.Second, func() bool {
+		return served(t, b, value).Version > before.Version && testkit.Metric(t, b.Scrape(t), series) >= 1
+	}) {
+		t.Fatal("b never served the write and observed its propagation")
+	}
+
+	fault.Silence()
+	if !eventually(5*time.Second, func() bool {
+		return testkit.Metric(t, b.Scrape(t), `flagnetic_listener_up{channel="rulesets"}`) == 0
+	}) {
+		t.Fatal("b's listener was never found deaf")
+	}
+	envVersion := do(p.admin.GetEnvironmentWithResponse(t.Context(), p.key, "qa")).JSON200.Version
+	deleted := do(p.admin.DeleteEnvironmentWithResponse(t.Context(), p.key, "qa",
+		&management.DeleteEnvironmentParams{IfMatch: ptr(`"` + strconv.Itoa(int(envVersion)) + `"`)}))
+	if deleted.StatusCode() != http.StatusNoContent {
+		t.Fatalf("delete qa = %d: %s", deleted.StatusCode(), deleted.Body)
+	}
+	fault.Restore()
+	if !eventually(5*time.Second, func() bool {
+		return testkit.Metric(t, b.Scrape(t), `flagnetic_listener_up{channel="rulesets"}`) == 1 &&
+			testkit.Metric(t, b.Scrape(t), series) == -1
+	}) {
+		t.Error("b still reports the propagation of an environment deleted while it was not listening")
+	}
+}
+
+func TestAMemberDownloadingTheRulesetLeavesItsPropagationToTheFirstSDK(t *testing.T) {
+	srv := testkit.StartServer(t)
+	p := newProject(t, srv)
+	p.flag(t, "search.ranking")
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	series := `flagnetic_ruleset_propagation_seconds_count{environment="` + p.environmentID(t, "production").String() + `"}`
+	served(t, srv, value)
+	start := testkit.Metric(t, srv.Scrape(t), series)
+
+	p.switchOn(t, "search.ranking", "production")
+	if res := do(p.admin.GetEnvironmentRulesetWithResponse(t.Context(), p.key, "production")); res.StatusCode() != http.StatusOK {
+		t.Fatalf("management read = %d: %s", res.StatusCode(), res.Body)
+	}
+	if got := testkit.Metric(t, srv.Scrape(t), series); got > max(start, 0) {
+		t.Errorf("%s = %v after a member's download, want it left to the first SDK", series, got)
+	}
+	served(t, srv, value)
+	if got := testkit.Metric(t, srv.Scrape(t), series); got != max(start, 0)+1 {
+		t.Errorf("%s = %v after the first SDK answer, want %v", series, got, max(start, 0)+1)
 	}
 }
 

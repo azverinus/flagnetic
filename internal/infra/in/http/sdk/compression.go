@@ -42,8 +42,10 @@ func compression(edge *flaghttp.Server) func(http.Handler) http.Handler {
 }
 
 // acceptsGzip reports whether Accept-Encoding, as the values of its headers,
-// accepts gzip with a quality above zero.
+// accepts gzip with a quality above zero. gzip named explicitly decides over
+// "*", which only speaks for the codings not named.
 func acceptsGzip(values []string) bool {
+	gzipQ, anyQ := -1.0, -1.0
 	for _, value := range values {
 		for coding := range strings.SplitSeq(value, ",") {
 			name, params, _ := strings.Cut(coding, ";")
@@ -57,10 +59,17 @@ func acceptsGzip(values []string) bool {
 					q = f
 				}
 			}
-			return q > 0
+			if name == "gzip" {
+				gzipQ = q
+			} else {
+				anyQ = q
+			}
 		}
 	}
-	return false
+	if gzipQ >= 0 {
+		return gzipQ > 0
+	}
+	return anyQ > 0
 }
 
 // gzipWriter compresses an answer once its status says it has a body, and

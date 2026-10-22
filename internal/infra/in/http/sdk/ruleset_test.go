@@ -88,6 +88,10 @@ func TestTheRulesetIsGzippedWhenTheRequestAcceptsIt(t *testing.T) {
 	if refusedGzip.HTTPResponse.Header.Get("Content-Encoding") != "" {
 		t.Error("gzip with quality 0 was answered in gzip")
 	}
+	refusedByName := ruleset(t, srv, value, header("Accept-Encoding", "*;q=1, gzip;q=0"))
+	if refusedByName.HTTPResponse.Header.Get("Content-Encoding") != "" {
+		t.Error("gzip refused by name was answered in gzip because * accepts any coding")
+	}
 }
 
 func TestAClientKeyIsRefusedAtTheRuleset(t *testing.T) {

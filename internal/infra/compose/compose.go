@@ -231,7 +231,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
 			Drafts: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
 		}),
-		ReadRuleset: appdelivery.NewReadRuleset(deliveryStore, rulesetCache),
+		ReadRuleset: appdelivery.NewReadRuleset(deliveryStore, rulesetCache.Unmeasured()),
 
 		ListSDKKeys:  appdelivery.NewListSDKKeys(deliveryStore, d.Clock),
 		CreateSDKKey: appdelivery.NewCreateSDKKey(sdkKeys),
