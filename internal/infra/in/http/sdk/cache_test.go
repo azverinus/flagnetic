@@ -36,6 +36,24 @@ func on(d document, flag string) bool {
 
 const materializations = "flagnetic_ruleset_materializations_total"
 
+const rulesetsListenerUp = `flagnetic_listener_up{channel="rulesets"}`
+
+// deafen silences the rulesets listener of srv through fault and waits until
+// srv finds it deaf. It waits for the listener to come up first: the gauge
+// reads 0 before the listener first connects too, and a listener that comes
+// up after the wait would trust the cache again for as long as it takes to
+// find itself deaf.
+func deafen(t *testing.T, srv *testkit.Server, fault *pglisten.Fault) {
+	t.Helper()
+	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, srv.Scrape(t), rulesetsListenerUp) == 1 }) {
+		t.Fatal("the rulesets listener never came up")
+	}
+	fault.Silence()
+	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, srv.Scrape(t), rulesetsListenerUp) == 0 }) {
+		t.Fatal("the listener was never found deaf")
+	}
+}
+
 func TestAWriteIsServedByTheReplicaThatTookItAtOnce(t *testing.T) {
 	srv := testkit.StartServer(t)
 	p := newProject(t, srv)
@@ -90,7 +108,7 @@ func TestAnUnchangedRulesetIsMaterializedOnceHoweverManyAskAtOnce(t *testing.T) 
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	if !eventually(5*time.Second, func() bool {
-		return testkit.Metric(t, srv.Scrape(t), `flagnetic_listener_up{channel="rulesets"}`) == 1
+		return testkit.Metric(t, srv.Scrape(t), rulesetsListenerUp) == 1
 	}) {
 		t.Fatal("the rulesets listener never came up")
 	}
@@ -129,12 +147,7 @@ func TestAReplicaWhoseListenerIsDownMaterializesEveryRequest(t *testing.T) {
 	}))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
-	fault.Silence()
-	if !eventually(5*time.Second, func() bool {
-		return testkit.Metric(t, srv.Scrape(t), `flagnetic_listener_up{channel="rulesets"}`) == 0
-	}) {
-		t.Fatal("the listener was never found deaf")
-	}
+	deafen(t, srv, fault)
 	start := testkit.Metric(t, srv.Scrape(t), materializations)
 	served(t, srv, value)
 	served(t, srv, value)
@@ -151,12 +164,7 @@ func TestWhileTheListenerIsDownARequestDoesNotJoinALoadStartedBeforeIt(t *testin
 	}))
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
-	listen.Silence()
-	if !eventually(5*time.Second, func() bool {
-		return testkit.Metric(t, srv.Scrape(t), `flagnetic_listener_up{channel="rulesets"}`) == 0
-	}) {
-		t.Fatal("the listener was never found deaf")
-	}
+	deafen(t, srv, listen)
 	stall.Stall()
 	t.Cleanup(stall.Release)
 	// Each request finds the load before it under way; it may have read the
