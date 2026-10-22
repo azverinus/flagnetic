@@ -26,6 +26,7 @@ type Handlers struct {
 	Authenticate *appdelivery.AuthenticateSDKKey
 	ServeRuleset *appdelivery.ServeRuleset
 	WatchRuleset *appdelivery.WatchRuleset
+	Evaluate     *appdelivery.EvaluateRemotely
 }
 
 // Options are what the SDK API runs on besides its use cases.
@@ -49,6 +50,9 @@ type operation struct {
 	queryKey bool
 	// stream marks a long-lived operation.
 	stream bool
+	// maxBodyBytes is the operation's body limit, after decompression; the
+	// edge's default when 0.
+	maxBodyBytes int64
 }
 
 // operations are the operations served so far, by the pattern the
@@ -59,6 +63,10 @@ var operations = map[string]operation{
 	"GET " + BaseURL + "/stream": {
 		endpoint: endpointStream, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient},
 		queryKey: true, stream: true,
+	},
+	"POST " + BaseURL + "/evaluate": {
+		endpoint: endpointEvaluate, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient},
+		maxBodyBytes: maxEvaluateBody,
 	},
 }
 
@@ -95,6 +103,9 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 	var opts []flaghttp.RouteOption
 	if op.stream {
 		opts = append(opts, flaghttp.Stream())
+	}
+	if op.maxBodyBytes > 0 {
+		opts = append(opts, flaghttp.MaxBodyBytes(op.maxBodyBytes))
 	}
 	rt.a.edge.Handle(pattern, rt.a.guard(op, http.HandlerFunc(h)), opts...)
 }
@@ -300,10 +311,6 @@ func noneMatch(values []string, version string) bool {
 }
 
 // The operations of the contract still to be served.
-
-func (a *api) Evaluate(w http.ResponseWriter, r *http.Request, _ EvaluateParams) {
-	a.edge.WriteError(w, r, errors.New("sdk: evaluate is not served yet"))
-}
 
 func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, _ PostEventsParams) {
 	a.edge.WriteError(w, r, errors.New("sdk: events are not served yet"))

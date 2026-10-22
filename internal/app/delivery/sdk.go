@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/azverinus/flagnetic/eval"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -166,6 +167,9 @@ type Ruleset struct {
 	Version int64
 	// Document is the server-scope ruleset document, as SDKs receive it.
 	Document []byte
+	// Evaluable is Document decoded, which remote evaluation evaluates, so
+	// that a replica decodes a document once rather than once per request.
+	Evaluable *eval.Ruleset
 }
 
 // Rulesets answers the current ruleset of an environment.
@@ -240,7 +244,11 @@ func (h *MaterializeRuleset) Ruleset(ctx context.Context, environment workspace.
 	if err != nil {
 		return Ruleset{}, err
 	}
-	return Ruleset{Version: m.Version, Document: doc}, nil
+	rs, err := eval.Decode(doc)
+	if err != nil {
+		return Ruleset{}, err
+	}
+	return Ruleset{Version: m.Version, Document: doc, Evaluable: rs}, nil
 }
 
 // readMaterials reads into m the declarations, segments and flags of
