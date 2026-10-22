@@ -1,6 +1,6 @@
 # Contributing to Flagnetic
 
-Thanks for your interest. Flagnetic is in early development: the codebase is being assembled in large pieces. Issues, bug reports and discussion are welcome now; pull requests are welcome too, but for anything beyond a small fix please open an issue first so we can agree on the shape before you invest time.
+Thanks for your interest. Flagnetic is a developer preview: much of what it will hold is still to be built, in large pieces. Issues, bug reports and discussion are welcome now; pull requests are welcome too, but for anything beyond a small fix please open an issue first so we can agree on the shape before you invest time.
 
 Every change, the maintainers' included, reaches `main` through a pull request.
 

@@ -51,5 +51,9 @@ Durations are written as a number and a unit: ` + "`500ms`, `15s`, `2m`" + `.
 		desc += " Example: `" + s.Example + "`."
 		fmt.Fprintf(&b, "| `%s` | %s | %s | %s |\n", s.Name, key, def, strings.ReplaceAll(desc, "|", `\|`))
 	}
+	// The one variable read outside the settings table, by the commands
+	// that create an instance admin; listed so the reference names every
+	// variable Flagnetic reads.
+	b.WriteString("\nOne more variable is read by `flagnetic admin bootstrap` and `flagnetic admin create` alone, never by `serve`: `FLAGNETIC_ADMIN_PASSWORD`, the password of the instance admin they create (environment only; when unset, a password is generated and printed once). See [The first instance admin](operations.md#the-first-instance-admin).\n")
 	return b.Bytes()
 }

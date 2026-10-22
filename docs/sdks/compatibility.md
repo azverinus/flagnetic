@@ -4,6 +4,16 @@ Which server an SDK build can talk to, and what an SDK version promises. A build
 
 Every SDK is in its 0.x line: until 1.0.0 a minor release may still change the SDK's own API, while the protocol between an SDK and the server only grows.
 
+## What 0.1 promises
+
+Flagnetic 0.1.0 is the first release, a developer preview. From it on:
+
+- **The SDK API and the ruleset format only grow.** `/sdk/v1`, its headers, answers and problem codes, and the ruleset document change only additively, under the degradation rules below, so an SDK released with 0.1 keeps working with every later 0.x and 1.x server. Anything an older SDK could not read is served only to an SDK that asks for it, as a new `schema_version` or under a new SDK API path beside `/sdk/v1`.
+- **Upgrades only migrate forward, without data loss.** Migrations are never edited once released and only add to the schema, so upgrading a server keeps every flag, segment, key and audit entry (see [Upgrades](../install.md#upgrades)).
+- **The management API and the console may still change.** `/api/v1` and the console may change incompatibly in a 0.x minor release; every such change is marked as breaking in the release notes.
+
+What 0.1 does not have yet: experiments (every exposure an SDK posts is rejected `unknown_experiment` until they exist), governance beyond roles and the audit log: protected environments, change requests, scheduled changes and webhooks (`environment.protected` is `false` everywhere, so local overrides work in every environment), single sign-on, and SDKs other than Go and its OpenFeature provider. It needs PostgreSQL 16 or later.
+
 ## Compatibility table
 
 One row per SDK line: an SDK major version, or the version within a major from which a new `schema_version` range applies. `N.x` covers every `N.y.z`; `≥ N.y.z` covers `N.y.z` and later within major `N`, and where two rows cover a version the later one applies. Server is the lowest Flagnetic server release that serves the path and the range.

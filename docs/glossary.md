@@ -314,6 +314,14 @@ _Avoid_: API key, API token (both name the management API credential), token, se
 The time during which an SDK key being rotated and its replacement both work, so services can move to the new key before the old one expires.
 _Avoid_: grace period, transition window
 
+**Ruleset stream**:
+The long-lived connection an SDK holds to learn that its environment's ruleset has a new version. It carries versions only; the SDK then fetches the ruleset or evaluates again.
+_Avoid_: SSE, push channel, stream (reserved for a sink's cursor), change stream (the management one)
+
+**SDK inventory**:
+The SDKs seen using an environment: their name, version, platform and application version, which key they used, and when each was first and last seen.
+_Avoid_: connected SDKs, clients, installations
+
 **Evaluation**:
 Computing the value of a flag for a context. Local evaluation happens inside the SDK from a ruleset; remote evaluation happens on the server.
 _Avoid_: resolution, lookup, check

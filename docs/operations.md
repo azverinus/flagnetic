@@ -1,6 +1,6 @@
 # Operations
 
-How to run Flagnetic in production: what it needs, how it starts and stops, and what to watch. Every setting named here is listed in the [configuration reference](configuration.md).
+How to run Flagnetic in production: what it needs, how it starts and stops, how changes reach SDKs, and what to watch. [Installing Flagnetic](install.md) gets an instance running; every setting named here is listed in the [configuration reference](configuration.md).
 
 ## What it needs
 
@@ -126,6 +126,8 @@ By default the client of a request is its TCP peer, and `X-Forwarded-For` and `X
 
 Set `FLAGNETIC_BASE_URL` to the URL members open the console at, such as `https://flags.example.com`. Its scheme decides whether the session cookie is `Secure`, whatever the proxy forwards, and its origin is trusted for the console's requests even when the proxy rewrites `Host`. Without it, each request's own scheme (from `X-Forwarded-Proto` of a trusted proxy) and host are used.
 
+What a proxy in front must do for the ruleset stream, with an nginx configuration, is in [TLS and a reverse proxy](install.md#tls-and-a-reverse-proxy).
+
 ## HTTP limits
 
 The public listener bounds what one client can hold:
@@ -137,7 +139,52 @@ The public listener bounds what one client can hold:
 | `FLAGNETIC_HTTP_IDLE_TIMEOUT` | `120s` | Time a keep-alive connection may stay idle. |
 | `FLAGNETIC_HTTP_MAX_BODY_BYTES` | `1048576` | Size of a request body; a larger one is answered 413. The few routes that take larger bodies declare their own limit. |
 
-There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) and must allow it a read timeout above its 15-second heartbeat.
+There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) and must allow it a read timeout above its 15-second heartbeat; see [TLS and a reverse proxy](install.md#tls-and-a-reverse-proxy).
+
+## Delivery across replicas
+
+Any replica serves any SDK: it can download its environment's [ruleset](sdks/ruleset.md) from one replica, hold its [ruleset stream](sdks/stream.md) on another and post [events](sdks/events.md) to a third, so a load balancer needs no sticky sessions. Replicas share nothing but PostgreSQL. Each keeps two caches in memory and learns through PostgreSQL notifications when what they hold changed:
+
+- **Rulesets**, each environment's document by version, built from PostgreSQL once per environment however many SDKs ask at the same moment. Remote evaluation evaluates against the same document. A change is notified when its transaction commits, with the environment and its new version; every replica then builds the new document and offers its version to the streams it holds. A replica that took a write serves it at once, without waiting for its own notification.
+- **SDK keys**, each key the replica has accepted, by the hash of its value. A key's revocation, rotation, a change of its allowed origins and the deletion of its environment or project are notified, and every replica drops the key; an unknown key is never cached. A rotated key's expiry is judged on every request, with no notification needed.
+
+Deleting an environment drops its cached ruleset, ends its streams at their next heartbeat (their key is gone with it) and removes its series of `flagnetic_ruleset_propagation_seconds`.
+
+### Notification listeners
+
+Each replica holds one PostgreSQL connection per channel, outside its pool, for `LISTEN`. Each listener checks itself every 10 seconds by sending itself a notification, so a connection that went silent without failing (through a pooler in transaction mode, or a half-dead network path) counts as down too. `flagnetic_listener_up{channel}` tells which are up.
+
+| Channel | Carries | While it is down |
+|---|---|---|
+| `rulesets` | every change to an environment's ruleset, and the deletion of an environment | The replica caches no ruleset: it builds one from PostgreSQL for every ruleset request and remote evaluation (`flagnetic_ruleset_materializations_total` grows with each). The streams it holds hear of no change made through another replica, so their SDKs learn of it only at their next poll. |
+| `sdk_keys` | every change that ends or restricts an SDK key | The replica caches no key and reads every SDK request's key from PostgreSQL, so a revocation still applies at once. |
+| `auth_settings` | changes to the instance's auth settings | The replica reads the settings from PostgreSQL on every use (see [Signing in to the console](#signing-in-to-the-console)). |
+
+A listener that is down never serves stale data, only slower. When a listener connects again, the replica starts afresh: the `rulesets` listener drops every ruleset it holds, takes the versions PostgreSQL holds as the newest (even when older than versions it saw before, as after a failover that lost recent writes), and tells every stream it holds of the current version. Ruleset versions come from the clock of the replica that commits a change, so the first change after a failover or a restore is numbered above every version handed out before it, and every SDK accepts it.
+
+### Propagation
+
+The declared propagation time of a server SDK, from the commit of a change until the SDK holds the new ruleset, is at most 2 seconds at the 99th percentile with the ruleset stream, whichever replicas the writer and the SDK use; without the stream, at most the SDK's poll interval (see [Propagation](sdks/stream.md#propagation)).
+
+`flagnetic_ruleset_propagation_seconds` measures the server's part, from the commit (by the clock of the replica that committed it) to each replica's first ruleset or evaluation answer carrying the version; the SDK's download comes on top. Watch its 99th percentile, for example:
+
+```promql
+histogram_quantile(0.99, sum by (le) (rate(flagnetic_ruleset_propagation_seconds_bucket[5m])))
+```
+
+Above a second or two for minutes, it points at a `rulesets` listener that is down, a database slow to build rulesets, or replica clocks out of step.
+
+## What a client key still learns
+
+A client key ships inside apps and browsers, where anyone can read it, so it never receives a ruleset and its [remote evaluation](sdks/evaluate.md) answers never say which rule, segment or prerequisite produced a value (see [What a key learns](sdks/compatibility.md#what-a-key-learns)). A private segment's conditions and members never leave the server. Whoever holds a client key can still learn:
+
+- **The served values.** A client key may post any context, so posting contexts that differ in one attribute shows whether that attribute changes a flag's value, and a value that a rule on a private segment decides tells whether the posted unit is in that segment.
+- **An experiment block** on a value an experiment rule assigned, even behind a private segment: it tells that the context is in the experiment.
+- **The reason `override`**, which tells that the unit has an override on that flag.
+- **The environment's flags**: the key, type and served variation of every flag, the environment's key and its ruleset version, which moves on with every change.
+- **The declared attributes**: `ignored_attributes` tells which attribute names the project does not declare (`undeclared`) and which value types a declared one refuses (`type_mismatch`).
+
+Nothing short of contexts a client cannot choose closes the first, so do not use a flag served to a client key to keep a secret: keep values that must not leak, and targeting that must not be probed, behind a server key.
 
 ## Rate limits on the SDK API
 
@@ -160,6 +207,19 @@ The failed authentications are checked before any key is looked up: once an IP p
 A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`; a stream's tells the budget of the streams held at once. A refusal is `429 rate_limited` with `Retry-After` and `RateLimit-Reset`, both in whole seconds of at least 1, and the problem's `retry_after`.
 
 Each replica counts on its own, in memory: an instance of three replicas behind a load balancer lets up to three times each limit through. Size the limits for the replica count. A limit set to `off` is switched off; `0` or a negative value is refused at start, so a typo never lifts a limit silently. The client IP is the one `FLAGNETIC_TRUSTED_PROXIES` resolves, so behind a proxy list it there, or every client counts as the proxy.
+
+### Client keys behind a shared address
+
+The client-key limits count each key and client IP together, which assumes that one address is one device. Many devices often share one: an office network, a campus or a hotel behind one NAT address, and mobile carriers, which put thousands of phones behind each address of a carrier-grade NAT. Every app using the key behind that address then shares one budget per replica:
+
+- **Concurrent streams.** Each app in the foreground holds a ruleset stream, so the 11th app open behind one address is refused its stream (`FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS`, 10).
+- **Stream connects.** When a replica drains, as in every rolling deploy, the streams it held reconnect within seconds: past 30 apps behind one address, the rest are refused until the minute ends (`FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS`).
+- **Evaluations.** Each change of the environment makes every open app evaluate once, at about the same moment: past 120 open apps behind one address, the rest are refused until the minute ends (`FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE`), and so are their evaluations on start.
+- **Failed authentications.** An app still shipping a revoked or expired key is refused, and each refusal counts against its address: 30 in a minute and every SDK API request from that address is refused, the apps with a valid key included, until the minute ends (`FLAGNETIC_RATE_LIMIT_FAILED_AUTHENTICATIONS`).
+
+A refused request is answered `429 rate_limited` with `Retry-After`, and an SDK keeps the values it holds and asks again once that time has passed, so a limit that is too low delays changes rather than breaking apps. Over IPv6, each device usually has an address of its own and is counted alone.
+
+For mobile apps, and web apps used from large offices, raise the client-key limits to the number of app instances you expect behind one address on one replica (a load balancer spreads them over the replicas, but after a deploy one replica may hold most of them), with headroom for evaluations: for example, for up to 1,000 apps behind one address, `FLAGNETIC_RATE_LIMIT_CLIENT_CONCURRENT_STREAMS=1000`, `FLAGNETIC_RATE_LIMIT_CLIENT_STREAM_CONNECTS=1000` and `FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE=2000`. `off` switches a limit off; the failed-authentication limit still keeps guessing keys slow. Watch `flagnetic_sdk_rate_limited_total{kind="client"}` to see whether your limits refuse real apps.
 
 ## Raw events
 
@@ -214,12 +274,4 @@ A second SIGTERM or SIGINT at any point exits at once with code 1, for an operat
 
 ## Docker Compose
 
-[`deploy/compose.yaml`](../deploy/compose.yaml) runs PostgreSQL, a one-shot `migrate`, and the server with migrations on start turned off, a health check through `flagnetic healthcheck` and a stop grace covering the defaults:
-
-```bash
-cd deploy
-echo "FLAGNETIC_SECRET_KEY=$(openssl rand -base64 32)" > .env   # once; keep this file
-docker compose up
-```
-
-The server answers on port 8080. Set `FLAGNETIC_VERSION` to pin an image version; `docker compose build` builds the image from the checkout instead.
+[`deploy/compose.yaml`](../deploy/compose.yaml) runs PostgreSQL, a one-shot `migrate`, and the server with migrations on start turned off, a health check through `flagnetic healthcheck` and a stop grace covering the defaults. [Installing Flagnetic](install.md#with-docker-compose) walks through it.
