@@ -12,6 +12,7 @@ import (
 	"path"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -102,6 +103,10 @@ type Server struct {
 	db          Pinger
 	opts        Options
 	draining    atomic.Bool
+	// drained is closed when the replica begins to drain, so long-lived
+	// requests such as streams end and their clients reconnect elsewhere.
+	drained   chan struct{}
+	drainOnce sync.Once
 	// console answers the paths no route owns, nil while none is mounted.
 	console http.Handler
 	// wraps are the middlewares around every request under a prefix.
@@ -130,6 +135,7 @@ func New(o Options) *Server {
 		patterns:    map[string]routeConfig{},
 		secretPaths: http.NewServeMux(),
 		secretSeen:  map[string]bool{},
+		drained:     make(chan struct{}),
 		log:         slog.New(newLogHandler(o.Logger.Handler())),
 		db:          o.DB,
 		opts:        o,
@@ -141,7 +147,15 @@ func New(o Options) *Server {
 
 // Drain makes readiness answer 503 from now on while every route is still
 // served, so load balancers route away from a replica about to stop.
-func (s *Server) Drain() { s.draining.Store(true) }
+func (s *Server) Drain() {
+	s.draining.Store(true)
+	s.drainOnce.Do(func() { close(s.drained) })
+}
+
+// Draining is closed once the replica begins to drain: a stream ends then,
+// so that its client reconnects to a replica that stays, and the drain is
+// not held up by connections that never end on their own.
+func (s *Server) Draining() <-chan struct{} { return s.drained }
 
 // Handle mounts h on pattern, a ServeMux pattern with a method and a path.
 func (s *Server) Handle(pattern string, h http.Handler, opts ...RouteOption) {
@@ -211,13 +225,17 @@ func cleanPath(p string) string {
 }
 
 // HTTPServer returns an http.Server serving the edge with its connection
-// timeouts. It sets no write timeout, which would cut off streams.
+// timeouts. It sets no write timeout, which would cut off streams. Its
+// shutdown drains the edge, so the streams still open end rather than hold
+// the shutdown until its grace period runs out.
 func (s *Server) HTTPServer() *http.Server {
-	return &http.Server{
+	srv := &http.Server{
 		Handler:           s,
 		ReadHeaderTimeout: s.opts.ReadHeaderTimeout,
 		IdleTimeout:       s.opts.IdleTimeout,
 	}
+	srv.RegisterOnShutdown(s.Drain)
+	return srv
 }
 
 // Logger returns the logger of the edge, whose records logged with a

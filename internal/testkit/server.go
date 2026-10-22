@@ -34,6 +34,7 @@ type Server struct {
 	// Logs captures everything the server logs.
 	Logs *LogSink
 
+	edge       *flaghttp.Server
 	metrics    http.Handler
 	runner     *worker.Runner
 	listeners  *postgres.Listeners
@@ -44,6 +45,9 @@ type Server struct {
 // own, such as ruleset loads nobody waits for, as stopping the replica
 // does.
 func (s *Server) CloseBackground() { s.background() }
+
+// Drain begins the replica's drain, as the stop signal does.
+func (s *Server) Drain() { s.edge.Drain() }
 
 // Listen starts a notification listener of the server's replica, reported on
 // its registry, until the test ends.
@@ -238,7 +242,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		listeners.Start(l.Channel, l.Handler, o.listen)
 	}
 	return &Server{
-		URL: srv.URL, Logs: logs, metrics: metrics.Handler(reg), runner: runner, listeners: listeners,
+		URL: srv.URL, Logs: logs, edge: h, metrics: metrics.Handler(reg), runner: runner, listeners: listeners,
 		background: background.Close,
 	}
 }

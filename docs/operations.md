@@ -137,7 +137,7 @@ The public listener bounds what one client can hold:
 | `FLAGNETIC_HTTP_IDLE_TIMEOUT` | `120s` | Time a keep-alive connection may stay idle. |
 | `FLAGNETIC_HTTP_MAX_BODY_BYTES` | `1048576` | Size of a request body; a larger one is answered 413. The few routes that take larger bodies declare their own limit. |
 
-There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own.
+There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) and must allow it a read timeout above its 15-second heartbeat.
 
 ## Metrics
 
@@ -172,7 +172,7 @@ Each request is logged once when it completes, as a `request` record with `metho
 
 On SIGTERM or SIGINT a replica stops in three steps:
 
-1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. This gives load balancers time to notice and route away, so a rolling deploy never refuses a request. `0` skips the drain.
+1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. Every [ruleset stream](sdks/stream.md) the replica holds is closed, and its SDK reconnects, usually to another replica. This gives load balancers time to notice and route away, so a rolling deploy never refuses a request. `0` skips the drain.
 2. **Grace** (`FLAGNETIC_SHUTDOWN_GRACE`, 15 s by default): the replica stops accepting connections and lets requests in flight finish.
 3. **Cancel**: requests still running when the grace period ends are cancelled, background work is stopped, and the database pool closes.
 

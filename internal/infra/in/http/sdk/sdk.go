@@ -11,6 +11,7 @@ import (
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
 
@@ -21,12 +22,24 @@ const BaseURL = "/sdk/v1"
 type Handlers struct {
 	Authenticate *appdelivery.AuthenticateSDKKey
 	ServeRuleset *appdelivery.ServeRuleset
+	WatchRuleset *appdelivery.WatchRuleset
+}
+
+// Options are what the SDK API runs on besides its use cases.
+type Options struct {
+	// Clock times the streams.
+	Clock clock.Clock
 }
 
 // operation is how the adapter guards one operation of the contract.
 type operation struct {
 	// kinds are the key kinds the operation serves.
 	kinds []delivery.SDKKeyKind
+	// queryKey lets a client key be presented as the query parameter
+	// sdk_key, for a browser's EventSource, which cannot set headers.
+	queryKey bool
+	// stream marks a long-lived operation.
+	stream bool
 }
 
 // operations are the operations served so far, by the pattern the
@@ -34,19 +47,23 @@ type operation struct {
 // here is not mounted, and its path answers 404 like any unknown one.
 var operations = map[string]operation{
 	"GET " + BaseURL + "/ruleset": {kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer}},
+	"GET " + BaseURL + "/stream": {
+		kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient}, queryKey: true, stream: true,
+	},
 }
 
 // api serves the operations of the SDK API.
 type api struct {
-	edge *flaghttp.Server
-	h    Handlers
+	edge  *flaghttp.Server
+	h     Handlers
+	clock clock.Clock
 }
 
 // Mount serves the SDK API on edge: every request under BaseURL, routed or
 // not, through the API's compression, and each operation behind the
 // authentication of its SDK key.
-func Mount(edge *flaghttp.Server, h Handlers) {
-	a := &api{edge: edge, h: h}
+func Mount(edge *flaghttp.Server, h Handlers, o Options) {
+	a := &api{edge: edge, h: h, clock: o.Clock}
 	edge.Wrap(BaseURL+"/", compression(edge))
 	HandlerWithOptions(a, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
@@ -64,25 +81,42 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 	if !ok {
 		return
 	}
-	rt.a.edge.Handle(pattern, rt.a.guard(op, http.HandlerFunc(h)))
+	var opts []flaghttp.RouteOption
+	if op.stream {
+		opts = append(opts, flaghttp.Stream())
+	}
+	rt.a.edge.Handle(pattern, rt.a.guard(op, http.HandlerFunc(h)), opts...)
 }
 
 func (rt router) ServeHTTP(w http.ResponseWriter, r *http.Request) { rt.a.edge.ServeHTTP(w, r) }
 
 type keyKey struct{}
 
+// presented is the SDK key the guard authenticated for a request, with the
+// value presented, which a stream checks again on each heartbeat.
+type presented struct {
+	key   delivery.SDKKey
+	value string
+}
+
 // keyOf returns the SDK key the guard authenticated for the request ctx
 // belongs to.
-func keyOf(ctx context.Context) delivery.SDKKey {
-	k, _ := ctx.Value(keyKey{}).(delivery.SDKKey)
-	return k
+func keyOf(ctx context.Context) delivery.SDKKey { return presentedOf(ctx).key }
+
+func presentedOf(ctx context.Context) presented {
+	p, _ := ctx.Value(keyKey{}).(presented)
+	return p
 }
 
 // guard authenticates the request's SDK key and refuses a key of a kind op
 // does not serve; the key then travels in the request's context.
 func (a *api) guard(op operation, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key, err := a.h.Authenticate.Handle(r.Context(), bearer(r.Header.Get("Authorization")))
+		value, err := a.keyValue(op, r)
+		var key delivery.SDKKey
+		if err == nil {
+			key, err = a.h.Authenticate.Handle(r.Context(), value)
+		}
 		if err == nil {
 			err = key.CheckKind(op.kinds...)
 		}
@@ -90,9 +124,33 @@ func (a *api) guard(op operation, next http.Handler) http.Handler {
 			a.writeError(w, r, err)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyKey{}, key)))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyKey{}, presented{key: key, value: value})))
 	})
 }
+
+// keyValue returns the SDK key value r presents: the bearer of its
+// Authorization header, or for an operation taking one, the query
+// parameter sdk_key when the header carries none. A server key in the query
+// is refused whether or not the header carries a key, since it has leaked
+// into a URL either way.
+func (a *api) keyValue(op operation, r *http.Request) (string, error) {
+	value := bearer(r.Header.Get("Authorization"))
+	if !op.queryKey {
+		return value, nil
+	}
+	query := r.URL.Query().Get(queryKeyParameter)
+	if err := delivery.CheckKeyInQuery(query); err != nil {
+		return "", err
+	}
+	if value == "" {
+		value = query
+	}
+	return value, nil
+}
+
+// queryKeyParameter is the query parameter a client key may be presented
+// in.
+const queryKeyParameter = "sdk_key"
 
 // bearer returns the credential of an Authorization header of the Bearer
 // scheme, or "" when the header carries none: another scheme carries no
@@ -216,8 +274,4 @@ func (a *api) Evaluate(w http.ResponseWriter, r *http.Request, _ EvaluateParams)
 
 func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, _ PostEventsParams) {
 	a.edge.WriteError(w, r, errors.New("sdk: events are not served yet"))
-}
-
-func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, _ StreamRulesetParams) {
-	a.edge.WriteError(w, r, errors.New("sdk: the stream is not served yet"))
 }

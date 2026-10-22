@@ -379,12 +379,31 @@ func parseRulesetNotification(payload string) (workspace.EnvironmentID, int64, t
 	return environment, version, time.UnixMilli(millis), true
 }
 
-// RulesetLoadFault stalls a replica's materializations, so a test can watch
-// it answer while it cannot load a ruleset.
+// RulesetLoadFault stalls or fails a replica's materializations, so a test
+// can watch it answer while it cannot load a ruleset.
 type RulesetLoadFault struct {
 	mu       sync.Mutex
 	released chan struct{}
 	stalled  int
+	failing  bool
+	failed   int
+}
+
+// errRulesetLoadFault is the failure of a materialization the fault fails.
+var errRulesetLoadFault = errors.New("the ruleset load fault failed the materialization")
+
+// Fail fails every materialization from now on until Release.
+func (f *RulesetLoadFault) Fail() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failing = true
+}
+
+// Failed counts the materializations failed so far.
+func (f *RulesetLoadFault) Failed() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.failed
 }
 
 // Stall holds every materialization from now on until Release.
@@ -400,6 +419,7 @@ func (f *RulesetLoadFault) Stall() {
 func (f *RulesetLoadFault) Release() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.failing = false
 	if f.released != nil {
 		close(f.released)
 		f.released = nil
@@ -418,6 +438,11 @@ func (f *RulesetLoadFault) wait(ctx context.Context) error {
 		return nil
 	}
 	f.mu.Lock()
+	if f.failing {
+		f.failed++
+		f.mu.Unlock()
+		return errRulesetLoadFault
+	}
 	released := f.released
 	if released == nil {
 		f.mu.Unlock()
