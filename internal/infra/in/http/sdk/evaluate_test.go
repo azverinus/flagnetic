@@ -14,6 +14,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
+	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -371,4 +372,29 @@ func TestRemoteEvaluationNegotiatesTheSchemaVersionAndNeedsAKey(t *testing.T) {
 	refused(t, "schema 0", a.status, a.body, http.StatusNotAcceptable, "schema_version_unsupported")
 	a = postEvaluate(t, srv, "", "application/json", body)
 	refused(t, "no key", a.status, a.body, http.StatusUnauthorized, "sdk_key_missing")
+}
+
+func TestRemoteEvaluationRecordsTheUndeclaredAttributesOfItsContext(t *testing.T) {
+	srv := testkit.StartServer(t)
+	p := newProject(t, srv)
+	_, client := p.sdkKey(t, "production", management.SdkKeyKindClient)
+	evaluation(t, srv, client, `{"context":{"units":{"user":"u-1"},"attributes":{
+		"favourite_colour":"green","user":"u-2","os":"ios","build_number":"x","gone":null,"seats":4}}}`)
+	if err := srv.Tick(t, worker.DiscoveredAttributesName); err != nil {
+		t.Fatal(err)
+	}
+	res := do(p.admin.ListDiscoveredAttributesWithResponse(t.Context(), p.key))
+	if res.JSON200 == nil {
+		t.Fatalf("GET …/attributes/discovered = %d %s", res.StatusCode(), res.Body)
+	}
+	var got []string
+	for _, d := range res.JSON200.Items {
+		got = append(got, d.Key+" "+strings.Join(d.ObservedTypes, ","))
+	}
+	if want := []string{"favourite_colour string", "seats number"}; !slices.Equal(got, want) {
+		t.Errorf("discovered = %v, want %v", got, want)
+	}
+	if bytes.Contains(res.Body, []byte("green")) {
+		t.Errorf("a value was recorded: %s", res.Body)
+	}
 }

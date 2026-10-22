@@ -8,6 +8,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 )
 
@@ -58,6 +59,10 @@ type EvaluateDeps struct {
 	Declarations Declarations
 	Flags        ConfiguredFlags
 	Drafts       Drafts
+	// Discoveries gathers the undeclared attributes of the contexts
+	// evaluated; nil records none.
+	Discoveries *Discoveries
+	Clock       clock.Clock
 }
 
 // Evaluate evaluates an environment's ruleset for a context, as its SDKs
@@ -101,7 +106,8 @@ var errEnvironmentNotFound = apperrors.NotFound("not_found", "the project has no
 // Handle refuses an invalid context with invalid_context, then
 // materializes the environment's ruleset from one snapshot, with the draft
 // in place of its flag's configuration once checked, and evaluates it. It
-// stores and records nothing: not the draft, not an exposure.
+// stores nothing, neither the draft nor an exposure; the context's
+// undeclared attributes, key and type only, are noted as discovered.
 func (h *Evaluate) Handle(ctx context.Context, q EvaluateQuery) (Evaluation, error) {
 	if err := delivery.CheckContext(q.Context); err != nil {
 		return Evaluation{}, err
@@ -131,7 +137,11 @@ func (h *Evaluate) Handle(ctx context.Context, q EvaluateQuery) (Evaluation, err
 	if err != nil {
 		return Evaluation{}, err
 	}
-	return Evaluation{RulesetVersion: m.Version, Results: delivery.Evaluate(rs, q.Context, q.Flags)}, nil
+	results := delivery.Evaluate(rs, q.Context, q.Flags)
+	if h.d.Discoveries != nil {
+		h.d.Discoveries.Note(q.Project, h.d.Clock.Now(), delivery.ObserveUndeclared(rs, q.Context.Attributes))
+	}
+	return Evaluation{RulesetVersion: m.Version, Results: results}, nil
 }
 
 // materials reads what the ruleset of project's environment keyed

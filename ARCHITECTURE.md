@@ -46,11 +46,11 @@ Data crosses layers as: HTTP DTO → command → domain model → result → HTT
 
 | Context | Owns |
 |---|---|
-| workspace | projects, environments, unit types, declared and discovered attributes |
+| workspace | projects, environments, unit types, declared attributes |
 | access | members, sessions, tokens, permissions, roles, grants, SSO and SCIM identities |
 | flags | flags, variations, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch, segments and their conditions |
 | experiments | experiments, their status machine, assignment, the sample-ratio check |
-| delivery | rulesets, their versions and materialization, SDK keys |
+| delivery | rulesets, their versions and materialization, SDK keys, the SDK API, remote evaluation, discovered attributes |
 | events | exposures, aliases, evaluation summaries, rollups, retention |
 | governance | protected environments, change requests, scheduled changes, the audit log, webhooks, notices |
 | integrations | sinks to ClickHouse, object storage and webhooks; import and export |

@@ -107,6 +107,10 @@ type Handlers struct {
 	Evaluate             *appdelivery.Evaluate
 	ReadRuleset          *appdelivery.ReadRuleset
 
+	ListDiscoveredAttributes   *appdelivery.ListDiscoveredAttributes
+	DismissDiscoveredAttribute *appdelivery.DismissDiscoveredAttribute
+	DeclareDiscoveredAttribute *appdelivery.DeclareDiscoveredAttribute
+
 	ListSDKKeys  *appdelivery.ListSDKKeys
 	CreateSDKKey *appdelivery.CreateSDKKey
 	UpdateSDKKey *appdelivery.UpdateSDKKey

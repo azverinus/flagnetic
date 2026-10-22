@@ -1228,6 +1228,97 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/attributes/discovered:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listDiscoveredAttributes
+      summary: Attributes SDKs sent that the project does not declare
+      description: |
+        The attributes that contexts evaluated through the SDK API and the
+        tester carried without the project declaring them, by key, with the
+        JSON types seen and when they were first and last seen. Only an
+        attribute's key and type are recorded, never a value. A dismissed
+        attribute is left out until it is seen with a type not seen before;
+        an attribute declared since is left out. A project records at most
+        500, dismissed ones included.
+      x-permission: project.read
+      tags: [attributes]
+      responses:
+        "200":
+          description: The discovered attributes, by key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoveredAttributeList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/attributes/discovered/{attribute}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/AttributeKey"
+    delete:
+      operationId: dismissDiscoveredAttribute
+      summary: Dismiss a discovered attribute
+      description: |
+        Leaves the attribute out of the discovered ones until it is seen
+        with a type not seen before. An attribute not listed is `not_found`.
+      x-permission: declaration.manage
+      tags: [attributes]
+      responses:
+        "204":
+          description: Dismissed.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/attributes/discovered/{attribute}/declare:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/AttributeKey"
+    post:
+      operationId: declareDiscoveredAttribute
+      summary: Declare a discovered attribute
+      description: |
+        Declares the attribute with the type given, named after its key
+        unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+        An attribute not listed is `not_found`.
+      x-permission: declaration.manage
+      tags: [attributes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoveredAttributeDeclaration"
+      responses:
+        "201":
+          description: Declared.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attribute"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/attributes/{attribute}:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -3996,6 +4087,45 @@ components:
           properties:
             usage_count:
               $ref: "#/components/schemas/DeclarationUsageCount"
+    DiscoveredAttribute:
+      type: object
+      required: [key, observed_types, first_seen, last_seen, count]
+      properties:
+        key:
+          type: string
+        observed_types:
+          type: array
+          description: "The JSON types seen, in the order first seen: `string`, `number`, `boolean`, `list` or `object`."
+          items:
+            type: string
+        first_seen:
+          type: string
+          format: date-time
+        last_seen:
+          type: string
+          format: date-time
+        count:
+          type: integer
+          format: int64
+          description: How many evaluated contexts carried it.
+    DiscoveredAttributeList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscoveredAttribute"
+    DiscoveredAttributeDeclaration:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: "#/components/schemas/AttributeType"
+        name:
+          $ref: "#/components/schemas/Name"
+        description:
+          $ref: "#/components/schemas/Description"
     AttributeCreate:
       type: object
       required: [key, type, name]

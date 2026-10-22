@@ -5,17 +5,23 @@ import (
 
 	"github.com/azverinus/flagnetic/eval"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 )
 
 // EvaluateRemotely evaluates an environment's ruleset for a context an SDK
 // posts, for an SDK that holds no ruleset: a client SDK, or a server SDK
 // that prefers to ask.
-type EvaluateRemotely struct{ rulesets Rulesets }
+type EvaluateRemotely struct {
+	rulesets    Rulesets
+	discoveries *Discoveries
+	clock       clock.Clock
+}
 
 // NewEvaluateRemotely returns the handler, evaluating the rulesets this
-// replica holds.
-func NewEvaluateRemotely(rulesets Rulesets) *EvaluateRemotely {
-	return &EvaluateRemotely{rulesets: rulesets}
+// replica holds and noting the undeclared attributes of each context in
+// discoveries.
+func NewEvaluateRemotely(rulesets Rulesets, discoveries *Discoveries, c clock.Clock) *EvaluateRemotely {
+	return &EvaluateRemotely{rulesets: rulesets, discoveries: discoveries, clock: c}
 }
 
 // RemoteQuery is a context posted for remote evaluation, and the flags to
@@ -42,7 +48,9 @@ type RemoteEvaluation struct {
 // declared ones, a flag asked for that the ruleset does not hold left out.
 // A client key's results are masked so that it learns the values served
 // and not how they were reached; a server key's carry the true reason. It
-// records no exposure: an exposure is the SDK's explicit call.
+// records no exposure, an exposure being the SDK's explicit call; the
+// context's undeclared attributes, key and type only, are noted as
+// discovered.
 func (h *EvaluateRemotely) Handle(ctx context.Context, key delivery.SDKKey, q RemoteQuery) (RemoteEvaluation, error) {
 	if err := delivery.CheckRemoteContext(q.Context); err != nil {
 		return RemoteEvaluation{}, err
@@ -84,5 +92,6 @@ func (h *EvaluateRemotely) Handle(ctx context.Context, key delivery.SDKKey, q Re
 		}
 		out.Results[k] = r.Result
 	}
+	h.discoveries.Note(key.Project, h.clock.Now(), delivery.ObserveUndeclared(evaluable, q.Context.Attributes))
 	return out, nil
 }
