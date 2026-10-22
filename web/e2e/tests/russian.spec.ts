@@ -209,12 +209,12 @@ test.describe("the console in Russian", () => {
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: /^Ротировать ключ бэкенд/ }).click();
-    await expect(page.getByRole("dialog")).toContainText("Ротировать");
+    await expect(page.getByRole("dialog", { name: "Ротировать ключ бэкенд" })).toBeVisible();
     await expectNoSeriousViolations(page, "the rotate dialog in Russian");
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: /^Отозвать ключ витрина/ }).click();
-    await expect(page.getByRole("dialog")).toContainText("Отозвать");
+    await expect(page.getByRole("dialog", { name: "Отозвать ключ витрина" })).toBeVisible();
     await expectNoSeriousViolations(page, "the revoke dialog in Russian");
   });
 

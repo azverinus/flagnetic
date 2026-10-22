@@ -37,7 +37,7 @@ describe("a table", () => {
     expect(wrapper).toHaveClass("relative", "overflow-x-auto", "max-w-full");
   });
 
-  it("takes the keyboard focus, named by its caption, while it is wider than the page", () => {
+  it("takes the keyboard focus, named by its caption, while it is wider than its wrapper", () => {
     const widths = { scrollWidth: 900, clientWidth: 400 };
     const scrollWidth = vi
       .spyOn(HTMLElement.prototype, "scrollWidth", "get")
