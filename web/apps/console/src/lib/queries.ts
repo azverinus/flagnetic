@@ -33,8 +33,12 @@ import {
   listFlags,
   getFlag,
   listSegments,
+  getSegment,
+  listSegmentUsages,
   type Flag,
+  type Reference,
   type Segment,
+  type SegmentListItem,
   listUnitTypes,
   type Attribute,
   type AuthMethods,
@@ -178,11 +182,35 @@ export function flagChoicesQuery(project: string) {
   });
 }
 
-/** A project's segments, which a rule's conditions name. */
+/** What every read of a project's segments is cached under. */
+export function segmentsQueryKey(project: string) {
+  return ["projects", project, "segments"] as const;
+}
+
+/**
+ * A project's segments, each with how many flags' rules name it: what a
+ * rule's conditions choose from, and the segments list.
+ */
 export function segmentsQuery(project: string) {
-  return queryOptions<Segment[]>({
-    queryKey: ["projects", project, "segments"],
+  return queryOptions<SegmentListItem[]>({
+    queryKey: [...segmentsQueryKey(project), "list"],
     queryFn: async () => (await unwrap(listSegments({ path: { project } }))).items,
+  });
+}
+
+export function segmentQuery(project: string, segment: string) {
+  return queryOptions<Segment>({
+    queryKey: [...segmentsQueryKey(project), "detail", segment],
+    queryFn: () => unwrap(getSegment({ path: { project, segment } })),
+    retry: false,
+  });
+}
+
+/** Every flag and environment whose rules name a segment. */
+export function segmentUsagesQuery(project: string, segment: string) {
+  return queryOptions<Reference[]>({
+    queryKey: [...segmentsQueryKey(project), "usages", segment],
+    queryFn: async () => (await unwrap(listSegmentUsages({ path: { project, segment } }))).items,
   });
 }
 
@@ -320,6 +348,25 @@ export function flagEntriesQuery(
               ...(killSwitch ? { kill_switch: true } : {}),
               limit,
             },
+          }),
+        )
+      ).items,
+  });
+}
+
+/**
+ * The newest audit entries of one segment, by its identifier: who made
+ * the version a save ran into, and when.
+ */
+export function segmentEntriesQuery(project: string, segmentId: string, limit: number) {
+  return queryOptions<AuditEntry[]>({
+    queryKey: [...auditQueryKey, { project }, "segment", segmentId, { limit }],
+    queryFn: async () =>
+      (
+        await unwrap(
+          listProjectAuditEntries({
+            path: { project },
+            query: { entity_kind: "segment", entity_id: segmentId, limit },
           }),
         )
       ).items,

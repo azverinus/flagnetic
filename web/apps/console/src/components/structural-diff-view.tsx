@@ -10,6 +10,7 @@ import type {
   OverrideValue,
   RuleDetail,
   RuleLike,
+  SegmentChange,
 } from "@/lib/structural-diff";
 
 /** A value as the change names it, set apart from the sentence around it. */
@@ -396,6 +397,45 @@ function DefinitionChangeItem({
       );
     }
   }
+}
+
+function SegmentChangeItem({ change }: { change: SegmentChange }) {
+  if (change.kind === "condition") return <RuleDetailItem detail={change} />;
+  switch (change.field) {
+    case "name": {
+      const [before, after] = [String(change.before), String(change.after)];
+      return (
+        <li>
+          <Trans>
+            Name changed from “{before}” to “{after}”.
+          </Trans>
+        </li>
+      );
+    }
+    case "description":
+      return (
+        <li>
+          <Trans>Description changed.</Trans>
+        </li>
+      );
+    case "private":
+      return (
+        <li>{change.after ? <Trans>Made private.</Trans> : <Trans>No longer private.</Trans>}</li>
+      );
+  }
+}
+
+/** What changed in a segment, item by item. */
+export function SegmentDiff({ changes }: { changes: readonly SegmentChange[] }) {
+  const { t } = useLingui();
+  if (changes.length === 0) return <Nothing />;
+  return (
+    <ChangeList label={t`Changes to the segment`}>
+      {changes.map((change, index) => (
+        <SegmentChangeItem key={index} change={change} />
+      ))}
+    </ChangeList>
+  );
 }
 
 /** What changed in a flag's definition, item by item. */
