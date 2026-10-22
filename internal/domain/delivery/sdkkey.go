@@ -104,8 +104,9 @@ type NewSDKKeyInput struct {
 }
 
 // NewSDKKey validates in and returns the key with the value drawn for it
-// from random: the kind's prefix and 40 base62 characters, about 238 bits,
-// shown once and then kept only as its hash.
+// from random: the kind's prefix and 40 base62 characters, shown once and
+// then kept only as its hash. The first 8 characters are shown as the key ID,
+// so the other 32 carry the secret, about 190 bits.
 func NewSDKKey(key SDKKeyID, in NewSDKKeyInput, random io.Reader) (SDKKey, secret.String, error) {
 	c := checkSDKKey()
 	if _, ok := sdkKeyPrefixes[in.Kind]; !ok {
