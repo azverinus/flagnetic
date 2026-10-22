@@ -106,6 +106,25 @@ describe("the variations editor", () => {
     expect(latest()[0]?.value).toBe('{\n  "limit": 3\n}');
   });
 
+  it("lays out a JSON value on request, leaving one that does not parse as typed", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Editor type="json" />);
+
+    const first = within(variation(1));
+    await user.click(first.getByLabelText("Value"));
+    await user.paste('{"limit":3,"tags":["a"]}');
+    await user.click(first.getByRole("button", { name: "Format variation 1" }));
+    expect(first.getByLabelText("Value")).toHaveValue(
+      '{\n  "limit": 3,\n  "tags": [\n    "a"\n  ]\n}',
+    );
+
+    const second = within(variation(2));
+    await user.click(second.getByLabelText("Value"));
+    await user.paste('{"limit":');
+    await user.click(second.getByRole("button", { name: "Format variation 2" }));
+    expect(second.getByLabelText("Value")).toHaveValue('{"limit":');
+  });
+
   it("shows the form's error under the field it concerns", () => {
     renderWithProviders(
       <Editor type="number" errors={[undefined, { value: "Enter a number." }]} />,

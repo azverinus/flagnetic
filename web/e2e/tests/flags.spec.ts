@@ -113,6 +113,18 @@ test.describe("creating a flag", () => {
     expect(flag.expected_removal_at).not.toBeNull();
   });
 
+  test("lays out a JSON variation's value on request", async ({ page }) => {
+    const projectKey = await seedProject("flags-format");
+    await openNewFlag(page, projectKey);
+
+    await choose(page, "Type", "JSON");
+    await variation(page, 1).getByLabel("Value").fill('{"a":1,"b":[2]}');
+    await variation(page, 1).getByRole("button", { name: "Format variation 1" }).click();
+    await expect(variation(page, 1).getByLabel("Value")).toHaveValue(
+      '{\n  "a": 1,\n  "b": [\n    2\n  ]\n}',
+    );
+  });
+
   test("adds and removes string variation rows, keeping at least one", async ({ page }) => {
     const projectKey = await seedProject("flags-rows");
     await openNewFlag(page, projectKey);
@@ -211,13 +223,13 @@ test.describe("the flags list", () => {
         name: "Search limit",
         variations: [{ key: "ten", value: 10 }],
       },
-      { key: "legacy.banner", type: "boolean", name: "Legacy banner" },
+      { key: "retired.banner", type: "boolean", name: "Retired banner" },
     ]);
     must(
-      "archiving legacy.banner",
+      "archiving retired.banner",
       await archiveFlag({
         client: managementClient(),
-        path: { project: projectKey, flag: "legacy.banner" },
+        path: { project: projectKey, flag: "retired.banner" },
         headers: { "If-Match": '"1"' },
       }),
     );
@@ -248,7 +260,7 @@ test.describe("the flags list", () => {
     await page.goto(`/projects/${projectKey}/flags`);
     await page.getByLabel("Archived flags instead").click();
     await expect(page).toHaveURL(/archived=true/);
-    await expect(keys).toHaveText(["legacy.banner"]);
+    await expect(keys).toHaveText(["retired.banner"]);
   });
 
   test("tells no match from no flag, and clears the filters", async ({ page }) => {

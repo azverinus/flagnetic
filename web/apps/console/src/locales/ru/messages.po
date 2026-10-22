@@ -255,7 +255,6 @@ msgid "Another member already has this email address."
 msgstr "Этот адрес электронной почты уже есть у другого участника."
 
 #: src/lib/flags.ts
-#: src/lib/variations.ts
 msgid "Another variation has this key."
 msgstr "Этот ключ уже есть у другого варианта."
 
@@ -473,6 +472,10 @@ msgstr "Выберите одну из предложенных областей
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered types."
 msgstr "Выберите один из предложенных типов."
+
+#: src/components/tags-input.tsx
+msgid "Chosen tags"
+msgstr "Выбранные теги"
 
 #: src/components/audit-log.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -853,6 +856,14 @@ msgstr "Флаги"
 msgid "Follow the browser"
 msgstr "Как в браузере"
 
+#: src/components/variations-editor.tsx
+msgid "Format"
+msgstr "Отформатировать"
+
+#: src/components/variations-editor.tsx
+msgid "Format variation {n}"
+msgstr "Отформатировать вариант {n}"
+
 #: src/components/audit-log.tsx
 msgid "From"
 msgstr "С"
@@ -1038,7 +1049,7 @@ msgstr "Уйти без сохранения?"
 
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Left empty, 90 days from today."
-msgstr "Если не указать, через 90 дней от сегодня."
+msgstr "Если оставить пустым — через 90 дней."
 
 #: src/lib/project-members.ts
 msgid "Lets the holder {list}."
@@ -1049,7 +1060,6 @@ msgid "Lets the holder do nothing yet."
 msgstr "Пока ничего не позволяет."
 
 #: src/lib/flags.ts
-#: src/lib/variations.ts
 msgid "Letters, digits, ., - and _, at most 64."
 msgstr "Буквы, цифры, ., - и _, не более 64."
 
@@ -1750,7 +1760,6 @@ msgstr "Как в системе"
 msgid "Tag"
 msgstr "Тег"
 
-#: src/components/tags-input.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Tags"

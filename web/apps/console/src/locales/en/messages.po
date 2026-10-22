@@ -255,7 +255,6 @@ msgid "Another member already has this email address."
 msgstr "Another member already has this email address."
 
 #: src/lib/flags.ts
-#: src/lib/variations.ts
 msgid "Another variation has this key."
 msgstr "Another variation has this key."
 
@@ -473,6 +472,10 @@ msgstr "Choose one of the offered scopes."
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered types."
 msgstr "Choose one of the offered types."
+
+#: src/components/tags-input.tsx
+msgid "Chosen tags"
+msgstr "Chosen tags"
 
 #: src/components/audit-log.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -853,6 +856,14 @@ msgstr "Flags"
 msgid "Follow the browser"
 msgstr "Follow the browser"
 
+#: src/components/variations-editor.tsx
+msgid "Format"
+msgstr "Format"
+
+#: src/components/variations-editor.tsx
+msgid "Format variation {n}"
+msgstr "Format variation {n}"
+
 #: src/components/audit-log.tsx
 msgid "From"
 msgstr "From"
@@ -1049,7 +1060,6 @@ msgid "Lets the holder do nothing yet."
 msgstr "Lets the holder do nothing yet."
 
 #: src/lib/flags.ts
-#: src/lib/variations.ts
 msgid "Letters, digits, ., - and _, at most 64."
 msgstr "Letters, digits, ., - and _, at most 64."
 
@@ -1750,7 +1760,6 @@ msgstr "System"
 msgid "Tag"
 msgstr "Tag"
 
-#: src/components/tags-input.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/new.tsx
 msgid "Tags"

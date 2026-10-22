@@ -1,4 +1,4 @@
-import type { FlagListItem, FlagType } from "@flagnetic/api";
+import { type FlagListItem, zFlagType } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -52,7 +52,6 @@ function Flags() {
   // back leaves the list instead of walking through its pages.
   const apply = (next: FlagsSearch) => void navigate({ search: next, replace: true });
   const filter = (patch: Partial<FlagsSearch>) => apply({ ...search, ...patch, cursor: undefined });
-  const { cursor: _page, ...filters } = search;
 
   const newFlag = (
     <Can permission="flag.edit" whenMissing="disable">
@@ -78,10 +77,7 @@ function Flags() {
         actions={newFlag}
       />
       <FlagFilters search={search} onFilter={filter} owners={names} />
-      {/* The pages seen belong to one set of filters: other filters start
-          again from their first page. */}
       <FlagsPages
-        key={JSON.stringify(filters)}
         project={project}
         search={search}
         onPage={(cursor) => apply({ ...search, cursor })}
@@ -122,9 +118,7 @@ function FlagFilters({
       <Field label={<Trans>Type</Trans>} className="w-40">
         <Select
           value={search.type ?? any}
-          onValueChange={(value) =>
-            onFilter({ type: value === any ? undefined : (value as FlagType) })
-          }
+          onValueChange={(value) => onFilter({ type: zFlagType.safeParse(value).data })}
         >
           <SelectItem value={any}>{t`Any type`}</SelectItem>
           {flagTypes.map((type) => (
@@ -147,7 +141,9 @@ function FlagFilters({
           onValueChange={(value) => onFilter({ owner: value === any ? undefined : value })}
         >
           <SelectItem value={any}>{t`Any owner`}</SelectItem>
-          {search.owner && !owners?.has(search.owner) ? (
+          {/* An owner the address names who is not among the members
+              read: one without a grant here, once the members are read. */}
+          {search.owner && owners && !owners.has(search.owner) ? (
             <SelectItem value={search.owner}>{t`A member without a grant here`}</SelectItem>
           ) : null}
           {ownerOptions.map((option) => (
@@ -195,8 +191,19 @@ function FlagsPages({
   const page = useQuery(flagsQuery(project, search));
   // The cursor of every page before this one, the first page's as none;
   // an address opened on a later page has seen none, and goes back to
-  // the first.
-  const [seen, setSeen] = useState<(string | undefined)[]>([]);
+  // the first. The pages seen belong to one set of filters, so other
+  // filters start again from their first page; they are dropped here
+  // rather than by mounting the list afresh, which would blank the table
+  // instead of keeping it while the new filters' page loads.
+  const { cursor: _page, ...filters } = search;
+  const filtersSeen = JSON.stringify(filters);
+  const [pages, setPages] = useState<{ of: string; seen: (string | undefined)[] }>({
+    of: filtersSeen,
+    seen: [],
+  });
+  if (pages.of !== filtersSeen) setPages({ of: filtersSeen, seen: [] });
+  const seen = pages.of === filtersSeen ? pages.seen : [];
+  const setSeen = (next: (string | undefined)[]) => setPages({ of: filtersSeen, seen: next });
 
   if (page.isError) {
     return <QueryError error={page.error} onRetry={() => void page.refetch()} />;

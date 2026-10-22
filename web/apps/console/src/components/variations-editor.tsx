@@ -8,7 +8,12 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { flagRefusalAt } from "@/lib/flags";
-import { newVariation, type VariationDraft, type VariationField } from "@/lib/variations";
+import {
+  formatJson,
+  newVariation,
+  type VariationDraft,
+  type VariationField,
+} from "@/lib/variations";
 
 export type VariationsEditorProps = {
   type: FlagType;
@@ -142,16 +147,30 @@ function VariationRow({
             onChange={(event) => onEdit("key", event.target.value)}
           />
         </Field>
-        <Field label={<Trans>Value</Trans>} error={error("value")}>
-          {type === "json" ? (
-            <Textarea
-              rows={3}
-              spellCheck={false}
-              className="font-mono"
-              value={row.value}
-              onChange={(event) => onEdit("value", event.target.value)}
-            />
-          ) : (
+        {type === "json" ? (
+          <div className="flex flex-col gap-2">
+            <Field label={<Trans>Value</Trans>} error={error("value")}>
+              <Textarea
+                rows={3}
+                spellCheck={false}
+                className="font-mono"
+                value={row.value}
+                onChange={(event) => onEdit("value", event.target.value)}
+              />
+            </Field>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="self-start"
+              aria-label={t`Format variation ${n}`}
+              onClick={() => onEdit("value", formatJson(row.value))}
+            >
+              <Trans>Format</Trans>
+            </Button>
+          </div>
+        ) : (
+          <Field label={<Trans>Value</Trans>} error={error("value")}>
             <Input
               autoComplete="off"
               inputMode={type === "number" ? "decimal" : undefined}
@@ -159,8 +178,8 @@ function VariationRow({
               value={row.value}
               onChange={(event) => onEdit("value", event.target.value)}
             />
-          )}
-        </Field>
+          </Field>
+        )}
         <Field label={<Trans>Name</Trans>} error={error("name")}>
           <Input
             autoComplete="off"

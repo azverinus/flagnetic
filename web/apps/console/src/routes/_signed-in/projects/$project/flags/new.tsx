@@ -59,6 +59,9 @@ function NewFlag() {
 /** The owner's value for the member creating the flag, whom the server names when none is sent. */
 const me = "me";
 
+/** The server's rules for a flag's tags: how many, and how long each. */
+const tagRules = zFlagCreate.shape.tags.unwrap();
+
 /** The fields whose refusals the form shows under them, by their pointers. */
 const fieldPointer =
   /^\/(key|type|name|description|owner|tags(\/\d+)?|lifetime|expected_removal_at|variations\/\d+\/(key|value|name|description))$/;
@@ -90,9 +93,11 @@ function CreateFlag({ project }: { project: string }) {
       owner: z.string(),
       tags: z
         .array(z.string())
-        .max(50, i18n._(msg`A flag has at most 50 tags.`))
-        .refine((tags) => tags.every((tag) => tag.length <= 64), {
+        .refine((tags) => tags.every((tag) => tagRules.element.safeParse(tag).success), {
           message: i18n._(msg`A tag has at most 64 characters.`),
+        })
+        .refine((tags) => tagRules.safeParse(tags).success, {
+          message: i18n._(msg`A flag has at most 50 tags.`),
         }),
       lifetime: zLifetime,
       expected_removal_at: z.string(),
@@ -283,7 +288,12 @@ function CreateFlag({ project }: { project: string }) {
               (tagsRefusal ? flagViolationMessage(i18n, tagsRefusal) : undefined)
             }
           >
-            <TagsInput value={field.value} onChange={field.onChange} />
+            <TagsInput
+              ref={field.ref}
+              onBlur={field.onBlur}
+              value={field.value}
+              onChange={field.onChange}
+            />
           </Field>
         )}
       />
@@ -330,7 +340,13 @@ function CreateFlag({ project }: { project: string }) {
           <VariationsEditor
             type={type}
             rows={field.value}
-            onChange={field.onChange}
+            onChange={(next) => {
+              // A refusal points at rows by their places, which adding or
+              // removing a row moves; it is dropped rather than shown on
+              // a row it was not about.
+              if (next.length !== field.value.length) create.reset();
+              field.onChange(next);
+            }}
             errors={variationErrors}
             refusal={refusal}
           />

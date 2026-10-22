@@ -8,7 +8,7 @@ import {
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
-import { violationMessage } from "./problem-messages";
+import { flagViolationMessage } from "./flags";
 
 /**
  * One variation as a form edits it: every field as typed, the value as
@@ -29,11 +29,12 @@ export type VariationField = "key" | "value" | "name" | "description";
 /** Something wrong with one row, at its index and field. */
 export type VariationIssue = { path: [number, VariationField]; message: string };
 
-let rows = 0;
+/** How many rows this page has made, so every row's identifier is its own. */
+let rowsMade = 0;
 
 function draft(key: string): VariationDraft {
-  rows += 1;
-  return { id: `variation-${rows}`, key, value: "", name: "", description: "" };
+  rowsMade += 1;
+  return { id: `variation-${rowsMade}`, key, value: "", name: "", description: "" };
 }
 
 /**
@@ -79,6 +80,19 @@ function parseValue(type: FlagType, raw: string): Parsed {
 }
 
 /**
+ * A JSON value laid out two spaces to a level, so a long one reads at a
+ * glance; text that does not parse is left as typed, for its error to say
+ * so rather than for the member to lose it.
+ */
+export function formatJson(raw: string): string {
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
+/**
  * The variations a flag is created or edited with, or none for a boolean
  * flag, whose variations are always `true` and `false`. A blank name or
  * description is left out, so the server names the variation by its key.
@@ -116,16 +130,22 @@ export function variationIssues(
   if (type === "boolean") return [];
   const issues: VariationIssue[] = [];
   const seen = new Set<string>();
+  // Each rule reads as the server's violation of it would, so a row says
+  // the same before and after the server is asked.
+  const issue = (index: number, field: VariationField, code: string, max?: number) =>
+    issues.push({
+      path: [index, field],
+      message: flagViolationMessage(i18n, {
+        pointer: `/variations/${index}/${field}`,
+        code,
+        detail: "",
+        ...(max === undefined ? {} : { params: { max } }),
+      }),
+    });
   rows.forEach((row, index) => {
     const key = row.key.trim();
-    if (!zVariationKey.safeParse(key).success) {
-      issues.push({
-        path: [index, "key"],
-        message: i18n._(msg`Letters, digits, ., - and _, at most 64.`),
-      });
-    } else if (seen.has(key)) {
-      issues.push({ path: [index, "key"], message: i18n._(msg`Another variation has this key.`) });
-    }
+    if (!zVariationKey.safeParse(key).success) issue(index, "key", "invalid_key");
+    else if (seen.has(key)) issue(index, "key", "duplicate");
     seen.add(key);
     if (!parseValue(type, row.value).ok) {
       issues.push({
@@ -141,17 +161,7 @@ export function variationIssues(
       ["description", zDescription.maxLength],
     ] as const;
     for (const [field, max] of bounds) {
-      if (max !== null && row[field].trim().length > max) {
-        issues.push({
-          path: [index, field],
-          message: violationMessage(i18n, {
-            pointer: `/variations/${index}/${field}`,
-            code: "too_long",
-            detail: "",
-            params: { max },
-          }),
-        });
-      }
+      if (max !== null && row[field].trim().length > max) issue(index, field, "too_long", max);
     }
   });
   return issues;

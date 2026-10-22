@@ -1,12 +1,16 @@
 import { useLingui } from "@lingui/react/macro";
 import { XIcon } from "lucide-react";
-import { type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, type Ref, useState } from "react";
 
 import { cn } from "@/lib/cn";
 
 export type TagsInputProps = {
   value: readonly string[];
   onChange: (tags: string[]) => void;
+  /** The text input, so a form can focus the field on an error. */
+  ref?: Ref<HTMLInputElement>;
+  /** Called once the text input loses focus, after what was typed is added. */
+  onBlur?: () => void;
   /** Passed to the text input, so a `Field` names and describes it. */
   id?: string;
   "aria-describedby"?: string;
@@ -19,7 +23,7 @@ export type TagsInputProps = {
  * never lost; a blank or repeated tag is not added. Each tag carries a
  * button that removes it.
  */
-export function TagsInput({ value, onChange, ...input }: TagsInputProps) {
+export function TagsInput({ value, onChange, onBlur, ...input }: TagsInputProps) {
   const { t } = useLingui();
   const [typed, setTyped] = useState("");
 
@@ -69,7 +73,10 @@ export function TagsInput({ value, onChange, ...input }: TagsInputProps) {
         value={typed}
         onChange={(event) => setTyped(event.target.value)}
         onKeyDown={onKeyDown}
-        onBlur={add}
+        onBlur={() => {
+          add();
+          onBlur?.();
+        }}
       />
     </div>
   );
