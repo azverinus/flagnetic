@@ -815,6 +815,179 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/environments/{environment}/sdk-keys:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+    get:
+      operationId: listSdkKeys
+      summary: The environment's SDK keys
+      description: |
+        Every SDK key of the environment, the oldest first, revoked and
+        expired ones included, each with its status now. A listed key never
+        carries its value.
+      x-permission: project.read
+      tags: [sdk-keys]
+      responses:
+        "200":
+          description: The keys.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdkKeyList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createSdkKey
+      summary: Create an SDK key
+      description: |
+        Creates a server or a client key for the environment and answers
+        its value, shown this once and never again: only its hash is kept.
+        An environment holds at most 10 active keys of each kind
+        (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+        count. Allowed origins are for client keys only
+        (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+        `https` origin (`invalid_origin`), kept normalized to
+        `scheme://host[:port]` without the default port; an empty list
+        allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+      x-permission: sdk_key.manage
+      tags: [sdk-keys]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SdkKeyCreate"
+      responses:
+        "201":
+          description: The key, with its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedSdkKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+      - $ref: "#/components/parameters/SdkKeyID"
+    patch:
+      operationId: updateSdkKey
+      summary: Rename an SDK key or change its allowed origins
+      description: |
+        Renames the key when `name` is given and replaces its allowed
+        origins, which are required, so a script that forgets them cannot
+        lift a restriction by accident; `[]` allows any origin. The rules
+        of creation apply (`422 invalid_sdk_key`). The change applies to a
+        rotated or revoked key too, and an SDK presenting the key meets it
+        on its next request. A change to the values the key already has
+        records nothing.
+      x-permission: sdk_key.manage
+      tags: [sdk-keys]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SdkKeyPatch"
+      responses:
+        "200":
+          description: As changed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdkKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+    delete:
+      operationId: revokeSdkKey
+      summary: Revoke an SDK key
+      description: |
+        Revokes the key at once: every SDK presenting it is refused
+        `sdk_key_revoked` from then on, within its rotation overlap too.
+        Revoking a revoked key answers it unchanged and records nothing.
+      x-permission: sdk_key.manage
+      tags: [sdk-keys]
+      responses:
+        "200":
+          description: The key, revoked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SdkKey"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+      - $ref: "#/components/parameters/SdkKeyID"
+    post:
+      operationId: rotateSdkKey
+      summary: Rotate an SDK key
+      description: |
+        Creates the key's replacement, of the same kind, name and allowed
+        origins, and answers it with its value, shown this once. The
+        rotated key keeps working for the rotation overlap, then is refused
+        `sdk_key_expired` without anyone acting, so services move to the
+        replacement without an outage. Only an active key is rotated
+        (`409 sdk_key_not_active`), so a rotated or revoked key is never
+        brought back. The replacement takes the rotated key's place among
+        the active keys, so a rotation is never refused for the limit.
+      x-permission: sdk_key.manage
+      tags: [sdk-keys]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SdkKeyRotation"
+      responses:
+        "201":
+          description: The replacement, with its value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedSdkKey"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/unit-types:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -2735,6 +2908,13 @@ components:
       description: The API token's identifier.
       schema:
         type: string
+    SdkKeyID:
+      name: sdk_key
+      in: path
+      required: true
+      description: The SDK key's identifier.
+      schema:
+        type: string
     ProjectKey:
       name: project
       in: path
@@ -3440,6 +3620,113 @@ components:
           type: string
           format: password
           description: The token's value, `fn_prj_` and 40 characters, shown this once.
+    SdkKeyKind:
+      type: string
+      enum: [server, client]
+      description: |
+        `server` downloads the environment's ruleset, private segments
+        included, and belongs on a server; `client` never receives a
+        ruleset, only the values remote evaluation serves it, and may be
+        shipped in a browser or an app.
+    SdkKeyStatus:
+      type: string
+      enum: [active, rotating, expired, revoked]
+      description: |
+        What the key is now: `revoked` once revoked, whatever its expiry;
+        `expired` once the overlap of its rotation has ended; `rotating`
+        within it; `active` otherwise.
+    SdkKey:
+      type: object
+      description: An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.
+      required: [id, kind, name, key_id, status, allowed_origins, created_at, last_used_at, expires_at, revoked_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/SdkKeyKind"
+        name:
+          type: string
+        key_id:
+          type: string
+          description: The first 8 characters of the value after its `fn_srv_` or `fn_cli_` prefix, to tell which key a service holds.
+        status:
+          $ref: "#/components/schemas/SdkKeyStatus"
+        allowed_origins:
+          type: array
+          description: The browser origins a client key is accepted from, normalized; empty allows any origin. Always empty on a server key.
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When an SDK last presented the key, recorded at most once a minute; null until it is used.
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: The end of the rotation overlap of a rotated key; null for a key never rotated.
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+    SdkKeyList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SdkKey"
+    SdkKeyCreate:
+      type: object
+      required: [kind, name]
+      properties:
+        kind:
+          type: string
+          description: "`server` or `client` (`unknown_kind` otherwise)."
+        name:
+          type: string
+          description: 1 to 200 characters, not blank, to tell which service holds the key.
+        allowed_origins:
+          type: array
+          description: For a client key, the browser origins it is accepted from, at most 50; absent or empty allows any origin.
+          items:
+            type: string
+    SdkKeyPatch:
+      type: object
+      required: [allowed_origins]
+      properties:
+        name:
+          type: string
+          description: The key's new name, 1 to 200 characters, not blank; the name is kept when absent.
+        allowed_origins:
+          type: array
+          description: The key's allowed origins, replacing the ones it has; `[]` allows any origin and is the only value a server key takes.
+          items:
+            type: string
+    SdkKeyRotation:
+      type: object
+      properties:
+        overlap_seconds:
+          type: integer
+          format: int64
+          description: How long the rotated key keeps working, 0 to 7776000 (90 days, `out_of_range` otherwise); 604800 (7 days) when absent. 0 ends it at once.
+    CreatedSdkKey:
+      type: object
+      description: An SDK key just created, with its value.
+      required: [key, value]
+      properties:
+        key:
+          $ref: "#/components/schemas/SdkKey"
+        value:
+          type: string
+          format: password
+          description: The key's value, `fn_srv_` or `fn_cli_` and 40 characters, shown this once.
     Grant:
       type: object
       description: One role held by one member in one project.

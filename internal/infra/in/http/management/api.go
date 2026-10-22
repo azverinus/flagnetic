@@ -106,6 +106,12 @@ type Handlers struct {
 	CopyConfiguration    *appflags.CopyConfiguration
 	Evaluate             *appdelivery.Evaluate
 
+	ListSDKKeys  *appdelivery.ListSDKKeys
+	CreateSDKKey *appdelivery.CreateSDKKey
+	UpdateSDKKey *appdelivery.UpdateSDKKey
+	RotateSDKKey *appdelivery.RotateSDKKey
+	RevokeSDKKey *appdelivery.RevokeSDKKey
+
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment
 	CreateSegment     *appflags.CreateSegment

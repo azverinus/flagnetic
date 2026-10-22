@@ -1635,6 +1635,10 @@ msgid "manage project tokens"
 msgstr "управлять токенами проекта"
 
 #: src/lib/access-names.ts
+msgid "manage SDK keys"
+msgstr "управлять SDK-ключами"
+
+#: src/lib/access-names.ts
 msgid "manage unit types and attributes"
 msgstr "управлять типами единиц и атрибутами"
 

@@ -1,0 +1,51 @@
+# SDK keys
+
+An SDK key identifies one environment to an SDK. Each environment has its own keys, of one of two kinds:
+
+- A **server key** (`fn_srv_…`) downloads the environment's ruleset, private segments included. It belongs on a server and never in a browser or an app.
+- A **client key** (`fn_cli_…`) never receives a ruleset, only the values remote evaluation serves it, so it may be shipped in a browser or a mobile app. It may be limited to allowed origins.
+
+A key's value is the kind's prefix and 40 random characters. It is shown once, when the key is created or is a rotation's replacement, and never again: Flagnetic keeps only its SHA-256. Every key is listed by its **key ID**, the first 8 characters after the prefix, so you can tell which key a service holds without seeing the value.
+
+## Managing keys
+
+The keys of an environment are under `/api/v1/projects/{project}/environments/{environment}/sdk-keys`. Listing them needs `project.read`; every change needs `sdk_key.manage`, which maintainers and owners hold and which a project token or a personal access token carrying the `project:admin` scope exercises too, so a pipeline provisioning an environment can give its services keys (see [Access](../access.md)).
+
+| Operation | Request | Answer |
+|---|---|---|
+| List | `GET …/sdk-keys` | every key, the oldest first, with its status; never a value |
+| Create | `POST …/sdk-keys` with `kind`, `name` and, for a client key, `allowed_origins` | `201` with the key and its `value` |
+| Rename, change origins | `PATCH …/sdk-keys/{sdk_key}` with `allowed_origins` (required) and optionally `name` | `200` with the key |
+| Rotate | `POST …/sdk-keys/{sdk_key}/rotate`, optionally with `overlap_seconds` | `201` with the replacement and its `value` |
+| Revoke | `DELETE …/sdk-keys/{sdk_key}` | `200` with the key, revoked |
+
+An environment holds at most 10 active keys of each kind; one more is refused `409 sdk_key_limit_reached`. A rotated or revoked key does not count, so revoke or rotate one first. A body that breaks a rule is refused `422 invalid_sdk_key`, with a JSON Pointer to each field to fix.
+
+## Status
+
+Each listed key carries its status now:
+
+| Status | Meaning |
+|---|---|
+| `active` | accepted; neither rotated nor revoked |
+| `rotating` | rotated, and still accepted until its `expires_at`, the end of its rotation overlap |
+| `expired` | rotated, and its overlap has ended: refused `sdk_key_expired`, without anyone acting |
+| `revoked` | revoked: refused `sdk_key_revoked`, within its overlap too |
+
+## Rotation
+
+Rotating a key creates its replacement, of the same kind, name and allowed origins, and answers its value once. The old key keeps working for the **rotation overlap**, so you can roll the new value out to your services without an outage, then it expires by itself. The overlap is `overlap_seconds`, from 0 (the old key ends at once) to 7,776,000 (90 days); without it, 604,800 (7 days). Only an active key is rotated: a rotating, expired or revoked key is refused `409 sdk_key_not_active`, so an ended key is never brought back. The replacement takes the old key's place among the active keys, so a rotation is never refused for the limit.
+
+## Revocation
+
+Revoking a key ends it at once, whatever its overlap. Revoking a revoked key answers it unchanged. Use it when a value has leaked; rotate instead when you replace a key on schedule.
+
+## Allowed origins
+
+A client key may list the browser origins it is accepted from, at most 50. Each is an `http` or `https` origin, `scheme://host[:port]`, without a path, query or credentials, and is kept normalized: in lower case and without the scheme's default port, so `HTTPS://App.Example.com:443` is kept as `https://app.example.com`. An empty list allows any origin. A server key takes none (`server_key_origins`): it is never used from a browser, and an origin on it would only suggest a restriction that does not exist.
+
+An update replaces the whole list and must name it, so a script that sends only a new name cannot lift a restriction by accident; send `[]` to allow any origin.
+
+## Audit
+
+Every change is in the project's audit log, by the key's key ID and never with its value: `sdk_key.created`, `sdk_key.rotated` (with the replacement's identifier and key ID and the overlap), `sdk_key.updated` and `sdk_key.revoked`. A change that changes nothing, such as revoking a revoked key, records nothing. Deleting an environment or a project deletes its keys.

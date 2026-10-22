@@ -98,7 +98,7 @@ const generatedPasswordLength = 24
 // accepts it for email, which a short local part can make necessary.
 func GeneratePassword(email string, random io.Reader) secret.String {
 	for {
-		p := base62(random, generatedPasswordLength)
+		p := secret.Base62(random, generatedPasswordLength)
 		if CheckPassword(p, email, MinPasswordLength) == nil {
 			return secret.New(p)
 		}

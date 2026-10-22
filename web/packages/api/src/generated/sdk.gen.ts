@@ -36,6 +36,9 @@ import type {
   CreateProjectTokenData,
   CreateProjectTokenErrors,
   CreateProjectTokenResponses,
+  CreateSdkKeyData,
+  CreateSdkKeyErrors,
+  CreateSdkKeyResponses,
   CreateSegmentData,
   CreateSegmentErrors,
   CreateSegmentResponses,
@@ -162,6 +165,9 @@ import type {
   ListRolesData,
   ListRolesErrors,
   ListRolesResponses,
+  ListSdkKeysData,
+  ListSdkKeysErrors,
+  ListSdkKeysResponses,
   ListSegmentsData,
   ListSegmentsErrors,
   ListSegmentsResponses,
@@ -210,6 +216,12 @@ import type {
   RevokeProjectTokenData,
   RevokeProjectTokenErrors,
   RevokeProjectTokenResponses,
+  RevokeSdkKeyData,
+  RevokeSdkKeyErrors,
+  RevokeSdkKeyResponses,
+  RotateSdkKeyData,
+  RotateSdkKeyErrors,
+  RotateSdkKeyResponses,
   SignInData,
   SignInErrors,
   SignInResponses,
@@ -237,6 +249,9 @@ import type {
   UpdateProjectData,
   UpdateProjectErrors,
   UpdateProjectResponses,
+  UpdateSdkKeyData,
+  UpdateSdkKeyErrors,
+  UpdateSdkKeyResponses,
   UpdateSegmentData,
   UpdateSegmentErrors,
   UpdateSegmentResponses,
@@ -902,6 +917,153 @@ export const evaluate = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/environments/{environment}/evaluate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * The environment's SDK keys
+ *
+ * Every SDK key of the environment, the oldest first, revoked and
+ * expired ones included, each with its status now. A listed key never
+ * carries its value.
+ *
+ */
+export const listSdkKeys = <ThrowOnError extends boolean = false>(
+  options: Options<ListSdkKeysData, ThrowOnError>,
+): RequestResult<ListSdkKeysResponses, ListSdkKeysErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListSdkKeysResponses, ListSdkKeysErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/sdk-keys",
+    ...options,
+  });
+
+/**
+ * Create an SDK key
+ *
+ * Creates a server or a client key for the environment and answers
+ * its value, shown this once and never again: only its hash is kept.
+ * An environment holds at most 10 active keys of each kind
+ * (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+ * count. Allowed origins are for client keys only
+ * (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+ * `https` origin (`invalid_origin`), kept normalized to
+ * `scheme://host[:port]` without the default port; an empty list
+ * allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+ *
+ */
+export const createSdkKey = <ThrowOnError extends boolean = false>(
+  options: Options<CreateSdkKeyData, ThrowOnError>,
+): RequestResult<CreateSdkKeyResponses, CreateSdkKeyErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateSdkKeyResponses, CreateSdkKeyErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/sdk-keys",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Revoke an SDK key
+ *
+ * Revokes the key at once: every SDK presenting it is refused
+ * `sdk_key_revoked` from then on, within its rotation overlap too.
+ * Revoking a revoked key answers it unchanged and records nothing.
+ *
+ */
+export const revokeSdkKey = <ThrowOnError extends boolean = false>(
+  options: Options<RevokeSdkKeyData, ThrowOnError>,
+): RequestResult<RevokeSdkKeyResponses, RevokeSdkKeyErrors, ThrowOnError> =>
+  (options.client ?? client).delete<RevokeSdkKeyResponses, RevokeSdkKeyErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}",
+    ...options,
+  });
+
+/**
+ * Rename an SDK key or change its allowed origins
+ *
+ * Renames the key when `name` is given and replaces its allowed
+ * origins, which are required, so a script that forgets them cannot
+ * lift a restriction by accident; `[]` allows any origin. The rules
+ * of creation apply (`422 invalid_sdk_key`). The change applies to a
+ * rotated or revoked key too, and an SDK presenting the key meets it
+ * on its next request. A change to the values the key already has
+ * records nothing.
+ *
+ */
+export const updateSdkKey = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateSdkKeyData, ThrowOnError>,
+): RequestResult<UpdateSdkKeyResponses, UpdateSdkKeyErrors, ThrowOnError> =>
+  (options.client ?? client).patch<UpdateSdkKeyResponses, UpdateSdkKeyErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Rotate an SDK key
+ *
+ * Creates the key's replacement, of the same kind, name and allowed
+ * origins, and answers it with its value, shown this once. The
+ * rotated key keeps working for the rotation overlap, then is refused
+ * `sdk_key_expired` without anyone acting, so services move to the
+ * replacement without an outage. Only an active key is rotated
+ * (`409 sdk_key_not_active`), so a rotated or revoked key is never
+ * brought back. The replacement takes the rotated key's place among
+ * the active keys, so a rotation is never refused for the limit.
+ *
+ */
+export const rotateSdkKey = <ThrowOnError extends boolean = false>(
+  options: Options<RotateSdkKeyData, ThrowOnError>,
+): RequestResult<RotateSdkKeyResponses, RotateSdkKeyErrors, ThrowOnError> =>
+  (options.client ?? client).post<RotateSdkKeyResponses, RotateSdkKeyErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate",
     ...options,
     headers: {
       "Content-Type": "application/json",

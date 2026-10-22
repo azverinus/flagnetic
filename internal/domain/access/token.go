@@ -57,35 +57,12 @@ type TokenValue struct {
 // NewTokenValue draws a token value of kind from random: the kind's prefix
 // and 40 base62 characters, about 238 bits.
 func NewTokenValue(kind TokenKind, random io.Reader) TokenValue {
-	v := prefixes[kind] + base62(random, tokenBodyLength)
+	v := prefixes[kind] + secret.Base62(random, tokenBodyLength)
 	return TokenValue{
 		Value: secret.New(v),
 		Hint:  v[:len(prefixes[kind])+hintBodyLength],
 		Hash:  sha256.Sum256([]byte(v)),
 	}
-}
-
-const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-
-// base62 draws n characters from random without bias: a byte is used only
-// below 248, the largest multiple of 62 a byte holds, since reducing the
-// bytes above it would favour the first characters.
-func base62(random io.Reader, n int) string {
-	out := make([]byte, 0, n)
-	buf := make([]byte, 64)
-	for len(out) < n {
-		if _, err := io.ReadFull(random, buf); err != nil {
-			// The system's randomness never fails; an exhausted test source
-			// is a programming error.
-			panic("access: reading randomness: " + err.Error())
-		}
-		for _, b := range buf {
-			if b < 248 && len(out) < n {
-				out = append(out, base62Alphabet[b%62])
-			}
-		}
-	}
-	return string(out)
 }
 
 // ErrInvalidToken refuses a bearer value that is no token, malformed or
@@ -101,7 +78,7 @@ func ParseTokenValue(value string) (TokenHash, error) {
 			body = b
 		}
 	}
-	if len(body) != tokenBodyLength || strings.ContainsFunc(body, func(r rune) bool { return !strings.ContainsRune(base62Alphabet, r) }) {
+	if len(body) != tokenBodyLength || !secret.IsBase62(body) {
 		return TokenHash{}, ErrInvalidToken
 	}
 	return sha256.Sum256([]byte(value)), nil

@@ -307,8 +307,12 @@ The complete evaluable configuration of one environment at one moment, carrying 
 _Avoid_: config, snapshot, bundle, payload, manifest
 
 **SDK key**:
-The credential that identifies an environment to an SDK. A server key may receive private segments; a client key may not.
+The credential that identifies an environment to an SDK. A server key downloads the ruleset, private segments included; a client key never receives a ruleset, only the values remote evaluation serves it, and may be limited to allowed origins.
 _Avoid_: API key, API token (both name the management API credential), token, secret
+
+**Rotation overlap**:
+The time during which an SDK key being rotated and its replacement both work, so services can move to the new key before the old one expires.
+_Avoid_: grace period, transition window
 
 **Evaluation**:
 Computing the value of a flag for a context. Local evaluation happens inside the SDK from a ruleset; remote evaluation happens on the server.

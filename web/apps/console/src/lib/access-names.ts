@@ -27,7 +27,8 @@ export type Permission =
   | "flag_configuration.kill"
   | "flag_configuration.revert"
   | "segment.edit"
-  | "segment.delete";
+  | "segment.delete"
+  | "sdk_key.manage";
 
 /** Each permission as what it lets a member do, to complete "the permission to …". */
 const permissionNames: Record<Permission, MessageDescriptor> = {
@@ -44,6 +45,7 @@ const permissionNames: Record<Permission, MessageDescriptor> = {
   "flag_configuration.revert": msg`revert flag configurations to earlier versions`,
   "segment.edit": msg`edit segments`,
   "segment.delete": msg`delete segments`,
+  "sdk_key.manage": msg`manage SDK keys`,
 };
 
 const roleNames: Record<string, MessageDescriptor> = {

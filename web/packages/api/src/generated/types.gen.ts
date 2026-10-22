@@ -481,6 +481,99 @@ export type CreatedProjectToken = {
 };
 
 /**
+ * `server` downloads the environment's ruleset, private segments
+ * included, and belongs on a server; `client` never receives a
+ * ruleset, only the values remote evaluation serves it, and may be
+ * shipped in a browser or an app.
+ *
+ */
+export type SdkKeyKind = "server" | "client";
+
+/**
+ * What the key is now: `revoked` once revoked, whatever its expiry;
+ * `expired` once the overlap of its rotation has ended; `rotating`
+ * within it; `active` otherwise.
+ *
+ */
+export type SdkKeyStatus = "active" | "rotating" | "expired" | "revoked";
+
+/**
+ * An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.
+ */
+export type SdkKey = {
+  id: string;
+  kind: SdkKeyKind;
+  name: string;
+  /**
+   * The first 8 characters of the value after its `fn_srv_` or `fn_cli_` prefix, to tell which key a service holds.
+   */
+  key_id: string;
+  status: SdkKeyStatus;
+  /**
+   * The browser origins a client key is accepted from, normalized; empty allows any origin. Always empty on a server key.
+   */
+  allowed_origins: Array<string>;
+  created_at: string;
+  /**
+   * When an SDK last presented the key, recorded at most once a minute; null until it is used.
+   */
+  last_used_at: string | null;
+  /**
+   * The end of the rotation overlap of a rotated key; null for a key never rotated.
+   */
+  expires_at: string | null;
+  revoked_at: string | null;
+};
+
+export type SdkKeyList = {
+  items: Array<SdkKey>;
+};
+
+export type SdkKeyCreate = {
+  /**
+   * `server` or `client` (`unknown_kind` otherwise).
+   */
+  kind: string;
+  /**
+   * 1 to 200 characters, not blank, to tell which service holds the key.
+   */
+  name: string;
+  /**
+   * For a client key, the browser origins it is accepted from, at most 50; absent or empty allows any origin.
+   */
+  allowed_origins?: Array<string>;
+};
+
+export type SdkKeyPatch = {
+  /**
+   * The key's new name, 1 to 200 characters, not blank; the name is kept when absent.
+   */
+  name?: string;
+  /**
+   * The key's allowed origins, replacing the ones it has; `[]` allows any origin and is the only value a server key takes.
+   */
+  allowed_origins: Array<string>;
+};
+
+export type SdkKeyRotation = {
+  /**
+   * How long the rotated key keeps working, 0 to 7776000 (90 days, `out_of_range` otherwise); 604800 (7 days) when absent. 0 ends it at once.
+   */
+  overlap_seconds?: number;
+};
+
+/**
+ * An SDK key just created, with its value.
+ */
+export type CreatedSdkKey = {
+  key: SdkKey;
+  /**
+   * The key's value, `fn_srv_` or `fn_cli_` and 40 characters, shown this once.
+   */
+  value: string;
+};
+
+/**
  * One role held by one member in one project.
  */
 export type Grant = {
@@ -1351,6 +1444,11 @@ export type GrantId = string;
  * The API token's identifier.
  */
 export type TokenId = string;
+
+/**
+ * The SDK key's identifier.
+ */
+export type SdkKeyId = string;
 
 /**
  * The project's key.
@@ -2681,6 +2779,310 @@ export type EvaluateResponses = {
 };
 
 export type EvaluateResponse = EvaluateResponses[keyof EvaluateResponses];
+
+export type ListSdkKeysData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/environments/{environment}/sdk-keys";
+};
+
+export type ListSdkKeysErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListSdkKeysError = ListSdkKeysErrors[keyof ListSdkKeysErrors];
+
+export type ListSdkKeysResponses = {
+  /**
+   * The keys.
+   */
+  200: SdkKeyList;
+};
+
+export type ListSdkKeysResponse = ListSdkKeysResponses[keyof ListSdkKeysResponses];
+
+export type CreateSdkKeyData = {
+  body: SdkKeyCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/environments/{environment}/sdk-keys";
+};
+
+export type CreateSdkKeyErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateSdkKeyError = CreateSdkKeyErrors[keyof CreateSdkKeyErrors];
+
+export type CreateSdkKeyResponses = {
+  /**
+   * The key, with its value.
+   */
+  201: CreatedSdkKey;
+};
+
+export type CreateSdkKeyResponse = CreateSdkKeyResponses[keyof CreateSdkKeyResponses];
+
+export type RevokeSdkKeyData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+    /**
+     * The SDK key's identifier.
+     */
+    sdk_key: string;
+  };
+  query?: never;
+  url: "/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}";
+};
+
+export type RevokeSdkKeyErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type RevokeSdkKeyError = RevokeSdkKeyErrors[keyof RevokeSdkKeyErrors];
+
+export type RevokeSdkKeyResponses = {
+  /**
+   * The key, revoked.
+   */
+  200: SdkKey;
+};
+
+export type RevokeSdkKeyResponse = RevokeSdkKeyResponses[keyof RevokeSdkKeyResponses];
+
+export type UpdateSdkKeyData = {
+  body: SdkKeyPatch;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+    /**
+     * The SDK key's identifier.
+     */
+    sdk_key: string;
+  };
+  query?: never;
+  url: "/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}";
+};
+
+export type UpdateSdkKeyErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type UpdateSdkKeyError = UpdateSdkKeyErrors[keyof UpdateSdkKeyErrors];
+
+export type UpdateSdkKeyResponses = {
+  /**
+   * As changed.
+   */
+  200: SdkKey;
+};
+
+export type UpdateSdkKeyResponse = UpdateSdkKeyResponses[keyof UpdateSdkKeyResponses];
+
+export type RotateSdkKeyData = {
+  body?: SdkKeyRotation;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+    /**
+     * The SDK key's identifier.
+     */
+    sdk_key: string;
+  };
+  query?: never;
+  url: "/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate";
+};
+
+export type RotateSdkKeyErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type RotateSdkKeyError = RotateSdkKeyErrors[keyof RotateSdkKeyErrors];
+
+export type RotateSdkKeyResponses = {
+  /**
+   * The replacement, with its value.
+   */
+  201: CreatedSdkKey;
+};
+
+export type RotateSdkKeyResponse = RotateSdkKeyResponses[keyof RotateSdkKeyResponses];
 
 export type ListUnitTypesData = {
   body?: never;

@@ -223,6 +223,48 @@ func (e Scope) Valid() bool {
 	}
 }
 
+// Defines values for SdkKeyKind.
+const (
+	SdkKeyKindClient SdkKeyKind = "client"
+	SdkKeyKindServer SdkKeyKind = "server"
+)
+
+// Valid indicates whether the value is a known member of the SdkKeyKind enum.
+func (e SdkKeyKind) Valid() bool {
+	switch e {
+	case SdkKeyKindClient:
+		return true
+	case SdkKeyKindServer:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SdkKeyStatus.
+const (
+	SdkKeyStatusActive   SdkKeyStatus = "active"
+	SdkKeyStatusExpired  SdkKeyStatus = "expired"
+	SdkKeyStatusRevoked  SdkKeyStatus = "revoked"
+	SdkKeyStatusRotating SdkKeyStatus = "rotating"
+)
+
+// Valid indicates whether the value is a known member of the SdkKeyStatus enum.
+func (e SdkKeyStatus) Valid() bool {
+	switch e {
+	case SdkKeyStatusActive:
+		return true
+	case SdkKeyStatusExpired:
+		return true
+	case SdkKeyStatusRevoked:
+		return true
+	case SdkKeyStatusRotating:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SessionMethod.
 const (
 	SessionMethodLocal SessionMethod = "local"
@@ -521,6 +563,15 @@ type CreatedProjectToken struct {
 	Token ProjectToken `json:"token"`
 
 	// Value The token's value, `fn_prj_` and 40 characters, shown this once.
+	Value string `json:"value"`
+}
+
+// CreatedSdkKey An SDK key just created, with its value.
+type CreatedSdkKey struct {
+	// Key An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.
+	Key SdkKey `json:"key"`
+
+	// Value The key's value, `fn_srv_` or `fn_cli_` and 40 characters, shown this once.
 	Value string `json:"value"`
 }
 
@@ -1314,6 +1365,79 @@ type RuleInput struct {
 // Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
 type Scope string
 
+// SdkKey An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.
+type SdkKey struct {
+	// AllowedOrigins The browser origins a client key is accepted from, normalized; empty allows any origin. Always empty on a server key.
+	AllowedOrigins []string  `json:"allowed_origins"`
+	CreatedAt      time.Time `json:"created_at"`
+
+	// ExpiresAt The end of the rotation overlap of a rotated key; null for a key never rotated.
+	ExpiresAt *time.Time         `json:"expires_at"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// KeyId The first 8 characters of the value after its `fn_srv_` or `fn_cli_` prefix, to tell which key a service holds.
+	KeyId string `json:"key_id"`
+
+	// Kind `server` downloads the environment's ruleset, private segments
+	// included, and belongs on a server; `client` never receives a
+	// ruleset, only the values remote evaluation serves it, and may be
+	// shipped in a browser or an app.
+	Kind SdkKeyKind `json:"kind"`
+
+	// LastUsedAt When an SDK last presented the key, recorded at most once a minute; null until it is used.
+	LastUsedAt *time.Time `json:"last_used_at"`
+	Name       string     `json:"name"`
+	RevokedAt  *time.Time `json:"revoked_at"`
+
+	// Status What the key is now: `revoked` once revoked, whatever its expiry;
+	// `expired` once the overlap of its rotation has ended; `rotating`
+	// within it; `active` otherwise.
+	Status SdkKeyStatus `json:"status"`
+}
+
+// SdkKeyCreate defines model for SdkKeyCreate.
+type SdkKeyCreate struct {
+	// AllowedOrigins For a client key, the browser origins it is accepted from, at most 50; absent or empty allows any origin.
+	AllowedOrigins *[]string `json:"allowed_origins,omitempty"`
+
+	// Kind `server` or `client` (`unknown_kind` otherwise).
+	Kind string `json:"kind"`
+
+	// Name 1 to 200 characters, not blank, to tell which service holds the key.
+	Name string `json:"name"`
+}
+
+// SdkKeyKind `server` downloads the environment's ruleset, private segments
+// included, and belongs on a server; `client` never receives a
+// ruleset, only the values remote evaluation serves it, and may be
+// shipped in a browser or an app.
+type SdkKeyKind string
+
+// SdkKeyList defines model for SdkKeyList.
+type SdkKeyList struct {
+	Items []SdkKey `json:"items"`
+}
+
+// SdkKeyPatch defines model for SdkKeyPatch.
+type SdkKeyPatch struct {
+	// AllowedOrigins The key's allowed origins, replacing the ones it has; `[]` allows any origin and is the only value a server key takes.
+	AllowedOrigins []string `json:"allowed_origins"`
+
+	// Name The key's new name, 1 to 200 characters, not blank; the name is kept when absent.
+	Name *string `json:"name,omitempty"`
+}
+
+// SdkKeyRotation defines model for SdkKeyRotation.
+type SdkKeyRotation struct {
+	// OverlapSeconds How long the rotated key keeps working, 0 to 7776000 (90 days, `out_of_range` otherwise); 604800 (7 days) when absent. 0 ends it at once.
+	OverlapSeconds *int64 `json:"overlap_seconds,omitempty"`
+}
+
+// SdkKeyStatus What the key is now: `revoked` once revoked, whatever its expiry;
+// `expired` once the overlap of its rotation has ended; `rotating`
+// within it; `active` otherwise.
+type SdkKeyStatus string
+
 // Segment defines model for Segment.
 type Segment struct {
 	Conditions  []Condition        `json:"conditions"`
@@ -1597,6 +1721,9 @@ type MemberID = string
 
 // ProjectKey defines model for ProjectKey.
 type ProjectKey = string
+
+// SdkKeyID defines model for SdkKeyID.
+type SdkKeyID = string
 
 // SegmentKey defines model for SegmentKey.
 type SegmentKey = string
@@ -2006,6 +2133,15 @@ type UpdateEnvironmentJSONRequestBody = EnvironmentPatch
 
 // EvaluateJSONRequestBody defines body for Evaluate for application/json ContentType.
 type EvaluateJSONRequestBody = EvaluationRequest
+
+// CreateSdkKeyJSONRequestBody defines body for CreateSdkKey for application/json ContentType.
+type CreateSdkKeyJSONRequestBody = SdkKeyCreate
+
+// UpdateSdkKeyJSONRequestBody defines body for UpdateSdkKey for application/json ContentType.
+type UpdateSdkKeyJSONRequestBody = SdkKeyPatch
+
+// RotateSdkKeyJSONRequestBody defines body for RotateSdkKey for application/json ContentType.
+type RotateSdkKeyJSONRequestBody = SdkKeyRotation
 
 // CreateFlagJSONRequestBody defines body for CreateFlag for application/json ContentType.
 type CreateFlagJSONRequestBody = FlagCreate
@@ -2744,6 +2880,120 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 	Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSdkKeys The environment's SDK keys
+	//
+	// Every SDK key of the environment, the oldest first, revoked and
+	// expired ones included, each with its status now. A listed key never
+	// carries its value.
+	//
+	// Corresponds with GET /projects/{project}/environments/{environment}/sdk-keys (the `ListSdkKeys` operationId).
+	ListSdkKeys(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSdkKeyWithBody Create an SDK key
+	//
+	// Creates a server or a client key for the environment and answers
+	// its value, shown this once and never again: only its hash is kept.
+	// An environment holds at most 10 active keys of each kind
+	// (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+	// count. Allowed origins are for client keys only
+	// (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+	// `https` origin (`invalid_origin`), kept normalized to
+	// `scheme://host[:port]` without the default port; an empty list
+	// allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys (the `CreateSdkKey` operationId).
+	CreateSdkKeyWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSdkKey Create an SDK key
+	//
+	// Creates a server or a client key for the environment and answers
+	// its value, shown this once and never again: only its hash is kept.
+	// An environment holds at most 10 active keys of each kind
+	// (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+	// count. Allowed origins are for client keys only
+	// (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+	// `https` origin (`invalid_origin`), kept normalized to
+	// `scheme://host[:port]` without the default port; an empty list
+	// allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys (the `CreateSdkKey` operationId).
+	CreateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, body CreateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeSdkKey Revoke an SDK key
+	//
+	// Revokes the key at once: every SDK presenting it is refused
+	// `sdk_key_revoked` from then on, within its rotation overlap too.
+	// Revoking a revoked key answers it unchanged and records nothing.
+	//
+	// Corresponds with DELETE /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `RevokeSdkKey` operationId).
+	RevokeSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSdkKeyWithBody Rename an SDK key or change its allowed origins
+	//
+	// Renames the key when `name` is given and replaces its allowed
+	// origins, which are required, so a script that forgets them cannot
+	// lift a restriction by accident; `[]` allows any origin. The rules
+	// of creation apply (`422 invalid_sdk_key`). The change applies to a
+	// rotated or revoked key too, and an SDK presenting the key meets it
+	// on its next request. A change to the values the key already has
+	// records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `UpdateSdkKey` operationId).
+	UpdateSdkKeyWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSdkKey Rename an SDK key or change its allowed origins
+	//
+	// Renames the key when `name` is given and replaces its allowed
+	// origins, which are required, so a script that forgets them cannot
+	// lift a restriction by accident; `[]` allows any origin. The rules
+	// of creation apply (`422 invalid_sdk_key`). The change applies to a
+	// rotated or revoked key too, and an SDK presenting the key meets it
+	// on its next request. A change to the values the key already has
+	// records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `UpdateSdkKey` operationId).
+	UpdateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body UpdateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateSdkKeyWithBody Rotate an SDK key
+	//
+	// Creates the key's replacement, of the same kind, name and allowed
+	// origins, and answers it with its value, shown this once. The
+	// rotated key keeps working for the rotation overlap, then is refused
+	// `sdk_key_expired` without anyone acting, so services move to the
+	// replacement without an outage. Only an active key is rotated
+	// (`409 sdk_key_not_active`), so a rotated or revoked key is never
+	// brought back. The replacement takes the rotated key's place among
+	// the active keys, so a rotation is never refused for the limit.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
+	RotateSdkKeyWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateSdkKey Rotate an SDK key
+	//
+	// Creates the key's replacement, of the same kind, name and allowed
+	// origins, and answers it with its value, shown this once. The
+	// rotated key keeps working for the rotation overlap, then is refused
+	// `sdk_key_expired` without anyone acting, so services move to the
+	// replacement without an outage. Only an active key is rotated
+	// (`409 sdk_key_not_active`), so a rotated or revoked key is never
+	// brought back. The replacement takes the rotated key's place among
+	// the active keys, so a rotation is never refused for the limit.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
+	RotateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListFlags The project's flags
 	//
@@ -4511,6 +4761,200 @@ func (c *Client) EvaluateWithBody(ctx context.Context, project ProjectKey, envir
 // Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 func (c *Client) Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEvaluateRequest(c.Server, project, environment, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSdkKeys The environment's SDK keys
+//
+// Every SDK key of the environment, the oldest first, revoked and
+// expired ones included, each with its status now. A listed key never
+// carries its value.
+//
+// Corresponds with GET /projects/{project}/environments/{environment}/sdk-keys (the `ListSdkKeys` operationId).
+func (c *Client) ListSdkKeys(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSdkKeysRequest(c.Server, project, environment)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSdkKeyWithBody Create an SDK key
+//
+// Creates a server or a client key for the environment and answers
+// its value, shown this once and never again: only its hash is kept.
+// An environment holds at most 10 active keys of each kind
+// (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+// count. Allowed origins are for client keys only
+// (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+// `https` origin (`invalid_origin`), kept normalized to
+// `scheme://host[:port]` without the default port; an empty list
+// allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys (the `CreateSdkKey` operationId).
+func (c *Client) CreateSdkKeyWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSdkKeyRequestWithBody(c.Server, project, environment, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSdkKey Create an SDK key
+//
+// Creates a server or a client key for the environment and answers
+// its value, shown this once and never again: only its hash is kept.
+// An environment holds at most 10 active keys of each kind
+// (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+// count. Allowed origins are for client keys only
+// (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+// `https` origin (`invalid_origin`), kept normalized to
+// `scheme://host[:port]` without the default port; an empty list
+// allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys (the `CreateSdkKey` operationId).
+func (c *Client) CreateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, body CreateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSdkKeyRequest(c.Server, project, environment, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeSdkKey Revoke an SDK key
+//
+// Revokes the key at once: every SDK presenting it is refused
+// `sdk_key_revoked` from then on, within its rotation overlap too.
+// Revoking a revoked key answers it unchanged and records nothing.
+//
+// Corresponds with DELETE /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `RevokeSdkKey` operationId).
+func (c *Client) RevokeSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeSdkKeyRequest(c.Server, project, environment, sdkKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSdkKeyWithBody Rename an SDK key or change its allowed origins
+//
+// Renames the key when `name` is given and replaces its allowed
+// origins, which are required, so a script that forgets them cannot
+// lift a restriction by accident; `[]` allows any origin. The rules
+// of creation apply (`422 invalid_sdk_key`). The change applies to a
+// rotated or revoked key too, and an SDK presenting the key meets it
+// on its next request. A change to the values the key already has
+// records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `UpdateSdkKey` operationId).
+func (c *Client) UpdateSdkKeyWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSdkKeyRequestWithBody(c.Server, project, environment, sdkKey, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSdkKey Rename an SDK key or change its allowed origins
+//
+// Renames the key when `name` is given and replaces its allowed
+// origins, which are required, so a script that forgets them cannot
+// lift a restriction by accident; `[]` allows any origin. The rules
+// of creation apply (`422 invalid_sdk_key`). The change applies to a
+// rotated or revoked key too, and an SDK presenting the key meets it
+// on its next request. A change to the values the key already has
+// records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `UpdateSdkKey` operationId).
+func (c *Client) UpdateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body UpdateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSdkKeyRequest(c.Server, project, environment, sdkKey, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RotateSdkKeyWithBody Rotate an SDK key
+//
+// Creates the key's replacement, of the same kind, name and allowed
+// origins, and answers it with its value, shown this once. The
+// rotated key keeps working for the rotation overlap, then is refused
+// `sdk_key_expired` without anyone acting, so services move to the
+// replacement without an outage. Only an active key is rotated
+// (`409 sdk_key_not_active`), so a rotated or revoked key is never
+// brought back. The replacement takes the rotated key's place among
+// the active keys, so a rotation is never refused for the limit.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
+func (c *Client) RotateSdkKeyWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateSdkKeyRequestWithBody(c.Server, project, environment, sdkKey, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RotateSdkKey Rotate an SDK key
+//
+// Creates the key's replacement, of the same kind, name and allowed
+// origins, and answers it with its value, shown this once. The
+// rotated key keeps working for the rotation overlap, then is refused
+// `sdk_key_expired` without anyone acting, so services move to the
+// replacement without an outage. Only an active key is rotated
+// (`409 sdk_key_not_active`), so a rotated or revoked key is never
+// brought back. The replacement takes the rotated key's place among
+// the active keys, so a rotation is never refused for the limit.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
+func (c *Client) RotateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateSdkKeyRequest(c.Server, project, environment, sdkKey, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7691,6 +8135,271 @@ func NewEvaluateRequestWithBody(server string, project ProjectKey, environment E
 	return req, nil
 }
 
+// NewListSdkKeysRequest constructs an http.Request for the ListSdkKeys method
+func NewListSdkKeysRequest(server string, project ProjectKey, environment EnvironmentKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/sdk-keys", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSdkKeyRequest calls the generic CreateSdkKey builder with application/json body
+func NewCreateSdkKeyRequest(server string, project ProjectKey, environment EnvironmentKey, body CreateSdkKeyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSdkKeyRequestWithBody(server, project, environment, "application/json", bodyReader)
+}
+
+// NewCreateSdkKeyRequestWithBody constructs an http.Request for the CreateSdkKey method, with any body, and a specified content type
+func NewCreateSdkKeyRequestWithBody(server string, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/sdk-keys", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeSdkKeyRequest constructs an http.Request for the RevokeSdkKey method
+func NewRevokeSdkKeyRequest(server string, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "sdk_key", sdkKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/sdk-keys/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateSdkKeyRequest calls the generic UpdateSdkKey builder with application/json body
+func NewUpdateSdkKeyRequest(server string, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body UpdateSdkKeyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSdkKeyRequestWithBody(server, project, environment, sdkKey, "application/json", bodyReader)
+}
+
+// NewUpdateSdkKeyRequestWithBody constructs an http.Request for the UpdateSdkKey method, with any body, and a specified content type
+func NewUpdateSdkKeyRequestWithBody(server string, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "sdk_key", sdkKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/sdk-keys/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRotateSdkKeyRequest calls the generic RotateSdkKey builder with application/json body
+func NewRotateSdkKeyRequest(server string, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRotateSdkKeyRequestWithBody(server, project, environment, sdkKey, "application/json", bodyReader)
+}
+
+// NewRotateSdkKeyRequestWithBody constructs an http.Request for the RotateSdkKey method, with any body, and a specified content type
+func NewRotateSdkKeyRequestWithBody(server string, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "sdk_key", sdkKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/sdk-keys/%s/rotate", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListFlagsRequest constructs an http.Request for the ListFlags method
 func NewListFlagsRequest(server string, project ProjectKey, params *ListFlagsParams) (*http.Request, error) {
 	var err error
@@ -10347,6 +11056,124 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 	EvaluateWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*EvaluateResponse, error)
+
+	// ListSdkKeysWithResponse The environment's SDK keys
+	//
+	// Every SDK key of the environment, the oldest first, revoked and
+	// expired ones included, each with its status now. A listed key never
+	// carries its value.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/environments/{environment}/sdk-keys (the `ListSdkKeys` operationId).
+	ListSdkKeysWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*ListSdkKeysResponse, error)
+
+	// CreateSdkKeyWithBodyWithResponse Create an SDK key
+	//
+	// Creates a server or a client key for the environment and answers
+	// its value, shown this once and never again: only its hash is kept.
+	// An environment holds at most 10 active keys of each kind
+	// (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+	// count. Allowed origins are for client keys only
+	// (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+	// `https` origin (`invalid_origin`), kept normalized to
+	// `scheme://host[:port]` without the default port; an empty list
+	// allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys (the `CreateSdkKey` operationId).
+	CreateSdkKeyWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSdkKeyResponse, error)
+
+	// CreateSdkKeyWithResponse Create an SDK key
+	//
+	// Creates a server or a client key for the environment and answers
+	// its value, shown this once and never again: only its hash is kept.
+	// An environment holds at most 10 active keys of each kind
+	// (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+	// count. Allowed origins are for client keys only
+	// (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+	// `https` origin (`invalid_origin`), kept normalized to
+	// `scheme://host[:port]` without the default port; an empty list
+	// allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys (the `CreateSdkKey` operationId).
+	CreateSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body CreateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSdkKeyResponse, error)
+
+	// RevokeSdkKeyWithResponse Revoke an SDK key
+	//
+	// Revokes the key at once: every SDK presenting it is refused
+	// `sdk_key_revoked` from then on, within its rotation overlap too.
+	// Revoking a revoked key answers it unchanged and records nothing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `RevokeSdkKey` operationId).
+	RevokeSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, reqEditors ...RequestEditorFn) (*RevokeSdkKeyResponse, error)
+
+	// UpdateSdkKeyWithBodyWithResponse Rename an SDK key or change its allowed origins
+	//
+	// Renames the key when `name` is given and replaces its allowed
+	// origins, which are required, so a script that forgets them cannot
+	// lift a restriction by accident; `[]` allows any origin. The rules
+	// of creation apply (`422 invalid_sdk_key`). The change applies to a
+	// rotated or revoked key too, and an SDK presenting the key meets it
+	// on its next request. A change to the values the key already has
+	// records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `UpdateSdkKey` operationId).
+	UpdateSdkKeyWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSdkKeyResponse, error)
+
+	// UpdateSdkKeyWithResponse Rename an SDK key or change its allowed origins
+	//
+	// Renames the key when `name` is given and replaces its allowed
+	// origins, which are required, so a script that forgets them cannot
+	// lift a restriction by accident; `[]` allows any origin. The rules
+	// of creation apply (`422 invalid_sdk_key`). The change applies to a
+	// rotated or revoked key too, and an SDK presenting the key meets it
+	// on its next request. A change to the values the key already has
+	// records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `UpdateSdkKey` operationId).
+	UpdateSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body UpdateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSdkKeyResponse, error)
+
+	// RotateSdkKeyWithBodyWithResponse Rotate an SDK key
+	//
+	// Creates the key's replacement, of the same kind, name and allowed
+	// origins, and answers it with its value, shown this once. The
+	// rotated key keeps working for the rotation overlap, then is refused
+	// `sdk_key_expired` without anyone acting, so services move to the
+	// replacement without an outage. Only an active key is rotated
+	// (`409 sdk_key_not_active`), so a rotated or revoked key is never
+	// brought back. The replacement takes the rotated key's place among
+	// the active keys, so a rotation is never refused for the limit.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
+	RotateSdkKeyWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RotateSdkKeyResponse, error)
+
+	// RotateSdkKeyWithResponse Rotate an SDK key
+	//
+	// Creates the key's replacement, of the same kind, name and allowed
+	// origins, and answers it with its value, shown this once. The
+	// rotated key keeps working for the rotation overlap, then is refused
+	// `sdk_key_expired` without anyone acting, so services move to the
+	// replacement without an outage. Only an active key is rotated
+	// (`409 sdk_key_not_active`), so a rotated or revoked key is never
+	// brought back. The replacement takes the rotated key's place among
+	// the active keys, so a rotation is never refused for the limit.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
+	RotateSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*RotateSdkKeyResponse, error)
 
 	// ListFlagsWithResponse The project's flags
 	//
@@ -14407,6 +15234,407 @@ func (r EvaluateResponse) ContentType() string {
 	return ""
 }
 
+// ListSdkKeysResponse401Headers the declared response headers of an HTTP 401 response for ListSdkKeys
+type ListSdkKeysResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListSdkKeysResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SdkKeyList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListSdkKeysResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSdkKeysResponse) GetJSON200() *SdkKeyList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListSdkKeysResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListSdkKeysResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListSdkKeysResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSdkKeysResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSdkKeysResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSdkKeysResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSdkKeysResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateSdkKeyResponse401Headers the declared response headers of an HTTP 401 response for CreateSdkKey
+type CreateSdkKeyResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateSdkKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CreatedSdkKey
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateSdkKeyResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateSdkKeyResponse) GetJSON201() *CreatedSdkKey {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreateSdkKeyResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateSdkKeyResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateSdkKeyResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateSdkKeyResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateSdkKeyResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateSdkKeyResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateSdkKeyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSdkKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSdkKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateSdkKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RevokeSdkKeyResponse401Headers the declared response headers of an HTTP 401 response for RevokeSdkKey
+type RevokeSdkKeyResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RevokeSdkKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SdkKey
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RevokeSdkKeyResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RevokeSdkKeyResponse) GetJSON200() *SdkKey {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RevokeSdkKeyResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RevokeSdkKeyResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RevokeSdkKeyResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeSdkKeyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeSdkKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeSdkKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeSdkKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateSdkKeyResponse401Headers the declared response headers of an HTTP 401 response for UpdateSdkKey
+type UpdateSdkKeyResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateSdkKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SdkKey
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateSdkKeyResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateSdkKeyResponse) GetJSON200() *SdkKey {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateSdkKeyResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateSdkKeyResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateSdkKeyResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateSdkKeyResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateSdkKeyResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateSdkKeyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSdkKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSdkKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateSdkKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RotateSdkKeyResponse401Headers the declared response headers of an HTTP 401 response for RotateSdkKey
+type RotateSdkKeyResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RotateSdkKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *CreatedSdkKey
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RotateSdkKeyResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r RotateSdkKeyResponse) GetJSON201() *CreatedSdkKey {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r RotateSdkKeyResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RotateSdkKeyResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RotateSdkKeyResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RotateSdkKeyResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RotateSdkKeyResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RotateSdkKeyResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RotateSdkKeyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateSdkKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateSdkKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RotateSdkKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListFlagsResponse401Headers the declared response headers of an HTTP 401 response for ListFlags
 type ListFlagsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -18422,6 +19650,172 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, project 
 		return nil, err
 	}
 	return ParseEvaluateResponse(rsp)
+}
+
+// ListSdkKeysWithResponse The environment's SDK keys
+//
+// Every SDK key of the environment, the oldest first, revoked and
+// expired ones included, each with its status now. A listed key never
+// carries its value.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/environments/{environment}/sdk-keys (the `ListSdkKeys` operationId).
+func (c *ClientWithResponses) ListSdkKeysWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*ListSdkKeysResponse, error) {
+	rsp, err := c.ListSdkKeys(ctx, project, environment, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSdkKeysResponse(rsp)
+}
+
+// CreateSdkKeyWithBodyWithResponse Create an SDK key
+//
+// Creates a server or a client key for the environment and answers
+// its value, shown this once and never again: only its hash is kept.
+// An environment holds at most 10 active keys of each kind
+// (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+// count. Allowed origins are for client keys only
+// (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+// `https` origin (`invalid_origin`), kept normalized to
+// `scheme://host[:port]` without the default port; an empty list
+// allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys (the `CreateSdkKey` operationId).
+func (c *ClientWithResponses) CreateSdkKeyWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSdkKeyResponse, error) {
+	rsp, err := c.CreateSdkKeyWithBody(ctx, project, environment, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSdkKeyResponse(rsp)
+}
+
+// CreateSdkKeyWithResponse Create an SDK key
+//
+// Creates a server or a client key for the environment and answers
+// its value, shown this once and never again: only its hash is kept.
+// An environment holds at most 10 active keys of each kind
+// (`409 sdk_key_limit_reached`); a rotated or revoked key does not
+// count. Allowed origins are for client keys only
+// (`server_key_origins`), at most 50 (`too_many`), each an `http` or
+// `https` origin (`invalid_origin`), kept normalized to
+// `scheme://host[:port]` without the default port; an empty list
+// allows any origin. Refusals of the body are `422 invalid_sdk_key`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys (the `CreateSdkKey` operationId).
+func (c *ClientWithResponses) CreateSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body CreateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSdkKeyResponse, error) {
+	rsp, err := c.CreateSdkKey(ctx, project, environment, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSdkKeyResponse(rsp)
+}
+
+// RevokeSdkKeyWithResponse Revoke an SDK key
+//
+// Revokes the key at once: every SDK presenting it is refused
+// `sdk_key_revoked` from then on, within its rotation overlap too.
+// Revoking a revoked key answers it unchanged and records nothing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `RevokeSdkKey` operationId).
+func (c *ClientWithResponses) RevokeSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, reqEditors ...RequestEditorFn) (*RevokeSdkKeyResponse, error) {
+	rsp, err := c.RevokeSdkKey(ctx, project, environment, sdkKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeSdkKeyResponse(rsp)
+}
+
+// UpdateSdkKeyWithBodyWithResponse Rename an SDK key or change its allowed origins
+//
+// Renames the key when `name` is given and replaces its allowed
+// origins, which are required, so a script that forgets them cannot
+// lift a restriction by accident; `[]` allows any origin. The rules
+// of creation apply (`422 invalid_sdk_key`). The change applies to a
+// rotated or revoked key too, and an SDK presenting the key meets it
+// on its next request. A change to the values the key already has
+// records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `UpdateSdkKey` operationId).
+func (c *ClientWithResponses) UpdateSdkKeyWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSdkKeyResponse, error) {
+	rsp, err := c.UpdateSdkKeyWithBody(ctx, project, environment, sdkKey, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSdkKeyResponse(rsp)
+}
+
+// UpdateSdkKeyWithResponse Rename an SDK key or change its allowed origins
+//
+// Renames the key when `name` is given and replaces its allowed
+// origins, which are required, so a script that forgets them cannot
+// lift a restriction by accident; `[]` allows any origin. The rules
+// of creation apply (`422 invalid_sdk_key`). The change applies to a
+// rotated or revoked key too, and an SDK presenting the key meets it
+// on its next request. A change to the values the key already has
+// records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key} (the `UpdateSdkKey` operationId).
+func (c *ClientWithResponses) UpdateSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body UpdateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSdkKeyResponse, error) {
+	rsp, err := c.UpdateSdkKey(ctx, project, environment, sdkKey, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSdkKeyResponse(rsp)
+}
+
+// RotateSdkKeyWithBodyWithResponse Rotate an SDK key
+//
+// Creates the key's replacement, of the same kind, name and allowed
+// origins, and answers it with its value, shown this once. The
+// rotated key keeps working for the rotation overlap, then is refused
+// `sdk_key_expired` without anyone acting, so services move to the
+// replacement without an outage. Only an active key is rotated
+// (`409 sdk_key_not_active`), so a rotated or revoked key is never
+// brought back. The replacement takes the rotated key's place among
+// the active keys, so a rotation is never refused for the limit.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
+func (c *ClientWithResponses) RotateSdkKeyWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RotateSdkKeyResponse, error) {
+	rsp, err := c.RotateSdkKeyWithBody(ctx, project, environment, sdkKey, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateSdkKeyResponse(rsp)
+}
+
+// RotateSdkKeyWithResponse Rotate an SDK key
+//
+// Creates the key's replacement, of the same kind, name and allowed
+// origins, and answers it with its value, shown this once. The
+// rotated key keeps working for the rotation overlap, then is refused
+// `sdk_key_expired` without anyone acting, so services move to the
+// replacement without an outage. Only an active key is rotated
+// (`409 sdk_key_not_active`), so a rotated or revoked key is never
+// brought back. The replacement takes the rotated key's place among
+// the active keys, so a rotation is never refused for the limit.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
+func (c *ClientWithResponses) RotateSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*RotateSdkKeyResponse, error) {
+	rsp, err := c.RotateSdkKey(ctx, project, environment, sdkKey, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateSdkKeyResponse(rsp)
 }
 
 // ListFlagsWithResponse The project's flags
@@ -22449,6 +23843,362 @@ func ParseEvaluateResponse(rsp *http.Response) (*EvaluateResponse, error) {
 	return response, nil
 }
 
+// ParseListSdkKeysResponse parses an HTTP response from a ListSdkKeysWithResponse call
+func ParseListSdkKeysResponse(rsp *http.Response) (*ListSdkKeysResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSdkKeysResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SdkKeyList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListSdkKeysResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateSdkKeyResponse parses an HTTP response from a CreateSdkKeyWithResponse call
+func ParseCreateSdkKeyResponse(rsp *http.Response) (*CreateSdkKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSdkKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CreatedSdkKey
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers CreateSdkKeyResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRevokeSdkKeyResponse parses an HTTP response from a RevokeSdkKeyWithResponse call
+func ParseRevokeSdkKeyResponse(rsp *http.Response) (*RevokeSdkKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeSdkKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SdkKey
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RevokeSdkKeyResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSdkKeyResponse parses an HTTP response from a UpdateSdkKeyWithResponse call
+func ParseUpdateSdkKeyResponse(rsp *http.Response) (*UpdateSdkKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSdkKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SdkKey
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers UpdateSdkKeyResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRotateSdkKeyResponse parses an HTTP response from a RotateSdkKeyWithResponse call
+func ParseRotateSdkKeyResponse(rsp *http.Response) (*RotateSdkKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateSdkKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest CreatedSdkKey
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RotateSdkKeyResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListFlagsResponse parses an HTTP response from a ListFlagsWithResponse call
 func ParseListFlagsResponse(rsp *http.Response) (*ListFlagsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -25311,6 +27061,21 @@ type ServerInterface interface {
 	// Evaluate Evaluate flags for a context, as the environment's SDKs would
 	// (POST /projects/{project}/environments/{environment}/evaluate)
 	Evaluate(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	// ListSdkKeys The environment's SDK keys
+	// (GET /projects/{project}/environments/{environment}/sdk-keys)
+	ListSdkKeys(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	// CreateSdkKey Create an SDK key
+	// (POST /projects/{project}/environments/{environment}/sdk-keys)
+	CreateSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	// RevokeSdkKey Revoke an SDK key
+	// (DELETE /projects/{project}/environments/{environment}/sdk-keys/{sdk_key})
+	RevokeSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID)
+	// UpdateSdkKey Rename an SDK key or change its allowed origins
+	// (PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key})
+	UpdateSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID)
+	// RotateSdkKey Rotate an SDK key
+	// (POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate)
+	RotateSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListFlagsParams)
@@ -26970,6 +28735,208 @@ func (siw *ServerInterfaceWrapper) Evaluate(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Evaluate(w, r, project, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSdkKeys operation middleware
+func (siw *ServerInterfaceWrapper) ListSdkKeys(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSdkKeys(w, r, project, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSdkKey operation middleware
+func (siw *ServerInterfaceWrapper) CreateSdkKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSdkKey(w, r, project, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RevokeSdkKey operation middleware
+func (siw *ServerInterfaceWrapper) RevokeSdkKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sdk_key" -------------
+	var sdkKey SdkKeyID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sdk_key", r.PathValue("sdk_key"), &sdkKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sdk_key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RevokeSdkKey(w, r, project, environment, sdkKey)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSdkKey operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSdkKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sdk_key" -------------
+	var sdkKey SdkKeyID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sdk_key", r.PathValue("sdk_key"), &sdkKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sdk_key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSdkKey(w, r, project, environment, sdkKey)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RotateSdkKey operation middleware
+func (siw *ServerInterfaceWrapper) RotateSdkKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "sdk_key" -------------
+	var sdkKey SdkKeyID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sdk_key", r.PathValue("sdk_key"), &sdkKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sdk_key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateSdkKey(w, r, project, environment, sdkKey)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -28772,6 +30739,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.GetEnvironment)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.UpdateEnvironment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/evaluate", wrapper.Evaluate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys", wrapper.ListSdkKeys)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys", wrapper.CreateSdkKey)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}", wrapper.RevokeSdkKey)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}", wrapper.UpdateSdkKey)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate", wrapper.RotateSdkKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/unit-types", wrapper.ListUnitTypes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/unit-types", wrapper.CreateUnitType)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/unit-types/{unit_type}", wrapper.DeleteUnitType)
@@ -32892,6 +34864,510 @@ func (response Evaluate422ApplicationProblemPlusJSONResponse) VisitEvaluateRespo
 	return err
 }
 
+type ListSdkKeysRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+}
+
+type ListSdkKeysResponseObject interface {
+	VisitListSdkKeysResponse(w http.ResponseWriter) error
+}
+
+type ListSdkKeys200JSONResponse SdkKeyList
+
+func (response ListSdkKeys200JSONResponse) VisitListSdkKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSdkKeys401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListSdkKeys401ApplicationProblemPlusJSONResponse) VisitListSdkKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSdkKeys403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListSdkKeys403ApplicationProblemPlusJSONResponse) VisitListSdkKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSdkKeys404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListSdkKeys404ApplicationProblemPlusJSONResponse) VisitListSdkKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSdkKeyRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+	Body        *CreateSdkKeyJSONRequestBody
+}
+
+type CreateSdkKeyResponseObject interface {
+	VisitCreateSdkKeyResponse(w http.ResponseWriter) error
+}
+
+type CreateSdkKey201JSONResponse CreatedSdkKey
+
+func (response CreateSdkKey201JSONResponse) VisitCreateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSdkKey400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSdkKey400ApplicationProblemPlusJSONResponse) VisitCreateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSdkKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSdkKey401ApplicationProblemPlusJSONResponse) VisitCreateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSdkKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSdkKey403ApplicationProblemPlusJSONResponse) VisitCreateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSdkKey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSdkKey404ApplicationProblemPlusJSONResponse) VisitCreateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSdkKey409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSdkKey409ApplicationProblemPlusJSONResponse) VisitCreateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSdkKey422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSdkKey422ApplicationProblemPlusJSONResponse) VisitCreateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSdkKeyRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+	SdkKey      SdkKeyID       `json:"sdk_key"`
+}
+
+type RevokeSdkKeyResponseObject interface {
+	VisitRevokeSdkKeyResponse(w http.ResponseWriter) error
+}
+
+type RevokeSdkKey200JSONResponse SdkKey
+
+func (response RevokeSdkKey200JSONResponse) VisitRevokeSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSdkKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeSdkKey401ApplicationProblemPlusJSONResponse) VisitRevokeSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSdkKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeSdkKey403ApplicationProblemPlusJSONResponse) VisitRevokeSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RevokeSdkKey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RevokeSdkKey404ApplicationProblemPlusJSONResponse) VisitRevokeSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSdkKeyRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+	SdkKey      SdkKeyID       `json:"sdk_key"`
+	Body        *UpdateSdkKeyJSONRequestBody
+}
+
+type UpdateSdkKeyResponseObject interface {
+	VisitUpdateSdkKeyResponse(w http.ResponseWriter) error
+}
+
+type UpdateSdkKey200JSONResponse SdkKey
+
+func (response UpdateSdkKey200JSONResponse) VisitUpdateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSdkKey400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSdkKey400ApplicationProblemPlusJSONResponse) VisitUpdateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSdkKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSdkKey401ApplicationProblemPlusJSONResponse) VisitUpdateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSdkKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSdkKey403ApplicationProblemPlusJSONResponse) VisitUpdateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSdkKey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSdkKey404ApplicationProblemPlusJSONResponse) VisitUpdateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSdkKey422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSdkKey422ApplicationProblemPlusJSONResponse) VisitUpdateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSdkKeyRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+	SdkKey      SdkKeyID       `json:"sdk_key"`
+	Body        *RotateSdkKeyJSONRequestBody
+}
+
+type RotateSdkKeyResponseObject interface {
+	VisitRotateSdkKeyResponse(w http.ResponseWriter) error
+}
+
+type RotateSdkKey201JSONResponse CreatedSdkKey
+
+func (response RotateSdkKey201JSONResponse) VisitRotateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSdkKey400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSdkKey400ApplicationProblemPlusJSONResponse) VisitRotateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSdkKey401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSdkKey401ApplicationProblemPlusJSONResponse) VisitRotateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSdkKey403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSdkKey403ApplicationProblemPlusJSONResponse) VisitRotateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSdkKey404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSdkKey404ApplicationProblemPlusJSONResponse) VisitRotateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSdkKey409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSdkKey409ApplicationProblemPlusJSONResponse) VisitRotateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateSdkKey422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response RotateSdkKey422ApplicationProblemPlusJSONResponse) VisitRotateSdkKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFlagsRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  ListFlagsParams
@@ -36844,6 +39320,21 @@ type StrictServerInterface interface {
 	// Evaluate Evaluate flags for a context, as the environment's SDKs would
 	// (POST /projects/{project}/environments/{environment}/evaluate)
 	Evaluate(ctx context.Context, request EvaluateRequestObject) (EvaluateResponseObject, error)
+	// ListSdkKeys The environment's SDK keys
+	// (GET /projects/{project}/environments/{environment}/sdk-keys)
+	ListSdkKeys(ctx context.Context, request ListSdkKeysRequestObject) (ListSdkKeysResponseObject, error)
+	// CreateSdkKey Create an SDK key
+	// (POST /projects/{project}/environments/{environment}/sdk-keys)
+	CreateSdkKey(ctx context.Context, request CreateSdkKeyRequestObject) (CreateSdkKeyResponseObject, error)
+	// RevokeSdkKey Revoke an SDK key
+	// (DELETE /projects/{project}/environments/{environment}/sdk-keys/{sdk_key})
+	RevokeSdkKey(ctx context.Context, request RevokeSdkKeyRequestObject) (RevokeSdkKeyResponseObject, error)
+	// UpdateSdkKey Rename an SDK key or change its allowed origins
+	// (PATCH /projects/{project}/environments/{environment}/sdk-keys/{sdk_key})
+	UpdateSdkKey(ctx context.Context, request UpdateSdkKeyRequestObject) (UpdateSdkKeyResponseObject, error)
+	// RotateSdkKey Rotate an SDK key
+	// (POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate)
+	RotateSdkKey(ctx context.Context, request RotateSdkKeyRequestObject) (RotateSdkKeyResponseObject, error)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(ctx context.Context, request ListFlagsRequestObject) (ListFlagsResponseObject, error)
@@ -38245,6 +40736,168 @@ func (sh *strictHandler) Evaluate(w http.ResponseWriter, r *http.Request, projec
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EvaluateResponseObject); ok {
 		if err := validResponse.VisitEvaluateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSdkKeys operation middleware
+func (sh *strictHandler) ListSdkKeys(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey) {
+	var request ListSdkKeysRequestObject
+
+	request.Project = project
+	request.Environment = environment
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSdkKeys(ctx, request.(ListSdkKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSdkKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSdkKeysResponseObject); ok {
+		if err := validResponse.VisitListSdkKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSdkKey operation middleware
+func (sh *strictHandler) CreateSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey) {
+	var request CreateSdkKeyRequestObject
+
+	request.Project = project
+	request.Environment = environment
+
+	var body CreateSdkKeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSdkKey(ctx, request.(CreateSdkKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSdkKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSdkKeyResponseObject); ok {
+		if err := validResponse.VisitCreateSdkKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RevokeSdkKey operation middleware
+func (sh *strictHandler) RevokeSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID) {
+	var request RevokeSdkKeyRequestObject
+
+	request.Project = project
+	request.Environment = environment
+	request.SdkKey = sdkKey
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RevokeSdkKey(ctx, request.(RevokeSdkKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RevokeSdkKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RevokeSdkKeyResponseObject); ok {
+		if err := validResponse.VisitRevokeSdkKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSdkKey operation middleware
+func (sh *strictHandler) UpdateSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID) {
+	var request UpdateSdkKeyRequestObject
+
+	request.Project = project
+	request.Environment = environment
+	request.SdkKey = sdkKey
+
+	var body UpdateSdkKeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSdkKey(ctx, request.(UpdateSdkKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSdkKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSdkKeyResponseObject); ok {
+		if err := validResponse.VisitUpdateSdkKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RotateSdkKey operation middleware
+func (sh *strictHandler) RotateSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID) {
+	var request RotateSdkKeyRequestObject
+
+	request.Project = project
+	request.Environment = environment
+	request.SdkKey = sdkKey
+
+	var body RotateSdkKeyJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		if !errors.Is(err, io.EOF) {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+	} else {
+		request.Body = &body
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RotateSdkKey(ctx, request.(RotateSdkKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RotateSdkKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RotateSdkKeyResponseObject); ok {
+		if err := validResponse.VisitRotateSdkKeyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
