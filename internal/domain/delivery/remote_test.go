@@ -134,7 +134,7 @@ func TestARemoteContextAtItsLimitsIsValid(t *testing.T) {
 	for i := range 63 {
 		attrs["a"+strings.Repeat("x", i)] = true
 	}
-	attrs["s"] = strings.Repeat("я", 256)
+	attrs["a"] = strings.Repeat("я", 256)
 	list := make([]any, 64)
 	for i := range list {
 		list[i] = strings.Repeat("я", 256)
