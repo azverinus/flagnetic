@@ -105,6 +105,11 @@ type Handlers struct {
 	RevertConfiguration  *appflags.RevertConfiguration
 	CopyConfiguration    *appflags.CopyConfiguration
 	Evaluate             *appdelivery.Evaluate
+	ReadRuleset          *appdelivery.ReadRuleset
+
+	ListDiscoveredAttributes   *appdelivery.ListDiscoveredAttributes
+	DismissDiscoveredAttribute *appdelivery.DismissDiscoveredAttribute
+	DeclareDiscoveredAttribute *appdelivery.DeclareDiscoveredAttribute
 
 	ListSDKKeys  *appdelivery.ListSDKKeys
 	CreateSDKKey *appdelivery.CreateSDKKey

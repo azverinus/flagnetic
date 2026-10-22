@@ -264,3 +264,106 @@ func TestAnUpdateRenamesAndReplacesTheAllowedOrigins(t *testing.T) {
 		t.Errorf("a blank name: %v", got)
 	}
 }
+
+func TestAKeyIsAcceptedUntilRevokedOrPastItsOverlap(t *testing.T) {
+	k, _ := newKey(t, delivery.SDKKeyServer)
+	if err := k.AcceptAt(bumpedAt); err != nil {
+		t.Errorf("an active key: %v", err)
+	}
+	rotated, _, _, err := k.Rotate(id.New[delivery.SDKKey](keyIDs), time.Hour, bumpedAt, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rotated.AcceptAt(bumpedAt.Add(time.Hour - time.Millisecond)); err != nil {
+		t.Errorf("a key within its overlap: %v", err)
+	}
+	if err := rotated.AcceptAt(bumpedAt.Add(time.Hour)); !hasCode(err, apperrors.KindUnauthenticated, "sdk_key_expired") {
+		t.Errorf("a key at the end of its overlap: %v, want sdk_key_expired", err)
+	}
+	revoked, _ := rotated.Revoke(bumpedAt)
+	if err := revoked.AcceptAt(bumpedAt); !hasCode(err, apperrors.KindUnauthenticated, "sdk_key_revoked") {
+		t.Errorf("a revoked key: %v, want sdk_key_revoked", err)
+	}
+}
+
+func TestAnOperationRefusesAKeyOfAKindItDoesNotServe(t *testing.T) {
+	server, _ := newKey(t, delivery.SDKKeyServer)
+	client, _ := newKey(t, delivery.SDKKeyClient)
+	if err := server.CheckKind(delivery.SDKKeyServer); err != nil {
+		t.Errorf("a server key where server keys are served: %v", err)
+	}
+	if err := client.CheckKind(delivery.SDKKeyServer, delivery.SDKKeyClient); err != nil {
+		t.Errorf("a client key where both kinds are served: %v", err)
+	}
+	if err := client.CheckKind(delivery.SDKKeyServer); !hasCode(err, apperrors.KindForbidden, "key_kind_not_allowed") {
+		t.Errorf("a client key where only server keys are served: %v, want key_kind_not_allowed", err)
+	}
+}
+
+func hasCode(err error, kind apperrors.Kind, code string) bool {
+	e, ok := apperrors.From(err)
+	return ok && e.Kind == kind && e.Code == code
+}
+
+func TestAKeysUseIsRecordedAtMostOnceAMinute(t *testing.T) {
+	k, _ := newKey(t, delivery.SDKKeyServer)
+	if !k.UseToRecord(bumpedAt) {
+		t.Error("the first use of a key is not recorded")
+	}
+	used := bumpedAt
+	k.LastUsedAt = &used
+	if k.UseToRecord(bumpedAt.Add(time.Minute - time.Millisecond)) {
+		t.Error("a use within a minute of the last one recorded is recorded again")
+	}
+	if !k.UseToRecord(bumpedAt.Add(time.Minute)) {
+		t.Error("a use a minute after the last one recorded is not recorded")
+	}
+}
+
+func TestOnlyAClientKeyMayBePresentedInAURL(t *testing.T) {
+	_, server := newKey(t, delivery.SDKKeyServer)
+	_, client := newKey(t, delivery.SDKKeyClient)
+	for _, v := range []string{server, "fn_srv_unknown"} {
+		if err := delivery.CheckKeyInQuery(v); !errors.Is(err, delivery.ErrServerKeyInQuery) {
+			t.Errorf("CheckKeyInQuery(%q) = %v, want server_key_in_query", v, err)
+		}
+	}
+	for _, v := range []string{client, "anything else"} {
+		if err := delivery.CheckKeyInQuery(v); err != nil {
+			t.Errorf("CheckKeyInQuery(%q) = %v, want it left to authentication", v, err)
+		}
+	}
+}
+
+func TestABrowsersOriginIsAdmittedByTheKeysAllowedOrigins(t *testing.T) {
+	server, _ := newKey(t, delivery.SDKKeyServer)
+	open, _ := newKey(t, delivery.SDKKeyClient)
+	listed, _ := newKey(t, delivery.SDKKeyClient, "https://app.example.com", "http://localhost:5173")
+
+	for _, origin := range []string{"https://app.example.com", "null", ""} {
+		if _, err := server.AdmitOrigin(origin, true); !hasCode(err, apperrors.KindForbidden, "server_key_from_browser") {
+			t.Errorf("a server key from origin %q: %v, want server_key_from_browser", origin, err)
+		}
+	}
+	if restricted, err := server.AdmitOrigin("", false); err != nil || restricted {
+		t.Errorf("a server key without an origin: %v %v, want admitted", restricted, err)
+	}
+	for _, origin := range []string{"https://elsewhere.example", "null"} {
+		if restricted, err := open.AdmitOrigin(origin, true); err != nil || restricted {
+			t.Errorf("a client key listing no origin, from %q: %v %v, want any origin admitted", origin, restricted, err)
+		}
+	}
+	for _, origin := range []string{"https://app.example.com", "HTTPS://App.Example.com:443", "http://localhost:5173"} {
+		if restricted, err := listed.AdmitOrigin(origin, true); err != nil || !restricted {
+			t.Errorf("a listed origin %q: %v %v, want admitted as restricted", origin, restricted, err)
+		}
+	}
+	for _, origin := range []string{"https://evil.example", "http://app.example.com", "http://localhost:5174", "null", "", "https://app.example.com/path"} {
+		if _, err := listed.AdmitOrigin(origin, true); !hasCode(err, apperrors.KindForbidden, "origin_not_allowed") {
+			t.Errorf("an unlisted origin %q: %v, want origin_not_allowed", origin, err)
+		}
+	}
+	if restricted, err := listed.AdmitOrigin("", false); err != nil || !restricted {
+		t.Errorf("a restricted key without an origin: %v %v, want served, restricted", restricted, err)
+	}
+}

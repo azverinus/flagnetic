@@ -6,10 +6,9 @@ import {
   updateEnvironment,
 } from "@flagnetic/api";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -36,8 +35,7 @@ import { useListMutation } from "@/lib/mutations";
 import { environmentsQuery } from "@/lib/queries";
 import { useFormConflict } from "@/lib/use-form-conflict";
 
-export const Route = createFileRoute("/_signed-in/projects/$project/environments")({
-  staticData: { crumb: msg`Environments` },
+export const Route = createFileRoute("/_signed-in/projects/$project/environments/")({
   component: Environments,
 });
 
@@ -59,7 +57,15 @@ function Environments() {
       {
         id: "key",
         header: t`Key`,
-        cell: ({ row }) => <code className="font-mono text-xs">{row.original.key}</code>,
+        cell: ({ row }) => (
+          <Link
+            to="/projects/$project/environments/$environment"
+            params={{ project, environment: row.original.key }}
+            className="font-mono text-xs underline-offset-4 hover:underline"
+          >
+            {row.original.key}
+          </Link>
+        ),
       },
       { id: "name", header: t`Name`, cell: ({ row }) => row.original.name },
     ];
@@ -72,7 +78,7 @@ function Environments() {
         </>
       );
     });
-  }, [canManage, t]);
+  }, [canManage, project, t]);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">

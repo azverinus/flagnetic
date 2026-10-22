@@ -153,6 +153,23 @@ func ParseSDKKeyValue(value string) (SDKKeyKind, SDKKeyHash, error) {
 	return "", SDKKeyHash{}, ErrSDKKeyInvalid
 }
 
+// ErrServerKeyInQuery refuses a server key presented in a URL, where logs,
+// histories and referrers keep it.
+var ErrServerKeyInQuery = apperrors.Forbidden("server_key_in_query",
+	"a server key must never be put in a URL; send it in the Authorization header")
+
+// CheckKeyInQuery refuses a value presented in a URL's query that is shaped
+// like a server key, known or not: only a client key, which ships in apps
+// and browsers anyway, may travel there, for a browser's EventSource that
+// cannot set headers. The refusal does not depend on a lookup, so it tells
+// nothing of which keys exist.
+func CheckKeyInQuery(value string) error {
+	if strings.HasPrefix(value, sdkKeyPrefixes[SDKKeyServer]) {
+		return ErrServerKeyInQuery
+	}
+	return nil
+}
+
 // StatusAt returns what the key is at t: revoked once revoked, whatever its
 // expiry; expired from the end of its overlap; rotating within it; active
 // otherwise.
@@ -167,6 +184,89 @@ func (k SDKKey) StatusAt(t time.Time) SDKKeyStatus {
 	default:
 		return SDKKeyExpired
 	}
+}
+
+// ErrSDKKeyMissing refuses a request to the SDK API that presents no key.
+var ErrSDKKeyMissing = apperrors.Unauthenticated("sdk_key_missing", "the request carries no SDK key")
+
+var (
+	errSDKKeyRevoked = apperrors.Unauthenticated("sdk_key_revoked", "the SDK key is revoked")
+	errSDKKeyExpired = apperrors.Unauthenticated("sdk_key_expired",
+		"the SDK key was rotated and its rotation overlap has ended")
+	errKeyKindNotAllowed = apperrors.Forbidden("key_kind_not_allowed",
+		"this operation does not serve this kind of SDK key")
+)
+
+// AcceptAt refuses the key presented at t when it no longer works: revoked
+// (sdk_key_revoked), or rotated and past its overlap (sdk_key_expired). The
+// time is the request's, so a rotation ends on time without anyone acting.
+func (k SDKKey) AcceptAt(t time.Time) error {
+	switch k.StatusAt(t) {
+	case SDKKeyRevoked:
+		return errSDKKeyRevoked
+	case SDKKeyExpired:
+		return errSDKKeyExpired
+	default:
+		return nil
+	}
+}
+
+// CheckKind refuses the key, key_kind_not_allowed, unless it is of one of
+// the kinds served. A client key ships inside apps anyone can read, so it
+// never reaches what only a server key may, such as a ruleset carrying
+// private segments.
+func (k SDKKey) CheckKind(served ...SDKKeyKind) error {
+	if slices.Contains(served, k.Kind) {
+		return nil
+	}
+	return errKeyKindNotAllowed
+}
+
+var (
+	errServerKeyFromBrowser = apperrors.Forbidden("server_key_from_browser",
+		"a server key must never be used from a browser; use a client key there")
+	errOriginNotAllowed = apperrors.Forbidden("origin_not_allowed",
+		"the SDK key does not allow requests from this origin")
+)
+
+// AdmitOrigin judges the browser origin a request comes from, sent telling
+// whether the request carries an Origin header at all. A server key sent
+// with one is refused server_key_from_browser, whatever the origin: a
+// server key in a web page is readable by anyone, and failing loudly makes
+// the mistake found before the key leaks further. A client key listing no
+// origins admits any. One listing origins admits a request without an
+// Origin header, which is not a browser's, and one from a listed origin,
+// compared normalized; any other, "null" included, is origin_not_allowed.
+// restricted reports a key whose answers depend on the origin, so that a
+// cache keeps them apart.
+func (k SDKKey) AdmitOrigin(origin string, sent bool) (restricted bool, err error) {
+	if k.Kind == SDKKeyServer {
+		if sent {
+			return false, errServerKeyFromBrowser
+		}
+		return false, nil
+	}
+	if len(k.AllowedOrigins) == 0 {
+		return false, nil
+	}
+	if !sent {
+		return true, nil
+	}
+	if n, ok := NormalizeOrigin(origin); ok && slices.Contains(k.AllowedOrigins, n) {
+		return true, nil
+	}
+	return true, errOriginNotAllowed
+}
+
+// SDKKeyUseInterval is how often at most a key's last use is recorded: often
+// enough for a member to see whether a key is still in use, rarely enough
+// that an SDK polling every few seconds costs no write per request.
+const SDKKeyUseInterval = time.Minute
+
+// UseToRecord reports whether a use of the key at at is worth recording: its
+// first, or one at least SDKKeyUseInterval after the last recorded.
+func (k SDKKey) UseToRecord(at time.Time) bool {
+	return k.LastUsedAt == nil || !at.Before(k.LastUsedAt.Add(SDKKeyUseInterval))
 }
 
 // IsActive reports whether the key is neither rotated nor revoked: what

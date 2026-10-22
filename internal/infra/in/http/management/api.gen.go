@@ -600,6 +600,32 @@ type DeclarationUsageCount = int
 // Description defines model for Description.
 type Description = string
 
+// DiscoveredAttribute defines model for DiscoveredAttribute.
+type DiscoveredAttribute struct {
+	// Count How many evaluated contexts carried it.
+	Count     int64     `json:"count"`
+	FirstSeen time.Time `json:"first_seen"`
+	Key       string    `json:"key"`
+	LastSeen  time.Time `json:"last_seen"`
+
+	// ObservedTypes The JSON types seen, in the order first seen: `string`, `number`, `boolean`, `list` or `object`.
+	ObservedTypes []string `json:"observed_types"`
+}
+
+// DiscoveredAttributeDeclaration defines model for DiscoveredAttributeDeclaration.
+type DiscoveredAttributeDeclaration struct {
+	Description *Description `json:"description,omitempty"`
+	Name        *Name        `json:"name,omitempty"`
+
+	// Type The type of an attribute's values; `semver` is a semantic version, `list` a list of strings.
+	Type AttributeType `json:"type"`
+}
+
+// DiscoveredAttributeList defines model for DiscoveredAttributeList.
+type DiscoveredAttributeList struct {
+	Items []DiscoveredAttribute `json:"items"`
+}
+
 // Environment defines model for Environment.
 type Environment struct {
 	Id openapi_types.UUID `json:"id"`
@@ -2122,6 +2148,9 @@ type UpdateProjectJSONRequestBody = ProjectPatch
 // CreateAttributeJSONRequestBody defines body for CreateAttribute for application/json ContentType.
 type CreateAttributeJSONRequestBody = AttributeCreate
 
+// DeclareDiscoveredAttributeJSONRequestBody defines body for DeclareDiscoveredAttribute for application/json ContentType.
+type DeclareDiscoveredAttributeJSONRequestBody = DiscoveredAttributeDeclaration
+
 // UpdateAttributeJSONRequestBody defines body for UpdateAttribute for application/json ContentType.
 type UpdateAttributeJSONRequestBody = AttributePatch
 
@@ -2755,6 +2784,49 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project}/attributes (the `CreateAttribute` operationId).
 	CreateAttribute(ctx context.Context, project ProjectKey, body CreateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListDiscoveredAttributes Attributes SDKs sent that the project does not declare
+	//
+	// The attributes that contexts evaluated through the SDK API and the
+	// tester carried without the project declaring them, by key, with the
+	// JSON types seen and when they were first and last seen. Only an
+	// attribute's key and type are recorded, never a value. A dismissed
+	// attribute is left out until it is seen with a type not seen before;
+	// an attribute declared since is left out. A project records at most
+	// 500, dismissed ones included.
+	//
+	// Corresponds with GET /projects/{project}/attributes/discovered (the `ListDiscoveredAttributes` operationId).
+	ListDiscoveredAttributes(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DismissDiscoveredAttribute Dismiss a discovered attribute
+	//
+	// Leaves the attribute out of the discovered ones until it is seen
+	// with a type not seen before. An attribute not listed is `not_found`.
+	//
+	// Corresponds with DELETE /projects/{project}/attributes/discovered/{attribute} (the `DismissDiscoveredAttribute` operationId).
+	DismissDiscoveredAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclareDiscoveredAttributeWithBody Declare a discovered attribute
+	//
+	// Declares the attribute with the type given, named after its key
+	// unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+	// An attribute not listed is `not_found`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/attributes/discovered/{attribute}/declare (the `DeclareDiscoveredAttribute` operationId).
+	DeclareDiscoveredAttributeWithBody(ctx context.Context, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeclareDiscoveredAttribute Declare a discovered attribute
+	//
+	// Declares the attribute with the type given, named after its key
+	// unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+	// An attribute not listed is `not_found`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/attributes/discovered/{attribute}/declare (the `DeclareDiscoveredAttribute` operationId).
+	DeclareDiscoveredAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, body DeclareDiscoveredAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteAttribute performs a DELETE /projects/{project}/attributes/{attribute} (the `DeleteAttribute` operationId) request.
 	//
 	// Deletes a declared attribute; a standard attribute is refused with
@@ -2880,6 +2952,18 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 	Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
+	//
+	// The environment's whole ruleset document, private segments
+	// included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+	// key, with its version as the `ETag`: a file to feed a test helper
+	// or to evaluate offline. It carries the replica's own latest writes.
+	// A replica that cannot load the ruleset answers
+	// `503 ruleset_unavailable` with `Retry-After`.
+	//
+	// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
+	GetEnvironmentRuleset(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListSdkKeys The environment's SDK keys
 	//
@@ -4495,6 +4579,89 @@ func (c *Client) CreateAttribute(ctx context.Context, project ProjectKey, body C
 	return c.Client.Do(req)
 }
 
+// ListDiscoveredAttributes Attributes SDKs sent that the project does not declare
+//
+// The attributes that contexts evaluated through the SDK API and the
+// tester carried without the project declaring them, by key, with the
+// JSON types seen and when they were first and last seen. Only an
+// attribute's key and type are recorded, never a value. A dismissed
+// attribute is left out until it is seen with a type not seen before;
+// an attribute declared since is left out. A project records at most
+// 500, dismissed ones included.
+//
+// Corresponds with GET /projects/{project}/attributes/discovered (the `ListDiscoveredAttributes` operationId).
+func (c *Client) ListDiscoveredAttributes(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDiscoveredAttributesRequest(c.Server, project)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DismissDiscoveredAttribute Dismiss a discovered attribute
+//
+// Leaves the attribute out of the discovered ones until it is seen
+// with a type not seen before. An attribute not listed is `not_found`.
+//
+// Corresponds with DELETE /projects/{project}/attributes/discovered/{attribute} (the `DismissDiscoveredAttribute` operationId).
+func (c *Client) DismissDiscoveredAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDismissDiscoveredAttributeRequest(c.Server, project, attribute)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclareDiscoveredAttributeWithBody Declare a discovered attribute
+//
+// Declares the attribute with the type given, named after its key
+// unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+// An attribute not listed is `not_found`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/attributes/discovered/{attribute}/declare (the `DeclareDiscoveredAttribute` operationId).
+func (c *Client) DeclareDiscoveredAttributeWithBody(ctx context.Context, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclareDiscoveredAttributeRequestWithBody(c.Server, project, attribute, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeclareDiscoveredAttribute Declare a discovered attribute
+//
+// Declares the attribute with the type given, named after its key
+// unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+// An attribute not listed is `not_found`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/attributes/discovered/{attribute}/declare (the `DeclareDiscoveredAttribute` operationId).
+func (c *Client) DeclareDiscoveredAttribute(ctx context.Context, project ProjectKey, attribute AttributeKey, body DeclareDiscoveredAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeclareDiscoveredAttributeRequest(c.Server, project, attribute, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // DeleteAttribute performs a DELETE /projects/{project}/attributes/{attribute} (the `DeleteAttribute` operationId) request.
 //
 // Deletes a declared attribute; a standard attribute is refused with
@@ -4761,6 +4928,28 @@ func (c *Client) EvaluateWithBody(ctx context.Context, project ProjectKey, envir
 // Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 func (c *Client) Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEvaluateRequest(c.Server, project, environment, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
+//
+// The environment's whole ruleset document, private segments
+// included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+// key, with its version as the `ETag`: a file to feed a test helper
+// or to evaluate offline. It carries the replica's own latest writes.
+// A replica that cannot load the ruleset answers
+// `503 ruleset_unavailable` with `Retry-After`.
+//
+// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
+func (c *Client) GetEnvironmentRuleset(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEnvironmentRulesetRequest(c.Server, project, environment)
 	if err != nil {
 		return nil, err
 	}
@@ -7434,6 +7623,135 @@ func NewCreateAttributeRequestWithBody(server string, project ProjectKey, conten
 	return req, nil
 }
 
+// NewListDiscoveredAttributesRequest constructs an http.Request for the ListDiscoveredAttributes method
+func NewListDiscoveredAttributesRequest(server string, project ProjectKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/attributes/discovered", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDismissDiscoveredAttributeRequest constructs an http.Request for the DismissDiscoveredAttribute method
+func NewDismissDiscoveredAttributeRequest(server string, project ProjectKey, attribute AttributeKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "attribute", attribute, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/attributes/discovered/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeclareDiscoveredAttributeRequest calls the generic DeclareDiscoveredAttribute builder with application/json body
+func NewDeclareDiscoveredAttributeRequest(server string, project ProjectKey, attribute AttributeKey, body DeclareDiscoveredAttributeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeclareDiscoveredAttributeRequestWithBody(server, project, attribute, "application/json", bodyReader)
+}
+
+// NewDeclareDiscoveredAttributeRequestWithBody constructs an http.Request for the DeclareDiscoveredAttribute method, with any body, and a specified content type
+func NewDeclareDiscoveredAttributeRequestWithBody(server string, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "attribute", attribute, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/attributes/discovered/%s/declare", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeleteAttributeRequest constructs an http.Request for the DeleteAttribute method
 func NewDeleteAttributeRequest(server string, project ProjectKey, attribute AttributeKey, params *DeleteAttributeParams) (*http.Request, error) {
 	var err error
@@ -8131,6 +8449,47 @@ func NewEvaluateRequestWithBody(server string, project ProjectKey, environment E
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetEnvironmentRulesetRequest constructs an http.Request for the GetEnvironmentRuleset method
+func NewGetEnvironmentRulesetRequest(server string, project ProjectKey, environment EnvironmentKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/ruleset", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -10913,6 +11272,53 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /projects/{project}/attributes (the `CreateAttribute` operationId).
 	CreateAttributeWithResponse(ctx context.Context, project ProjectKey, body CreateAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAttributeResponse, error)
 
+	// ListDiscoveredAttributesWithResponse Attributes SDKs sent that the project does not declare
+	//
+	// The attributes that contexts evaluated through the SDK API and the
+	// tester carried without the project declaring them, by key, with the
+	// JSON types seen and when they were first and last seen. Only an
+	// attribute's key and type are recorded, never a value. A dismissed
+	// attribute is left out until it is seen with a type not seen before;
+	// an attribute declared since is left out. A project records at most
+	// 500, dismissed ones included.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/attributes/discovered (the `ListDiscoveredAttributes` operationId).
+	ListDiscoveredAttributesWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListDiscoveredAttributesResponse, error)
+
+	// DismissDiscoveredAttributeWithResponse Dismiss a discovered attribute
+	//
+	// Leaves the attribute out of the discovered ones until it is seen
+	// with a type not seen before. An attribute not listed is `not_found`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/attributes/discovered/{attribute} (the `DismissDiscoveredAttribute` operationId).
+	DismissDiscoveredAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*DismissDiscoveredAttributeResponse, error)
+
+	// DeclareDiscoveredAttributeWithBodyWithResponse Declare a discovered attribute
+	//
+	// Declares the attribute with the type given, named after its key
+	// unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+	// An attribute not listed is `not_found`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/attributes/discovered/{attribute}/declare (the `DeclareDiscoveredAttribute` operationId).
+	DeclareDiscoveredAttributeWithBodyWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclareDiscoveredAttributeResponse, error)
+
+	// DeclareDiscoveredAttributeWithResponse Declare a discovered attribute
+	//
+	// Declares the attribute with the type given, named after its key
+	// unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+	// An attribute not listed is `not_found`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/attributes/discovered/{attribute}/declare (the `DeclareDiscoveredAttribute` operationId).
+	DeclareDiscoveredAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, body DeclareDiscoveredAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclareDiscoveredAttributeResponse, error)
+
 	// DeleteAttributeWithResponse performs a DELETE /projects/{project}/attributes/{attribute} (the `DeleteAttribute` operationId) request.
 	//
 	// Deletes a declared attribute; a standard attribute is refused with
@@ -11056,6 +11462,20 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 	EvaluateWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*EvaluateResponse, error)
+
+	// GetEnvironmentRulesetWithResponse The environment's ruleset, as server SDKs download it
+	//
+	// The environment's whole ruleset document, private segments
+	// included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+	// key, with its version as the `ETag`: a file to feed a test helper
+	// or to evaluate offline. It carries the replica's own latest writes.
+	// A replica that cannot load the ruleset answers
+	// `503 ruleset_unavailable` with `Retry-After`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
+	GetEnvironmentRulesetWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*GetEnvironmentRulesetResponse, error)
 
 	// ListSdkKeysWithResponse The environment's SDK keys
 	//
@@ -14300,6 +14720,234 @@ func (r CreateAttributeResponse) ContentType() string {
 	return ""
 }
 
+// ListDiscoveredAttributesResponse401Headers the declared response headers of an HTTP 401 response for ListDiscoveredAttributes
+type ListDiscoveredAttributesResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListDiscoveredAttributesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DiscoveredAttributeList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListDiscoveredAttributesResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListDiscoveredAttributesResponse) GetJSON200() *DiscoveredAttributeList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListDiscoveredAttributesResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListDiscoveredAttributesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListDiscoveredAttributesResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListDiscoveredAttributesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDiscoveredAttributesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDiscoveredAttributesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListDiscoveredAttributesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DismissDiscoveredAttributeResponse401Headers the declared response headers of an HTTP 401 response for DismissDiscoveredAttribute
+type DismissDiscoveredAttributeResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DismissDiscoveredAttributeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DismissDiscoveredAttributeResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DismissDiscoveredAttributeResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DismissDiscoveredAttributeResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DismissDiscoveredAttributeResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DismissDiscoveredAttributeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DismissDiscoveredAttributeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DismissDiscoveredAttributeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DismissDiscoveredAttributeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeclareDiscoveredAttributeResponse201Headers the declared response headers of an HTTP 201 response for DeclareDiscoveredAttribute
+type DeclareDiscoveredAttributeResponse201Headers struct {
+	ETag *string
+}
+
+// DeclareDiscoveredAttributeResponse401Headers the declared response headers of an HTTP 401 response for DeclareDiscoveredAttribute
+type DeclareDiscoveredAttributeResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeclareDiscoveredAttributeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Attribute
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *DeclareDiscoveredAttributeResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeclareDiscoveredAttributeResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r DeclareDiscoveredAttributeResponse) GetJSON201() *Attribute {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeclareDiscoveredAttributeResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeclareDiscoveredAttributeResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeclareDiscoveredAttributeResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeclareDiscoveredAttributeResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeclareDiscoveredAttributeResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r DeclareDiscoveredAttributeResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r DeclareDiscoveredAttributeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeclareDiscoveredAttributeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeclareDiscoveredAttributeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeclareDiscoveredAttributeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // DeleteAttributeResponse401Headers the declared response headers of an HTTP 401 response for DeleteAttribute
 type DeleteAttributeResponse401Headers struct {
 	WWWAuthenticate *string
@@ -15228,6 +15876,96 @@ func (r EvaluateResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r EvaluateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetEnvironmentRulesetResponse200Headers the declared response headers of an HTTP 200 response for GetEnvironmentRuleset
+type GetEnvironmentRulesetResponse200Headers struct {
+	ETag *string
+}
+
+// GetEnvironmentRulesetResponse401Headers the declared response headers of an HTTP 401 response for GetEnvironmentRuleset
+type GetEnvironmentRulesetResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+// GetEnvironmentRulesetResponse503Headers the declared response headers of an HTTP 503 response for GetEnvironmentRuleset
+type GetEnvironmentRulesetResponse503Headers struct {
+	RetryAfter *int
+}
+
+type GetEnvironmentRulesetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *map[string]interface{}
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON503 the response for an HTTP 503 `application/problem+json` response
+	ApplicationproblemJSON503 *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetEnvironmentRulesetResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetEnvironmentRulesetResponse401Headers
+	// Headers503 the parsed response headers for an HTTP 503 response
+	Headers503 *GetEnvironmentRulesetResponse503Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetEnvironmentRulesetResponse) GetJSON200() *map[string]interface{} {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetEnvironmentRulesetResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetEnvironmentRulesetResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetEnvironmentRulesetResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON503 returns the response for an HTTP 503 `application/problem+json` response
+func (r GetEnvironmentRulesetResponse) GetApplicationproblemJSON503() *Problem {
+	return r.ApplicationproblemJSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetEnvironmentRulesetResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetEnvironmentRulesetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetEnvironmentRulesetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetEnvironmentRulesetResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -19418,6 +20156,77 @@ func (c *ClientWithResponses) CreateAttributeWithResponse(ctx context.Context, p
 	return ParseCreateAttributeResponse(rsp)
 }
 
+// ListDiscoveredAttributesWithResponse Attributes SDKs sent that the project does not declare
+//
+// The attributes that contexts evaluated through the SDK API and the
+// tester carried without the project declaring them, by key, with the
+// JSON types seen and when they were first and last seen. Only an
+// attribute's key and type are recorded, never a value. A dismissed
+// attribute is left out until it is seen with a type not seen before;
+// an attribute declared since is left out. A project records at most
+// 500, dismissed ones included.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/attributes/discovered (the `ListDiscoveredAttributes` operationId).
+func (c *ClientWithResponses) ListDiscoveredAttributesWithResponse(ctx context.Context, project ProjectKey, reqEditors ...RequestEditorFn) (*ListDiscoveredAttributesResponse, error) {
+	rsp, err := c.ListDiscoveredAttributes(ctx, project, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDiscoveredAttributesResponse(rsp)
+}
+
+// DismissDiscoveredAttributeWithResponse Dismiss a discovered attribute
+//
+// Leaves the attribute out of the discovered ones until it is seen
+// with a type not seen before. An attribute not listed is `not_found`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/attributes/discovered/{attribute} (the `DismissDiscoveredAttribute` operationId).
+func (c *ClientWithResponses) DismissDiscoveredAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, reqEditors ...RequestEditorFn) (*DismissDiscoveredAttributeResponse, error) {
+	rsp, err := c.DismissDiscoveredAttribute(ctx, project, attribute, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDismissDiscoveredAttributeResponse(rsp)
+}
+
+// DeclareDiscoveredAttributeWithBodyWithResponse Declare a discovered attribute
+//
+// Declares the attribute with the type given, named after its key
+// unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+// An attribute not listed is `not_found`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/attributes/discovered/{attribute}/declare (the `DeclareDiscoveredAttribute` operationId).
+func (c *ClientWithResponses) DeclareDiscoveredAttributeWithBodyWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeclareDiscoveredAttributeResponse, error) {
+	rsp, err := c.DeclareDiscoveredAttributeWithBody(ctx, project, attribute, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclareDiscoveredAttributeResponse(rsp)
+}
+
+// DeclareDiscoveredAttributeWithResponse Declare a discovered attribute
+//
+// Declares the attribute with the type given, named after its key
+// unless a name is given, as `createAttribute` does and audited as it is, and removes it from the discovered ones.
+// An attribute not listed is `not_found`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/attributes/discovered/{attribute}/declare (the `DeclareDiscoveredAttribute` operationId).
+func (c *ClientWithResponses) DeclareDiscoveredAttributeWithResponse(ctx context.Context, project ProjectKey, attribute AttributeKey, body DeclareDiscoveredAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*DeclareDiscoveredAttributeResponse, error) {
+	rsp, err := c.DeclareDiscoveredAttribute(ctx, project, attribute, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeclareDiscoveredAttributeResponse(rsp)
+}
+
 // DeleteAttributeWithResponse performs a DELETE /projects/{project}/attributes/{attribute} (the `DeleteAttribute` operationId) request.
 //
 // Deletes a declared attribute; a standard attribute is refused with
@@ -19650,6 +20459,26 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, project 
 		return nil, err
 	}
 	return ParseEvaluateResponse(rsp)
+}
+
+// GetEnvironmentRulesetWithResponse The environment's ruleset, as server SDKs download it
+//
+// The environment's whole ruleset document, private segments
+// included, exactly as `GET /sdk/v1/ruleset` answers it to a server
+// key, with its version as the `ETag`: a file to feed a test helper
+// or to evaluate offline. It carries the replica's own latest writes.
+// A replica that cannot load the ruleset answers
+// `503 ruleset_unavailable` with `Retry-After`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/environments/{environment}/ruleset (the `GetEnvironmentRuleset` operationId).
+func (c *ClientWithResponses) GetEnvironmentRulesetWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, reqEditors ...RequestEditorFn) (*GetEnvironmentRulesetResponse, error) {
+	rsp, err := c.GetEnvironmentRuleset(ctx, project, environment, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetEnvironmentRulesetResponse(rsp)
 }
 
 // ListSdkKeysWithResponse The environment's SDK keys
@@ -22987,6 +23816,213 @@ func ParseCreateAttributeResponse(rsp *http.Response) (*CreateAttributeResponse,
 	return response, nil
 }
 
+// ParseListDiscoveredAttributesResponse parses an HTTP response from a ListDiscoveredAttributesWithResponse call
+func ParseListDiscoveredAttributesResponse(rsp *http.Response) (*ListDiscoveredAttributesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDiscoveredAttributesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DiscoveredAttributeList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListDiscoveredAttributesResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDismissDiscoveredAttributeResponse parses an HTTP response from a DismissDiscoveredAttributeWithResponse call
+func ParseDismissDiscoveredAttributeResponse(rsp *http.Response) (*DismissDiscoveredAttributeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DismissDiscoveredAttributeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DismissDiscoveredAttributeResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeclareDiscoveredAttributeResponse parses an HTTP response from a DeclareDiscoveredAttributeWithResponse call
+func ParseDeclareDiscoveredAttributeResponse(rsp *http.Response) (*DeclareDiscoveredAttributeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeclareDiscoveredAttributeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Attribute
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers DeclareDiscoveredAttributeResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers DeclareDiscoveredAttributeResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseDeleteAttributeResponse parses an HTTP response from a DeleteAttributeWithResponse call
 func ParseDeleteAttributeResponse(rsp *http.Response) (*DeleteAttributeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -23838,6 +24874,93 @@ func ParseEvaluateResponse(rsp *http.Response) (*EvaluateResponse, error) {
 			headers.WWWAuthenticate = &value
 		}
 		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetEnvironmentRulesetResponse parses an HTTP response from a GetEnvironmentRulesetWithResponse call
+func ParseGetEnvironmentRulesetResponse(rsp *http.Response) (*GetEnvironmentRulesetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEnvironmentRulesetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetEnvironmentRulesetResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetEnvironmentRulesetResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 503:
+		var headers GetEnvironmentRulesetResponse503Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers503 = &headers
 	}
 
 	return response, nil
@@ -27028,6 +28151,15 @@ type ServerInterface interface {
 	// CreateAttribute Declare an attribute
 	// (POST /projects/{project}/attributes)
 	CreateAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// ListDiscoveredAttributes Attributes SDKs sent that the project does not declare
+	// (GET /projects/{project}/attributes/discovered)
+	ListDiscoveredAttributes(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// DismissDiscoveredAttribute Dismiss a discovered attribute
+	// (DELETE /projects/{project}/attributes/discovered/{attribute})
+	DismissDiscoveredAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey)
+	// DeclareDiscoveredAttribute Declare a discovered attribute
+	// (POST /projects/{project}/attributes/discovered/{attribute}/declare)
+	DeclareDiscoveredAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey)
 
 	// (DELETE /projects/{project}/attributes/{attribute})
 	DeleteAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey, params DeleteAttributeParams)
@@ -27061,6 +28193,9 @@ type ServerInterface interface {
 	// Evaluate Evaluate flags for a context, as the environment's SDKs would
 	// (POST /projects/{project}/environments/{environment}/evaluate)
 	Evaluate(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
+	// (GET /projects/{project}/environments/{environment}/ruleset)
+	GetEnvironmentRuleset(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
 	// ListSdkKeys The environment's SDK keys
 	// (GET /projects/{project}/environments/{environment}/sdk-keys)
 	ListSdkKeys(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
@@ -28131,6 +29266,102 @@ func (siw *ServerInterfaceWrapper) CreateAttribute(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// ListDiscoveredAttributes operation middleware
+func (siw *ServerInterfaceWrapper) ListDiscoveredAttributes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListDiscoveredAttributes(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DismissDiscoveredAttribute operation middleware
+func (siw *ServerInterfaceWrapper) DismissDiscoveredAttribute(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "attribute" -------------
+	var attribute AttributeKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "attribute", r.PathValue("attribute"), &attribute, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "attribute", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DismissDiscoveredAttribute(w, r, project, attribute)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeclareDiscoveredAttribute operation middleware
+func (siw *ServerInterfaceWrapper) DeclareDiscoveredAttribute(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "attribute" -------------
+	var attribute AttributeKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "attribute", r.PathValue("attribute"), &attribute, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "attribute", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeclareDiscoveredAttribute(w, r, project, attribute)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteAttribute operation middleware
 func (siw *ServerInterfaceWrapper) DeleteAttribute(w http.ResponseWriter, r *http.Request) {
 
@@ -28735,6 +29966,41 @@ func (siw *ServerInterfaceWrapper) Evaluate(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Evaluate(w, r, project, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEnvironmentRuleset operation middleware
+func (siw *ServerInterfaceWrapper) GetEnvironmentRuleset(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEnvironmentRuleset(w, r, project, environment)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -30739,6 +32005,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.GetEnvironment)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.UpdateEnvironment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/evaluate", wrapper.Evaluate)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/ruleset", wrapper.GetEnvironmentRuleset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys", wrapper.ListSdkKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys", wrapper.CreateSdkKey)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-keys/{sdk_key}", wrapper.RevokeSdkKey)
@@ -30751,6 +32018,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/unit-types/{unit_type}", wrapper.UpdateUnitType)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/attributes", wrapper.ListAttributes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/attributes", wrapper.CreateAttribute)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/attributes/discovered", wrapper.ListDiscoveredAttributes)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/attributes/discovered/{attribute}", wrapper.DismissDiscoveredAttribute)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/attributes/discovered/{attribute}/declare", wrapper.DeclareDiscoveredAttribute)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.DeleteAttribute)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.GetAttribute)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/attributes/{attribute}", wrapper.UpdateAttribute)
@@ -33654,6 +34924,280 @@ func (response CreateAttribute422ApplicationProblemPlusJSONResponse) VisitCreate
 	return err
 }
 
+type ListDiscoveredAttributesRequestObject struct {
+	Project ProjectKey `json:"project"`
+}
+
+type ListDiscoveredAttributesResponseObject interface {
+	VisitListDiscoveredAttributesResponse(w http.ResponseWriter) error
+}
+
+type ListDiscoveredAttributes200JSONResponse DiscoveredAttributeList
+
+func (response ListDiscoveredAttributes200JSONResponse) VisitListDiscoveredAttributesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDiscoveredAttributes401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListDiscoveredAttributes401ApplicationProblemPlusJSONResponse) VisitListDiscoveredAttributesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDiscoveredAttributes403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListDiscoveredAttributes403ApplicationProblemPlusJSONResponse) VisitListDiscoveredAttributesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListDiscoveredAttributes404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListDiscoveredAttributes404ApplicationProblemPlusJSONResponse) VisitListDiscoveredAttributesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DismissDiscoveredAttributeRequestObject struct {
+	Project   ProjectKey   `json:"project"`
+	Attribute AttributeKey `json:"attribute"`
+}
+
+type DismissDiscoveredAttributeResponseObject interface {
+	VisitDismissDiscoveredAttributeResponse(w http.ResponseWriter) error
+}
+
+type DismissDiscoveredAttribute204Response struct {
+}
+
+func (response DismissDiscoveredAttribute204Response) VisitDismissDiscoveredAttributeResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DismissDiscoveredAttribute401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DismissDiscoveredAttribute401ApplicationProblemPlusJSONResponse) VisitDismissDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DismissDiscoveredAttribute403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DismissDiscoveredAttribute403ApplicationProblemPlusJSONResponse) VisitDismissDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DismissDiscoveredAttribute404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DismissDiscoveredAttribute404ApplicationProblemPlusJSONResponse) VisitDismissDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclareDiscoveredAttributeRequestObject struct {
+	Project   ProjectKey   `json:"project"`
+	Attribute AttributeKey `json:"attribute"`
+	Body      *DeclareDiscoveredAttributeJSONRequestBody
+}
+
+type DeclareDiscoveredAttributeResponseObject interface {
+	VisitDeclareDiscoveredAttributeResponse(w http.ResponseWriter) error
+}
+
+type DeclareDiscoveredAttribute201ResponseHeaders struct {
+	ETag *string
+}
+
+type DeclareDiscoveredAttribute201JSONResponse struct {
+	Body    Attribute
+	Headers DeclareDiscoveredAttribute201ResponseHeaders
+}
+
+func (response DeclareDiscoveredAttribute201JSONResponse) VisitDeclareDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclareDiscoveredAttribute400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeclareDiscoveredAttribute400ApplicationProblemPlusJSONResponse) VisitDeclareDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclareDiscoveredAttribute401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeclareDiscoveredAttribute401ApplicationProblemPlusJSONResponse) VisitDeclareDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclareDiscoveredAttribute403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeclareDiscoveredAttribute403ApplicationProblemPlusJSONResponse) VisitDeclareDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclareDiscoveredAttribute404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeclareDiscoveredAttribute404ApplicationProblemPlusJSONResponse) VisitDeclareDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclareDiscoveredAttribute409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeclareDiscoveredAttribute409ApplicationProblemPlusJSONResponse) VisitDeclareDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeclareDiscoveredAttribute422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response DeclareDiscoveredAttribute422ApplicationProblemPlusJSONResponse) VisitDeclareDiscoveredAttributeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteAttributeRequestObject struct {
 	Project   ProjectKey   `json:"project"`
 	Attribute AttributeKey `json:"attribute"`
@@ -34860,6 +36404,114 @@ func (response Evaluate422ApplicationProblemPlusJSONResponse) VisitEvaluateRespo
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRulesetRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+}
+
+type GetEnvironmentRulesetResponseObject interface {
+	VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error
+}
+
+type GetEnvironmentRuleset200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetEnvironmentRuleset200JSONResponse struct {
+	Body    map[string]interface{}
+	Headers GetEnvironmentRuleset200ResponseHeaders
+}
+
+func (response GetEnvironmentRuleset200JSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRuleset401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetEnvironmentRuleset401ApplicationProblemPlusJSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRuleset403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetEnvironmentRuleset403ApplicationProblemPlusJSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRuleset404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetEnvironmentRuleset404ApplicationProblemPlusJSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEnvironmentRuleset503ResponseHeaders struct {
+	RetryAfter *int
+}
+
+type GetEnvironmentRuleset503ApplicationProblemPlusJSONResponse struct {
+	Body    Problem
+	Headers GetEnvironmentRuleset503ResponseHeaders
+}
+
+func (response GetEnvironmentRuleset503ApplicationProblemPlusJSONResponse) VisitGetEnvironmentRulesetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -39287,6 +40939,15 @@ type StrictServerInterface interface {
 	// CreateAttribute Declare an attribute
 	// (POST /projects/{project}/attributes)
 	CreateAttribute(ctx context.Context, request CreateAttributeRequestObject) (CreateAttributeResponseObject, error)
+	// ListDiscoveredAttributes Attributes SDKs sent that the project does not declare
+	// (GET /projects/{project}/attributes/discovered)
+	ListDiscoveredAttributes(ctx context.Context, request ListDiscoveredAttributesRequestObject) (ListDiscoveredAttributesResponseObject, error)
+	// DismissDiscoveredAttribute Dismiss a discovered attribute
+	// (DELETE /projects/{project}/attributes/discovered/{attribute})
+	DismissDiscoveredAttribute(ctx context.Context, request DismissDiscoveredAttributeRequestObject) (DismissDiscoveredAttributeResponseObject, error)
+	// DeclareDiscoveredAttribute Declare a discovered attribute
+	// (POST /projects/{project}/attributes/discovered/{attribute}/declare)
+	DeclareDiscoveredAttribute(ctx context.Context, request DeclareDiscoveredAttributeRequestObject) (DeclareDiscoveredAttributeResponseObject, error)
 
 	// (DELETE /projects/{project}/attributes/{attribute})
 	DeleteAttribute(ctx context.Context, request DeleteAttributeRequestObject) (DeleteAttributeResponseObject, error)
@@ -39320,6 +40981,9 @@ type StrictServerInterface interface {
 	// Evaluate Evaluate flags for a context, as the environment's SDKs would
 	// (POST /projects/{project}/environments/{environment}/evaluate)
 	Evaluate(ctx context.Context, request EvaluateRequestObject) (EvaluateResponseObject, error)
+	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
+	// (GET /projects/{project}/environments/{environment}/ruleset)
+	GetEnvironmentRuleset(ctx context.Context, request GetEnvironmentRulesetRequestObject) (GetEnvironmentRulesetResponseObject, error)
 	// ListSdkKeys The environment's SDK keys
 	// (GET /projects/{project}/environments/{environment}/sdk-keys)
 	ListSdkKeys(ctx context.Context, request ListSdkKeysRequestObject) (ListSdkKeysResponseObject, error)
@@ -40416,6 +42080,93 @@ func (sh *strictHandler) CreateAttribute(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// ListDiscoveredAttributes operation middleware
+func (sh *strictHandler) ListDiscoveredAttributes(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request ListDiscoveredAttributesRequestObject
+
+	request.Project = project
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListDiscoveredAttributes(ctx, request.(ListDiscoveredAttributesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListDiscoveredAttributes")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListDiscoveredAttributesResponseObject); ok {
+		if err := validResponse.VisitListDiscoveredAttributesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DismissDiscoveredAttribute operation middleware
+func (sh *strictHandler) DismissDiscoveredAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey) {
+	var request DismissDiscoveredAttributeRequestObject
+
+	request.Project = project
+	request.Attribute = attribute
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DismissDiscoveredAttribute(ctx, request.(DismissDiscoveredAttributeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DismissDiscoveredAttribute")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DismissDiscoveredAttributeResponseObject); ok {
+		if err := validResponse.VisitDismissDiscoveredAttributeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeclareDiscoveredAttribute operation middleware
+func (sh *strictHandler) DeclareDiscoveredAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey) {
+	var request DeclareDiscoveredAttributeRequestObject
+
+	request.Project = project
+	request.Attribute = attribute
+
+	var body DeclareDiscoveredAttributeJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeclareDiscoveredAttribute(ctx, request.(DeclareDiscoveredAttributeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeclareDiscoveredAttribute")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeclareDiscoveredAttributeResponseObject); ok {
+		if err := validResponse.VisitDeclareDiscoveredAttributeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteAttribute operation middleware
 func (sh *strictHandler) DeleteAttribute(w http.ResponseWriter, r *http.Request, project ProjectKey, attribute AttributeKey, params DeleteAttributeParams) {
 	var request DeleteAttributeRequestObject
@@ -40736,6 +42487,33 @@ func (sh *strictHandler) Evaluate(w http.ResponseWriter, r *http.Request, projec
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EvaluateResponseObject); ok {
 		if err := validResponse.VisitEvaluateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEnvironmentRuleset operation middleware
+func (sh *strictHandler) GetEnvironmentRuleset(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey) {
+	var request GetEnvironmentRulesetRequestObject
+
+	request.Project = project
+	request.Environment = environment
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnvironmentRuleset(ctx, request.(GetEnvironmentRulesetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnvironmentRuleset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEnvironmentRulesetResponseObject); ok {
+		if err := validResponse.VisitGetEnvironmentRulesetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

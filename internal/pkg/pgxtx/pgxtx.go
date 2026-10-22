@@ -53,6 +53,22 @@ const (
 type current struct {
 	tx   pgx.Tx
 	mode mode
+	// afterCommit are the hooks to run once tx commits, in order.
+	afterCommit []func()
+}
+
+// AfterCommit runs fn once the transaction ctx carries commits, and never if
+// it rolls back; outside a transaction, where each statement commits on its
+// own, it runs fn at once. It lets a repository tell the rest of its process
+// about a change only once other transactions can see it, such as a
+// replica's cache learning the version it just wrote. fn runs on the
+// committing goroutine and must return promptly.
+func AfterCommit(ctx context.Context, fn func()) {
+	if c, ok := ctx.Value(txKey{}).(*current); ok {
+		c.afterCommit = append(c.afterCommit, fn)
+		return
+	}
+	fn()
 }
 
 // Transactor begins transactions on a pool.
@@ -128,7 +144,8 @@ func (t *Transactor) run(ctx context.Context, m mode, opts pgx.TxOptions, fn fun
 		}
 	}()
 
-	if err := fn(context.WithValue(ctx, txKey{}, &current{tx: tx, mode: m})); err != nil {
+	c := &current{tx: tx, mode: m}
+	if err := fn(context.WithValue(ctx, txKey{}, c)); err != nil {
 		finished = true
 		_ = tx.Rollback(context.WithoutCancel(ctx))
 		return t.report(err)
@@ -136,6 +153,9 @@ func (t *Transactor) run(ctx context.Context, m mode, opts pgx.TxOptions, fn fun
 	finished = true
 	if err := tx.Commit(ctx); err != nil {
 		return t.report(fmt.Errorf("commit transaction: %w", err))
+	}
+	for _, hook := range c.afterCommit {
+		hook()
 	}
 	return nil
 }

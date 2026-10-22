@@ -19,11 +19,12 @@ import (
 )
 
 // keyNotifications listens on the SDK keys' channel on its own connection
-// and returns a function answering the payloads delivered within wait for
-// the keys in own. The channel is shared by the whole database, and packages
-// run their tests against it at the same time, so a payload for a key another
-// test changed is not this test's to judge.
-func keyNotifications(t *testing.T, pool *pgxpool.Pool, own map[string]bool) func(wait time.Duration) []string {
+// and returns a function answering the payloads delivered within wait that
+// name one of the given keys. A notification channel spans the whole
+// database while each test package works in a schema of its own, so keys
+// that tests of other packages change at the same time are announced on
+// this connection too; only the keys this test stored say anything about it.
+func keyNotifications(t *testing.T, pool *pgxpool.Pool) func(wait time.Duration, keys ...delivery.SDKKey) []string {
 	t.Helper()
 	conn, err := pool.Acquire(t.Context())
 	if err != nil {
@@ -33,7 +34,7 @@ func keyNotifications(t *testing.T, pool *pgxpool.Pool, own map[string]bool) fun
 	if _, err = conn.Exec(t.Context(), "LISTEN "+pgdelivery.SDKKeysChannel); err != nil {
 		t.Fatal(err)
 	}
-	return func(wait time.Duration) []string {
+	return func(wait time.Duration, keys ...delivery.SDKKey) []string {
 		var out []string
 		for {
 			ctx, cancel := context.WithTimeout(t.Context(), wait)
@@ -45,7 +46,7 @@ func keyNotifications(t *testing.T, pool *pgxpool.Pool, own map[string]bool) fun
 			if err != nil {
 				t.Fatal(err)
 			}
-			if own[n.Payload] {
+			if slices.ContainsFunc(keys, func(k delivery.SDKKey) bool { return k.ID.String() == n.Payload }) {
 				out = append(out, n.Payload)
 			}
 		}
@@ -73,12 +74,10 @@ func TestAChangeDecidingWhetherAKeyIsAcceptedNotifiesItsIdentifier(t *testing.T)
 	pool := testkit.Pool(t)
 	store := pgdelivery.NewStore(pool)
 	p, envs := project(t, "keys")
-	own := map[string]bool{}
-	notified := keyNotifications(t, pool, own)
+	notified := keyNotifications(t, pool)
 	const quiet = 200 * time.Millisecond
 
 	k := storedKey(t, store, p, envs[0], delivery.SDKKeyClient)
-	own[k.ID.String()] = true
 	renamed, _, err := k.Update(delivery.SDKKeyChange{Name: ptr("storefront"), AllowedOrigins: []string{}})
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +85,7 @@ func TestAChangeDecidingWhetherAKeyIsAcceptedNotifiesItsIdentifier(t *testing.T)
 	if err = store.UpdateSDKKey(t.Context(), renamed); err != nil {
 		t.Fatal(err)
 	}
-	if got := notified(quiet); len(got) != 0 {
+	if got := notified(quiet, k); len(got) != 0 {
 		t.Errorf("creating and renaming notified %v, want nothing", got)
 	}
 
@@ -97,17 +96,16 @@ func TestAChangeDecidingWhetherAKeyIsAcceptedNotifiesItsIdentifier(t *testing.T)
 		if err := store.UpdateSDKKey(t.Context(), change); err != nil {
 			t.Fatal(err)
 		}
-		if got := notified(time.Second); !slices.Equal(got, []string{k.ID.String()}) {
+		if got := notified(time.Second, k); !slices.Equal(got, []string{k.ID.String()}) {
 			t.Errorf("a change of %s notified %v, want the key's identifier", name, got)
 		}
 	}
 
 	other := storedKey(t, store, p, envs[0], delivery.SDKKeyServer)
-	own[other.ID.String()] = true
 	if err := pgworkspace.NewStore(pool).DeleteEnvironment(t.Context(), envs[0].ID); err != nil {
 		t.Fatal(err)
 	}
-	got := notified(time.Second)
+	got := notified(time.Second, k, other)
 	slices.Sort(got)
 	want := []string{k.ID.String(), other.ID.String()}
 	slices.Sort(want)

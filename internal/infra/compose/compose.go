@@ -5,6 +5,7 @@
 package compose
 
 import (
+	"context"
 	"crypto/rand"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,10 +17,12 @@ import (
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/console"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
@@ -55,6 +58,11 @@ type Options struct {
 	// PasswordHashConcurrency bounds the password hashes and verifications
 	// the replica runs at once.
 	PasswordHashConcurrency int
+	// RulesetLoadFault lets a test stall the replica's ruleset
+	// materializations; nil in production.
+	RulesetLoadFault *pgdelivery.RulesetLoadFault
+	// RateLimits are the limits of the SDK API.
+	RateLimits config.RateLimits
 	management.Options
 }
 
@@ -65,6 +73,10 @@ type Background struct {
 	Workers []worker.Worker
 	// Listeners are started on the replica's notification listeners.
 	Listeners []Listener
+	// Close ends the work the replica's use cases started on their own, such
+	// as the ruleset loads in flight; whoever runs the replica calls it once
+	// the requests are done.
+	Close func()
 }
 
 // Listener is a handler of the notifications of one channel.
@@ -73,8 +85,8 @@ type Listener struct {
 	Handler pglisten.Handler
 }
 
-// Management mounts the management API on edge, its metrics on reg, and
-// returns the background work its use cases need.
+// Management mounts the management API and the SDK API on edge, their
+// metrics on reg, and returns the background work their use cases need.
 func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Options) Background {
 	tx, auditLog := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
 	rec := appworkspace.NewRecorder(auditLog, d.Clock, d.IDs)
@@ -84,6 +96,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// on, through the delivery context.
 	deliveryStore := pgdelivery.NewStore(d.Pool)
 	rulesets := appdelivery.NewBumpRulesets(deliveryStore, d.Clock)
+	// Every replica serves rulesets from memory by version, learning each
+	// version from its notification, and its own writes' versions as they
+	// commit, before they are answered.
+	rulesetCache := pgdelivery.NewRulesetCache(pgdelivery.RulesetCacheOptions{
+		Load: appdelivery.NewMaterializeRuleset(appdelivery.MaterializeRulesetDeps{
+			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
+		}),
+		Clock: d.Clock, Registerer: reg, Logger: edge.Logger(), Fault: o.RulesetLoadFault,
+	})
+	deliveryStore.OnCommitted(rulesetCache.Committed)
 	sdkKeys := appdelivery.SDKKeyDeps{
 		Tx: tx, Store: deliveryStore, Audit: auditLog, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 	}
@@ -106,6 +128,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Token uses are gathered per replica and written in rounds, so no
 	// request waits on recording one.
 	tokenUses := appaccess.NewTokenUses(accessStore)
+	// The attributes evaluated contexts carry undeclared are gathered per
+	// replica and written in rounds, so no evaluation waits on recording.
+	discoveries := appdelivery.NewDiscoveries(tx, deliveryStore)
+	createAttribute := appworkspace.NewCreateAttribute(tx, ws, rulesets, rec)
 	management.Mount(edge, management.Handlers{
 		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
 		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
@@ -167,7 +193,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 
 		ListAttributes:  appworkspace.NewListAttributes(tx, ws, declarationUsages),
 		GetAttribute:    appworkspace.NewGetAttribute(ws),
-		CreateAttribute: appworkspace.NewCreateAttribute(tx, ws, rulesets, rec),
+		CreateAttribute: createAttribute,
 		UpdateAttribute: appworkspace.NewUpdateAttribute(tx, ws, rec),
 		DeleteAttribute: appworkspace.NewDeleteAttribute(tx, ws, declarationGuard, rulesets, rec),
 
@@ -211,8 +237,21 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		// the flags context to check a draft as a write would.
 		Evaluate: appdelivery.NewEvaluate(appdelivery.EvaluateDeps{
 			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
-			Drafts: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
+			Drafts:      appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
+			Discoveries: discoveries, Clock: d.Clock,
 		}),
+		ReadRuleset: appdelivery.NewReadRuleset(deliveryStore, rulesetCache.Unmeasured()),
+
+		ListDiscoveredAttributes:   appdelivery.NewListDiscoveredAttributes(deliveryStore),
+		DismissDiscoveredAttribute: appdelivery.NewDismissDiscoveredAttribute(tx, deliveryStore),
+		// A discovered attribute is declared through the workspace context,
+		// as a member creating it would.
+		DeclareDiscoveredAttribute: appdelivery.NewDeclareDiscoveredAttribute(tx, deliveryStore,
+			func(ctx context.Context, a appdelivery.AttributeDeclaration) (workspace.Attribute, error) {
+				return createAttribute.Handle(ctx, appworkspace.CreateAttributeCommand{
+					Project: a.Project, Key: a.Key, Name: a.Name, Description: a.Description, Type: a.Type, Request: a.Request,
+				})
+			}),
 
 		ListSDKKeys:  appdelivery.NewListSDKKeys(deliveryStore, d.Clock),
 		CreateSDKKey: appdelivery.NewCreateSDKKey(sdkKeys),
@@ -236,12 +275,35 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
 	}, reg, o.Options)
+	// Every replica keeps the SDK keys it authenticated, dropped on a
+	// notification of each change, and writes their uses in rounds.
+	sdkKeyCache := pgdelivery.NewSDKKeyCache(deliveryStore)
+	sdkKeyUses := appdelivery.NewSDKKeyUses(deliveryStore)
+	// Every replica offers each new ruleset version to the streams it holds
+	// once it has loaded it, woken by the notification of each bump.
+	rulesetStream := pgdelivery.NewRulesetStream(rulesetCache, edge.Logger())
+	sdk.Mount(edge, sdk.Handlers{
+		Authenticate: appdelivery.NewAuthenticateSDKKey(sdkKeyCache, sdkKeyUses, d.Clock),
+		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
+		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
+		Evaluate:     appdelivery.NewEvaluateRemotely(rulesetCache, discoveries, d.Clock),
+	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
 		Workers: []worker.Worker{
 			worker.AuthRetention(appaccess.NewPurgeAuthRecords(tx, accessStore, settings, d.Clock), reg),
 			worker.TokenLastUse(tokenUses),
+			worker.SDKKeyLastUse(sdkKeyUses),
+			worker.DiscoveredAttributes(discoveries, edge.Logger()),
 		},
-		Listeners: []Listener{{Channel: pgaccess.AuthSettingsChannel, Handler: settings}},
+		Listeners: []Listener{
+			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},
+			{Channel: pgdelivery.SDKKeysChannel, Handler: sdkKeyCache},
+			{Channel: pgdelivery.RulesetsChannel, Handler: rulesetStream},
+		},
+		Close: func() {
+			rulesetStream.Close()
+			rulesetCache.Close()
+		},
 	}
 }
 

@@ -219,8 +219,18 @@ func TestEveryProblemDocumentIsOfThePlatformShape(t *testing.T) {
 		}
 		if p.Errors != nil {
 			for _, v := range *p.Errors {
-				if !strings.HasPrefix(v.Pointer, "/") || v.Params == nil {
-					t.Errorf("%s: violation %+v, want a JSON Pointer into the body and the rule's params", filepath.Base(f), v)
+				if !strings.HasPrefix(v.Pointer, "/") {
+					t.Errorf("%s: violation %+v, want a JSON Pointer into the body", filepath.Base(f), v)
+				}
+				// A limit's violation carries the limit, so that a client can
+				// explain it without knowing the server's numbers.
+				if (v.Code == "too_long" || v.Code == "too_many") && v.Params == nil {
+					t.Errorf("%s: violation %+v, want the limit in params", filepath.Base(f), v)
+				}
+				// Violation codes are an open set like problem codes, and for
+				// the same reason every one a document answers is named.
+				if !regexp.MustCompile("`" + regexp.QuoteMeta(v.Code) + "`").Match(spec) {
+					t.Errorf("%s: violation code %s, which the contract does not name", filepath.Base(f), v.Code)
 				}
 			}
 		}

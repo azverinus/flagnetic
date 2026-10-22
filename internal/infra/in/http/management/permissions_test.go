@@ -35,6 +35,21 @@ func matrix(t *testing.T) []matrixRow {
 			res := do(c.ListProjectMembersWithResponse(t.Context(), p.Key))
 			return res.StatusCode(), res.Body
 		}},
+		{"project.read", "listDiscoveredAttributes", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			res := do(c.ListDiscoveredAttributesWithResponse(t.Context(), p.Key))
+			return res.StatusCode(), res.Body
+		}},
+		{"declaration.manage", "dismissDiscoveredAttribute", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			// Nothing was discovered, so a caller holding the permission is
+			// answered not_found, and one lacking it forbidden first.
+			res := do(c.DismissDiscoveredAttributeWithResponse(t.Context(), p.Key, "absent"))
+			return res.StatusCode(), res.Body
+		}},
+		{"declaration.manage", "declareDiscoveredAttribute", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			res := do(c.DeclareDiscoveredAttributeWithResponse(t.Context(), p.Key, "absent",
+				management.DiscoveredAttributeDeclaration{Type: management.AttributeTypeString}))
+			return res.StatusCode(), res.Body
+		}},
 		{"project.update", "updateProject", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
 			res := do(c.UpdateProjectWithResponse(t.Context(), p.Key, &management.UpdateProjectParams{IfMatch: ifMatch(1)}, management.ProjectPatch{Name: ptr("Renamed " + projectKey())}))
 			return res.StatusCode(), res.Body

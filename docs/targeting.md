@@ -6,6 +6,17 @@ Who receives what is decided by **conditions** over the **context** an SDK evalu
 
 A context is the unit IDs of an evaluation, by unit type (`{"user": "u-1001"}`), and its attributes by key (`{"plan": "pro", "app_version": "2.4.0"}`). A project declares the **unit types** and **attributes** its conditions may name, each attribute with a type; every project starts with the unit types `user` and `anonymous` and the standard attributes SDKs send, such as `platform`, `app_version` and `os_version`. A unit type named in a condition works as a string attribute holding that unit's ID.
 
+### Discovered attributes
+
+Contexts often carry attributes nobody has declared yet. Every context evaluated through the SDK API's remote evaluation and through the tester (`POST …/environments/{environment}/evaluate`) is checked for them, and each is listed as **discovered**: `GET /projects/{project}/attributes/discovered` (`project.read`) answers, by key, the JSON types it was seen with (`string`, `number`, `boolean`, `list` or `object`, in the order first seen), when it was first and last seen, and how many contexts carried it.
+
+Only the attribute's key and the type of its value are recorded, never the value, so discovery stores no personal data. A `null` value, a key named like a unit type and a key no attribute could have are not recorded. Recording happens in the background, within about a second of the evaluation, and writes no audit entry.
+
+- **Declare** it with a type in one step: `POST …/attributes/discovered/{attribute}/declare` with `{"type": "string"}` and optionally a `name` (the key otherwise) and a `description` (`declaration.manage`). It is declared exactly as `POST …/attributes` would, audited as `attribute.created`, and leaves the list. An attribute declared any other way leaves it too.
+- **Dismiss** it: `DELETE …/attributes/discovered/{attribute}` (`declaration.manage`) hides it until it is seen with a type not seen before, which may be a change worth a look.
+
+A project keeps at most 500 discovered attributes, dismissed ones included; a new key beyond them is not recorded until one is declared. Between two writes, each replica holds at most 1,024 new keys in all and 1,000 per project. It drops what does not fit, and what it could not write, and logs the count as one warning a second; they are recorded when contexts carry them again.
+
 ## Conditions
 
 | Kind | Holds when |

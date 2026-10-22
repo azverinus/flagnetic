@@ -726,6 +726,30 @@ export type AttributeListItem = Attribute & {
   usage_count: DeclarationUsageCount;
 };
 
+export type DiscoveredAttribute = {
+  key: string;
+  /**
+   * The JSON types seen, in the order first seen: `string`, `number`, `boolean`, `list` or `object`.
+   */
+  observed_types: Array<string>;
+  first_seen: string;
+  last_seen: string;
+  /**
+   * How many evaluated contexts carried it.
+   */
+  count: number;
+};
+
+export type DiscoveredAttributeList = {
+  items: Array<DiscoveredAttribute>;
+};
+
+export type DiscoveredAttributeDeclaration = {
+  type: AttributeType;
+  name?: Name;
+  description?: Description;
+};
+
 export type AttributeCreate = {
   key: Key;
   type: AttributeType;
@@ -2780,6 +2804,66 @@ export type EvaluateResponses = {
 
 export type EvaluateResponse = EvaluateResponses[keyof EvaluateResponses];
 
+export type GetEnvironmentRulesetData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/environments/{environment}/ruleset";
+};
+
+export type GetEnvironmentRulesetErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * `ruleset_unavailable`: this replica cannot load the ruleset yet; retry after `Retry-After` seconds.
+   */
+  503: Problem;
+};
+
+export type GetEnvironmentRulesetError =
+  GetEnvironmentRulesetErrors[keyof GetEnvironmentRulesetErrors];
+
+export type GetEnvironmentRulesetResponses = {
+  /**
+   * The ruleset document (schema 1), as described by the SDK API's `Ruleset`.
+   */
+  200: {
+    [key: string]: unknown;
+  };
+};
+
+export type GetEnvironmentRulesetResponse =
+  GetEnvironmentRulesetResponses[keyof GetEnvironmentRulesetResponses];
+
 export type ListSdkKeysData = {
   body?: never;
   path: {
@@ -3501,6 +3585,176 @@ export type CreateAttributeResponses = {
 };
 
 export type CreateAttributeResponse = CreateAttributeResponses[keyof CreateAttributeResponses];
+
+export type ListDiscoveredAttributesData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/attributes/discovered";
+};
+
+export type ListDiscoveredAttributesErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListDiscoveredAttributesError =
+  ListDiscoveredAttributesErrors[keyof ListDiscoveredAttributesErrors];
+
+export type ListDiscoveredAttributesResponses = {
+  /**
+   * The discovered attributes, by key.
+   */
+  200: DiscoveredAttributeList;
+};
+
+export type ListDiscoveredAttributesResponse =
+  ListDiscoveredAttributesResponses[keyof ListDiscoveredAttributesResponses];
+
+export type DismissDiscoveredAttributeData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The attribute's key.
+     */
+    attribute: string;
+  };
+  query?: never;
+  url: "/projects/{project}/attributes/discovered/{attribute}";
+};
+
+export type DismissDiscoveredAttributeErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type DismissDiscoveredAttributeError =
+  DismissDiscoveredAttributeErrors[keyof DismissDiscoveredAttributeErrors];
+
+export type DismissDiscoveredAttributeResponses = {
+  /**
+   * Dismissed.
+   */
+  204: void;
+};
+
+export type DismissDiscoveredAttributeResponse =
+  DismissDiscoveredAttributeResponses[keyof DismissDiscoveredAttributeResponses];
+
+export type DeclareDiscoveredAttributeData = {
+  body: DiscoveredAttributeDeclaration;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The attribute's key.
+     */
+    attribute: string;
+  };
+  query?: never;
+  url: "/projects/{project}/attributes/discovered/{attribute}/declare";
+};
+
+export type DeclareDiscoveredAttributeErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type DeclareDiscoveredAttributeError =
+  DeclareDiscoveredAttributeErrors[keyof DeclareDiscoveredAttributeErrors];
+
+export type DeclareDiscoveredAttributeResponses = {
+  /**
+   * Declared.
+   */
+  201: Attribute;
+};
+
+export type DeclareDiscoveredAttributeResponse =
+  DeclareDiscoveredAttributeResponses[keyof DeclareDiscoveredAttributeResponses];
 
 export type DeleteAttributeData = {
   body?: never;
