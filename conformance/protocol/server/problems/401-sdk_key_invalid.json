@@ -1,6 +1,6 @@
 {
   "code": "sdk_key_invalid",
-  "detail": "the SDK key is not one this platform issued",
+  "detail": "the SDK key is not valid",
   "request_id": "<request id>",
   "status": 401,
   "title": "Unauthenticated",

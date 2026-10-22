@@ -1,6 +1,6 @@
 {
   "code": "sdk_key_revoked",
-  "detail": "the SDK key was revoked",
+  "detail": "the SDK key is revoked",
   "request_id": "<request id>",
   "status": 401,
   "title": "Unauthenticated",

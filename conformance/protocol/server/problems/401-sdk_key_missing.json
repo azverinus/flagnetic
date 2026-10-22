@@ -1,6 +1,6 @@
 {
   "code": "sdk_key_missing",
-  "detail": "an SDK key is required in Authorization: Bearer",
+  "detail": "the request carries no SDK key",
   "request_id": "<request id>",
   "status": 401,
   "title": "Unauthenticated",

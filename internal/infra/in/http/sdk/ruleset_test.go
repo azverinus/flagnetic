@@ -177,7 +177,7 @@ func TestPathsAndMethodsTheSDKAPIDoesNotServeAreProblems(t *testing.T) {
 	}{
 		{http.MethodGet, "/sdk/v1/rulesets", http.StatusNotFound, "not_found", ""},
 		{http.MethodGet, "/sdk/v2/ruleset", http.StatusNotFound, "not_found", ""},
-		{http.MethodDelete, "/sdk/v1/ruleset", http.StatusMethodNotAllowed, "method_not_allowed", "GET, HEAD"},
+		{http.MethodDelete, "/sdk/v1/ruleset", http.StatusMethodNotAllowed, "method_not_allowed", "GET, HEAD, OPTIONS"},
 	} {
 		req, err := http.NewRequestWithContext(t.Context(), tc.method, srv.URL+tc.path, nil)
 		if err != nil {

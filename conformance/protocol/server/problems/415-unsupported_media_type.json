@@ -1,6 +1,6 @@
 {
   "code": "unsupported_media_type",
-  "detail": "the body must be application/json",
+  "detail": "the body must be sent as application/json",
   "request_id": "<request id>",
   "status": 415,
   "title": "Unsupported media type",

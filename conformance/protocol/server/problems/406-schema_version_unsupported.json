@@ -1,8 +1,8 @@
 {
   "code": "schema_version_unsupported",
-  "detail": "Flagnetic-Schema-Version must be an integer of at least 1, the lowest document schema served",
+  "detail": "Flagnetic-Schema-Version must be an integer of 1 or more: the highest document schema the SDK reads",
   "request_id": "<request id>",
   "status": 406,
-  "title": "Schema version unsupported",
+  "title": "Not acceptable",
   "type": "urn:flagnetic:problem:schema_version_unsupported"
 }

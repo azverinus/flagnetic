@@ -1,6 +1,6 @@
 {
   "code": "server_key_from_browser",
-  "detail": "a server key is never used from a browser; use a client key there and rotate this one",
+  "detail": "a server key must never be used from a browser; use a client key there",
   "request_id": "<request id>",
   "status": 403,
   "title": "Forbidden",
