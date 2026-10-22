@@ -46,9 +46,10 @@ func cors(routed func(path string) bool) func(http.Handler) http.Handler {
 // admitOrigin applies the key's allowed origins to the answer: refused
 // server_key_from_browser for a server key sent from a browser,
 // origin_not_allowed for an origin a client key does not list. A key that
-// lists origins makes the answer depend on the origin: a listed one is
-// echoed in place of "*", and a request without Origin, which is no
-// browser's, is answered without the header.
+// lists origins makes the answer depend on the origin, its refusals
+// included, so every answer to it varies by Origin: a listed one is echoed
+// in place of "*", and a request without Origin, which is no browser's, is
+// answered without the header.
 func admitOrigin(w http.ResponseWriter, r *http.Request, restricted func(origin string, sent bool) (bool, error)) error {
 	origins, sent := r.Header["Origin"]
 	origin := ""
@@ -56,11 +57,14 @@ func admitOrigin(w http.ResponseWriter, r *http.Request, restricted func(origin 
 		origin = strings.TrimSpace(origins[0])
 	}
 	isRestricted, err := restricted(origin, sent)
-	if err != nil || !isRestricted {
+	if !isRestricted {
 		return err
 	}
 	h := w.Header()
 	h.Add("Vary", "Origin")
+	if err != nil {
+		return err
+	}
 	if sent {
 		h.Set("Access-Control-Allow-Origin", origin)
 	} else {

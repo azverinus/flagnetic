@@ -26,7 +26,7 @@
       "component": "server",
       "include-component-in-tag": false,
       "changelog-path": "CHANGELOG.md",
-      "exclude-paths": ["eval", "sdks", "conformance"]
+      "exclude-paths": ["eval", "sdks", "conformance", "e2e"]
     },
     "eval": {
       "release-type": "go",

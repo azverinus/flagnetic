@@ -119,13 +119,21 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 		return
 	}
 	_, path, _ := strings.Cut(pattern, " ")
+	if !rt.a.paths[path] {
+		// cors answers a preflight on every path before it is routed; the
+		// path is registered for OPTIONS as well so that a 405 lists it in
+		// Allow, as a browser SDK may send it.
+		rt.a.edge.Handle("OPTIONS "+path, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}))
+	}
 	rt.a.paths[path] = true
 	var opts []flaghttp.RouteOption
 	if op.stream {
 		opts = append(opts, flaghttp.Stream())
 	}
 	if op.maxBodyBytes > 0 {
-		opts = append(opts, flaghttp.MaxBodyBytes(op.maxBodyBytes))
+		opts = append(opts, flaghttp.MaxBodyBytes(op.maxBodyBytes), flaghttp.LimitBodyWhileReading())
 	}
 	rt.a.edge.Handle(pattern, rt.a.guard(op, http.HandlerFunc(h)), opts...)
 }

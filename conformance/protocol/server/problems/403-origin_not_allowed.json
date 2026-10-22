@@ -1,6 +1,6 @@
 {
   "code": "origin_not_allowed",
-  "detail": "the client key does not allow the origin https://elsewhere.example.com; a member lists it in the key's allowed origins",
+  "detail": "the SDK key does not allow requests from this origin",
   "request_id": "<request id>",
   "status": 403,
   "title": "Forbidden",

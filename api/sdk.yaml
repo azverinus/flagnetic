@@ -67,6 +67,14 @@ info:
     `events`, `text/plain`) `415 unsupported_media_type`. An answer is gzip when the request accepts
     it.
 
+    **Unknown members.** The server ignores what it does not know in a
+    request, so an SDK released later that sends a new optional member or
+    query parameter is answered as if it had not: a member of a request
+    body at any level (the evaluate body and its `context`, the events
+    envelope and its `sdk`, each event, each summary row) and a query
+    parameter of any operation. Context attributes keep their own rule: one
+    the project does not declare is listed in `ignored_attributes`.
+
     **Problems.** Every error is a problem document (RFC 9457) in the same
     shape as the management API's: `type` (`urn:flagnetic:problem:<code>`),
     `title`, `status`, a stable `code`, `detail` for humans, the
@@ -946,9 +954,10 @@ components:
           type: string
           description: |
             A true reason (`rule`, `rollout`, `fallthrough`,
-            `prerequisite_failed`, `off`, `override`, `experiment`), the
-            SDK's own `fallback` or `local_override`, or `targeting_match`,
-            which a client SDK counts from the answers it receives.
+            `prerequisite_failed`, `off`, `override`, `experiment`, `error`),
+            the SDK's own `fallback` or `local_override`, or
+            `targeting_match`, which a client SDK counts from the answers it
+            receives.
         count:
           type: integer
           format: int64

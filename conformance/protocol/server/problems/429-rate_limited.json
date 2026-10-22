@@ -1,6 +1,6 @@
 {
   "code": "rate_limited",
-  "detail": "too many requests; retry after Retry-After seconds",
+  "detail": "too many requests for this SDK key or client address; retry after the time Retry-After gives",
   "request_id": "<request id>",
   "retry_after": 60,
   "status": 429,

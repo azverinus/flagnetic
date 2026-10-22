@@ -72,6 +72,9 @@ type routeConfig struct {
 	stream       bool
 	maxBodyBytes int64
 	secretInPath bool
+	// limitWhileReading leaves a body over maxBodyBytes to be refused when
+	// the handler reads it, not by its Content-Length before the handler.
+	limitWhileReading bool
 }
 
 // Stream marks a long-lived route, such as server-sent events: its requests
@@ -81,6 +84,14 @@ func Stream() RouteOption { return func(c *routeConfig) { c.stream = true } }
 // MaxBodyBytes gives a route a body limit of its own, for the few that take
 // large bodies.
 func MaxBodyBytes(n int64) RouteOption { return func(c *routeConfig) { c.maxBodyBytes = n } }
+
+// LimitBodyWhileReading refuses a route's body over its limit only when the
+// handler reads past it, never up front by its Content-Length, so that the
+// handler judges the request's credentials first: the SDK API counts an
+// oversized body against the key's rate limit and answers it with the
+// key's rate-limit headers, as every other refused body. Reading stops at
+// the limit either way.
+func LimitBodyWhileReading() RouteOption { return func(c *routeConfig) { c.limitWhileReading = true } }
 
 // SecretInPath marks a route whose path carries a secret, such as an
 // invitation's: its requests are logged with the route's pattern in place
@@ -308,7 +319,7 @@ func (s *Server) route(conn, rw http.ResponseWriter, r *http.Request, st *reques
 		r.Body = withReadDeadline(r.Body, r.ContentLength, http.NewResponseController(conn), s.opts.BodyReadTimeout)
 	}
 	if route.maxBodyBytes > 0 {
-		if r.ContentLength > route.maxBodyBytes {
+		if r.ContentLength > route.maxBodyBytes && !route.limitWhileReading {
 			s.WriteError(rw, r, &http.MaxBytesError{Limit: route.maxBodyBytes})
 			return
 		}

@@ -1,6 +1,6 @@
 {
   "code": "sdk_key_expired",
-  "detail": "the SDK key expired after a rotation; use its replacement",
+  "detail": "the SDK key was rotated and its rotation overlap has ended",
   "request_id": "<request id>",
   "status": 401,
   "title": "Unauthenticated",

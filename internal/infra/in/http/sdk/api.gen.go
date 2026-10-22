@@ -150,9 +150,10 @@ type EvaluationSummaryRow struct {
 	Flag  string `json:"flag"`
 
 	// Reason A true reason (`rule`, `rollout`, `fallthrough`,
-	// `prerequisite_failed`, `off`, `override`, `experiment`), the
-	// SDK's own `fallback` or `local_override`, or `targeting_match`,
-	// which a client SDK counts from the answers it receives.
+	// `prerequisite_failed`, `off`, `override`, `experiment`, `error`),
+	// the SDK's own `fallback` or `local_override`, or
+	// `targeting_match`, which a client SDK counts from the answers it
+	// receives.
 	Reason string `json:"reason"`
 
 	// Variation Null when no variation was served.

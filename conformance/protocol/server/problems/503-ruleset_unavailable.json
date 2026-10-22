@@ -1,6 +1,6 @@
 {
   "code": "ruleset_unavailable",
-  "detail": "this replica has not loaded the environment's ruleset yet; retry later",
+  "detail": "this replica cannot load the environment's ruleset yet; try again",
   "request_id": "<request id>",
   "retry_after": 2,
   "status": 503,

@@ -1,6 +1,6 @@
 {
   "code": "invalid_request",
-  "detail": "can't decode JSON body: unexpected end of JSON input",
+  "detail": "the body is not an evaluation request: unexpected EOF",
   "request_id": "<request id>",
   "status": 400,
   "title": "Invalid request",

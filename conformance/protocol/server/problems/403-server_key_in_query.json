@@ -1,6 +1,6 @@
 {
   "code": "server_key_in_query",
-  "detail": "a server key never travels in a URL; send it in Authorization: Bearer and rotate this one",
+  "detail": "a server key must never be put in a URL; send it in the Authorization header",
   "request_id": "<request id>",
   "status": 403,
   "title": "Forbidden",
