@@ -1,6 +1,7 @@
 package delivery
 
 import (
+	"cmp"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -14,6 +15,14 @@ const InventoryInterval = time.Minute
 // DefaultInventoryRetention is how long a row of the SDK inventory is kept
 // after its SDK was last seen when the configuration does not say.
 const DefaultInventoryRetention = 90 * 24 * time.Hour
+
+// MaxInventoryRowsPerKey bounds the rows of the SDK inventory one key
+// holds. A client key ships inside apps and browsers and any caller sets its
+// own User-Agent, so without a bound whoever holds a key could add rows
+// without end; 200 is far more SDK, version, platform and app version
+// combinations than one key meets in practice. A request that would add a
+// row beyond it is not recorded; the rows the key holds keep being updated.
+const MaxInventoryRowsPerKey = 200
 
 // InventoryIdentity is what one row of the SDK inventory is about: an SDK
 // at one version, on one platform and app version, using one key of one
@@ -42,6 +51,14 @@ func Sight(key SDKKey, sdk SDKIdentity, appVersion string, rulesetVersion int64,
 		InventoryIdentity: InventoryIdentity{Environment: key.Environment, Key: key.ID, SDK: sdk, AppVersion: cut(appVersion)},
 		First:             at, At: at, RulesetVersion: rulesetVersion,
 	}
+}
+
+// CompareInventoryIdentities orders identities by SDK name, version,
+// platform and app version, so that which rows a full key keeps does not
+// depend on chance.
+func CompareInventoryIdentities(a, b InventoryIdentity) int {
+	return cmp.Or(cmp.Compare(a.SDK.Name, b.SDK.Name), cmp.Compare(a.SDK.Version, b.SDK.Version),
+		cmp.Compare(a.SDK.Platform, b.SDK.Platform), cmp.Compare(a.AppVersion, b.AppVersion))
 }
 
 // Merge returns s with a later sighting of the same row folded in: the

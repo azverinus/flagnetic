@@ -1,7 +1,10 @@
 package sdk_test
 
 import (
+	"fmt"
+	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -158,5 +161,73 @@ func TestTheInventoryForgetsSDKsNotSeenForTheRetention(t *testing.T) {
 	got := inventory(t, p.admin, p, "production")
 	if len(got) != 1 || got[0].SdkVersion != "1.5.0" {
 		t.Errorf("91 and 61 days after = %+v, want only 1.5.0 kept", got)
+	}
+}
+
+func TestAKeyHoldsAtMost200InventoryRows(t *testing.T) {
+	start := time.Date(2026, 9, 19, 10, 0, 0, 0, time.UTC)
+	c := clock.NewFake(start)
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	p := newProject(t, srv)
+	_, server := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	otherKey, other := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	fetch := func(value, version string) {
+		t.Helper()
+		if res := ruleset(t, srv, value, header("User-Agent", "flagnetic-go/"+version+" (linux)")); res.StatusCode() != http.StatusOK {
+			t.Fatalf("ruleset = %d", res.StatusCode())
+		}
+	}
+	version := func(n int) string { return fmt.Sprintf("1.0.%03d", n) }
+	for n := range 201 {
+		fetch(server, version(n))
+	}
+	fetch(other, version(0))
+	if err := srv.Tick(t, worker.SDKInventoryName); err != nil {
+		t.Fatal(err)
+	}
+	rows := func() map[string][]string {
+		out := map[string][]string{}
+		for _, r := range inventory(t, p.admin, p, "production") {
+			out[r.SdkKey.KeyId] = append(out[r.SdkKey.KeyId], r.SdkVersion)
+		}
+		return out
+	}
+	got := rows()
+	if len(got[otherKey.KeyId]) != 1 || len(got) != 2 {
+		t.Fatalf("keys = %d, other key's rows = %v, want each key bounded on its own", len(got), got[otherKey.KeyId])
+	}
+	var full []string
+	for k, versions := range got {
+		if k != otherKey.KeyId {
+			full = versions
+		}
+	}
+	if len(full) != 200 || slices.Contains(full, version(200)) {
+		t.Errorf("the key's rows = %d, holding %s: %t; want the first 200 in order", len(full), version(200), slices.Contains(full, version(200)))
+	}
+	if n := testkit.Metric(t, srv.Scrape(t), `flagnetic_sdk_inventory_dropped_total{reason="key_full"}`); n != 1 {
+		t.Errorf("key_full drops = %v, want 1", n)
+	}
+	warnings := srv.Logs.Find("SDK inventory sightings dropped")
+	if len(warnings) != 1 || warnings[0].Level != slog.LevelWarn || warnings[0].Attrs["dropped"] != int64(1) || warnings[0].Attrs["key_full"] != int64(1) {
+		t.Fatalf("warnings = %+v, want one counting the sighting beyond the key's 200 rows", warnings)
+	}
+
+	c.Advance(2 * time.Minute)
+	fetch(server, version(5))
+	fetch(server, version(201))
+	if err := srv.Tick(t, worker.SDKInventoryName); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range inventory(t, p.admin, p, "production") {
+		if r.SdkVersion == version(201) {
+			t.Errorf("a new row of a full key was recorded: %+v", r)
+		}
+		if r.SdkVersion == version(5) && !r.LastSeen.Equal(start.Add(2*time.Minute)) {
+			t.Errorf("a row the full key holds was not updated: last seen %v", r.LastSeen)
+		}
+	}
+	if n := testkit.Metric(t, srv.Scrape(t), `flagnetic_sdk_inventory_dropped_total{reason="key_full"}`); n != 2 {
+		t.Errorf("key_full drops = %v, want 2", n)
 	}
 }

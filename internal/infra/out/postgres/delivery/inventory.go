@@ -12,6 +12,41 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
+// LockSDKInventory holds, until the unit of work ends, the right to add rows
+// of key to the inventory, so that replicas writing at once never take a key
+// past its bound. The lock is advisory, keyed by the key, and touches no row
+// a member's write needs.
+func (s *Store) LockSDKInventory(ctx context.Context, key delivery.SDKKeyID) error {
+	_, err := s.db(ctx).Exec(ctx,
+		`SELECT pg_advisory_xact_lock(hashtextextended('sdk_inventory:' || $1::uuid::text, 0))`, key.Bytes())
+	if err != nil {
+		return fmt.Errorf("lock the SDK inventory: %w", err)
+	}
+	return nil
+}
+
+// InventoryOfKey returns the identities of the rows key holds.
+func (s *Store) InventoryOfKey(ctx context.Context, key delivery.SDKKeyID) ([]delivery.InventoryIdentity, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT environment_id, sdk_name, sdk_version, platform, app_version
+		FROM sdk_inventory WHERE sdk_key_id = $1`, key.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("reading the SDK inventory of a key: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (delivery.InventoryIdentity, error) {
+		var (
+			r   delivery.InventoryIdentity
+			env [16]byte
+		)
+		scanErr := row.Scan(&env, &r.SDK.Name, &r.SDK.Version, &r.SDK.Platform, &r.AppVersion)
+		r.Environment, r.Key = id.FromBytes[workspace.Environment](env), key
+		return r, scanErr
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading the SDK inventory of a key: %w", err)
+	}
+	return out, nil
+}
+
 // RecordInventory records a sighting of an SDK. The row's first time stays,
 // its last time and ruleset version move on, unless it was seen less than
 // delivery.InventoryInterval before with the same ruleset version: replicas

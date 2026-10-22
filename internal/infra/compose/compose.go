@@ -302,7 +302,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	remoteCounts := appdelivery.NewRemoteEvaluationCounts(deliveryStore, d.Clock)
 	// Every replica gathers the SDKs its requests come from and writes them
 	// in rounds.
-	inventory := appdelivery.NewSDKInventory(deliveryStore, d.Clock)
+	inventory := appdelivery.NewSDKInventory(tx, deliveryStore, d.Clock)
 	sdk.Mount(edge, sdk.Handlers{
 		Authenticate: appdelivery.NewAuthenticateSDKKey(sdkKeyCache, sdkKeyUses, d.Clock),
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
@@ -318,7 +318,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.SDKKeyLastUse(sdkKeyUses),
 			worker.DiscoveredAttributes(discoveries, edge.Logger()),
 			worker.RemoteEvaluationCounts(remoteCounts, edge.Logger()),
-			worker.SDKInventory(inventory),
+			worker.SDKInventory(inventory, edge.Logger(), reg),
 			worker.SDKInventoryRetention(appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention)),
 			worker.EventPartitions(func(ctx context.Context) error {
 				return deliveryStore.CreateEventPartitions(ctx, d.Clock.Now(), o.EventsPartitionsAhead)

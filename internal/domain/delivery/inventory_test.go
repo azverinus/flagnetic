@@ -31,3 +31,23 @@ func TestSightingsOfOneRowMerge(t *testing.T) {
 		t.Errorf("an app version of 300 bytes is kept as %d", len(long.AppVersion))
 	}
 }
+
+func TestInventoryIdentitiesAreOrderedBySDKVersionPlatformAndAppVersion(t *testing.T) {
+	id := func(name, version, platform, app string) delivery.InventoryIdentity {
+		return delivery.InventoryIdentity{SDK: delivery.SDKIdentity{Name: name, Version: version, Platform: platform}, AppVersion: app}
+	}
+	ordered := []delivery.InventoryIdentity{
+		id("flagnetic-go", "1.4.0", "linux", ""), id("flagnetic-go", "1.4.0", "linux", "3.1.0"),
+		id("flagnetic-go", "1.4.0", "windows", ""), id("flagnetic-go", "1.5.0", "", ""), id("flagnetic-js", "1.0.0", "", ""),
+	}
+	for i := range ordered {
+		if got := delivery.CompareInventoryIdentities(ordered[i], ordered[i]); got != 0 {
+			t.Errorf("%+v against itself = %d", ordered[i], got)
+		}
+		for j := i + 1; j < len(ordered); j++ {
+			if delivery.CompareInventoryIdentities(ordered[i], ordered[j]) >= 0 || delivery.CompareInventoryIdentities(ordered[j], ordered[i]) <= 0 {
+				t.Errorf("%+v is not before %+v", ordered[i], ordered[j])
+			}
+		}
+	}
+}
