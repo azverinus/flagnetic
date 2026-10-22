@@ -299,6 +299,74 @@ export const zCreatedProjectToken = z.object({
 });
 
 /**
+ * `server` downloads the environment's ruleset, private segments
+ * included, and belongs on a server; `client` never receives a
+ * ruleset, only the values remote evaluation serves it, and may be
+ * shipped in a browser or an app.
+ *
+ */
+export const zSdkKeyKind = z.enum(["server", "client"]);
+
+/**
+ * What the key is now: `revoked` once revoked, whatever its expiry;
+ * `expired` once the overlap of its rotation has ended; `rotating`
+ * within it; `active` otherwise.
+ *
+ */
+export const zSdkKeyStatus = z.enum(["active", "rotating", "expired", "revoked"]);
+
+/**
+ * An SDK key of an environment; its value is shown only when it is created or is a rotation's replacement.
+ */
+export const zSdkKey = z.object({
+  id: z.uuid(),
+  kind: zSdkKeyKind,
+  name: z.string(),
+  key_id: z.string(),
+  status: zSdkKeyStatus,
+  allowed_origins: z.array(z.string()),
+  created_at: z.iso.datetime(),
+  last_used_at: z.iso.datetime().nullable(),
+  expires_at: z.iso.datetime().nullable(),
+  revoked_at: z.iso.datetime().nullable(),
+});
+
+export const zSdkKeyList = z.object({
+  items: z.array(zSdkKey),
+});
+
+export const zSdkKeyCreate = z.object({
+  kind: z.string(),
+  name: z.string(),
+  allowed_origins: z.array(z.string()).optional(),
+});
+
+export const zSdkKeyPatch = z.object({
+  name: z.string().optional(),
+  allowed_origins: z.array(z.string()),
+});
+
+export const zSdkKeyRotation = z.object({
+  overlap_seconds: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    })
+    .optional(),
+});
+
+/**
+ * An SDK key just created, with its value.
+ */
+export const zCreatedSdkKey = z.object({
+  key: zSdkKey,
+  value: z.string(),
+});
+
+/**
  * One role held by one member in one project.
  */
 export const zGrant = z.object({
@@ -975,6 +1043,11 @@ export const zGrantId = z.string();
 export const zTokenId = z.string();
 
 /**
+ * The SDK key's identifier.
+ */
+export const zSdkKeyId = z.string();
+
+/**
  * The project's key.
  */
 export const zProjectKey = z.string();
@@ -1200,6 +1273,65 @@ export const zEvaluatePath = z.object({
  * The result of every flag evaluated, by flag key.
  */
 export const zEvaluateResponse = zEvaluation;
+
+export const zListSdkKeysPath = z.object({
+  project: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The keys.
+ */
+export const zListSdkKeysResponse = zSdkKeyList;
+
+export const zCreateSdkKeyBody = zSdkKeyCreate;
+
+export const zCreateSdkKeyPath = z.object({
+  project: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * The key, with its value.
+ */
+export const zCreateSdkKeyResponse = zCreatedSdkKey;
+
+export const zRevokeSdkKeyPath = z.object({
+  project: z.string(),
+  environment: z.string(),
+  sdk_key: z.string(),
+});
+
+/**
+ * The key, revoked.
+ */
+export const zRevokeSdkKeyResponse = zSdkKey;
+
+export const zUpdateSdkKeyBody = zSdkKeyPatch;
+
+export const zUpdateSdkKeyPath = z.object({
+  project: z.string(),
+  environment: z.string(),
+  sdk_key: z.string(),
+});
+
+/**
+ * As changed.
+ */
+export const zUpdateSdkKeyResponse = zSdkKey;
+
+export const zRotateSdkKeyBody = zSdkKeyRotation;
+
+export const zRotateSdkKeyPath = z.object({
+  project: z.string(),
+  environment: z.string(),
+  sdk_key: z.string(),
+});
+
+/**
+ * The replacement, with its value.
+ */
+export const zRotateSdkKeyResponse = zCreatedSdkKey;
 
 export const zListUnitTypesPath = z.object({
   project: z.string(),

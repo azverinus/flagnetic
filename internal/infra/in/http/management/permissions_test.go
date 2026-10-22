@@ -101,6 +101,18 @@ func matrix(t *testing.T) []matrixRow {
 			res := do(c.ListProjectTokensWithResponse(t.Context(), p.Key))
 			return res.StatusCode(), res.Body
 		}},
+		{"sdk_key.manage", "createSdkKey", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			// A client key per call, in an environment of its own, so the
+			// cells never meet the limit of active keys.
+			res := do(c.CreateSdkKeyWithResponse(t.Context(), p.Key, "development", management.SdkKeyCreate{Kind: "client", Name: "Matrix"}))
+			return res.StatusCode(), res.Body
+		}},
+		{"sdk_key.manage", "revokeSdkKey", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			// No key has the identifier, so a caller holding the permission
+			// is answered not_found, and one lacking it forbidden first.
+			res := do(c.RevokeSdkKeyWithResponse(t.Context(), p.Key, "staging", "0190d2a0-0000-7000-8000-000000000000"))
+			return res.StatusCode(), res.Body
+		}},
 	}
 }
 
@@ -125,6 +137,7 @@ func TestThePermissionMatrixHoldsRowByRow(t *testing.T) {
 		"flag_configuration.revert": {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
 		"segment.edit":              {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
 		"segment.delete":            {access.RoleMaintainer, access.RoleOwner},
+		"sdk_key.manage":            {access.RoleMaintainer, access.RoleOwner},
 	}
 	callers := map[string]*management.ClientWithResponses{
 		"instance admin": testkit.Client(t, srv, testkit.InstanceAdminToken(t)),
@@ -161,9 +174,9 @@ func TestProjectMeAnswersGrantsAndPermissionsPerRole(t *testing.T) {
 		access.RoleViewer:    {"project.read"},
 		access.RoleDeveloper: {"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit"},
 		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
-			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"},
+			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"},
 		access.RoleOwner: {"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage",
-			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"},
+			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"},
 	} {
 		got := projectMe(t, testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), role)), p.Key)
 		if !slices.Equal(got.Permissions, want) || !slices.Equal(rolesOf(got.Grants), []string{string(role)}) {

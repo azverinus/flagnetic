@@ -24,6 +24,7 @@ func TestTheCatalogAssignsEachPermissionItsScope(t *testing.T) {
 		{Name: "flag_configuration.revert", Scope: access.ScopeFlagsWrite},
 		{Name: "segment.edit", Scope: access.ScopeFlagsWrite},
 		{Name: "segment.delete", Scope: access.ScopeFlagsWrite},
+		{Name: "sdk_key.manage", Scope: access.ScopeProjectAdmin},
 	}
 	if got := access.Catalog(); !slices.Equal(got, want) {
 		t.Errorf("catalog = %+v, want %+v", got, want)
@@ -35,9 +36,9 @@ func TestTheBuiltInRolesHoldThePermissionsRowByRow(t *testing.T) {
 		access.RoleViewer:    {"project.read"},
 		access.RoleDeveloper: {"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit"},
 		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
-			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"},
+			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"},
 		access.RoleOwner: {"project.read", "project.update", "environment.manage", "declaration.manage",
-			"grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"},
+			"grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"},
 	}
 	for _, r := range access.Roles() {
 		got := slices.Clone(r.Permissions)
@@ -54,7 +55,7 @@ func TestEffectivePermissionsAreTheUnionOfGrantsNarrowedByScopes(t *testing.T) {
 	ids := newIDs()
 	mobile, web := id.New[workspace.Project](ids), id.New[workspace.Project](ids)
 	all := []access.Permission{"project.read", "project.update", "environment.manage", "declaration.manage",
-		"grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"}
+		"grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"}
 
 	for name, tc := range map[string]struct {
 		caller access.Caller
@@ -68,15 +69,17 @@ func TestEffectivePermissionsAreTheUnionOfGrantsNarrowedByScopes(t *testing.T) {
 		"a viewer reads":                         {sessionCaller(false), []access.RoleName{access.RoleViewer}, []access.Permission{"project.read"}},
 		"grants add up and never take away": {sessionCaller(false), []access.RoleName{access.RoleViewer, access.RoleMaintainer},
 			[]access.Permission{"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
-				"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"}},
+				"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete",
+				"sdk_key.manage"}},
 		"an owner's read token reads": {tokenCaller(t, false), []access.RoleName{access.RoleOwner},
 			[]access.Permission{"project.read"}},
 		"an owner's admin token never holds a flags permission": {tokenCaller(t, false, access.ScopeProjectAdmin),
 			[]access.RoleName{access.RoleOwner},
-			[]access.Permission{"project.read", "project.update", "environment.manage", "grant.manage", "project_token.manage"}},
+			[]access.Permission{"project.read", "project.update", "environment.manage", "grant.manage", "project_token.manage", "sdk_key.manage"}},
 		"a project token holds its role but never changes who has access": {projectTokenCaller(mobile, access.RoleOwner), nil,
 			[]access.Permission{"project.read", "project.update", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
-				"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"}},
+				"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete",
+				"sdk_key.manage"}},
 		"a project token is narrowed by its scopes": {projectTokenCaller(mobile, access.RoleMaintainer, access.ScopeRead), nil,
 			[]access.Permission{"project.read"}},
 	} {

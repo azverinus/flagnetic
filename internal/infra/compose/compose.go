@@ -84,6 +84,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// on, through the delivery context.
 	deliveryStore := pgdelivery.NewStore(d.Pool)
 	rulesets := appdelivery.NewBumpRulesets(deliveryStore, d.Clock)
+	sdkKeys := appdelivery.SDKKeyDeps{
+		Tx: tx, Store: deliveryStore, Audit: auditLog, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
+	}
 	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
 	// Deleting a unit type or attribute asks the flags context what still
@@ -210,6 +213,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
 			Drafts: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
 		}),
+
+		ListSDKKeys:  appdelivery.NewListSDKKeys(deliveryStore, d.Clock),
+		CreateSDKKey: appdelivery.NewCreateSDKKey(sdkKeys),
+		UpdateSDKKey: appdelivery.NewUpdateSDKKey(sdkKeys),
+		RotateSDKKey: appdelivery.NewRotateSDKKey(sdkKeys),
+		RevokeSDKKey: appdelivery.NewRevokeSDKKey(sdkKeys),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

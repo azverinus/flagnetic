@@ -73,6 +73,10 @@ const (
 	PermSegmentEdit Permission = "segment.edit"
 	// PermSegmentDelete deletes segments.
 	PermSegmentDelete Permission = "segment.delete"
+	// PermSDKKeyManage creates, renames, rotates and revokes an
+	// environment's SDK keys and edits their allowed origins. Reading them
+	// is project.read: a listed key never carries its value.
+	PermSDKKeyManage Permission = "sdk_key.manage"
 )
 
 // catalog is every permission an operation can require. Each context adds
@@ -94,6 +98,10 @@ var catalog = []PermissionSpec{
 	{Name: PermFlagConfigurationRevert, Scope: ScopeFlagsWrite},
 	{Name: PermSegmentEdit, Scope: ScopeFlagsWrite},
 	{Name: PermSegmentDelete, Scope: ScopeFlagsWrite},
+	// A pipeline provisioning an environment gives its services keys, so a
+	// project token may hold it: an SDK key reaches one environment's
+	// delivery and never changes who has access to the project.
+	{Name: PermSDKKeyManage, Scope: ScopeProjectAdmin},
 }
 
 // Catalog returns the permission catalog.
@@ -182,11 +190,12 @@ var roles = []Role{
 	{Name: RoleOwner, Permissions: []Permission{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermDeclarationManage,
 		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
-		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete,
+		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete, PermSDKKeyManage,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
 		PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete,
+		PermSDKKeyManage,
 	}},
 	{Name: RoleDeveloper, Permissions: []Permission{
 		PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert,

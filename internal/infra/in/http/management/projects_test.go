@@ -340,13 +340,13 @@ func TestProjectMeAnswersGrantsAndPermissionsNarrowedByScopes(t *testing.T) {
 		want  []string
 	}{
 		"an instance admin holds every permission": {testkit.InstanceAdminToken(t),
-			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"}},
+			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"}},
 		"a maintainer's project token, narrowed to read": {
 			testkit.ProjectToken(t, testkit.Pool(t), projectIDOf(p), access.RoleMaintainer, access.ScopeRead),
 			[]string{"project.read"}},
 		"an owner's project token never changes who has access": {
 			testkit.ProjectToken(t, testkit.Pool(t), projectIDOf(p), access.RoleOwner),
-			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"}},
+			[]string{"project.read", "project.update", "environment.manage", "declaration.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"}},
 	} {
 		res, err := testkit.Client(t, srv, tc.token).GetProjectMeWithResponse(t.Context(), p.Key)
 		if err != nil {
@@ -378,9 +378,9 @@ func TestEveryRoleIsListedWithItsPermissions(t *testing.T) {
 	}
 	want := []management.Role{
 		{Name: "owner", Permissions: []string{"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage",
-			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"}},
+			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"}},
 		{Name: "maintainer", Permissions: []string{"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
-			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete"}},
+			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"}},
 		{Name: "developer", Permissions: []string{"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit"}},
 		{Name: "viewer", Permissions: []string{"project.read"}},
 	}
