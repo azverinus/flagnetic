@@ -72,13 +72,21 @@ const signedIn: Route[] = [
     path: (s) => `/admin/audit/${s.auditEntry}?project_key=${s.project}`,
   },
   { name: "overview", route: "/projects/$project", path: (s) => `/projects/${s.project}` },
-  ...["environments", "unit-types", "attributes", "members", "tokens", "settings", "audit"].map(
-    (screen) => ({
-      name: `project ${screen}`,
-      route: `/projects/$project/${screen}`,
-      path: (s: Seeded) => `/projects/${s.project}/${screen}`,
-    }),
-  ),
+  ...[
+    "flags",
+    "flags/new",
+    "environments",
+    "unit-types",
+    "attributes",
+    "members",
+    "tokens",
+    "settings",
+    "audit",
+  ].map((screen) => ({
+    name: `project ${screen}`,
+    route: `/projects/$project/${screen}`,
+    path: (s: Seeded) => `/projects/${s.project}/${screen}`,
+  })),
   {
     name: "project audit entry",
     route: "/projects/$project/audit/$entry",
