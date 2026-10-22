@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -31,6 +32,9 @@ type Store struct {
 	// committed is told every version this process commits, nil when no one
 	// listens.
 	committed func(environment workspace.EnvironmentID, version int64, bumpedAt time.Time)
+	// partitions are the days whose event partitions this process knows
+	// exist, as "2006-01-02", so that it creates a missing one at most once.
+	partitions sync.Map
 }
 
 // NewStore returns the repository on pool.

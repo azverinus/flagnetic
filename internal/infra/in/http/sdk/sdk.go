@@ -27,6 +27,7 @@ type Handlers struct {
 	ServeRuleset *appdelivery.ServeRuleset
 	WatchRuleset *appdelivery.WatchRuleset
 	Evaluate     *appdelivery.EvaluateRemotely
+	Ingest       *appdelivery.IngestEvents
 }
 
 // Options are what the SDK API runs on besides its use cases.
@@ -68,6 +69,10 @@ var operations = map[string]operation{
 		endpoint: endpointEvaluate, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient},
 		maxBodyBytes: maxEvaluateBody,
 	},
+	"POST " + BaseURL + "/events": {
+		endpoint: endpointEvents, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient},
+		maxBodyBytes: delivery.MaxBatchBytes,
+	},
 }
 
 // api serves the operations of the SDK API.
@@ -79,13 +84,15 @@ type api struct {
 	h      Handlers
 	clock  clock.Clock
 	limits *limiter
+	events eventMetrics
 }
 
 // Mount serves the SDK API on edge: every request under BaseURL, routed or
 // not, through the API's compression, and each operation behind the
 // authentication of its SDK key.
 func Mount(edge *flaghttp.Server, h Handlers, o Options) {
-	a := &api{paths: map[string]bool{}, edge: edge, h: h, clock: o.Clock, limits: newLimiter(o.RateLimits, o.Clock, o.Registerer)}
+	a := &api{paths: map[string]bool{}, edge: edge, h: h, clock: o.Clock, limits: newLimiter(o.RateLimits, o.Clock, o.Registerer),
+		events: newEventMetrics(o.Registerer)}
 	routed := func(path string) bool { return a.paths[path] }
 	edge.Wrap(BaseURL+"/", func(next http.Handler) http.Handler { return compression(edge)(cors(routed)(next)) })
 	HandlerWithOptions(a, StdHTTPServerOptions{
@@ -318,10 +325,4 @@ func noneMatch(values []string, version string) bool {
 		}
 	}
 	return false
-}
-
-// The operations of the contract still to be served.
-
-func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, _ PostEventsParams) {
-	a.edge.WriteError(w, r, errors.New("sdk: events are not served yet"))
 }

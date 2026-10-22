@@ -7,6 +7,7 @@ package compose
 import (
 	"context"
 	"crypto/rand"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
@@ -63,6 +64,11 @@ type Options struct {
 	RulesetLoadFault *pgdelivery.RulesetLoadFault
 	// RateLimits are the limits of the SDK API.
 	RateLimits config.RateLimits
+	// EventsRetention is how long raw events are kept.
+	EventsRetention time.Duration
+	// EventsPartitionsAhead is how many days after today the raw event
+	// tables' partitions are created ahead of time.
+	EventsPartitionsAhead int
 	management.Options
 }
 
@@ -287,6 +293,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
 		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
 		Evaluate:     appdelivery.NewEvaluateRemotely(rulesetCache, discoveries, d.Clock),
+		Ingest:       appdelivery.NewIngestEvents(tx, deliveryStore, d.Clock, o.EventsRetention),
 	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
 		Workers: []worker.Worker{
@@ -294,6 +301,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.TokenLastUse(tokenUses),
 			worker.SDKKeyLastUse(sdkKeyUses),
 			worker.DiscoveredAttributes(discoveries, edge.Logger()),
+			worker.EventPartitions(func(ctx context.Context) error {
+				return deliveryStore.CreateEventPartitions(ctx, d.Clock.Now(), o.EventsPartitionsAhead)
+			}),
 		},
 		Listeners: []Listener{
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},

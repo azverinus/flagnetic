@@ -228,6 +228,8 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	background := compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Options{
 		Keyring: secret.NewKeyring(secret.New(SecretKey)), PasswordHashConcurrency: defaultHashConcurrency, Options: o.web,
 		RulesetLoadFault: o.fault, RateLimits: limits,
+		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
+		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 	})
 	// Registered first, so it runs once the server below has stopped.
 	t.Cleanup(background.Close)

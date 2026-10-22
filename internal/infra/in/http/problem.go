@@ -56,6 +56,21 @@ func InvalidRequest(detail string) error {
 	return &adapterProblem{problem{status: http.StatusBadRequest, code: "invalid_request", title: "Invalid request", detail: detail}}
 }
 
+// MalformedRequest is answered 400 invalid_request with the violations of a
+// body that is JSON but breaks the shape the operation decodes, such as an
+// envelope missing a member.
+func MalformedRequest(detail string, violations ...apperrors.Violation) error {
+	return &adapterProblem{problem{
+		status: http.StatusBadRequest, code: "invalid_request", title: "Invalid request", detail: detail, violations: violations,
+	}}
+}
+
+// RequestTooLarge is answered 413 request_too_large: a body holding more
+// than the operation takes, beyond its size in bytes.
+func RequestTooLarge(detail string) error {
+	return &adapterProblem{problem{status: http.StatusRequestEntityTooLarge, code: "request_too_large", title: "Request too large", detail: detail}}
+}
+
 // UnsupportedMediaType is answered 415 unsupported_media_type: a body sent
 // as a media type the operation does not accept.
 func UnsupportedMediaType(detail string) error {
