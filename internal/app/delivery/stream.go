@@ -26,7 +26,8 @@ type RulesetStreams interface {
 	// Subscribe returns a subscription to the versions of environment.
 	Subscribe(environment workspace.EnvironmentID) RulesetSubscription
 	// Latest returns the newest version of environment this replica has
-	// heard of while it has streams, 0 when it has heard of none.
+	// heard of while it has streams, 0 when it has heard of none, and above
+	// every version while a version may exist that it could not load.
 	Latest(environment workspace.EnvironmentID) int64
 }
 

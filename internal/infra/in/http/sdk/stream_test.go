@@ -421,3 +421,39 @@ func TestAVersionMissedWhileTheListenerWasDeafIsStreamedOnceItListensAgain(t *te
 	fault.Restore()
 	version(t, s.next(t), currentVersion(t, a, value))
 }
+
+func TestAVersionMissedWhileTheListenerWasDeafIsCaughtUpByAHeartbeatWhenItsReloadFails(t *testing.T) {
+	c := fakeClock()
+	deaf := &pglisten.Fault{}
+	load := &pgdelivery.RulesetLoadFault{}
+	a := testkit.StartServer(t)
+	b := testkit.StartServer(t, testkit.WithClock(c), testkit.WithRulesetLoadFault(load), testkit.WithListenerOptions(pglisten.Options{
+		PingInterval: 50 * time.Millisecond, PingTimeout: 50 * time.Millisecond, Fault: deaf,
+	}))
+	p := newProject(t, a)
+	p.flag(t, "checkout.new-flow")
+	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	s := openStream(t, b, nil, bearer(value))
+	s.started(t)
+	s.next(t) // the current version
+
+	up := `flagnetic_listener_up{channel="rulesets"}`
+	deaf.Silence()
+	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, b.Scrape(t), up) == 0 }) {
+		t.Fatal("b's listener was never found deaf")
+	}
+	p.switchOn(t, "checkout.new-flow", "production")
+	// The reload woken by the listener listening again fails, its retry
+	// too: no notification ever names the version missed.
+	load.Fail()
+	deaf.Restore()
+	if !eventually(5*time.Second, func() bool { return load.Failed() >= 2 }) {
+		t.Fatal("the reload woken by the listener was not tried twice")
+	}
+	s.quiet(t, 200*time.Millisecond)
+	load.Release()
+
+	c.Advance(15 * time.Second)
+	version(t, s.next(t), currentVersion(t, a, value))
+	heartbeat(t, s.next(t))
+}

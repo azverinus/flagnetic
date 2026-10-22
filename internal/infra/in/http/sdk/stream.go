@@ -81,10 +81,16 @@ func (a *api) StreamRuleset(w http.ResponseWriter, r *http.Request, params Strea
 			send(sub.Version())
 		case <-heartbeat:
 			heartbeat = clock.After(a.clock, heartbeatInterval)
-			if _, err := a.h.Authenticate.Handle(r.Context(), p.value); refusesKey(err) {
+			// Bounded, so a lookup that hangs delays the heartbeat by
+			// seconds, never past the silence after which the SDK
+			// reconnects.
+			ctx, cancel := context.WithTimeout(r.Context(), appdelivery.RulesetWait)
+			_, err := a.h.Authenticate.Handle(ctx, p.value)
+			cancel()
+			if refusesKey(err) {
 				return
 			}
-			ctx, cancel := context.WithTimeout(r.Context(), appdelivery.RulesetWait)
+			ctx, cancel = context.WithTimeout(r.Context(), appdelivery.RulesetWait)
 			version, err := a.h.WatchRuleset.CatchUp(ctx, p.key, sent)
 			cancel()
 			if err == nil {

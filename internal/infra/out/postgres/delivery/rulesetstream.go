@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"log/slog"
+	"math"
 	"sync"
 	"time"
 
@@ -50,6 +51,11 @@ type topic struct {
 	running, dirty bool
 	// latest is the newest version heard of.
 	latest int64
+	// unsure is set while the last reload failed: a version may then exist
+	// that no notification announced, as when the listener listens again
+	// after missing one, so the heartbeats look for it until a reload
+	// succeeds.
+	unsure bool
 }
 
 // NewRulesetStream returns the fan-out in front of cache, reloading
@@ -113,14 +119,20 @@ func (s *RulesetStream) Received(payload string) {
 }
 
 // Latest returns the newest version of environment heard of while it has
-// streams.
+// streams, or above every version while its last reload failed, since the
+// version that reload was looking for may be known nowhere else.
 func (s *RulesetStream) Latest(environment workspace.EnvironmentID) int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if t, ok := s.topics[environment]; ok {
+	t, ok := s.topics[environment]
+	switch {
+	case !ok:
+		return 0
+	case t.unsure:
+		return math.MaxInt64
+	default:
 		return t.latest
 	}
-	return 0
 }
 
 // Subscribe returns a subscription to the versions of environment.
@@ -155,9 +167,13 @@ func (s *RulesetStream) wake(environment workspace.EnvironmentID, t *topic) {
 		defer func() {
 			if !ended {
 				// A fan-out that panicked must not leave its topic
-				// waiting for it forever.
+				// waiting for it forever, nor keep a topic its streams
+				// left for it to drop.
 				s.mu.Lock()
 				t.running = false
+				if len(t.subs) == 0 && s.topics[environment] == t {
+					delete(s.topics, environment)
+				}
 				s.mu.Unlock()
 			}
 		}()
@@ -191,8 +207,14 @@ func (s *RulesetStream) fanOut(ctx context.Context, environment workspace.Enviro
 			}
 			continue
 		default:
-			s.log.Warn("a ruleset version could not be offered to its streams; their heartbeats catch it up",
-				"environment", environment.String(), "error", err.Error())
+			s.mu.Lock()
+			t.unsure = true
+			s.mu.Unlock()
+			// A reload cut short by Close is no failure worth telling.
+			if ctx.Err() == nil {
+				s.log.Warn("a ruleset version could not be offered to its streams; their heartbeats catch it up",
+					"environment", environment.String(), "error", err.Error())
+			}
 		}
 
 		s.mu.Lock()
@@ -214,6 +236,7 @@ func (s *RulesetStream) offer(t *topic, version int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	t.latest = max(t.latest, version)
+	t.unsure = false
 	for sub := range t.subs {
 		sub.offer(version)
 	}

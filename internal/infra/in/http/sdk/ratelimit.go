@@ -32,8 +32,9 @@ const (
 	// count in.
 	rateWindow = time.Minute
 	// sweepAt is the number of windows above which the ended ones are
-	// swept, so the counters of keys and addresses no longer seen do not
-	// grow the replica's memory.
+	// swept, at most once a window, so the counters of keys and addresses
+	// no longer seen do not grow the replica's memory, and a replica
+	// counting many live windows does not walk them all on every request.
 	sweepAt = 1024
 	// noKeyKind labels a refusal made before any key is known.
 	noKeyKind = "none"
@@ -52,6 +53,8 @@ type limiter struct {
 	windows  map[string]*window
 	failures map[netip.Addr]*window
 	streams  map[string]int
+	// windowsSwept and failuresSwept are when each map was last swept.
+	windowsSwept, failuresSwept time.Time
 }
 
 // window is the count of one fixed window, which begins with the first
@@ -123,12 +126,14 @@ func current(w *window, now time.Time) *window {
 	return w
 }
 
-// sweep drops the ended windows of m once it holds sweepAt of them. l.mu
-// is held.
-func sweep[K comparable](m map[K]*window, now time.Time) {
-	if len(m) < sweepAt {
+// sweep drops the ended windows of m once it holds sweepAt of them, unless
+// it was swept, at *swept, less than a window ago: a window then lives at
+// most two windows. l.mu is held.
+func sweep[K comparable](m map[K]*window, now time.Time, swept *time.Time) {
+	if len(m) < sweepAt || now.Before(swept.Add(rateWindow)) {
 		return
 	}
+	*swept = now
 	for k, w := range m {
 		if !now.Before(w.start.Add(rateWindow)) {
 			delete(m, k)
@@ -163,7 +168,7 @@ func (l *limiter) failed(ip netip.Addr) {
 	now := l.clock.Now()
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	sweep(l.failures, now)
+	sweep(l.failures, now, &l.failuresSwept)
 	f := current(l.failures[ip], now)
 	f.count++
 	l.failures[ip] = f
@@ -178,7 +183,7 @@ func (l *limiter) take(w http.ResponseWriter, ep endpoint, key delivery.SDKKey, 
 		now := l.clock.Now()
 		ck := counterKey(ep, key, ip)
 		l.mu.Lock()
-		sweep(l.windows, now)
+		sweep(l.windows, now, &l.windowsSwept)
 		win := current(l.windows[ck], now)
 		l.windows[ck] = win
 		if win.count >= limit {
