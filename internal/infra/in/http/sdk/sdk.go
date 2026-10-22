@@ -72,6 +72,9 @@ var operations = map[string]operation{
 
 // api serves the operations of the SDK API.
 type api struct {
+	// paths are the paths of the operations mounted, which a preflight is
+	// answered on.
+	paths  map[string]bool
 	edge   *flaghttp.Server
 	h      Handlers
 	clock  clock.Clock
@@ -82,8 +85,9 @@ type api struct {
 // not, through the API's compression, and each operation behind the
 // authentication of its SDK key.
 func Mount(edge *flaghttp.Server, h Handlers, o Options) {
-	a := &api{edge: edge, h: h, clock: o.Clock, limits: newLimiter(o.RateLimits, o.Clock, o.Registerer)}
-	edge.Wrap(BaseURL+"/", compression(edge))
+	a := &api{paths: map[string]bool{}, edge: edge, h: h, clock: o.Clock, limits: newLimiter(o.RateLimits, o.Clock, o.Registerer)}
+	routed := func(path string) bool { return a.paths[path] }
+	edge.Wrap(BaseURL+"/", func(next http.Handler) http.Handler { return compression(edge)(cors(routed)(next)) })
 	HandlerWithOptions(a, StdHTTPServerOptions{
 		BaseURL:          BaseURL,
 		BaseRouter:       router{a},
@@ -100,6 +104,8 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 	if !ok {
 		return
 	}
+	_, path, _ := strings.Cut(pattern, " ")
+	rt.a.paths[path] = true
 	var opts []flaghttp.RouteOption
 	if op.stream {
 		opts = append(opts, flaghttp.Stream())
@@ -132,7 +138,8 @@ func presentedOf(ctx context.Context) presented {
 
 // guard admits a request to op: it refuses a client IP that presented too
 // many refused keys before its key is looked up, authenticates the key,
-// refuses a key of a kind op does not serve, and counts the request against
+// applies the key's allowed origins, refuses a key of a kind op does not
+// serve, and counts the request against
 // the key's limits, holding a stream slot for a stream until it ends. The
 // key then travels in the request's context.
 func (a *api) guard(op operation, next http.Handler) http.Handler {
@@ -148,6 +155,9 @@ func (a *api) guard(op operation, next http.Handler) http.Handler {
 			if refusesPresentedKey(err) {
 				a.limits.failed(ip)
 			}
+		}
+		if err == nil {
+			err = admitOrigin(w, r, key.AdmitOrigin)
 		}
 		if err == nil {
 			err = key.CheckKind(op.kinds...)
@@ -280,7 +290,7 @@ func writeRuleset(w http.ResponseWriter, r *http.Request, rs appdelivery.Ruleset
 	h := w.Header()
 	h.Set("ETag", `"`+version+`"`)
 	h.Set("Cache-Control", "private, no-cache")
-	h.Set("Vary", "Authorization, Accept-Encoding")
+	h.Add("Vary", "Authorization, Accept-Encoding")
 	if noneMatch(r.Header.Values("If-None-Match"), version) {
 		w.WriteHeader(http.StatusNotModified)
 		return

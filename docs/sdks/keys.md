@@ -61,6 +61,14 @@ A client key may list the browser origins it is accepted from, at most 50. Each 
 
 An update replaces the whole list and must name it, so a script that sends only a new name cannot lift a restriction by accident; send `[]` to allow any origin.
 
+The server enforces the list, not the browser: a request from an origin the key does not list is refused `403 origin_not_allowed`, and an answer from a listed one names that origin in `Access-Control-Allow-Origin` with `Vary: Origin`. A request without an `Origin` header, which is no browser's, is served without the header. A change to the list applies on every replica within a second.
+
+## Browsers
+
+The SDK API answers a CORS preflight (`OPTIONS`) on any of its paths with `204` and no key, allowing `GET`, `POST` and `OPTIONS` and the headers `Authorization`, `Content-Type`, `Content-Encoding`, `Flagnetic-Schema-Version` and `Last-Event-ID`, cached for a day. Every answer, problems included, allows any origin unless a client key lists its origins, and exposes `ETag`, `Retry-After`, `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` to scripts. Credentials are never allowed, so no cookie rides along.
+
+A server key sent with an `Origin` header is refused `403 server_key_from_browser`, whatever the origin: a server key in a web page can be read by anyone who opens it. Use a client key there, and create a new server key if one was ever shipped to a browser.
+
 ## Audit
 
 Every change is in the project's audit log, by the key's key ID and never with its value: `sdk_key.created`, `sdk_key.rotated` (with the replacement's identifier and key ID and the overlap), `sdk_key.updated` and `sdk_key.revoked`. A change that changes nothing, such as revoking a revoked key, records nothing. Deleting an environment or a project deletes its keys.
