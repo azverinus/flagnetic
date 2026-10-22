@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { rememberSidebarCollapsed, sidebarCollapsed } from "./preferences";
+import {
+  lastEnvironment,
+  rememberLastEnvironment,
+  rememberSidebarCollapsed,
+  sidebarCollapsed,
+} from "./preferences";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -24,5 +29,13 @@ describe("what the console remembers in this browser", () => {
     });
     expect(() => rememberSidebarCollapsed(true)).not.toThrow();
     expect(sidebarCollapsed()).toBe(false);
+  });
+
+  it("remembers the environment shown last for each project on its own", () => {
+    expect(lastEnvironment("checkout")).toBeNull();
+    rememberLastEnvironment("checkout", "staging");
+    rememberLastEnvironment("billing", "production");
+    expect(lastEnvironment("checkout")).toBe("staging");
+    expect(lastEnvironment("billing")).toBe("production");
   });
 });

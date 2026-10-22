@@ -89,6 +89,8 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
         ? i18n._(msg`It is still in use by ${references}.`)
         : i18n._(msg`It is still in use.`);
     }
+    case "version_not_found":
+      return i18n._(msg`The configuration's history in this environment has no such version.`);
     case "not_archived":
       return i18n._(msg`Archive the flag first; only an archived flag can be deleted.`);
     case "archived":

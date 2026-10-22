@@ -54,7 +54,7 @@ import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
 import { type AuditSearch, auditQueryOf } from "./audit";
 import { unwrap } from "./errors";
-import type { FlagsSearch } from "./flags";
+import { type FlagsSearch, listFlagsQueryOf } from "./flags";
 
 /** The caller: who is signed in, and with which credential. */
 export const meQuery = queryOptions<Me>({
@@ -146,7 +146,7 @@ export function flagsQueryKey(project: string) {
 export function flagsQuery(project: string, search: FlagsSearch) {
   return queryOptions<FlagList>({
     queryKey: [...flagsQueryKey(project), "list", search],
-    queryFn: () => unwrap(listFlags({ path: { project }, query: search })),
+    queryFn: () => unwrap(listFlags({ path: { project }, query: listFlagsQueryOf(search) })),
     placeholderData: keepPreviousData,
   });
 }
@@ -351,6 +351,25 @@ export function flagEntriesQuery(
           }),
         )
       ).items,
+  });
+}
+
+/**
+ * One page of a flag's history, by the flag's identifier: its audit
+ * entries in every environment, newest first, from the page's cursor.
+ * The page shown stays while the next one loads.
+ */
+export function flagHistoryQuery(project: string, flagId: string, cursor: string | undefined) {
+  return queryOptions<AuditEntryList>({
+    queryKey: [...auditQueryKey, { project }, "flag", flagId, "history", cursor],
+    queryFn: () =>
+      unwrap(
+        listProjectAuditEntries({
+          path: { project },
+          query: { entity_kind: "flag", entity_id: flagId, ...(cursor ? { cursor } : {}) },
+        }),
+      ),
+    placeholderData: keepPreviousData,
   });
 }
 

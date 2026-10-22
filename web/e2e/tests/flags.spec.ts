@@ -10,6 +10,7 @@ import {
   seedProject,
   signIn,
 } from "../support/console";
+import { writeConfiguration } from "../support/flags";
 import { admin, seededProject, viewer } from "../support/instance";
 
 async function openFlags(page: Page, projectKey: string, who: Credentials = admin) {
@@ -339,6 +340,82 @@ test.describe("the flags list", () => {
     await expect(previous).toBeDisabled();
   });
 
+  test("shows each flag's state per environment, filters by state and drift, and sorts", async ({
+    page,
+  }) => {
+    const projectKey = await seedProject("flags-states");
+    const two = (key: string, name: string): FlagCreate => ({
+      key,
+      type: "string",
+      name,
+      variations: [
+        { key: "control", value: "control" },
+        { key: "treatment", value: "treatment" },
+      ],
+    });
+    await seedFlags(projectKey, [
+      two("alpha", "Zeta banner"),
+      two("beta", "Alpha banner"),
+      two("gamma", "Middle banner"),
+    ]);
+    await writeConfiguration(projectKey, "beta", "staging", () => ({
+      on: true,
+      rules: [
+        {
+          conditions: [],
+          serve: { kind: "rollout", variation: "treatment", unit_type: "user", percentage: 2500 },
+        },
+      ],
+    }));
+    await writeConfiguration(projectKey, "gamma", "production", () => ({ on: true }));
+    await openFlags(page, projectKey);
+    const keys = flagsTable(page).locator("tbody code");
+    // Flag, type, then Development, Staging and Production.
+    const staging = (key: string) => rowFor(page, key).getByRole("cell").nth(3);
+
+    await expect(keys).toHaveText(["alpha", "beta", "gamma"]);
+    await expect(flagsTable(page).getByRole("columnheader", { name: "Staging" })).toBeVisible();
+    await expect(staging("beta")).toContainText("On");
+    await expect(staging("beta").getByText("Has rules")).toBeAttached();
+    await expect(staging("beta").getByText("Has a rollout")).toBeAttached();
+    await expect(staging("alpha")).toContainText("Off");
+    await expect(rowFor(page, "alpha").getByRole("cell").last().locator("time")).toBeVisible();
+
+    await choose(page, "Environment", "Staging");
+    await expect(page).toHaveURL(/environment=staging/);
+    await choose(page, "State", "Has a rollout");
+    await expect(page).toHaveURL(/state=rollout/);
+    await expect(keys).toHaveText(["beta"]);
+    await choose(page, "State", "Off");
+    await expect(keys).toHaveText(["alpha", "gamma"]);
+
+    // The same state judged in another environment.
+    await choose(page, "Environment", "Production");
+    await expect(keys).toHaveText(["alpha", "beta"]);
+    await choose(page, "State", "Any state");
+
+    await choose(page, "Differs between", "Staging and Production");
+    await expect(page).toHaveURL(
+      /differs_between=staging%2Cproduction|differs_between=staging,production/,
+    );
+    await expect(keys).toHaveText(["beta", "gamma"]);
+    await choose(page, "Differs between", "Development and Staging");
+    await expect(keys).toHaveText(["beta"]);
+    await choose(page, "Differs between", "Any environments");
+    await expect(keys).toHaveText(["alpha", "beta", "gamma"]);
+
+    await choose(page, "Sort by", "Name");
+    await expect(page).toHaveURL(/sort=name/);
+    await expect(keys).toHaveText(["beta", "gamma", "alpha"]);
+    // The latest change to a definition first: the flags were created in key order.
+    await choose(page, "Sort by", "Last updated");
+    await expect(keys).toHaveText(["gamma", "beta", "alpha"]);
+
+    // A flag opens in the environment the list shows.
+    await rowFor(page, "beta").getByRole("link").click();
+    await expect(page).toHaveURL(new RegExp(`/flags/beta\\?environment=production$`));
+  });
+
   test("shows a viewer the list with creating a flag disabled and why", async ({ page }) => {
     await openFlags(page, seededProject.key, viewer);
 
@@ -346,7 +423,9 @@ test.describe("the flags list", () => {
     await expect(create).toHaveAttribute("aria-disabled", "true");
     await expect(create).toHaveAccessibleDescription(/Needs the permission to edit flags/);
     await create.click({ force: true });
-    await expect(page).toHaveURL(new RegExp(`/projects/${seededProject.key}/flags$`));
+    await expect(page).toHaveURL(
+      new RegExp(`/projects/${seededProject.key}/flags\\?environment=development$`),
+    );
   });
 });
 

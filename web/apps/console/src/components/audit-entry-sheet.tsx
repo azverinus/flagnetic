@@ -18,6 +18,13 @@ export type AuditEntrySheetProps = {
   onRetry?: () => void;
   /** Where the entry happened, such as its environment's name, when it says. */
   place?: { label: string; value: ReactNode };
+  /**
+   * What changed, item by item, for an entry whose entity the screen
+   * knows how to compare, shown above its fields before and after.
+   */
+  changes?: ReactNode;
+  /** What can be done from the entry, such as reverting to the version it made. */
+  actions?: ReactNode;
 };
 
 /**
@@ -32,6 +39,8 @@ export function AuditEntrySheet({
   error,
   onRetry,
   place,
+  changes,
+  actions,
 }: AuditEntrySheetProps) {
   const { t } = useLingui();
   return (
@@ -45,9 +54,25 @@ export function AuditEntrySheet({
           <Skeleton className="h-24 w-full" />
         </div>
       ) : (
-        <EntryDetail entry={entry} place={place} />
+        <>
+          {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+          {changes ? <EntryChanges>{changes}</EntryChanges> : null}
+          <EntryDetail entry={entry} place={place} />
+        </>
       )}
     </Sheet>
+  );
+}
+
+function EntryChanges({ children }: { children: ReactNode }) {
+  const heading = useId();
+  return (
+    <section aria-labelledby={heading} className="flex flex-col gap-2 text-sm">
+      <h3 id={heading} className="font-semibold">
+        <Trans>Changes</Trans>
+      </h3>
+      {children}
+    </section>
   );
 }
 

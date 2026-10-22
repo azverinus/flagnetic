@@ -77,7 +77,7 @@ describe("an action's label", () => {
   });
 
   it("is the action itself for one this build does not know", () => {
-    expect(actionLabel(i18n, "flag.archived")).toBe("flag.archived");
+    expect(actionLabel(i18n, "experiment.started")).toBe("experiment.started");
   });
 
   it("speaks the member's language", () => {

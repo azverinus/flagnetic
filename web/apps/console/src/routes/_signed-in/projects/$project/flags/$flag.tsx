@@ -11,20 +11,21 @@ import {
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArchiveIcon, OctagonXIcon } from "lucide-react";
+import { ArchiveIcon, GitCompareArrowsIcon, OctagonXIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/can";
+import { CompareEnvironments } from "@/components/compare-environments";
 import { ConfigurationEditor } from "@/components/configuration-editor";
 import { FlagDefinitionSheet } from "@/components/flag-definition-sheet";
+import { FlagHistory } from "@/components/flag-history";
 import { KillSwitchDialog } from "@/components/kill-switch-dialog";
 import { OverridesSection } from "@/components/overrides-section";
 import { QueryError } from "@/components/query-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -123,6 +124,7 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
   const unitTypes = useQuery(unitTypesQuery(project));
   const nameOf = useNameOf(project);
   const [editing, setEditing] = useState(false);
+  const [comparing, setComparing] = useState(false);
 
   const first = flag.environments[0]?.environment;
   const environment =
@@ -155,7 +157,17 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
     {
       value: historyTab,
       label: t`History`,
-      content: <HistoryPlaceholder project={project} flag={flag} />,
+      content: (
+        <FlagHistory
+          project={project}
+          flag={flag}
+          entry={search.entry}
+          onCloseEntry={() =>
+            void navigate({ search: (prev) => ({ ...prev, entry: undefined }), replace: true })
+          }
+          nameOf={nameOf}
+        />
+      ),
     },
   ];
 
@@ -178,6 +190,12 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
         }
         actions={
           <>
+            {flag.environments.length > 1 ? (
+              <Button variant="outline" onClick={() => setComparing(true)}>
+                <GitCompareArrowsIcon aria-hidden />
+                <Trans>Compare environments</Trans>
+              </Button>
+            ) : null}
             <FlagLifecycleActions project={project} flag={flag} />
             <Can permission="flag.edit" whenMissing="disable">
               <Button variant="outline" onClick={() => setEditing(true)}>
@@ -255,6 +273,14 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
         open={editing}
         onOpenChange={setEditing}
         nameOf={nameOf}
+      />
+      <CompareEnvironments
+        project={project}
+        flag={flag}
+        environments={environments.data ?? []}
+        open={comparing}
+        onOpenChange={setComparing}
+        initial={environment}
       />
     </div>
   );
@@ -533,31 +559,5 @@ function OnOff({
         </>
       ) : null}
     </section>
-  );
-}
-
-function HistoryPlaceholder({ project, flag }: { project: string; flag: Flag }) {
-  const { t } = useLingui();
-  return (
-    <EmptyState
-      title={t`History`}
-      description={
-        <Trans>
-          Every change to this flag, its definition and its configurations, is recorded in the
-          project's audit log.
-        </Trans>
-      }
-      action={
-        <Button asChild variant="outline">
-          <Link
-            to="/projects/$project/audit"
-            params={{ project }}
-            search={{ entity_kind: "flag", q: flag.key }}
-          >
-            <Trans>Open the audit log</Trans>
-          </Link>
-        </Button>
-      }
-    />
   );
 }

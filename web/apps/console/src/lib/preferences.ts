@@ -26,3 +26,15 @@ export function lastProject(): string | null {
 export function rememberLastProject(project: string): void {
   writeStored(keys.lastProject, project);
 }
+
+/**
+ * The key of the environment this browser showed last in a project's
+ * flags list, which the list opens in again; each project keeps its own.
+ */
+export function lastEnvironment(project: string): string | null {
+  return readStored(`flagnetic.last-environment.${project}`);
+}
+
+export function rememberLastEnvironment(project: string, environment: string): void {
+  writeStored(`flagnetic.last-environment.${project}`, environment);
+}

@@ -14,16 +14,29 @@ import { flagViolationMessage } from "./flags";
 
 /**
  * The flag detail's search parameters: the environment whose tab is open,
- * by key (the first environment when absent), or the History tab.
+ * by key (the first environment when absent), or the History tab with the
+ * entry open in its drawer; and whether the tester is open beside an
+ * environment's tab.
  */
-export type FlagDetailSearch = { environment?: string; tab?: "history" };
+export type FlagDetailSearch = {
+  environment?: string;
+  tab?: "history";
+  entry?: string;
+  tester?: true;
+};
 
 export function validateFlagDetailSearch(search: Record<string, unknown>): FlagDetailSearch {
   const out: FlagDetailSearch = {};
   if (typeof search.environment === "string" && search.environment.trim() !== "") {
     out.environment = search.environment.trim();
   }
-  if (search.tab === "history") out.tab = "history";
+  if (search.tab === "history") {
+    out.tab = "history";
+    if (typeof search.entry === "string" && search.entry.trim() !== "") {
+      out.entry = search.entry.trim();
+    }
+  }
+  if (search.tester === true || search.tester === "true") out.tester = true;
   return out;
 }
 

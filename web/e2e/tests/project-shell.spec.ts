@@ -357,6 +357,46 @@ test.describe("the project navigation", () => {
   });
 });
 
+test.describe("the environment search parameter", () => {
+  test("preselects the first environment by sort order and puts it in the URL", async ({
+    page,
+  }) => {
+    await openProject(page, seededProject);
+
+    await projectNavigation(page).getByRole("link", { name: "Flags" }).click();
+
+    await expect(page).toHaveURL(/\/flags\?environment=development$/);
+  });
+
+  test("preselects the environment this project showed last", async ({ page }) => {
+    await openProject(page, seededProject);
+    await page.goto(`/projects/${seededProject.key}/flags?environment=staging`);
+    await expect(page.getByRole("combobox", { name: "Environment" })).toHaveText("Staging");
+
+    await page.goto(`/projects/${seededProject.key}/flags`);
+
+    await expect(page).toHaveURL(/\/flags\?environment=staging$/);
+  });
+
+  test("keeps the environments of two projects apart", async ({ page }) => {
+    await openProject(page, seededProject);
+    await page.goto(`/projects/${seededProject.key}/flags?environment=production`);
+    await expect(page).toHaveURL(/environment=production$/);
+
+    await page.goto(`/projects/${secondProject.key}/flags`);
+
+    await expect(page).toHaveURL(/\/flags\?environment=development$/);
+  });
+
+  test("drops an environment the project does not have", async ({ page }) => {
+    await openProject(page, seededProject);
+
+    await page.goto(`/projects/${seededProject.key}/flags?environment=sandbox`);
+
+    await expect(page).toHaveURL(/\/flags\?environment=development$/);
+  });
+});
+
 test.describe("accessibility", () => {
   for (const theme of ["light", "dark"] as const) {
     test(`every screen in the project navigation has no serious violation in the ${theme} theme`, async ({
