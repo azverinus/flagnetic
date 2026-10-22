@@ -11,6 +11,11 @@
       "pointer": "/context/attributes/country"
     },
     {
+      "code": "duplicate",
+      "detail": "a unit type is given once",
+      "pointer": "/context/units/device"
+    },
+    {
       "code": "too_long",
       "detail": "a unit ID has at most 256 bytes",
       "params": {
