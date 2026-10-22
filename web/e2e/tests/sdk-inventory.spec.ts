@@ -71,11 +71,10 @@ test.describe("the SDKs tab", () => {
     await expect(go).toContainText("Server");
     const version = await sdkRequest(server, "/ruleset").then((r) => r.headers.get("etag"));
     expect(version).toMatch(/^"\d+"$/);
-    await expect(go).toContainText(
-      String(Number(version!.slice(1, -1))).replace(/\B(?=(\d{3})+$)/g, ","),
-    );
+    await expect(go).toContainText(version!.slice(1, -1));
 
-    const js = page.getByRole("row", { name: /flagnetic-js/ });
+    // The client's request may be written in a later flush than the server's.
+    const js = await expectRow(page, /flagnetic-js/);
     await expect(js).toContainText("4.2.0");
     await expect(js).toContainText("browser");
     await expect(js).toContainText("storefront");

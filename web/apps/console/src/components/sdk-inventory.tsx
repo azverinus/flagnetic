@@ -8,7 +8,6 @@ import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
 import { Table } from "@/components/ui/table";
 import { kindName } from "@/lib/sdk-keys";
-import { formatNumber } from "@/i18n/format";
 import { sdkInventoryQuery } from "@/lib/queries";
 
 export type SdkInventoryProps = {
@@ -83,10 +82,15 @@ export function SdkInventory({ project, environment }: SdkInventoryProps) {
       {
         id: "ruleset_version",
         header: t`Last ruleset version`,
+        // A ruleset version is an identifier, not a quantity: it is shown
+        // ungrouped so that it reads exactly as the ETag, the SDK's logs and
+        // the downloaded file name write it.
         cell: ({ row }) =>
-          row.original.last_ruleset_version === null
-            ? none
-            : formatNumber(i18n, row.original.last_ruleset_version),
+          row.original.last_ruleset_version === null ? (
+            none
+          ) : (
+            <span className="tabular-nums">{String(row.original.last_ruleset_version)}</span>
+          ),
       },
     ],
     [i18n, t],

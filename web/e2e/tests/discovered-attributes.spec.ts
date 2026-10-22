@@ -34,11 +34,13 @@ async function openDiscovered(page: Page, project: string, who: Credentials = ad
     "aria-selected",
     "true",
   );
-  // Recording is asynchronous, within about a second of the evaluation.
-  const plan = page.getByRole("row", { name: /^plan/ });
+  // Recording is asynchronous, within about a second of each evaluation, and
+  // the two seeded evaluations may be written in different flushes: the page
+  // is read again until the second one, which saw `level` as a string, shows.
+  const level = page.getByRole("row", { name: /^level/ });
   await expect(async () => {
     await page.reload();
-    await expect(plan).toBeVisible({ timeout: 1_000 });
+    await expect(level).toContainText("String", { timeout: 1_000 });
   }).toPass({ timeout: 20_000, intervals: [1_000] });
 }
 
@@ -51,7 +53,8 @@ test.describe("the discovered attributes", () => {
 
     const plan = page.getByRole("row", { name: /^plan/ });
     await expect(plan).toContainText("String");
-    await expect(plan).toContainText("2");
+    // Times seen: both evaluations carried `plan`.
+    await expect(plan.getByRole("cell").nth(4)).toHaveText("2");
     const level = page.getByRole("row", { name: /^level/ });
     await expect(level).toContainText("Number, String");
     // Declared attributes, such as the standard ones, are not discovered.

@@ -50,7 +50,8 @@ describe("the SDK inventory of an environment", () => {
     expect(go).toHaveTextContent("go1.26 linux/amd64");
     expect(go).toHaveTextContent("checkout backend");
     expect(go).toHaveTextContent("Server · aB3dE5fG");
-    expect(go).toHaveTextContent("1,760,000,000,123");
+    // The version reads as the ETag writes it, without grouping.
+    expect(go).toHaveTextContent("1760000000123");
     const js = screen.getByRole("row", { name: /flagnetic-js/ });
     expect(js).toHaveTextContent("4.2.0");
     expect(js).toHaveTextContent("Client · hJ7kL9mN");

@@ -34,5 +34,7 @@ export async function downloadRuleset(project: string, environment: string): Pro
     download: file.name,
   });
   link.click();
-  URL.revokeObjectURL(url);
+  // Some browsers start the download only after the click returns, and a
+  // URL revoked before then saves nothing; it is released on the next tick.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
