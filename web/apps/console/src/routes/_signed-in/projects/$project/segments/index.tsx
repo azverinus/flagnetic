@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_signed-in/projects/$project/segments/")(
 });
 
 /** The private filter's values; Radix keeps the empty string for itself. */
-const privateChoices = { any: "any", only: "private", none: "shared" } as const;
+const privateChoices = { any: "any", only: "private", none: "not_private" } as const;
 
 /**
  * A project's segments with how many flags' rules name each, filtered by

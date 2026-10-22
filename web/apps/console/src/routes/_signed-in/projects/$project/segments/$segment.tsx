@@ -26,7 +26,7 @@ import { problemMessage } from "@/lib/problem-messages";
 import {
   segmentEntriesQuery,
   segmentQuery,
-  segmentsQueryKey,
+  segmentsQuery,
   segmentUsagesQuery,
 } from "@/lib/queries";
 import {
@@ -145,6 +145,7 @@ function SegmentPage({
   const missing = useMissingPermissionReason("segment.edit");
   const usages = useQuery(segmentUsagesQuery(project, segment.key));
   const detailKey = segmentQuery(project, segment.key).queryKey;
+  const key = segment.key;
 
   // The segment the draft was filled from, which a save compares it
   // with to send only what the member changed, and the version the save
@@ -189,7 +190,7 @@ function SegmentPage({
     meta: { toast: false },
     onSuccess: (saved) => {
       queryClient.setQueryData(detailKey, saved);
-      void queryClient.invalidateQueries({ queryKey: [...segmentsQueryKey(project), "list"] });
+      void queryClient.invalidateQueries({ queryKey: segmentsQuery(project).queryKey });
       restart(saved);
       toast.success(t`The segment is saved.`);
     },
@@ -239,13 +240,17 @@ function SegmentPage({
     setRefusal(undefined);
     save.mutate({ sent: draft, at });
   };
-  const submit = () => {
+  const submit = async () => {
     setChecked(true);
     setRefusal(undefined);
     if (issues.size > 0) return;
-    // Rules naming the segment follow every change to it, so their
-    // flags are named before it is saved.
-    if ((usages.data?.length ?? 0) > 0) setConfirming(true);
+    // Rules naming the segment follow every change to it, so their flags
+    // are named before it is saved: read afresh, since a rule may have
+    // started naming it since the page opened, and asked about whenever
+    // they cannot be read, since a used segment must never be saved
+    // without asking.
+    const fresh = await usages.refetch();
+    if (fresh.data === undefined || fresh.data.length > 0) setConfirming(true);
     else send(version);
   };
 
@@ -261,9 +266,8 @@ function SegmentPage({
     onSuccess: async () => {
       // The draft goes with the segment, so leaving does not ask about it.
       flushSync(() => setDeleted(true));
-      const key = segment.key;
       toast.success(t`The segment ${key} is deleted.`);
-      void queryClient.invalidateQueries({ queryKey: [...segmentsQueryKey(project), "list"] });
+      void queryClient.invalidateQueries({ queryKey: segmentsQuery(project).queryKey });
       await navigate({ to: "/projects/$project/segments", params: { project } });
       queryClient.removeQueries({ queryKey: detailKey });
     },
@@ -298,7 +302,6 @@ function SegmentPage({
       ))}
     </ul>
   );
-  const key = segment.key;
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
@@ -398,7 +401,7 @@ function SegmentPage({
       <UnsavedChangesBar
         dirty={dirty}
         onDiscard={() => restart(base)}
-        onSave={submit}
+        onSave={() => void submit()}
         pending={save.isPending}
       />
       <ConfirmDialog
@@ -409,12 +412,23 @@ function SegmentPage({
         pending={save.isPending}
         onConfirm={() => send(version)}
       >
-        <p>
-          <Trans>
-            Rules of these flags use the segment and evaluate by what it holds once saved:
-          </Trans>
-        </p>
-        {usageList}
+        {usages.data === undefined ? (
+          <p>
+            <Trans>
+              Which flags use the segment could not be read; the rules of any that do evaluate by
+              what it holds once saved.
+            </Trans>
+          </p>
+        ) : (
+          <>
+            <p>
+              <Trans>
+                Rules of these flags use the segment and evaluate by what it holds once saved:
+              </Trans>
+            </p>
+            {usageList}
+          </>
+        )}
       </ConfirmDialog>
       <ConfirmDialog
         open={deleting}

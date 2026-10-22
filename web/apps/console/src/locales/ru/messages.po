@@ -3495,6 +3495,10 @@ msgstr "Всё, что пользуется токеном, с этого мом
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr "Откуда проект отдаёт значения. Ключ после создания не меняется, название можно изменить."
 
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
+msgstr "Не удалось узнать, какие флаги используют сегмент; правила тех, что используют, после сохранения вычисляются по его новому содержимому."
+
 #: src/components/overrides-section.tsx
 msgid "Why the unit has this override, such as the test it is for. Never sent to SDKs."
 msgstr "Зачем у единицы это переопределение, например для какого теста. В SDK не передаётся."

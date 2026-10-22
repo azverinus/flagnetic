@@ -80,7 +80,10 @@ export function segmentIssues(
   return issues;
 }
 
-/** What the draft's name and description still need, by the field's name, as the server says it. */
+/**
+ * What the draft's name and description still need, by the field's name,
+ * in the words of the server's own refusal of them.
+ */
 export function segmentFieldIssues(i18n: I18n, draft: SegmentDraft): Map<string, string> {
   const issues = new Map<string, string>();
   const name = nameSchema(i18n).safeParse(draft.name);

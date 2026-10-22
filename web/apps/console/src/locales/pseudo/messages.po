@@ -3495,6 +3495,10 @@ msgstr ""
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "Why the unit has this override, such as the test it is for. Never sent to SDKs."
 msgstr ""
