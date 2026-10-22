@@ -433,7 +433,8 @@ type AliasRecord struct {
 	ReceivedAt time.Time
 }
 
-// UnknownSDK names an SDK whose User-Agent is not one of Flagnetic's.
+// UnknownSDK names an SDK identified neither by its User-Agent nor by what
+// it posted.
 const UnknownSDK = "unknown"
 
 // userAgent is the User-Agent of a Flagnetic SDK:
@@ -451,6 +452,40 @@ func ParseUserAgent(ua string) SDKIdentity {
 	return SDKIdentity{Name: cut(m[1]), Version: cut(m[2]), Platform: cut(strings.TrimSpace(m[3]))}
 }
 
+// IdentifySDK returns the SDK a request comes from: the one its User-Agent
+// names, else the one it posted itself, cut like a User-Agent's, else
+// UnknownSDK. A browser cannot set User-Agent, so an SDK running in one
+// names itself in what it posts: the context's standard attributes on
+// evaluate, the envelope on events. The User-Agent wins when it names an
+// SDK, since it is set by the SDK's own code and not by the app's context.
+// What is posted without a name identifies nothing.
+func IdentifySDK(userAgent string, posted SDKIdentity) SDKIdentity {
+	if sdk := ParseUserAgent(userAgent); sdk.Name != UnknownSDK {
+		return sdk
+	}
+	if posted.Name == "" {
+		return SDKIdentity{Name: UnknownSDK}
+	}
+	return SDKIdentity{Name: cut(posted.Name), Version: cut(posted.Version), Platform: cut(posted.Platform)}
+}
+
+// The standard attributes by which a context names the SDK that sent it.
+const (
+	sdkAttribute        = "sdk"
+	sdkVersionAttribute = "sdk_version"
+	platformAttribute   = "platform"
+)
+
+// SDKOfContext returns the SDK a context's attributes name: sdk,
+// sdk_version and platform, each only when a string.
+func SDKOfContext(attributes map[string]any) SDKIdentity {
+	text := func(key string) string {
+		s, _ := attributes[key].(string)
+		return s
+	}
+	return SDKIdentity{Name: text(sdkAttribute), Version: text(sdkVersionAttribute), Platform: text(platformAttribute)}
+}
+
 // cut returns s as valid UTF-8 of at most MaxEventString bytes without
 // U+0000, whatever a client sent.
 func cut(s string) string {
@@ -462,8 +497,8 @@ func cut(s string) string {
 	return s
 }
 
-// RemoteEvaluator is who asked for remote evaluations: the key, the SDK as
-// its User-Agent names it, and the app version its context carried.
+// RemoteEvaluator is who asked for remote evaluations: the key, the SDK it
+// comes from, and the app version its context carried.
 type RemoteEvaluator struct {
 	Key        SDKKey
 	SDK        SDKIdentity

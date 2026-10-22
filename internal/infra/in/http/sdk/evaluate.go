@@ -121,7 +121,7 @@ func (a *api) Evaluate(w http.ResponseWriter, r *http.Request, params EvaluatePa
 		a.writeError(w, r, err)
 		return
 	}
-	q.SDK = delivery.ParseUserAgent(r.UserAgent())
+	q.SDK = delivery.IdentifySDK(r.UserAgent(), delivery.SDKOfContext(q.Context.Attributes))
 	ctx, cancel := context.WithTimeout(r.Context(), appdelivery.RulesetWait)
 	defer cancel()
 	ev, err := a.h.Evaluate.Handle(ctx, keyOf(r.Context()), q)

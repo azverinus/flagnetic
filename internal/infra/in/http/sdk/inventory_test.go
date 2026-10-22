@@ -75,7 +75,7 @@ func TestEveryKindOfSDKRequestIsInTheInventory(t *testing.T) {
 		ruleset                           int64
 	}
 	want := []row{
-		{"unknown", "", "", "", serverKey.KeyId, start.Add(3 * time.Second), 0},
+		{"flagnetic-dart", "1.0.0", "linux", "", serverKey.KeyId, start.Add(3 * time.Second), 0},
 		{"flagnetic-swift", "2.0.0", "ios", "3.1.0", clientKey.KeyId, start.Add(2 * time.Second), version},
 		{"flagnetic-js", "1.0.0", "web", "", clientKey.KeyId, start.Add(time.Second), version},
 		{"flagnetic-go", "1.4.0", "linux", "", serverKey.KeyId, start, version},
@@ -90,8 +90,8 @@ func TestEveryKindOfSDKRequestIsInTheInventory(t *testing.T) {
 			t.Errorf("row %d = %+v, want %+v", i, r, w)
 		}
 	}
-	if got[0].SdkKey.Kind != management.SdkKeyKindServer || got[0].SdkKey.Name != "checkout" || got[0].Platform != nil || got[0].LastRulesetVersion != nil {
-		t.Errorf("events row = %+v, want the server key, null platform and ruleset version", got[0])
+	if got[0].SdkKey.Kind != management.SdkKeyKindServer || got[0].SdkKey.Name != "checkout" || got[0].LastRulesetVersion != nil {
+		t.Errorf("events row = %+v, want the server key and a null ruleset version", got[0])
 	}
 	if other := inventory(t, p.admin, p, "staging"); len(other) != 0 {
 		t.Errorf("staging = %+v, want empty", other)

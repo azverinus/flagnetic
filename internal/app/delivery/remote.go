@@ -30,7 +30,7 @@ func NewEvaluateRemotely(rulesets Rulesets, discoveries *Discoveries, counts *Re
 type RemoteQuery struct {
 	Context delivery.RemoteContext
 	Flags   []string
-	// SDK is the SDK asking, as its User-Agent names it.
+	// SDK is the SDK asking, as its User-Agent names it or else its context.
 	SDK delivery.SDKIdentity
 }
 

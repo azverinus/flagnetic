@@ -443,7 +443,9 @@ type RulesetWeight struct {
 
 // SDKIdentity defines model for SDKIdentity.
 type SDKIdentity struct {
-	// Name The SDK's name, such as `flagnetic-go`.
+	// Name The SDK's name, such as `flagnetic-go`, as its `User-Agent`
+	// would name it. The SDK inventory takes the SDK from here when
+	// the request's `User-Agent` names none.
 	Name     string  `json:"name"`
 	Platform *string `json:"platform,omitempty"`
 	Version  string  `json:"version"`

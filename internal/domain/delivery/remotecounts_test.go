@@ -25,6 +25,44 @@ func TestTheUserAgentNamesTheSDK(t *testing.T) {
 	}
 }
 
+func TestAnSDKIsNamedByItsUserAgentElseByWhatItPosts(t *testing.T) {
+	posted := delivery.SDKIdentity{Name: "flagnetic-js", Version: "1.3.0", Platform: "web"}
+	for _, c := range []struct {
+		ua     string
+		posted delivery.SDKIdentity
+		want   delivery.SDKIdentity
+	}{
+		{"flagnetic-swift/2.0.0 (ios)", posted, delivery.SDKIdentity{Name: "flagnetic-swift", Version: "2.0.0", Platform: "ios"}},
+		{"Mozilla/5.0 (X11; Linux x86_64)", posted, posted},
+		{"", delivery.SDKIdentity{Name: "flagnetic-js"}, delivery.SDKIdentity{Name: "flagnetic-js"}},
+		{"Mozilla/5.0", delivery.SDKIdentity{Version: "1.3.0", Platform: "web"}, delivery.SDKIdentity{Name: "unknown"}},
+		{"curl/8.4.0", delivery.SDKIdentity{Name: "flagnetic-js\x00", Version: strings.Repeat("9", 300)},
+			delivery.SDKIdentity{Name: "flagnetic-js\uFFFD", Version: strings.Repeat("9", 256)}},
+	} {
+		if got := delivery.IdentifySDK(c.ua, c.posted); got != c.want {
+			t.Errorf("IdentifySDK(%q, %+v) = %+v, want %+v", c.ua, c.posted, got, c.want)
+		}
+	}
+}
+
+func TestAContextNamesItsSDKByItsStandardAttributes(t *testing.T) {
+	for _, c := range []struct {
+		attributes map[string]any
+		want       delivery.SDKIdentity
+	}{
+		{map[string]any{"sdk": "flagnetic-js", "sdk_version": "1.3.0", "platform": "web", "os": "linux"},
+			delivery.SDKIdentity{Name: "flagnetic-js", Version: "1.3.0", Platform: "web"}},
+		{map[string]any{"sdk": "flagnetic-js", "sdk_version": 1.3, "platform": nil},
+			delivery.SDKIdentity{Name: "flagnetic-js"}},
+		{map[string]any{"sdk": true, "sdk_version": "1.3.0"}, delivery.SDKIdentity{Version: "1.3.0"}},
+		{nil, delivery.SDKIdentity{}},
+	} {
+		if got := delivery.SDKOfContext(c.attributes); got != c.want {
+			t.Errorf("SDKOfContext(%v) = %+v, want %+v", c.attributes, got, c.want)
+		}
+	}
+}
+
 func TestRemoteEvaluationsAreCountedByTheirTrueReason(t *testing.T) {
 	key := delivery.SDKKey{Kind: delivery.SDKKeyClient}
 	web := delivery.RemoteEvaluator{Key: key, SDK: delivery.SDKIdentity{Name: "flagnetic-js", Version: "1.2.0", Platform: "web"}, AppVersion: "3.1.0"}

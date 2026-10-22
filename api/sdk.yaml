@@ -40,6 +40,18 @@ info:
     reads. Absent, or 1 and above, is served schema 1; below 1 or not an
     integer is `406 schema_version_unsupported`.
 
+    **SDK identity.** The server lists the SDKs that use an environment
+    and counts the evaluations it answers per SDK. An SDK that can set
+    `User-Agent` sends `flagnetic-<sdk>/<version> (<platform>)` on every
+    request, such as `flagnetic-go/1.4.0 (linux)`. A browser cannot set
+    `User-Agent` and `EventSource` no header at all, so an SDK names itself
+    in what it posts as well: on `evaluate` the context's standard
+    attributes `sdk`, `sdk_version` and `platform` (strings, `sdk` holding
+    the same name as the `User-Agent`, such as `flagnetic-js`), on `events`
+    the envelope's `sdk`. A `User-Agent` naming an SDK wins over both. A
+    request identified by neither is `unknown`, and so is a ruleset fetch
+    or a stream without such a `User-Agent`.
+
     **Rate limits.** Each operation is limited per key in fixed one-minute
     windows counted by each replica (a client key per key and client IP).
     A limited answer carries `RateLimit-Limit` and `RateLimit-Remaining`; a
@@ -859,7 +871,10 @@ components:
       properties:
         name:
           type: string
-          description: The SDK's name, such as `flagnetic-go`.
+          description: |
+            The SDK's name, such as `flagnetic-go`, as its `User-Agent`
+            would name it. The SDK inventory takes the SDK from here when
+            the request's `User-Agent` names none.
         version:
           type: string
         platform:

@@ -195,7 +195,7 @@ func (a *api) PostEvents(w http.ResponseWriter, r *http.Request, params PostEven
 		return
 	}
 	a.events.observe(res)
-	a.h.Inventory.Note(keyOf(r.Context()), delivery.ParseUserAgent(r.UserAgent()), "", 0)
+	a.h.Inventory.Note(keyOf(r.Context()), delivery.IdentifySDK(r.UserAgent(), b.SDK), "", 0)
 	out := EventBatchResult{
 		Accepted: res.AcceptedTotal(), Duplicates: res.Duplicates, DroppedRows: res.DroppedRows,
 		Rejected: make([]EventRejection, 0, len(res.Rejected)),
