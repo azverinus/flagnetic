@@ -23,12 +23,7 @@ import { ApiError, unwrap } from "@/lib/errors";
 import { entryOfVersion } from "@/lib/flag-detail";
 import { ifMatch } from "@/lib/http";
 import { problemMessage } from "@/lib/problem-messages";
-import {
-  segmentEntriesQuery,
-  segmentQuery,
-  segmentsQuery,
-  segmentUsagesQuery,
-} from "@/lib/queries";
+import { entityEntriesQuery, segmentQuery, segmentsQuery, segmentUsagesQuery } from "@/lib/queries";
 import {
   placeSegmentRefusal,
   type SegmentDraft,
@@ -215,7 +210,7 @@ function SegmentPage({
           return;
         }
         const entries = await queryClient
-          .fetchQuery({ ...segmentEntriesQuery(project, segment.id, 20), staleTime: 0 })
+          .fetchQuery({ ...entityEntriesQuery(project, "segment", segment.id, 20), staleTime: 0 })
           .catch(() => [] as AuditEntry[]);
         setConflict({ current, entry: entryOfVersion(entries, current.version) });
         return;

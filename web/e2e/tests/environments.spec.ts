@@ -1,7 +1,8 @@
+import { getEnvironment, updateEnvironment } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { type Credentials, seedProject, signIn } from "../support/console";
+import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
 import { admin, seededProject, viewer } from "../support/instance";
 
 /** Signs in and opens one project's environments. */
@@ -90,6 +91,77 @@ test.describe("environments", () => {
     );
     await page.keyboard.press("Escape");
     await expect(environmentRow(page, "sandbox")).toBeVisible();
+  });
+});
+
+test.describe("an environment someone else changed meanwhile", () => {
+  /** Renames an environment through the management API, as a colleague saving first would. */
+  async function renameElsewhere(project: string, environment: string, name: string) {
+    const current = must(
+      `reading ${environment}`,
+      await getEnvironment({ client: managementClient(), path: { project, environment } }),
+    );
+    must(
+      `renaming ${environment}`,
+      await updateEnvironment({
+        client: managementClient(),
+        path: { project, environment },
+        body: { name },
+        headers: { "If-Match": `"${current.version}"` },
+      }),
+    );
+  }
+
+  test("a rename shows their change in the dialog and reloads it on request", async ({ page }) => {
+    const projectKey = await seedProject("environments-conflict");
+    await openEnvironments(page, projectKey);
+    await environmentRow(page, "staging").getByRole("button", { name: "Rename staging" }).click();
+    const rename = page.getByRole("dialog", { name: "Rename staging" });
+    await rename.getByLabel("Name").fill("Mine");
+
+    await renameElsewhere(projectKey, "staging", "Theirs");
+    await rename.getByRole("button", { name: "Save" }).click();
+
+    const banner = rename.getByRole("alert").filter({ hasText: "after you opened this" });
+    await expect(banner).toContainText("bootstrap saved a change on");
+    await expect(banner).toContainText("Name changed from “Staging” to “Theirs”.");
+    await expectNoSeriousViolations(page, "the rename dialog's conflict banner");
+    await banner.getByRole("button", { name: "Reload and lose my edits" }).click();
+
+    await expect(banner).toHaveCount(0);
+    await expect(rename.getByLabel("Name")).toHaveValue("Theirs");
+    // Saving now names the version just read, so it is accepted.
+    await rename.getByLabel("Name").fill("Pre-production");
+    await rename.getByRole("button", { name: "Save" }).click();
+    await expect(rename).toBeHidden();
+    await expect(environmentRow(page, "staging")).toContainText("Pre-production");
+  });
+
+  test("a deletion is refused once, then confirmed on the version it read again", async ({
+    page,
+  }) => {
+    const projectKey = await seedProject("environments-delete-conflict");
+    await openEnvironments(page, projectKey);
+    await environmentRow(page, "staging").getByRole("button", { name: "Delete staging" }).click();
+    const confirm = page.getByRole("dialog", { name: "Delete staging" });
+    await confirm.getByLabel("Type staging to confirm").fill("staging");
+
+    await renameElsewhere(projectKey, "staging", "Theirs");
+    const reread = page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        new URL(response.url()).pathname.endsWith(`/projects/${projectKey}/environments`),
+    );
+    await confirm.getByRole("button", { name: "Delete environment" }).click();
+    await expect(confirm.getByRole("alert")).toHaveText(
+      "Someone else changed this since you opened it. Reload to see their changes, then make yours again.",
+    );
+    // The refusal reads the list again, so the next confirmation names its version.
+    await reread;
+
+    await confirm.getByRole("button", { name: "Delete environment" }).click();
+    await expect(confirm).toBeHidden();
+    await expect(environmentRow(page, "staging")).toHaveCount(0);
   });
 });
 

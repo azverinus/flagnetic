@@ -7,6 +7,7 @@ import { describeCondition, describeServe } from "@/lib/conditions";
 import type {
   ConfigurationChange,
   DefinitionChange,
+  NamedChange,
   OverrideValue,
   RuleDetail,
   RuleLike,
@@ -433,6 +434,37 @@ export function SegmentDiff({ changes }: { changes: readonly SegmentChange[] }) 
     <ChangeList label={t`Changes to the segment`}>
       {changes.map((change, index) => (
         <SegmentChangeItem key={index} change={change} />
+      ))}
+    </ChangeList>
+  );
+}
+
+function NamedChangeItem({ change }: { change: NamedChange }) {
+  if (change.field === "description") {
+    return (
+      <li>
+        <Trans>Description changed.</Trans>
+      </li>
+    );
+  }
+  const { before, after } = change;
+  return (
+    <li>
+      <Trans>
+        Name changed from “{before}” to “{after}”.
+      </Trans>
+    </li>
+  );
+}
+
+/** What changed in a project, an environment, a unit type or an attribute, item by item. */
+export function NamedDiff({ changes }: { changes: readonly NamedChange[] }) {
+  const { t } = useLingui();
+  if (changes.length === 0) return <Nothing />;
+  return (
+    <ChangeList label={t`Their changes`}>
+      {changes.map((change) => (
+        <NamedChangeItem key={change.field} change={change} />
       ))}
     </ChangeList>
   );

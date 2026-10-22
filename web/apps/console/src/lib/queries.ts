@@ -40,7 +40,7 @@ import {
   type Segment,
   type SegmentListItem,
   listUnitTypes,
-  type Attribute,
+  type AttributeListItem,
   type AuthMethods,
   type Environment,
   type FlagList,
@@ -48,7 +48,7 @@ import {
   type Project,
   type ProjectMe,
   type Role,
-  type UnitType,
+  type UnitTypeListItem,
 } from "@flagnetic/api";
 import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
@@ -128,7 +128,7 @@ export function environmentsQuery(project: string) {
 }
 
 export function unitTypesQuery(project: string) {
-  return queryOptions<UnitType[]>({
+  return queryOptions<UnitTypeListItem[]>({
     queryKey: ["projects", project, "unit-types"],
     queryFn: async () => (await unwrap(listUnitTypes({ path: { project } }))).items,
   });
@@ -216,7 +216,7 @@ export function segmentUsagesQuery(project: string, segment: string) {
 
 /** A project's declared attributes, the standard ones among them. */
 export function attributesQuery(project: string) {
-  return queryOptions<Attribute[]>({
+  return queryOptions<AttributeListItem[]>({
     queryKey: ["projects", project, "attributes"],
     queryFn: async () => (await unwrap(listAttributes({ path: { project } }))).items,
   });
@@ -374,18 +374,19 @@ export function flagHistoryQuery(project: string, flagId: string, cursor: string
 }
 
 /**
- * The newest audit entries of one segment, by its identifier: who made
- * the version a save ran into, and when.
+ * The newest audit entries of one entity of a project, such as a segment
+ * or an environment, by its kind and identifier: who made the version a
+ * save ran into, and when.
  */
-export function segmentEntriesQuery(project: string, segmentId: string, limit: number) {
+export function entityEntriesQuery(project: string, kind: string, id: string, limit: number) {
   return queryOptions<AuditEntry[]>({
-    queryKey: [...auditQueryKey, { project }, "segment", segmentId, { limit }],
+    queryKey: [...auditQueryKey, { project }, kind, id, { limit }],
     queryFn: async () =>
       (
         await unwrap(
           listProjectAuditEntries({
             path: { project },
-            query: { entity_kind: "segment", entity_id: segmentId, limit },
+            query: { entity_kind: kind, entity_id: id, limit },
           }),
         )
       ).items,

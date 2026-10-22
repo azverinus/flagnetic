@@ -2,12 +2,13 @@ import {
   createEnvironment,
   deleteEnvironment,
   type Environment,
+  getEnvironment,
   updateEnvironment,
 } from "@flagnetic/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -16,8 +17,15 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Can } from "@/components/can";
+import { NamedConflictBanner } from "@/components/conflict-banner";
 import { QueryError } from "@/components/query-error";
-import { DeleteRowDialog, RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
+import {
+  DeleteRowDialog,
+  listedIfMatch,
+  RowAction,
+  RowDialog,
+  withRowActions,
+} from "@/components/row-dialogs";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { DialogForm } from "@/components/ui/dialog-form";
@@ -28,10 +36,11 @@ import { Table } from "@/components/ui/table";
 import { useCan } from "@/lib/access";
 import type { Permission } from "@/lib/access-names";
 import { ApiError, unwrap } from "@/lib/errors";
-import { keySchema, nameSchema } from "@/lib/forms";
+import { changedFields, keySchema, nameSchema } from "@/lib/forms";
 import { ifMatch } from "@/lib/http";
 import { useListMutation } from "@/lib/mutations";
 import { environmentsQuery } from "@/lib/queries";
+import { useFormConflict } from "@/lib/use-form-conflict";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/environments")({
   staticData: { crumb: msg`Environments` },
@@ -130,7 +139,7 @@ function Environments() {
           unwrap(
             deleteEnvironment({
               path: { project, environment: key },
-              headers: deleting && ifMatch(deleting.version),
+              headers: listedIfMatch(environments.data, key, deleting),
             }),
           )
         }
@@ -204,33 +213,70 @@ function RenameEnvironment({
   onDone: () => void;
 }) {
   const { i18n } = useLingui();
+  const queryClient = useQueryClient();
   const schema = z.object({ name: nameSchema(i18n) });
   type Values = z.infer<typeof schema>;
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { name: environment.name },
   });
+  // The environment the form was filled from and the version a save
+  // names, apart: keeping one's edits saves onto a newer version what was
+  // changed from this one.
+  const [base, setBase] = useState(environment);
+  const [version, setVersion] = useState(environment.version);
+  const conflicts = useFormConflict({
+    project,
+    kind: "environment",
+    read: () => unwrap(getEnvironment({ path: { project, environment: environment.key } })),
+  });
+  const list = environmentsQuery(project).queryKey;
   const rename = useListMutation(
-    (body: Values) =>
+    ({ values, at }: { values: Values; at: number }) =>
       unwrap(
         updateEnvironment({
           path: { project, environment: environment.key },
-          body,
-          headers: ifMatch(environment.version),
+          body: changedFields({ name: base.name }, values),
+          headers: ifMatch(at),
         }),
       ),
-    environmentsQuery(project).queryKey,
+    list,
     onDone,
   );
+  const send = (at: number) =>
+    form.handleSubmit((values) => {
+      conflicts.clear();
+      rename.mutate({ values, at }, { onError: (error) => conflicts.meet(error) });
+    });
+  const conflict = conflicts.conflict;
 
   return (
     <DialogForm
-      onSubmit={form.handleSubmit((values) => rename.mutate(values))}
+      onSubmit={send(version)}
       onCancel={onDone}
       submitLabel={<Trans>Save</Trans>}
       pending={rename.isPending}
-      refusal={rename.error}
+      refusal={conflicts.refusal(rename.error)}
     >
+      {conflict ? (
+        <NamedConflictBanner
+          base={base}
+          conflict={conflict}
+          pending={rename.isPending}
+          onReload={() => {
+            form.reset({ name: conflict.current.name });
+            setBase(conflict.current);
+            setVersion(conflict.current.version);
+            conflicts.clear();
+            rename.reset();
+            void queryClient.invalidateQueries({ queryKey: list });
+          }}
+          onKeep={() => {
+            setVersion(conflict.current.version);
+            void send(conflict.current.version)();
+          }}
+        />
+      ) : null}
       <Field
         label={<Trans>Name</Trans>}
         error={form.formState.errors.name?.message}

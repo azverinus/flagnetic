@@ -1754,6 +1754,7 @@ msgstr ""
 msgid "JSON"
 msgstr ""
 
+#: src/components/conflict-banner.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Keep my edits"
@@ -2586,6 +2587,7 @@ msgstr ""
 msgid "Regenerate the salt?"
 msgstr ""
 
+#: src/components/conflict-banner.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Reload and lose my edits"
@@ -3538,6 +3540,10 @@ msgstr ""
 msgid "Their change:"
 msgstr ""
 
+#: src/components/structural-diff-view.tsx
+msgid "Their changes"
+msgstr ""
+
 #: src/components/personal-menu.tsx
 #: src/components/theme-choice.tsx
 msgid "Theme"
@@ -3840,6 +3846,11 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Used by flags"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/unit-types.tsx
+msgid "Used by flags and segments"
 msgstr ""
 
 #: src/components/tester-panel.tsx

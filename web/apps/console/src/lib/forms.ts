@@ -49,3 +49,20 @@ export function descriptionSchema(i18n: I18n) {
       }),
     );
 }
+
+/**
+ * The values of a form that differ from those it was filled from, and
+ * only those: saving them onto a version someone else wrote meanwhile
+ * keeps what that member changed in every other field.
+ */
+export function changedFields<Base extends Record<string, unknown>>(
+  base: Base,
+  values: Partial<Base> & Record<string, unknown>,
+): Partial<Base> {
+  const changed: Partial<Base> = {};
+  for (const field of Object.keys(base) as (keyof Base)[]) {
+    if (field in values && values[field] !== base[field])
+      changed[field] = values[field] as Base[keyof Base];
+  }
+  return changed;
+}

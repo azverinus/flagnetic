@@ -521,8 +521,47 @@ test.describe("renaming a project", () => {
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText("After");
     await expect(switcher(page)).toHaveAccessibleName("Project: After");
   });
-  test("refuses to overwrite a change someone else saved meanwhile", async ({ page }) => {
+  test("shows who changed it meanwhile and what, and keeps the member's edits over it", async ({
+    page,
+  }) => {
     const key = await seedProject("conflict");
+    await signIn(page);
+    await page.goto(`/projects/${key}/settings`);
+    await page.getByLabel("Description").fill("Where shoppers pay.");
+
+    must(
+      "renaming it elsewhere",
+      await updateProject({
+        client: managementClient(),
+        path: { project: key },
+        body: { name: "Theirs" },
+        headers: { "If-Match": '"1"' },
+      }),
+    );
+    await page.getByRole("button", { name: "Save" }).click();
+
+    const banner = page.getByRole("alert").filter({ hasText: "after you opened this" });
+    // The suite's seeding token made the change, so the entry names it.
+    await expect(banner).toContainText("bootstrap saved a change on");
+    await expect(banner.getByRole("list", { name: "Their changes" })).toHaveText(
+      "Name changed from “Project conflict” to “Theirs”.",
+    );
+    await expectNoSeriousViolations(page, "the project settings conflict banner");
+    await banner.getByRole("button", { name: "Keep my edits" }).click();
+
+    await expect(page.getByText("The project is saved.")).toBeVisible();
+    await expect(banner).toHaveCount(0);
+    // Only the description was the member's edit: the other change stays.
+    await expect(page.getByLabel("Name")).toHaveValue("Theirs");
+    await page.reload();
+    await expect(page.getByLabel("Name")).toHaveValue("Theirs");
+    await expect(page.getByLabel("Description")).toHaveValue("Where shoppers pay.");
+  });
+
+  test("reloads what someone else saved meanwhile, losing the member's edits, on request", async ({
+    page,
+  }) => {
+    const key = await seedProject("conflict-reload");
     await signIn(page);
     await page.goto(`/projects/${key}/settings`);
     await page.getByLabel("Name").fill("Mine");
@@ -537,13 +576,12 @@ test.describe("renaming a project", () => {
       }),
     );
     await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Reload and lose my edits" }).click();
 
-    await expect(
-      page.getByText(
-        "Someone else changed this since you opened it. Reload to see their changes, then make yours again.",
-      ),
-    ).toBeVisible();
-    await page.reload();
+    await expect(page.getByRole("alert").filter({ hasText: "after you opened this" })).toHaveCount(
+      0,
+    );
     await expect(page.getByLabel("Name")).toHaveValue("Theirs");
+    await expect(page.getByText("You have unsaved changes")).toHaveCount(0);
   });
 });

@@ -1,7 +1,7 @@
 import type { FlagConfiguration, FlagDefinition, Rule, Segment } from "@flagnetic/api";
 import { describe, expect, it } from "vitest";
 
-import { diffConfigurations, diffDefinitions, diffSegments } from "./structural-diff";
+import { diffConfigurations, diffDefinitions, diffNamed, diffSegments } from "./structural-diff";
 
 function configuration(over: Partial<FlagConfiguration> = {}): FlagConfiguration {
   return {
@@ -433,5 +433,31 @@ describe("diffSegments", () => {
     expect(
       diffSegments(segment({ conditions: [plan, country("NL")] }), segment({ conditions: [plan] })),
     ).toEqual([{ kind: "condition", change: "removed", position: 2, before: country("NL") }]);
+  });
+});
+
+describe("diffNamed", () => {
+  it("finds nothing between equal entities, whatever else they carry", () => {
+    expect(
+      diffNamed(
+        { name: "Staging", description: "Before production" },
+        { name: "Staging", description: "Before production" },
+      ),
+    ).toEqual([]);
+  });
+
+  it("reports the name, then the description", () => {
+    expect(
+      diffNamed({ name: "User", description: "" }, { name: "Person", description: "Who signs in" }),
+    ).toEqual([
+      { kind: "field", field: "name", before: "User", after: "Person" },
+      { kind: "field", field: "description", before: "", after: "Who signs in" },
+    ]);
+  });
+
+  it("compares no description for an entity that has none", () => {
+    expect(diffNamed({ name: "Staging" }, { name: "Preview" })).toEqual([
+      { kind: "field", field: "name", before: "Staging", after: "Preview" },
+    ]);
   });
 });

@@ -1,8 +1,15 @@
-import { createUnitType, deleteUnitType, type UnitType, updateUnitType } from "@flagnetic/api";
+import {
+  createUnitType,
+  deleteUnitType,
+  getUnitType,
+  type UnitType,
+  type UnitTypeListItem,
+  updateUnitType,
+} from "@flagnetic/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { BoxesIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -11,8 +18,15 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Can } from "@/components/can";
+import { NamedConflictBanner } from "@/components/conflict-banner";
 import { QueryError } from "@/components/query-error";
-import { DeleteRowDialog, RowAction, RowDialog, withRowActions } from "@/components/row-dialogs";
+import {
+  DeleteRowDialog,
+  listedIfMatch,
+  RowAction,
+  RowDialog,
+  withRowActions,
+} from "@/components/row-dialogs";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { DialogForm } from "@/components/ui/dialog-form";
@@ -22,13 +36,15 @@ import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { formatNumber } from "@/i18n/format";
 import { useCan } from "@/lib/access";
 import type { Permission } from "@/lib/access-names";
 import { ApiError, unwrap } from "@/lib/errors";
-import { descriptionSchema, keySchema, nameSchema } from "@/lib/forms";
+import { changedFields, descriptionSchema, keySchema, nameSchema } from "@/lib/forms";
 import { ifMatch } from "@/lib/http";
 import { useListMutation } from "@/lib/mutations";
 import { unitTypesQuery } from "@/lib/queries";
+import { useFormConflict } from "@/lib/use-form-conflict";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/unit-types")({
   staticData: { crumb: msg`Unit types` },
@@ -39,7 +55,7 @@ const permission: Permission = "declaration.manage";
 
 /** The kinds of unit a flag can be served to, such as a user or a device. */
 function UnitTypes() {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const { project } = Route.useParams();
   const unitTypes = useQuery(unitTypesQuery(project));
   const [creating, setCreating] = useState(false);
@@ -49,7 +65,7 @@ function UnitTypes() {
   const canManage = useCan(permission);
 
   const columns = useMemo(() => {
-    const columns: ColumnDef<UnitType, unknown>[] = [
+    const columns: ColumnDef<UnitTypeListItem, unknown>[] = [
       {
         id: "key",
         header: t`Key`,
@@ -63,6 +79,11 @@ function UnitTypes() {
           <span className="text-muted-foreground">{row.original.description}</span>
         ),
       },
+      {
+        id: "usage",
+        header: t`Used by flags and segments`,
+        cell: ({ row }) => formatNumber(i18n, row.original.usage_count),
+      },
     ];
     return withRowActions(columns, canManage, (row) => {
       const { key } = row;
@@ -73,7 +94,7 @@ function UnitTypes() {
         </>
       );
     });
-  }, [canManage, t]);
+  }, [canManage, i18n, t]);
   const newUnitType = (
     <Can permission={permission} whenMissing="disable">
       <Button onClick={() => setCreating(true)}>
@@ -140,7 +161,7 @@ function UnitTypes() {
           unwrap(
             deleteUnitType({
               path: { project, unit_type: key },
-              headers: deleting && ifMatch(deleting.version),
+              headers: listedIfMatch(unitTypes.data, key, deleting),
             }),
           )
         }
@@ -169,6 +190,7 @@ function UnitTypeForm({
   onDone: () => void;
 }) {
   const { i18n, t } = useLingui();
+  const queryClient = useQueryClient();
   const schema = z.object({
     // A disabled field submits no value: the key of a declared unit type is shown, not sent.
     key: unitType ? z.string().optional() : keySchema(i18n),
@@ -184,31 +206,71 @@ function UnitTypeForm({
       description: unitType?.description ?? "",
     },
   });
+  // The unit type the form was filled from and the version a save names,
+  // apart: keeping one's edits saves onto a newer version what was
+  // changed from this one.
+  const [base, setBase] = useState(unitType);
+  const [version, setVersion] = useState(unitType?.version);
+  const conflicts = useFormConflict({
+    project,
+    kind: "unit_type",
+    read: () => unwrap(getUnitType({ path: { project, unit_type: unitType?.key ?? "" } })),
+  });
+  const list = unitTypesQuery(project).queryKey;
   const save = useListMutation(
-    ({ key, name, description }: Values) =>
+    ({ values: { key, name, description }, at }: { values: Values; at?: number }) =>
       unwrap(
-        unitType
+        base && at !== undefined
           ? updateUnitType({
-              path: { project, unit_type: unitType.key },
-              body: { name, description },
-              headers: ifMatch(unitType.version),
+              path: { project, unit_type: base.key },
+              body: changedFields(
+                { name: base.name, description: base.description },
+                { name, description },
+              ),
+              headers: ifMatch(at),
             })
           : createUnitType({ path: { project }, body: { key: key ?? "", name, description } }),
       ),
-    unitTypesQuery(project).queryKey,
+    list,
     onDone,
   );
+  const send = (at: number | undefined) =>
+    form.handleSubmit((values) => {
+      conflicts.clear();
+      save.mutate({ values, at }, { onError: (error) => conflicts.meet(error) });
+    });
+  const conflict = conflicts.conflict;
   const taken = save.error instanceof ApiError && save.error.code === "already_exists";
   const { errors } = form.formState;
 
   return (
     <DialogForm
-      onSubmit={form.handleSubmit((values) => save.mutate(values))}
+      onSubmit={send(version)}
       onCancel={onDone}
       submitLabel={unitType ? <Trans>Save</Trans> : <Trans>Create unit type</Trans>}
       pending={save.isPending}
-      refusal={taken ? undefined : save.error}
+      refusal={taken ? undefined : conflicts.refusal(save.error)}
     >
+      {base && conflict ? (
+        <NamedConflictBanner
+          base={base}
+          conflict={conflict}
+          pending={save.isPending}
+          onReload={() => {
+            const { current } = conflict;
+            form.reset({ key: current.key, name: current.name, description: current.description });
+            setBase(current);
+            setVersion(current.version);
+            conflicts.clear();
+            save.reset();
+            void queryClient.invalidateQueries({ queryKey: list });
+          }}
+          onKeep={() => {
+            setVersion(conflict.current.version);
+            void send(conflict.current.version)();
+          }}
+        />
+      ) : null}
       <Field
         label={<Trans>Key</Trans>}
         hint={
