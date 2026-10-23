@@ -162,7 +162,18 @@ class Ruleset:
         return {key: list(constructs) for key, constructs in self.unsupported.items()}
 
 
+# Go's int and int64, the widest integer a ruleset member holds: every
+# evaluator refuses a document whose integer does not fit, as Go's decoder does.
+_INT_MIN = -(1 << 63)
+_INT_MAX = (1 << 63) - 1
+
+
 def _object(value: Any, where: str) -> Mapping[str, Any]:
+    # A null object reads as an empty one, every member at its zero value, as
+    # Go's decoder reads it: the flag holding it then evaluates to
+    # inconsistent_ruleset instead of the whole document being refused.
+    if value is None:
+        return {}
     if not isinstance(value, dict):
         raise RulesetError(f"decode ruleset: {where} is not an object")
     return value
@@ -199,9 +210,14 @@ def _integer(raw: Mapping[str, Any], key: str, where: str) -> int:
     value = raw.get(key)
     if value is None:
         return 0
-    if isinstance(value, bool) or not isinstance(value, int):
+    if isinstance(value, bool) or not isinstance(value, int) or not _INT_MIN <= value <= _INT_MAX:
         raise RulesetError(f"decode ruleset: {where}.{key} is not an integer")
     return value
+
+
+def _refuse_constant(name: str) -> Any:
+    # NaN and Infinity are not JSON; Python's parser accepts them, Go's does not.
+    raise ValueError(f"{name} is not JSON")
 
 
 def decode(document: str | bytes | bytearray | Mapping[str, Any]) -> Ruleset:
@@ -215,15 +231,20 @@ def decode(document: str | bytes | bytearray | Mapping[str, Any]) -> Ruleset:
     inconsistent_ruleset, so one defective flag never takes the others down.
     """
     if isinstance(document, (str, bytes, bytearray)):
+        if not isinstance(document, str):
+            # UTF-8 only, with no byte order mark and each invalid sequence
+            # read as U+FFFD, as Go decodes a document; json.loads would
+            # otherwise also guess UTF-16 and UTF-32 from the bytes.
+            document = bytes(document).decode("utf-8", errors="replace")
         try:
-            raw: Any = json.loads(document)
+            raw: Any = json.loads(document, parse_constant=_refuse_constant)
         except (ValueError, RecursionError) as err:
             raise RulesetError(f"decode ruleset: {err}") from err
     else:
         raw = document
     top = _object(raw, "the document")
     schema_version = top.get("schema_version")
-    if isinstance(schema_version, bool) or schema_version != SCHEMA_VERSION:
+    if type(schema_version) is not int or schema_version != SCHEMA_VERSION:
         raise RulesetError(
             f"decode ruleset: unsupported schema_version {schema_version!r}, "
             f"this evaluator reads {SCHEMA_VERSION}"
@@ -248,11 +269,13 @@ def decode(document: str | bytes | bytearray | Mapping[str, Any]) -> Ruleset:
     units: set[str] = set()
     unit_types = top.get("unit_types")
     if unit_types is not None:
-        if not isinstance(unit_types, list) or not all(isinstance(u, str) for u in unit_types):
+        if not isinstance(unit_types, list) or not all(u is None or isinstance(u, str) for u in unit_types):
             raise RulesetError("decode ruleset: unit_types is not a list of strings")
         for u in unit_types:
-            units.add(u)
-            types[u] = "string"
+            # A null unit type reads as "", as Go's decoder reads it.
+            unit_type = u or ""
+            units.add(unit_type)
+            types[unit_type] = "string"
     _build(rs, top, types, units)
     return rs
 
@@ -393,7 +416,7 @@ def _build(rs: Ruleset, top: Mapping[str, Any], types: dict[str, str], units: se
                 if segment is not None:
                     for construct in segment.unsupported:
                         _add(found, construct)
-            serve = Serve(_object(r.get("serve", {}), f"{rule_where}.serve"), rule_where)
+            serve = Serve(_object(r.get("serve"), f"{rule_where}.serve"), rule_where)
             invalid = serve.kind == SERVE_EXPERIMENT and not _valid_experiment(serve, f.variations)
             if serve.kind not in _SERVE_KINDS:
                 _add(found, _unsupported("serve_kind", serve.kind))

@@ -168,11 +168,56 @@ class TestDecode:
             '{"schema_version": 1, "scope": "server", "flags": [{"key": 1}]}',
             '{"schema_version": 1, "scope": "server", "flags": [{"key": "f", "on": "yes"}]}',
             '{"schema_version": 1, "scope": "server", "unit_types": "user"}',
+            '{"schema_version": 1.0, "scope": "server"}',
+            '{"schema_version": 1, "version": 9223372036854775808, "scope": "server"}',
+            '{"schema_version": 1, "version": -9223372036854775809, "scope": "server"}',
+            '{"schema_version": 1, "scope": "server", "flags": [{"variations": [{"value": NaN}]}]}',
+            '{"schema_version": 1, "scope": "server", "flags": [{"variations": [{"value": -Infinity}]}]}',
+            '\ufeff{"schema_version": 1, "scope": "server"}',
         ],
     )
     def test_refuses_what_it_cannot_read(self, document: str) -> None:
         with pytest.raises(RulesetError):
             decode(document)
+
+    def test_reads_bytes_as_utf8_only(self) -> None:
+        text = '{"schema_version": 1, "scope": "server"}'
+        with pytest.raises(RulesetError):
+            decode(text.encode("utf-16"))
+        with pytest.raises(RulesetError):
+            decode(text.encode("utf-8-sig"))
+
+    def test_invalid_utf8_in_a_string_reads_as_the_replacement_character(self) -> None:
+        document = b'{"schema_version": 1, "scope": "server", "flags": [{"key": "f\xff"}]}'
+        assert decode(document).keys == ("f�",)
+
+    def test_the_widest_integer_is_read(self) -> None:
+        assert decode({**self.DOCUMENT, "version": (1 << 63) - 1}).version == (1 << 63) - 1
+
+    def test_null_members_read_as_their_zero_value(self) -> None:
+        flag = {
+            "key": "f",
+            "type": "string",
+            "on": True,
+            "variations": [{"key": "a", "value": "A"}],
+            "fallthrough": "a",
+        }
+        rs = decode(
+            {
+                **self.DOCUMENT,
+                "environment": None,
+                "unit_types": [None, "user"],
+                "attributes": [None],
+                "flags": [None, flag, {**flag, "key": "g", "rules": [{"id": "r", "serve": None}]}],
+            }
+        )
+        assert rs.keys == ("", "f", "g")
+        assert evaluate(rs, Context(), "f").variation == "a"
+        assert evaluate(rs, Context(), "g").error_code == "inconsistent_ruleset"
+        broken = {**flag, "rules": [{"id": "r", "conditions": [None], "serve": {"kind": "variation"}}]}
+        assert evaluate(decode({**self.DOCUMENT, "flags": [broken]}), Context(), "f").error_code == (
+            "inconsistent_ruleset"
+        )
 
     def test_an_unknown_flag_is_an_error_without_type(self) -> None:
         result = evaluate(decode(self.DOCUMENT), Context(), "missing")
