@@ -51,10 +51,11 @@ func listening(t *testing.T, srv *testkit.Server) {
 }
 
 // deafen silences the rulesets listener of srv through fault and waits until
-// srv finds it deaf. It waits for the listener to come up first: the gauge
-// reads 0 before the listener first connects too, and a listener that comes
-// up after the wait would trust the cache again for as long as it takes to
-// find itself deaf.
+// srv finds it deaf; it stays down until fault.Restore. It waits for the
+// listener to come up first: the gauge reads 0 before the listener first
+// connects too, and a listener that comes up after the wait would trust the
+// cache again, and drop what is written next, for as long as it takes to find
+// itself deaf.
 func deafen(t *testing.T, srv *testkit.Server, fault *pglisten.Fault) {
 	t.Helper()
 	listening(t, srv)

@@ -135,6 +135,12 @@ func TestASilencedListenerIsDetectedAndReconnects(t *testing.T) {
 	if took := time.Since(silenced); took > 2*time.Second {
 		t.Errorf("a silenced listener was detected after %v, want within the ping interval and timeout", took)
 	}
+	// Found deaf, it stays down while silenced, well past its 100ms backoff.
+	select {
+	case up := <-l.rec.listening:
+		t.Fatalf("Listening(%v) while silenced, want the listener to stay down", up)
+	case <-time.After(500 * time.Millisecond):
+	}
 	l.fault.Restore()
 	l.rec.expectListening(t, true, 10*time.Second)
 }
