@@ -183,6 +183,13 @@ final class RulesetStream {
   bool _suspended = false;
   bool _running = false;
 
+  // Counts the connections given up by [suspend] and [close]. A connect still
+  // waiting for its response when the app goes to the background and back
+  // compares it after the wait: without it, both that connect and the one the
+  // foreground starts would listen, and every change would be fetched twice
+  // over a stream nothing could cancel.
+  int _generation = 0;
+
   /// Connects, and keeps the stream connected until [suspend] or [close].
   void start() {
     _suspended = false;
@@ -194,6 +201,7 @@ final class RulesetStream {
   /// where nothing runs.
   Future<void> suspend() async {
     _suspended = true;
+    _generation++;
     _reconnect?.cancel();
     _reconnect = null;
     _failures = 0;
@@ -204,6 +212,7 @@ final class RulesetStream {
   /// Stops the stream; it never reconnects afterwards.
   Future<void> close() async {
     _closed = true;
+    _generation++;
     _reconnect?.cancel();
     await _stop();
   }
@@ -217,23 +226,27 @@ final class RulesetStream {
   Future<void> _connect() async {
     if (_closed || _suspended || _running) return;
     _running = true;
+    final generation = _generation;
     final id = _lastEventId();
     final TransportStream stream;
     try {
       stream = await _transport.openStream(_url, {
         'Authorization': 'Bearer $_sdkKey',
-        'User-Agent': '$sdkName/$sdkVersion (${_settings.platform ?? 'dart'})',
+        'User-Agent':
+            '$sdkName/$sdkVersion (${_settings.platform ?? hostPlatform()})',
         'Last-Event-ID': ?id,
       }, _settings.requestTimeout);
     } on Object catch (e) {
+      // A given-up connect leaves `_running` to the connect that replaced it.
+      if (generation != _generation) return;
       _running = false;
       if (_gone) return;
       _onFailed();
       _retryAfterError({'cause': 'network', 'detail': '$e'});
       return;
     }
-    if (_gone) {
-      _running = false;
+    if (generation != _generation || _gone) {
+      if (generation == _generation) _running = false;
       unawaited(stream.body.drain<void>().catchError((Object _) {}));
       return;
     }

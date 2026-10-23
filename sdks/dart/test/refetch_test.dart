@@ -465,6 +465,75 @@ void main() {
       );
     });
 
+    test('a background and a foreground while the stream connects leave one '
+        'stream listened to', () async {
+      final server = await MockServer.start();
+      final client = Flagnetic.client(
+        clientKey,
+        baseUrl: server.url,
+        context: anonymous,
+        options: scaledOptions(
+          sse: true,
+          pollInterval: const Duration(hours: 1),
+          streamSilenceTimeout: const Duration(seconds: 30),
+          minimumRefetchGap: Duration.zero,
+        ),
+      );
+      addTearDown(() async {
+        await client.close();
+        await server.close();
+      });
+      await (await server.next(path: '/sdk/v1/stream')).respondStream();
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+      )).respondJson(evaluation);
+      await eventually(() => client.stage == Stage.fresh);
+
+      // The app goes to the background and back twice before the stream it
+      // reopened the first time is answered.
+      client
+        ..background()
+        ..foreground();
+      final given = await server.next(path: '/sdk/v1/stream');
+      client
+        ..background()
+        ..foreground();
+      final kept = await server.next(path: '/sdk/v1/stream');
+      final stale = await given.respondStream();
+      final held = await kept.respondStream();
+      // Answers the refetches of both returns.
+      for (;;) {
+        try {
+          await (await server.next(
+            path: '/sdk/v1/evaluate',
+            timeout: const Duration(milliseconds: 300),
+          )).respondJson(evaluation);
+        } on TimeoutException {
+          break;
+        }
+      }
+
+      int evaluates() =>
+          server.received.where((e) => e.path == '/sdk/v1/evaluate').length;
+      final before = evaluates();
+      await stale.send('event: ruleset\nid: 5\ndata: {"version":5}\n\n');
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(evaluates(), before, reason: 'the given-up stream is not read');
+
+      await held.send('event: ruleset\nid: 5\ndata: {"version":5}\n\n');
+      await (await server.next(
+        path: '/sdk/v1/evaluate',
+      )).respondJson(afterKillSwitch);
+      await eventually(
+        () => servesAnswers(
+          client,
+          answersOf('server/evaluation-after-kill-switch.json'),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(evaluates(), before + 1, reason: 'one change, one evaluate');
+    });
+
     test(
       'a stream refused with 401 stops, logs once and keeps serving',
       () async {
