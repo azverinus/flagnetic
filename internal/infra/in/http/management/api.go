@@ -14,6 +14,7 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
@@ -117,6 +118,10 @@ type Handlers struct {
 	UpdateSDKKey *appdelivery.UpdateSDKKey
 	RotateSDKKey *appdelivery.RotateSDKKey
 	RevokeSDKKey *appdelivery.RevokeSDKKey
+
+	ListExperiments  *appexperiments.ListExperiments
+	CreateExperiment *appexperiments.CreateExperiment
+	GetExperiment    *appexperiments.GetExperiment
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

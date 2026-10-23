@@ -15,6 +15,7 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
@@ -29,6 +30,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
+	pgexperiments "github.com/azverinus/flagnetic/internal/infra/out/postgres/experiments"
 	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
@@ -125,6 +127,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	}
 	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
+	experimentStore := pgexperiments.NewStore(d.Pool)
+	experimentRec := appexperiments.NewRecorder(auditLog, d.Clock, d.IDs)
 	// Deleting a unit type or attribute asks the flags context what still
 	// names it.
 	declarationGuard := appflags.NewDeclarationGuard(flagStore)
@@ -273,6 +277,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		UpdateSDKKey: appdelivery.NewUpdateSDKKey(sdkKeys),
 		RotateSDKKey: appdelivery.NewRotateSDKKey(sdkKeys),
 		RevokeSDKKey: appdelivery.NewRevokeSDKKey(sdkKeys),
+
+		ListExperiments: appexperiments.NewListExperiments(experimentStore),
+		CreateExperiment: appexperiments.NewCreateExperiment(appexperiments.CreateExperimentDeps{
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Rollouts: flagStore,
+			Owners: owners, Recorder: experimentRec,
+		}),
+		GetExperiment: appexperiments.NewGetExperiment(experimentStore),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

@@ -2118,6 +2118,103 @@ paths:
           $ref: "#/components/responses/VersionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/experiments:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listExperiments
+      summary: The project's experiments
+      description: |
+        The project's experiments by key in byte order (capitals before
+        lower case). Page with `cursor` set to the `next_cursor` of the
+        previous page.
+      x-permission: project.read
+      tags: [experiments]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of experiments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createExperiment
+      summary: Create an experiment
+      description: |
+        The experiment arrives as a draft, with an inclusion salt and a
+        variation salt the server draws: no other experiment or rollout of
+        the project uses either, so two assignments are independent. It
+        compares 2 to 50 distinct variations of a flag of the project that
+        is not archived, each with a weight in basis points, the weights
+        summing to 10,000, over units of a declared unit type. The traffic
+        allocation is every unit's (10,000) when absent. The owner defaults
+        to the calling member; a project token names one. A key in use is
+        `already_exists`.
+      x-permission: experiment.edit
+      tags: [experiments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentCreate"
+      responses:
+        "201":
+          description: Created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/experiments/{experiment}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+    get:
+      operationId: getExperiment
+      summary: An experiment
+      description: The experiment with both its salts, so anyone can recompute a unit's buckets.
+      x-permission: project.read
+      tags: [experiments]
+      responses:
+        "200":
+          description: The experiment; its `ETag` is its version.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/segments:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -3011,6 +3108,13 @@ components:
       in: path
       required: true
       description: The flag's key.
+      schema:
+        type: string
+    ExperimentKey:
+      name: experiment
+      in: path
+      required: true
+      description: The experiment's key.
       schema:
         type: string
     SegmentKey:
@@ -4380,6 +4484,162 @@ components:
           description: Defaults to the key.
         description:
           $ref: "#/components/schemas/Description"
+    ExperimentStatus:
+      type: string
+      enum: [draft, running, stopped, archived]
+    ExperimentWeight:
+      type: object
+      description: |
+        The share of the allocated traffic one variation of the experiment's
+        flag gets. The order of an experiment's weights fixes the cumulative
+        bucket ranges.
+      required: [variation, weight]
+      properties:
+        variation:
+          type: string
+          description: The key of a variation of the experiment's flag.
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          description: In basis points (0.01 %); the weights of an experiment sum to 10,000.
+    Experiment:
+      type: object
+      required: [id, key, name, hypothesis, owner, tags, flag, unit_type, variations, traffic_allocation,
+        inclusion_salt, variation_salt, status, expected_end_at, started_at, stopped_at, archived_at, created_by,
+        created_at, updated_at, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          pattern: "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"
+          description: Names the experiment in rules and in the exposures SDKs report; unique, case sensitively, in the project, and never changes.
+        name:
+          $ref: "#/components/schemas/Name"
+        hypothesis:
+          type: string
+          maxLength: 2000
+          description: What the experiment expects to find, written before it runs.
+        owner:
+          type: string
+          format: uuid
+          description: The member accountable for the experiment.
+        tags:
+          type: array
+          items:
+            type: string
+        flag:
+          type: string
+          description: The key of the flag whose variations the experiment compares.
+        unit_type:
+          type: string
+          description: The key of the declared unit type whose units are split.
+        variations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExperimentWeight"
+        traffic_allocation:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          description: The share of units included, in basis points.
+        inclusion_salt:
+          type: string
+          pattern: "^[0-9a-f]{16}$"
+          description: Decides whether a unit is included; no other experiment or rollout of the project has it.
+        variation_salt:
+          type: string
+          pattern: "^[0-9a-f]{16}$"
+          description: Decides which variation an included unit gets; no other experiment or rollout of the project has it.
+        status:
+          $ref: "#/components/schemas/ExperimentStatus"
+        expected_end_at:
+          type: string
+          format: date
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        stopped_at:
+          type: string
+          format: date-time
+          nullable: true
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member who created the experiment; null when a project token did.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          $ref: "#/components/schemas/Version"
+    ExperimentList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Experiment"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` for the next page; null on the last.
+    ExperimentCreate:
+      type: object
+      required: [key, name, flag, unit_type, variations]
+      properties:
+        key:
+          type: string
+          pattern: "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"
+          description: Names the experiment in rules and in the exposures SDKs report; unique, case sensitively, in the project, and never changes.
+        name:
+          $ref: "#/components/schemas/Name"
+        hypothesis:
+          type: string
+          maxLength: 2000
+        owner:
+          type: string
+          format: uuid
+          description: An active member holding a grant in the project, or an instance admin (`invalid_owner` otherwise); the calling member when absent, which a project token cannot leave it.
+        tags:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+        flag:
+          type: string
+          description: The key of a flag of the project that is not archived.
+        unit_type:
+          type: string
+          description: The key of a unit type the project declares.
+        variations:
+          type: array
+          minItems: 2
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/ExperimentWeight"
+        traffic_allocation:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          description: Every unit's (10,000) when absent.
+        expected_end_at:
+          type: string
+          format: date
     FlagDefinition:
       type: object
       required: [id, key, type, name, description, owner, tags, lifetime, expected_removal_at, automatic_exposure,

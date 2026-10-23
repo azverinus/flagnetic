@@ -1132,6 +1132,10 @@ msgstr ""
 msgid "Delete attribute"
 msgstr ""
 
+#: src/lib/access-names.ts
+msgid "delete draft experiments"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Delete environment"
 msgstr ""
@@ -1257,6 +1261,10 @@ msgstr ""
 
 #: src/components/sdk-keys.tsx
 msgid "Edit {name} ({keyId})"
+msgstr ""
+
+#: src/lib/access-names.ts
+msgid "edit and run experiments"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
@@ -1530,6 +1538,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Expected removal changed from {before} to {after}."
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Experiment created"
 msgstr ""
 
 #: src/lib/flag-detail.ts

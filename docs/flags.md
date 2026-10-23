@@ -73,7 +73,7 @@ A rule serves:
 - `{"kind": "variation", "variation": "on"}`: one variation to every context it matches.
 - `{"kind": "rollout", "unit_type": "user", "variation": "on", "percentage": 2500}`: a **rollout**, serving the variation to a share of the units of that unit type, in basis points from 0 to 10,000 (2500 is 25%).
 
-Experiments are not available yet: a rule serving one is refused `experiment_not_available`.
+Experiments can be created (see [Experiments](experiments.md)) but a rule cannot serve one yet: a rule serving one is refused `experiment_not_available`.
 
 ### Rollouts and salts
 

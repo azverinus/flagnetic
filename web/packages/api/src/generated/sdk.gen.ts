@@ -21,6 +21,9 @@ import type {
   CreateEnvironmentData,
   CreateEnvironmentErrors,
   CreateEnvironmentResponses,
+  CreateExperimentData,
+  CreateExperimentErrors,
+  CreateExperimentResponses,
   CreateFlagData,
   CreateFlagErrors,
   CreateFlagResponses,
@@ -93,6 +96,9 @@ import type {
   GetEnvironmentRulesetData,
   GetEnvironmentRulesetErrors,
   GetEnvironmentRulesetResponses,
+  GetExperimentData,
+  GetExperimentErrors,
+  GetExperimentResponses,
   GetFlagConfigurationData,
   GetFlagConfigurationErrors,
   GetFlagConfigurationResponses,
@@ -141,6 +147,9 @@ import type {
   ListEnvironmentsData,
   ListEnvironmentsErrors,
   ListEnvironmentsResponses,
+  ListExperimentsData,
+  ListExperimentsErrors,
+  ListExperimentsResponses,
   ListFlagsData,
   ListFlagsErrors,
   ListFlagsResponses,
@@ -1902,6 +1911,85 @@ export const regenerateRolloutSalt = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt",
+    ...options,
+  });
+
+/**
+ * The project's experiments
+ *
+ * The project's experiments by key in byte order (capitals before
+ * lower case). Page with `cursor` set to the `next_cursor` of the
+ * previous page.
+ *
+ */
+export const listExperiments = <ThrowOnError extends boolean = false>(
+  options: Options<ListExperimentsData, ThrowOnError>,
+): RequestResult<ListExperimentsResponses, ListExperimentsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListExperimentsResponses, ListExperimentsErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments",
+    ...options,
+  });
+
+/**
+ * Create an experiment
+ *
+ * The experiment arrives as a draft, with an inclusion salt and a
+ * variation salt the server draws: no other experiment or rollout of
+ * the project uses either, so two assignments are independent. It
+ * compares 2 to 50 distinct variations of a flag of the project that
+ * is not archived, each with a weight in basis points, the weights
+ * summing to 10,000, over units of a declared unit type. The traffic
+ * allocation is every unit's (10,000) when absent. The owner defaults
+ * to the calling member; a project token names one. A key in use is
+ * `already_exists`.
+ *
+ */
+export const createExperiment = <ThrowOnError extends boolean = false>(
+  options: Options<CreateExperimentData, ThrowOnError>,
+): RequestResult<CreateExperimentResponses, CreateExperimentErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateExperimentResponses, CreateExperimentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * An experiment
+ *
+ * The experiment with both its salts, so anyone can recompute a unit's buckets.
+ */
+export const getExperiment = <ThrowOnError extends boolean = false>(
+  options: Options<GetExperimentData, ThrowOnError>,
+): RequestResult<GetExperimentResponses, GetExperimentErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetExperimentResponses, GetExperimentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}",
     ...options,
   });
 

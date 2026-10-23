@@ -1132,6 +1132,10 @@ msgstr "Delete {key}"
 msgid "Delete attribute"
 msgstr "Delete attribute"
 
+#: src/lib/access-names.ts
+msgid "delete draft experiments"
+msgstr "delete draft experiments"
+
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Delete environment"
 msgstr "Delete environment"
@@ -1258,6 +1262,10 @@ msgstr "Edit {name}"
 #: src/components/sdk-keys.tsx
 msgid "Edit {name} ({keyId})"
 msgstr "Edit {name} ({keyId})"
+
+#: src/lib/access-names.ts
+msgid "edit and run experiments"
+msgstr "edit and run experiments"
 
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -1531,6 +1539,10 @@ msgstr "Expected removal"
 #: src/components/structural-diff-view.tsx
 msgid "Expected removal changed from {before} to {after}."
 msgstr "Expected removal changed from {before} to {after}."
+
+#: src/lib/audit.ts
+msgid "Experiment created"
+msgstr "Experiment created"
 
 #: src/lib/flag-detail.ts
 msgid "Experiments are not available yet."

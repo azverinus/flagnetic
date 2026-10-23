@@ -104,6 +104,14 @@ func matrix(t *testing.T) []matrixRow {
 			res := do(c.DeleteSegmentWithResponse(t.Context(), p.Key, "absent", &management.DeleteSegmentParams{IfMatch: ptr("1")}))
 			return res.StatusCode(), res.Body
 		}},
+		{"experiment.edit", "createExperiment", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			// Nothing to compare, so a caller holding the permission is
+			// answered invalid, and one lacking it forbidden first.
+			res := do(c.CreateExperimentWithResponse(t.Context(), p.Key, management.ExperimentCreate{
+				Key: projectKey(), Name: "Matrix", Flag: "absent", UnitType: "user", Variations: weights("a", 5000, "b", 5000),
+			}))
+			return res.StatusCode(), res.Body
+		}},
 		{"grant.manage", "createGrant", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
 			res := do(c.CreateGrantWithResponse(t.Context(), p.Key, management.GrantCreate{Member: target.ID.Bytes(), Role: "viewer"}))
 			if res.JSON201 != nil {
@@ -153,10 +161,12 @@ func TestThePermissionMatrixHoldsRowByRow(t *testing.T) {
 		"segment.edit":              {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
 		"segment.delete":            {access.RoleMaintainer, access.RoleOwner},
 		"sdk_key.manage":            {access.RoleMaintainer, access.RoleOwner},
+		"experiment.edit":           {access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
+		"experiment.delete":         {access.RoleMaintainer, access.RoleOwner},
 	}
 	callers := map[string]*management.ClientWithResponses{
 		"instance admin": testkit.Client(t, srv, testkit.InstanceAdminToken(t)),
-		"no grant":       testkit.Client(t, srv, testkit.MemberToken(t, pool, access.ScopeRead, access.ScopeFlagsWrite, access.ScopeProjectAdmin)),
+		"no grant":       testkit.Client(t, srv, testkit.MemberToken(t, pool, access.ScopeRead, access.ScopeFlagsWrite, access.ScopeExperimentsWrite, access.ScopeProjectAdmin)),
 	}
 	for _, r := range access.Roles() {
 		callers[string(r.Name)] = testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), r.Name))
@@ -187,11 +197,11 @@ func TestProjectMeAnswersGrantsAndPermissionsPerRole(t *testing.T) {
 	p := createProject(t, admin, projectKey())
 	for role, want := range map[access.RoleName][]string{
 		access.RoleViewer:    {"project.read"},
-		access.RoleDeveloper: {"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit"},
+		access.RoleDeveloper: {"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "experiment.edit"},
 		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
-			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"},
+			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete"},
 		access.RoleOwner: {"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage",
-			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"},
+			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete"},
 	} {
 		got := projectMe(t, testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), role)), p.Key)
 		if !slices.Equal(got.Permissions, want) || !slices.Equal(rolesOf(got.Grants), []string{string(role)}) {
