@@ -11,6 +11,8 @@ github.com/apapsch/go-jsonmerge/v2 v2.0.0 h1:axGnT1gRIfimI7gJifB699GoE/oq+F2MU7D
 github.com/apapsch/go-jsonmerge/v2 v2.0.0/go.mod h1:lvDnEdqiQrp0O42VQGgmlKpxL1AP2+08jFMw88y4klk=
 github.com/azverinus/flagnetic/eval v0.1.0 h1:6SwOjQofhclh91vfgzCzW810xvthdR/nSXFt5J9YzQs=
 github.com/azverinus/flagnetic/eval v0.1.0/go.mod h1:69B4i5/VhaQwvWrguKBdOj0axK/8NeLpZ8SYg6JKIbY=
+github.com/azverinus/flagnetic/sdks/go v0.1.0 h1:tLUWCXRLU0crmn1JdsktP4YWcPWaGViYQCm27tBzHBM=
+github.com/azverinus/flagnetic/sdks/go v0.1.0/go.mod h1:AQ4D8mRN0cJ9Uq7zjai+HnyXdwdaMhD1iNqaA45b87k=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bmatcuk/doublestar v1.1.1/go.mod h1:UD6OnuiIn0yFxxA2le/rnRU1G4RaI4UvFv1sNto9p6w=
