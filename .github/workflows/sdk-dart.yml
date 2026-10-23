@@ -1,0 +1,36 @@
+name: sdk-dart
+
+# The Dart SDK: format, static analysis with infos fatal, and the unit and
+# protocol tests on the oldest Dart that Flutter's supported stable ships and
+# on the current stable. Called from ci.yml.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  dart:
+    name: dart ${{ matrix.sdk }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor of pubspec.yaml and the newest release.
+        sdk: ['3.9.0', stable]
+    defaults:
+      run:
+        working-directory: sdks/dart
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ matrix.sdk }}
+      - name: Install
+        run: dart pub get
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Analyze
+        run: dart analyze --fatal-infos
+      - name: Test
+        run: dart test
