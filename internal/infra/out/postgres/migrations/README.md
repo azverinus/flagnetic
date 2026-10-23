@@ -12,6 +12,10 @@ The schema of the server, applied in order by `flagnetic migrate`.
 - Migrations are append-only from v0.1.0 on: a released migration is never
   edited, renamed or removed, since databases in the field have already
   applied it and would never see the change. A change is a new migration.
+  `released.sum` lists the SHA-256 of every released file, and a test fails
+  when a listed file changes or disappears. A release that ships new
+  migrations appends them: `sha256sum NNNNN_*.sql >> released.sum` for each
+  new file, in order.
 - A migration runs forward only and loses no data. A change that would break
   the running version (renaming or dropping a column or table, tightening a
   constraint on existing rows) goes expand/contract: one release adds the new
