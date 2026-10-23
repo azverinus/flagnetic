@@ -5,4 +5,4 @@
 -- it belongs to its project.
 ALTER TABLE api_tokens ADD COLUMN created_by uuid REFERENCES members (id);
 
-CREATE INDEX api_tokens_project_idx ON api_tokens (project_id) WHERE project_id IS NOT NULL;
+CREATE INDEX api_tokens_project ON api_tokens (project_id) WHERE project_id IS NOT NULL;

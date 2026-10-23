@@ -9,7 +9,7 @@ CREATE TABLE sdk_keys (
     kind            text        NOT NULL CHECK (kind IN ('server', 'client')),
     name            text        NOT NULL,
     key_id          text        NOT NULL,
-    key_hash        bytea       NOT NULL UNIQUE,
+    key_hash        bytea       NOT NULL UNIQUE CHECK (length(key_hash) = 32),
     -- Normalized origins a client key is accepted from; empty allows any.
     allowed_origins text[]      NOT NULL,
     created_at      timestamptz NOT NULL,

@@ -16,4 +16,4 @@ CREATE TABLE grants (
 );
 
 -- The projects a member holds grants in, for their project list and count.
-CREATE INDEX grants_member_idx ON grants (member_id, project_id);
+CREATE INDEX grants_member ON grants (member_id, project_id);

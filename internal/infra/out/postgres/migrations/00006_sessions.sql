@@ -20,4 +20,4 @@ CREATE TABLE sessions (
     revoked_at    timestamptz
 );
 
-CREATE INDEX sessions_member_idx ON sessions (member_id);
+CREATE INDEX sessions_member ON sessions (member_id);

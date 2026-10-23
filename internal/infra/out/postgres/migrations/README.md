@@ -9,5 +9,13 @@ The schema of the server, applied in order by `flagnetic migrate`.
   relatives), not even in a column default: every time is written by the
   application from its own clock, so that a test moving the clock moves all
   time at once.
-- From the first public release on, a released migration is never edited:
-  databases in the field have already applied it. A change is a new migration.
+- Migrations are append-only from v0.1.0 on: a released migration is never
+  edited, renamed or removed, since databases in the field have already
+  applied it and would never see the change. A change is a new migration.
+- A migration runs forward only and loses no data. A change that would break
+  the running version (renaming or dropping a column or table, tightening a
+  constraint on existing rows) goes expand/contract: one release adds the new
+  shape and writes both, a later one removes the old shape once nothing reads
+  it.
+- Name an index `<table>_<what it serves>`, without an `_idx` suffix; the
+  schema tests check it.
