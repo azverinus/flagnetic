@@ -468,9 +468,6 @@ jobs:
         working-directory: e2e
         run: go test -count=1 -v ./...
 
-  # The one check branch protection requires. A job above may be skipped (a
-  # module matrix with nothing to run, a job behind a condition), which is
-  # fine; a failed or cancelled one is not.
   # Whether a pull request touches what the Dart SDK is tested against; push,
   # schedule and release runs always test it.
   dart-changes:
@@ -504,6 +501,9 @@ jobs:
       )
     uses: ./.github/workflows/sdk-dart.yml
 
+  # The one check branch protection requires. A job above may be skipped (a
+  # module matrix with nothing to run, a job behind a condition), which is
+  # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
     needs: [lint, test, vuln, tidy, console, changes, e2e, sdk-e2e, sdk-ruby, workflows, docker, modules, module, released, dart-changes, dart]
