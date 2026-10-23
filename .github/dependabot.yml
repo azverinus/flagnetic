@@ -58,3 +58,9 @@ updates:
       interval: weekly
     commit-message:
       prefix: build
+  - package-ecosystem: pub
+    directory: /sdks/dart
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(sdk-dart)"

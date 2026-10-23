@@ -1,0 +1,56 @@
+# flagnetic
+
+Feature flags and experiments for Dart and Flutter apps, served by a self-hosted [Flagnetic](https://github.com/azverinus/flagnetic) instance. This package is the client mode: it runs on the Dart VM and has no dependency, Flutter included.
+
+A client posts its context to remote evaluation with a **client key** and serves every flag from memory, so getters are synchronous and never throw. The values it last received are kept in a store on the device, so a cold start without a network serves them. A server key cannot build a client: it must never ship in an app.
+
+```dart
+import 'package:flagnetic/flagnetic.dart';
+
+final client = Flagnetic.client(
+  'fn_cli_…',
+  baseUrl: Uri.parse('https://flags.example.com'),
+  context: const FlagneticContext(units: {'anonymous': 'd-8f1c'}),
+  options: ClientOptions(
+    store: myStore, // a FlagneticStore: get, set and remove by key
+    platform: 'android',
+    appVersion: '1.42.0',
+  ),
+);
+
+await client.ready(const Duration(seconds: 2));
+final showCheckout = client.getBool('checkout', false);
+final limit = client.getInt('upload_limit', 10);
+client.onChange((keys) => rebuild(keys));
+
+// After sign-in, keep the anonymous unit beside the user unit.
+await client.setContext(
+  const FlagneticContext(units: {'anonymous': 'd-8f1c', 'user': 'u-1001'}),
+);
+
+// Record that the user saw what an experiment decided.
+client.exposure('checkout');
+client.alias(
+  fromUnitType: 'anonymous',
+  fromUnitId: 'd-8f1c',
+  toUnitType: 'user',
+  toUnitId: 'u-1001',
+);
+await client.close();
+```
+
+## The fallback chain
+
+Values come from, in order: the fresh response, the last good values in the store, the built-in defaults you pass to the getter. `client.stage` and `client.status()` tell which one is serving, and `getDetail` returns the value with why it was served.
+
+## Events
+
+Exposures and aliases are queued in the store, sent in batches and flushed every 5 seconds while the app is in the foreground, so events recorded offline are sent on a later start. Call `foreground()` and `background()` as the app's lifecycle changes.
+
+## Tests
+
+Build a client with `ClientOptions(offline: OfflineSource.document(...))` to serve a values document without a network. `client.offline` sets values, reloads the document and lists the events the client recorded.
+
+## Local overrides
+
+`ClientOptions(allowOverrides: true)` enables `client.overrides` to substitute flag values on the device. Without it, `client.overrides` throws a `StateError`. An environment marked protected refuses overrides.

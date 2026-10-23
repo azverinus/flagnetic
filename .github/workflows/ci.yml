@@ -468,12 +468,45 @@ jobs:
         working-directory: e2e
         run: go test -count=1 -v ./...
 
+  # Whether a pull request touches what the Dart SDK is tested against; push,
+  # schedule and release runs always test it.
+  dart-changes:
+    name: dart changed
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    outputs:
+      dart: ${{ steps.diff.outputs.dart }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --name-only "$BASE...HEAD" |
+            grep -qE '^(sdks/dart/|conformance/|api/sdk\.yaml$|\.github/workflows/(sdk-dart|ci)\.yml$)'; then
+            echo "dart=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dart=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  dart:
+    name: dart
+    needs: dart-changes
+    if: >-
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.dart-changes.outputs.dart == 'true'
+      )
+    uses: ./.github/workflows/sdk-dart.yml
+
   # The one check branch protection requires. A job above may be skipped (a
   # module matrix with nothing to run, a job behind a condition), which is
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, tidy, console, changes, e2e, sdk-e2e, sdk-ruby, workflows, docker, modules, module, released]
+    needs: [lint, test, vuln, tidy, console, changes, e2e, sdk-e2e, sdk-ruby, workflows, docker, modules, module, released, dart-changes, dart]
     if: always()
     runs-on: ubuntu-latest
     steps:
