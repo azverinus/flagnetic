@@ -1,0 +1,100 @@
+name: sdk-js
+
+# The JavaScript SDK: lint, types, the evaluator against the conformance
+# suite on the supported Node releases and in a browser, the evaluation
+# budget, and the built package. ci.yml calls it when the SDK, the
+# conformance suite, the SDK protocol or this workflow changes.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: sdks/js
+
+jobs:
+  # The package as a consumer gets it, and what only needs checking once.
+  package:
+    name: lint, types and package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: sdks/js/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: sdks/js/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Unicode tables are what Go generates
+        run: pnpm check:unicode
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
+      - name: Package (entry points in ESM and CJS, types, no dependencies, publint)
+        run: pnpm check:package
+      # Last step: it removes the optional peers from node_modules. The
+      # entry points must still load and the types still resolve without them.
+      - name: Package again without the optional peers
+        run: |
+          rm -rf node_modules/react node_modules/react-dom node_modules/@openfeature
+          pnpm check:package
+
+  # The evaluator on every supported Node release.
+  node:
+    name: node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: sdks/js/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+          cache-dependency-path: sdks/js/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Conformance suite and unit tests
+        run: pnpm test
+      # Timed alone: the other tests running beside it would distort it.
+      - name: Evaluation p99 over 1,000 flags
+        run: pnpm test:p99
+
+  # The same suite in a browser, with the fixtures bundled.
+  browser:
+    name: browser (chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: sdks/js/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: sdks/js/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Conformance suite in Chromium
+        run: pnpm test:browser
