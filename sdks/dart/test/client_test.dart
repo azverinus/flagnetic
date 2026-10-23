@@ -8,6 +8,7 @@ library;
 // and the requests the mock receives; durations are the protocol's divided by
 // 1000 (see scaledOptions).
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flagnetic/flagnetic.dart';
 import 'package:flagnetic/src/client/options.dart';
@@ -359,6 +360,18 @@ void main() {
           },
         },
       });
+    });
+
+    test('names the operating system in User-Agent when the options name '
+        'no platform', () async {
+      final server = await startServer();
+      clientOf(server);
+      final request = await server.next();
+      expect(
+        request.headers['user-agent'],
+        'flagnetic-dart/$sdkVersion (${Platform.operatingSystem})',
+      );
+      await request.respondJson(evaluation);
     });
 
     test('a 200 replaces values, goes fresh, fires the change callback with '

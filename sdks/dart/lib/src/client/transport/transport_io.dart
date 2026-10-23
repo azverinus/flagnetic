@@ -6,6 +6,9 @@ import 'transport.dart';
 /// The `dart:io` transport.
 Transport createTransport() => _IoTransport();
 
+/// The operating system the app runs on.
+String hostPlatform() => Platform.operatingSystem;
+
 final class _IoTransport implements Transport {
   final HttpClient _http = HttpClient()..autoUncompress = true;
   final Set<HttpClientRequest> _inFlight = {};

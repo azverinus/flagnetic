@@ -310,8 +310,8 @@ final class FlagneticClient {
   /// [setContext] replaces it.
   FlagneticContext get context => _context;
 
-  /// Whether the app is foregrounded. Fetching runs only while it is
-  ///: see [foreground] and [background].
+  /// Whether the app is foregrounded. Fetching runs only while it is: see
+  /// [foreground] and [background].
   bool get isForeground => _foreground;
 
   /// Evaluates for [context] from now on and completes when the answer has
@@ -966,7 +966,8 @@ final class FlagneticClient {
         {
           'Authorization': 'Bearer $_sdkKey',
           'Content-Type': 'application/json',
-          'User-Agent': '$sdkName/$sdkVersion (${_options.platform ?? 'dart'})',
+          'User-Agent':
+              '$sdkName/$sdkVersion (${_options.platform ?? hostPlatform()})',
           'Flagnetic-Schema-Version': '$schemaVersionMax',
         },
         utf8.encode(jsonEncode(_requestBody(context), toEncodable: _encode)),

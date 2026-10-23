@@ -449,7 +449,7 @@ final class Ingest {
           'Authorization': 'Bearer $_sdkKey',
           'Content-Type': 'application/json',
           'User-Agent':
-              '$sdkName/$sdkVersion (${_settings.platform ?? 'dart'})',
+              '$sdkName/$sdkVersion (${_settings.platform ?? hostPlatform()})',
           'Flagnetic-Schema-Version': '$schemaVersionMax',
         },
         utf8.encode(jsonEncode(_envelope(batch))),

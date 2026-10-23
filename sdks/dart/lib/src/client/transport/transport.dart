@@ -70,3 +70,8 @@ abstract interface class Transport {
 
 /// The platform's transport: `dart:io` on the VM and in Flutter apps.
 Transport defaultTransport() => platform.createTransport();
+
+/// The platform `User-Agent` names when the options name none: the operating
+/// system (`android`, `ios`, `macos`, …) wherever `dart:io` runs, so the SDK
+/// inventory tells devices apart without the app configuring anything.
+String hostPlatform() => platform.hostPlatform();

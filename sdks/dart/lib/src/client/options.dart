@@ -97,7 +97,8 @@ final class ClientOptions {
   final Logger? logger;
 
   /// The `platform` attribute and the platform in `User-Agent`, such as
-  /// `android`, `ios` or `web`.
+  /// `android`, `ios` or `web`. When null, `User-Agent` names the operating
+  /// system and the context goes without the attribute.
   final String? platform;
 
   /// The `app_version` attribute: the application's semantic version.
