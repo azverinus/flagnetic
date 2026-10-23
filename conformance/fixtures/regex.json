@@ -206,6 +206,20 @@
     {"pattern": "(?i)\\p{Lu}", "input": "a", "match": true},
     {"pattern": "(?i)\\x{D800}", "input": "a", "match": false},
     {"pattern": "\\x{D800}", "input": "a", "match": false},
-    {"pattern": "[\\x{D7FF}-\\x{E000}]", "input": "a", "match": false}
+    {"pattern": "[\\x{D7FF}-\\x{E000}]", "input": "a", "match": false},
+    {"pattern": "^(ios|android)-[0-9]+$", "input": "ios-12", "match": true},
+    {"pattern": "(?i)\\P{Lu}", "input": "a", "match": false},
+    {"pattern": "(?i)\\P{Lu}", "input": "1", "match": true},
+    {"pattern": "(?i)\\p{Ll}", "input": "A", "match": true},
+    {"pattern": "(?i)[\\p{Lu}x]", "input": "a", "match": true},
+    {"pattern": "(?i)[^\\p{Lu}]", "input": "a", "match": false},
+    {"pattern": "(?i)[^\\P{Lu}]", "input": "a", "match": true},
+    {"pattern": "(?i)\\p{Greek}", "input": "Ω", "match": true},
+    {"pattern": "(?i)\\p{Greek}", "input": "ω", "match": true},
+    {"pattern": "(?i)\\p{Lu}", "input": "K", "match": true},
+    {"pattern": "(?i)\\P{Ll}", "input": "K", "match": false},
+    {"pattern": "(?i)\\p{Lu}", "input": "ſ", "match": true},
+    {"pattern": "(?i)^\\p{Lu}+$", "input": "aBc", "match": true},
+    {"pattern": "\\p{Lu}", "input": "a", "match": false}
   ]
 }
