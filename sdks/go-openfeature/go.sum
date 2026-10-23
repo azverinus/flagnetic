@@ -1,3 +1,5 @@
+github.com/azverinus/flagnetic/eval v0.1.0 h1:6SwOjQofhclh91vfgzCzW810xvthdR/nSXFt5J9YzQs=
+github.com/azverinus/flagnetic/eval v0.1.0/go.mod h1:69B4i5/VhaQwvWrguKBdOj0axK/8NeLpZ8SYg6JKIbY=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/open-feature/go-sdk v1.18.0 h1:+Ge8LAJjqDwQBqAWaWiTbnsiJ22d5SPQq7/hOiBwpqM=
