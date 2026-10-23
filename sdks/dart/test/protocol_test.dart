@@ -3,9 +3,10 @@
 library;
 
 // The protocol fixtures of conformance/protocol run against a mock server:
-// the degradation cases of the evaluate endpoint and every client-mode
-// scenario of the lists, with no skip list. Every duration of a scenario is
-// divided by 1000 (the README allows one factor for real-time runs).
+// the degradation cases of the evaluate and events endpoints and every
+// client-mode scenario of the lists, with no skip list. Every duration of a
+// scenario is divided by 1000 (the README allows one factor for real-time
+// runs).
 import 'dart:async';
 import 'dart:convert';
 
@@ -35,6 +36,26 @@ void main() {
             .cast<Map<String, Object?>>()
             .where((c) => c['endpoint'] == 'POST /sdk/v1/evaluate')) {
       test(c['name'], () => runCase(c, caseContext));
+    }
+  });
+  group('degradation cases of POST /sdk/v1/events', () {
+    for (final c
+        in (cases['cases']! as List<Object?>)
+            .cast<Map<String, Object?>>()
+            .where((c) => c['endpoint'] == 'POST /sdk/v1/events')) {
+      test(c['name'], () => runEventsCase(c, caseContext));
+    }
+  });
+  // The ruleset endpoint serves server keys only; every other case is a
+  // client-mode case this runner plays.
+  test('every degradation case is played or belongs to server mode', () {
+    for (final c
+        in (cases['cases']! as List<Object?>).cast<Map<String, Object?>>()) {
+      expect(
+        ['POST /sdk/v1/evaluate', 'POST /sdk/v1/events', 'GET /sdk/v1/ruleset'],
+        contains(c['endpoint']),
+        reason: '${c['name']}',
+      );
     }
   });
 
@@ -226,6 +247,67 @@ Future<void> runCase(Map<String, Object?> c, FlagneticContext context) async {
   );
   expectSdkAnswers(sdk, answers);
   expect(sdk.staleSince, keep ? isNotNull : isNull);
+}
+
+/// Plays a degradation case of the events endpoint: a batch answered with
+/// the case's response is never sent again, whatever the answer rejects.
+Future<void> runEventsCase(
+  Map<String, Object?> c,
+  FlagneticContext context,
+) async {
+  expect(c['outcome'], 'never_retry_rejected');
+  final server = await MockServer.start();
+  final logs = LogRecorder();
+  final client = Flagnetic.client(
+    clientKey,
+    baseUrl: server.url,
+    context: context,
+    options: scaledOptions(
+      logger: logs.call,
+      pollInterval: const Duration(hours: 1),
+      sendSummaries: false,
+    ),
+  );
+  addTearDown(() async {
+    await client.close();
+    await server.close();
+  });
+  await (await server.next(
+    path: evaluatePath,
+  )).respondJson(protocolJson('server/evaluation.json'));
+  await eventually(() => client.stage == Stage.fresh, reason: 'fresh');
+
+  void link(String userId) => client.alias(
+    fromUnitType: 'anonymous',
+    fromUnitId: 'd-8f1c',
+    toUnitType: 'user',
+    toUnitId: userId,
+  );
+
+  link('u-1001');
+  final flushed = client.flush();
+  final first = await server.next(path: eventsPath);
+  final ids = eventIdsOf(first);
+  final response = c['response']! as Map<String, Object?>;
+  await first.respond(
+    response['status']! as int,
+    headers: (response['headers']! as Map<String, Object?>)
+        .cast<String, String>(),
+    body: protocolBytes(response['body']! as String),
+  );
+  await flushed;
+  expect(logs.count(LogEvents.eventsFailed), 0, reason: 'the batch landed');
+
+  link('u-1002');
+  final again = client.flush();
+  final second = await server.next(path: eventsPath);
+  expect(
+    eventIdsOf(second).toSet().intersection(ids.toSet()),
+    isEmpty,
+    reason: c['outcome']! as String,
+  );
+  await acceptBatch(second);
+  await again;
 }
 
 Future<void> runScenario(
