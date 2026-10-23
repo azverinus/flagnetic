@@ -1,4 +1,4 @@
-// npm run bench: evaluation throughput on a 1000-flag ruleset.
+// pnpm bench: evaluation throughput on a 1000-flag ruleset.
 import { bench, describe } from "vitest";
 import { decodeRuleset } from "../src/server.js";
 import { contexts, FLAGS, largeRuleset } from "./ruleset.js";
