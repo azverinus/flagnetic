@@ -201,7 +201,7 @@ type problemViolation struct {
 
 func (s *Server) writeProblem(w http.ResponseWriter, r *http.Request, p problem) {
 	// Extensions go first so that no extension can replace a standard member.
-	members := make(map[string]any, len(p.extensions)+8)
+	members := make(map[string]any, len(p.extensions))
 	for k, v := range p.extensions {
 		members[k] = v
 	}
