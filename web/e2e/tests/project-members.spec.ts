@@ -51,7 +51,7 @@ test.describe("project members and their grants", () => {
     await choose(page, dialog, "Member", `Linus Torvalds (${linus.email})`);
     await choose(page, dialog, "Role", "Developer");
     await expect(dialog.getByRole("combobox", { name: "Role" })).toHaveAccessibleDescription(
-      "Lets the holder view the project, edit flags, change flag configurations, switch flags off with the kill switch, revert flag configurations to earlier versions, and edit segments.",
+      "Lets the holder view the project, edit flags, change flag configurations, switch flags off with the kill switch, revert flag configurations to earlier versions, edit segments, and edit and run experiments.",
     );
     await dialog.getByRole("button", { name: "Grant role" }).click();
     await expect(dialog).toBeHidden();
