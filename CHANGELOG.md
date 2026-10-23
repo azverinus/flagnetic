@@ -52,5 +52,3 @@
 * **platform:** build with go1.26.10 for the crypto/x509 fix ([#17](https://github.com/azverinus/flagnetic/issues/17)) ([ba2dcd4](https://github.com/azverinus/flagnetic/commit/ba2dcd4e1618c477f7e7a8a6dc83238f11dba912))
 * **platform:** count a panic in a notification handler ([#14](https://github.com/azverinus/flagnetic/issues/14)) ([7dff2f0](https://github.com/azverinus/flagnetic/commit/7dff2f02a9407bd39099e62d9f1b170c351f012c))
 * **platform:** treat a request the client canceled as canceled ([#41](https://github.com/azverinus/flagnetic/issues/41)) ([ebd5bc0](https://github.com/azverinus/flagnetic/commit/ebd5bc0ce4206ed6beb37d9922bc036ff68a9147))
-
-## Changelog
