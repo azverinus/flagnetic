@@ -27,11 +27,6 @@ type Transactor interface {
 	Within(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-// Snapshotter runs a query of several statements on one consistent view.
-type Snapshotter interface {
-	Snapshot(ctx context.Context, fn func(ctx context.Context) error) error
-}
-
 // AuditLog records the audit entry of a change, in the unit of work of the
 // change.
 type AuditLog interface {
