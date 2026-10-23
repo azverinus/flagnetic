@@ -16,7 +16,7 @@ task test       # go test -race in every module (starts PostgreSQL through testc
 task build      # bin/flagnetic, with the console built and embedded
 ```
 
-Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for PostgreSQL in tests, [Task](https://taskfile.dev), [jq](https://jqlang.org) for the check scripts, and Node.js with pnpm for the console in `web/`.
+Requires Go (the toolchain in `go.mod` is fetched automatically), Docker for PostgreSQL in tests, [Task](https://taskfile.dev), [jq](https://jqlang.org) for the check scripts, Node.js with pnpm for the console in `web/`, and Dart for the Dart SDK in `sdks/dart/`.
 
 ## Rules
 
