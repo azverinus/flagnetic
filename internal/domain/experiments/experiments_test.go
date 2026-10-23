@@ -1,6 +1,7 @@
 package experiments_test
 
 import (
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -120,8 +121,15 @@ func TestAnExperimentIsRefusedWithEveryFieldToFix(t *testing.T) {
 			[]string{"/variations/1/variation duplicate"}},
 		{"a variation the flag does not have", func(in *experiments.Input) { in.Variations = weights(w("short", 5000), w("tiny", 5000)) },
 			[]string{"/variations/1/variation unknown_variation"}},
-		{"a negative weight", func(in *experiments.Input) { in.Variations = weights(w("short", 10100), w("long", -100)) },
+		{"a negative weight", func(in *experiments.Input) { in.Variations = weights(w("short", 10000), w("long", -100)) },
 			[]string{"/variations/1/weight invalid_weight"}},
+		{"a weight over 10000", func(in *experiments.Input) { in.Variations = weights(w("short", 10100), w("long", -100)) },
+			[]string{"/variations/0/weight invalid_weight", "/variations/1/weight invalid_weight"}},
+		// Without a bound on each weight, these would wrap around to exactly
+		// 10,000 and pass as a valid split.
+		{"weights overflowing to 10000", func(in *experiments.Input) {
+			in.Variations = weights(w("short", math.MaxInt), w("long", math.MaxInt), w("huge", 10002))
+		}, []string{"/variations/0/weight invalid_weight", "/variations/1/weight invalid_weight", "/variations/2/weight invalid_weight"}},
 		{"weights summing to 9999", func(in *experiments.Input) { in.Variations = weights(w("short", 5000), w("long", 4999)) },
 			[]string{"/variations invalid_weights_sum"}},
 		{"a traffic allocation over 10000", func(in *experiments.Input) { in.TrafficAllocation = ptr(10001) },

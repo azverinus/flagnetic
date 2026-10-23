@@ -2,6 +2,7 @@ package management_test
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 	"slices"
@@ -177,8 +178,11 @@ func TestCreatingAnExperimentRefusesEveryViolationNamingTheField(t *testing.T) {
 			[]string{"/variations/1/variation duplicate"}},
 		{"a variation the flag does not have", with(func(b *management.ExperimentCreate) { b.Variations = weights("a", 5000, "huge", 5000) }),
 			[]string{"/variations/1/variation unknown_variation"}},
-		{"a negative weight", with(func(b *management.ExperimentCreate) { b.Variations = weights("a", 10100, "b", -100) }),
+		{"a negative weight", with(func(b *management.ExperimentCreate) { b.Variations = weights("a", 10000, "b", -100) }),
 			[]string{"/variations/1/weight invalid_weight"}},
+		{"weights that would overflow to 10000", with(func(b *management.ExperimentCreate) {
+			b.Variations = weights("a", math.MaxInt, "b", math.MaxInt, "c", 10002)
+		}), []string{"/variations/0/weight invalid_weight", "/variations/1/weight invalid_weight", "/variations/2/weight invalid_weight"}},
 		{"weights summing to 9999", with(func(b *management.ExperimentCreate) { b.Variations = weights("a", 5000, "b", 4999) }),
 			[]string{"/variations invalid_weights_sum"}},
 		{"a traffic allocation over 10000", with(func(b *management.ExperimentCreate) { b.TrafficAllocation = ptr(10001) }),

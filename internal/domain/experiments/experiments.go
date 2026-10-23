@@ -272,7 +272,7 @@ func (c *check) trafficAllocation(a int) int {
 }
 
 // weights returns ws when they are 2 to 50 distinct variations of the flag,
-// each weighing 0 or more basis points, together exactly TotalWeight.
+// each weighing 0 to TotalWeight basis points, together exactly TotalWeight.
 // flagUsable says whether the flag was found and not archived; without it the
 // variations cannot be judged against it, and only their shape is.
 func (c *check) weights(ws []Weight, flagUsable bool, flagVariations []string) []Weight {
@@ -281,7 +281,7 @@ func (c *check) weights(ws []Weight, flagUsable bool, flagVariations []string) [
 			map[string]any{"min": minVariations, "max": maxVariations})
 		return ws
 	}
-	sum := 0
+	sum, weightsValid := 0, true
 	seen := make(map[string]bool, len(ws))
 	for i, w := range ws {
 		pointer := "/variations/" + strconv.Itoa(i)
@@ -292,12 +292,20 @@ func (c *check) weights(ws []Weight, flagUsable bool, flagVariations []string) [
 			c.add(pointer+"/variation", "unknown_variation", "the flag has no variation with this key", nil)
 		}
 		seen[w.Variation] = true
-		if w.Weight < 0 {
-			c.add(pointer+"/weight", "invalid_weight", "a weight is 0 or more basis points", nil)
+		// A weight above the total can never be part of a valid split, and
+		// refusing it here also keeps the sum from overflowing: weights near
+		// the largest int would otherwise wrap around to exactly the total.
+		if w.Weight < 0 || w.Weight > TotalWeight {
+			c.add(pointer+"/weight", "invalid_weight", "a weight is 0 to 10,000 basis points",
+				map[string]any{"min": 0, "max": TotalWeight})
+			weightsValid = false
+			continue
 		}
 		sum += w.Weight
 	}
-	if sum != TotalWeight {
+	// The sum of weights some of which are out of range says nothing more
+	// than the weights' own violations do.
+	if weightsValid && sum != TotalWeight {
 		c.add("/variations", "invalid_weights_sum", "the weights sum to exactly 10,000 basis points",
 			map[string]any{"total": TotalWeight, "sum": sum})
 	}
