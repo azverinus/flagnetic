@@ -585,7 +585,11 @@ void main() {
         'flags': {
           'checkout': (evaluation['flags']! as Map)['checkout'],
           'broken': {'type': 'boolean', 'reason': 'error', 'error_code': 'x'},
-          'wrong_value': {'type': 'boolean', 'value': 'yes', 'reason': 'rule'},
+          'wrong_value': {
+            'type': 'boolean',
+            'value': 'yes',
+            'reason': 'targeting_match',
+          },
         },
       };
       await (await server.next()).respondJson(partial);

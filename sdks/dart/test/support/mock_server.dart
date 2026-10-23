@@ -445,7 +445,7 @@ Map<String, Object?> experimentValues({
       'type': 'string',
       'value': 'Try free',
       'variation': 'short',
-      'reason': 'fallthrough',
+      'reason': 'targeting_match',
       'automatic_exposure': false,
     },
   },
