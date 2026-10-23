@@ -1,0 +1,70 @@
+name: sdk-ruby
+
+# The Ruby gem, called from ci.yml when the gem, the conformance suite, the
+# SDK contract or this workflow changes.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: ruby rubocop
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/ruby
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+          working-directory: sdks/ruby
+      - name: Rubocop
+        run: bundle exec rubocop
+
+  # The oldest Ruby the gem supports, the one before the newest and the
+  # newest. The tests run every conformance fixture, the RE2 vectors and the
+  # OpenFeature reasons with no skip list, and the evaluation p99 test writes
+  # its figure to the job summary.
+  test:
+    name: ruby ${{ matrix.ruby }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.3", "3.4", "4.0"]
+    defaults:
+      run:
+        working-directory: sdks/ruby
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+          working-directory: sdks/ruby
+      - name: Test
+        run: bundle exec rake test
+      - name: Gem builds
+        run: gem build --strict flagnetic.gemspec
+
+  # The case folding orbits and property names come from the Go the server is
+  # built with; a Go upgrade that changes them must regenerate them.
+  unicode-tables:
+    name: ruby unicode tables are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Regenerate and compare
+        env:
+          GOWORK: "off"
+        run: |
+          go run ./sdks/ruby/script/_unicode_tables > sdks/ruby/lib/flagnetic/eval/unicode_tables.rb
+          git diff --exit-code -- sdks/ruby/lib/flagnetic/eval/unicode_tables.rb
