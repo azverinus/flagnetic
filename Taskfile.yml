@@ -112,6 +112,21 @@ tasks:
     cmds:
       - pnpm --dir web i18n:extract
 
+  # --- JavaScript SDK (sdks/js/, needs Node and pnpm) ---
+
+  sdk-js:check:
+    desc: Lint, typecheck, test, time and package the JavaScript SDK (its browser run is pnpm test:browser)
+    dir: sdks/js
+    cmds:
+      - pnpm install --frozen-lockfile
+      - pnpm check:unicode
+      - pnpm lint
+      - pnpm typecheck
+      - pnpm test
+      - pnpm test:p99
+      - pnpm build
+      - pnpm check:package
+
   # --- SDK end to end (e2e/, needs Docker) ---
 
   e2e:
@@ -134,6 +149,7 @@ tasks:
       - task: lint
       - task: web:check
       - task: dart:check
+      - task: sdk-js:check
       - task: test
       - task: cover
       - task: vuln

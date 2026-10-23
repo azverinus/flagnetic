@@ -12,7 +12,7 @@ You need:
 - Docker, for the PostgreSQL that tests start through testcontainers
 - [Task](https://taskfile.dev)
 - [jq](https://jqlang.org), which the check scripts use to read `go.work` and `go.mod`
-- Node.js 22 or newer and [pnpm](https://pnpm.io) (the version in `web/package.json`), for the console in `web/`
+- Node.js 22 or newer and [pnpm](https://pnpm.io) (the version in `web/package.json`), for the console in `web/` and the JavaScript SDK in `sdks/js/` (`task sdk-js:check`)
 
 ```bash
 task check   # lint, tests and vulnerability scan: what CI runs
