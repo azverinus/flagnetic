@@ -30,6 +30,23 @@ const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf
 const entries = Object.keys(pkg.exports).filter((e) => e !== "./package.json");
 assert.deepEqual(entries.sort(), [".", "./client", "./openfeature", "./react", "./server"]);
 
+const resolvable = (name) => {
+  try {
+    require.resolve(name);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// The optional peers each entry point may import. With one of them absent
+// that entry point is not expected to load, every other one still is.
+const peersOf = {
+  "./react": ["react"],
+  "./openfeature": ["@openfeature/server-sdk", "@openfeature/web-sdk"],
+};
+
+let loaded = 0;
 for (const entry of entries) {
   const specifier = entry === "." ? pkg.name : `${pkg.name}/${entry.slice(2)}`;
   const target = pkg.exports[entry];
@@ -38,8 +55,10 @@ for (const entry of entries) {
       assert.ok(existsSync(new URL(`../${file}`, import.meta.url)), `${specifier} (${condition}): ${file} is missing`);
     }
   }
+  if (!(peersOf[entry] ?? []).every(resolvable)) continue;
   // Both formats of every entry point load, and a named export is the same
   // in both.
+  loaded++;
   const esm = await import(specifier);
   const cjs = require(specifier);
   assert.deepEqual(Object.keys(esm).filter((k) => k !== "default").sort(), Object.keys(cjs).sort(), `${specifier}: ESM and CJS export different names`);
@@ -81,10 +100,12 @@ for (const file of ["dist/server.js", "dist/server.cjs"]) {
   }
 }
 
-// Only flagnetic/react reaches for React, and it never bundles it.
+// Only flagnetic/react reaches for React, and it never bundles it. JSX
+// compiles to react/jsx-runtime, so a subpath of react counts, as does
+// react-dom.
 for (const name of ["index", "client", "server", "openfeature"]) {
   for (const file of [`dist/${name}.js`, `dist/${name}.cjs`]) {
-    assert.ok(!/["']react["']/.test(read(file)), `${file} pulls in react, which is an optional peer dependency`);
+    assert.ok(!/["']react(-dom)?(\/[^"']*)?["']/.test(read(file)), `${file} pulls in react, which is an optional peer dependency`);
   }
 }
 
@@ -96,14 +117,6 @@ for (const name of ["index", "client", "server", "react"]) {
   }
 }
 
-const resolvable = (name) => {
-  try {
-    require.resolve(name);
-    return true;
-  } catch {
-    return false;
-  }
-};
 const react = resolvable("react") ? "react installed" : "react absent";
 const openfeature = resolvable("@openfeature/server-sdk") || resolvable("@openfeature/web-sdk") ? "OpenFeature installed" : "OpenFeature absent";
-console.log(`ok: ${entries.length} entry points, ESM and CJS, no runtime dependencies, ${react}, ${openfeature}, every entry point loaded (Node ${process.version})`);
+console.log(`ok: ${entries.length} entry points, ESM and CJS, no runtime dependencies, ${react}, ${openfeature}, ${loaded} entry points loaded (Node ${process.version})`);

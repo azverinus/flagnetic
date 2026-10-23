@@ -214,7 +214,7 @@ function needStrings(op: string, value: unknown): readonly string[] {
 }
 
 // toNumber accepts a finite JavaScript number: an IEEE 754 double, as every
-// port compares. Strings are not numbers: "5" is wrong-typed.
+// evaluator compares. Strings are not numbers: "5" is wrong-typed.
 function toNumber(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
 }
