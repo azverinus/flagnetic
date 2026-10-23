@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/azverinus/flagnetic/sdks/go v0.1.0
-	github.com/open-feature/go-sdk v1.18.0
+	github.com/open-feature/go-sdk v1.19.0
 )
 
 require (
