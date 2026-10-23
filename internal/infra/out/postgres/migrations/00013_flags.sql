@@ -1,9 +1,11 @@
 -- +goose Up
 
 -- The version of an environment's ruleset: every write that changes what an
--- SDK of the environment receives increments it in its own transaction, so
--- a replica or an SDK holding an older version knows to fetch again. It
--- starts at 1 and only grows.
+-- SDK of the environment receives moves it on in its own transaction, so a
+-- replica or an SDK holding an older version knows to fetch again. It starts
+-- at 1 and only grows: the application sets it to the greater of the next
+-- number and the time of the write in milliseconds, so a database restored
+-- from an older backup still serves versions above any an SDK already holds.
 ALTER TABLE environments ADD COLUMN ruleset_version bigint NOT NULL DEFAULT 1 CHECK (ruleset_version >= 1);
 
 -- Flags: a flag's definition, the same in every environment of its project.

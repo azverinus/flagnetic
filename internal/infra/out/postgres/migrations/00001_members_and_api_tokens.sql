@@ -27,10 +27,10 @@ CREATE TABLE api_tokens (
     kind        text        NOT NULL CHECK (kind IN ('personal', 'project')),
     member_id   uuid        REFERENCES members (id),
     project_id  uuid,
-    role        text,
+    role        text        CHECK (role IN ('owner', 'maintainer', 'developer', 'viewer')),
     name        text        NOT NULL,
     hint        text        NOT NULL,
-    token_hash  bytea       NOT NULL UNIQUE,
+    token_hash  bytea       NOT NULL UNIQUE CHECK (length(token_hash) = 32),
     scopes      text[]      NOT NULL,
     expires_at  timestamptz,
     revoked_at  timestamptz,
@@ -41,4 +41,4 @@ CREATE TABLE api_tokens (
     )
 );
 
-CREATE INDEX api_tokens_member_idx ON api_tokens (member_id) WHERE member_id IS NOT NULL;
+CREATE INDEX api_tokens_member ON api_tokens (member_id) WHERE member_id IS NOT NULL;

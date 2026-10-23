@@ -15,4 +15,4 @@ CREATE TABLE invitations (
     consumed_at  timestamptz
 );
 
-CREATE INDEX invitations_member_idx ON invitations (member_id, created_at);
+CREATE INDEX invitations_member ON invitations (member_id, created_at);
