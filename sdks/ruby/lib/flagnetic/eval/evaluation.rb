@@ -80,7 +80,9 @@ module Flagnetic
         flag.rules.each_with_index do |rule, i|
           compiled.rules[i].each do |c|
             add_unsupported(found, c)
-            segments[c.segment]&.unsupported&.each { |u| found << u unless found.include?(u) } if c.segment
+            next if c.segment.to_s.empty?
+
+            segments[c.segment]&.unsupported&.each { |u| found << u unless found.include?(u) }
           end
           kind = rule.serve.kind
           add_construct(found, construct(:serve_kind, kind)) unless SERVE_KINDS.include?(kind)

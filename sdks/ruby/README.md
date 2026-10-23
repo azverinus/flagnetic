@@ -23,7 +23,7 @@ Evaluation records nothing. An exposure is an explicit call, never a side effect
 
 ## Unsupported rules
 
-A server newer than the SDK may send an operator, a condition kind or a serve kind this evaluator does not know. Decoding reports them per flag, and evaluating a flag that reaches one answers `error` with `inconsistent_ruleset`, so a caller serves its default:
+A server newer than the SDK may send an operator, a condition kind or a serve kind this evaluator does not know. Decoding reports them per flag, and evaluating a flag that reaches one answers `error` with `inconsistent_ruleset`, so the flag serves the fallback:
 
 ```ruby
 ruleset.unsupported_rules

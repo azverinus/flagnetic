@@ -126,6 +126,17 @@ class RulesetTest < Minitest::Test
     assert_empty rs.unsupported_rules
   end
 
+  # A condition with an empty segment key names no segment, so a segment
+  # whose key is empty lends it none of its unsupported constructs, as in
+  # the Go module.
+  def test_an_empty_segment_key_names_no_segment_in_the_unsupported_report
+    rs = Eval::Ruleset.decode('{"schema_version":1,"version":1,"scope":"server",
+      "segments":[{"key":"","conditions":[{"kind":"attribute","attribute":"a","op":"sounds_like","value":"x"}]}],
+      "flags":[{"key":"f","on":true,
+        "rules":[{"id":"r","conditions":[{"kind":"in_segment","segment":""}],"serve":{"kind":"variation"}}]}]}')
+    assert_empty rs.unsupported_rules
+  end
+
   def test_check_operator_follows_the_operator_table
     [
       ["string", "matches", "^a", true],

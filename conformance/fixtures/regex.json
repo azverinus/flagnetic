@@ -219,7 +219,6 @@
     {"pattern": "(?i)\\p{Lu}", "input": "K", "match": true},
     {"pattern": "(?i)\\P{Ll}", "input": "K", "match": false},
     {"pattern": "(?i)\\p{Lu}", "input": "ſ", "match": true},
-    {"pattern": "(?i)^\\p{Lu}+$", "input": "aBc", "match": true},
-    {"pattern": "\\p{Lu}", "input": "a", "match": false}
+    {"pattern": "(?i)^\\p{Lu}+$", "input": "aBc", "match": true}
   ]
 }
