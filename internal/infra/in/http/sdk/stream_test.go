@@ -236,6 +236,10 @@ func TestLastEventIDDecidesWhetherTheCurrentVersionIsSent(t *testing.T) {
 
 func TestAKillSwitchOnOneReplicaIsStreamedByAnotherWithinTwoSeconds(t *testing.T) {
 	a, b := testkit.StartServer(t), testkit.StartServer(t)
+	// b observes the kill's propagation only once its listener hears the
+	// notification, and drops its propagation series when the listener comes
+	// up: wait for it before any write, so neither falls inside the test.
+	listening(t, b)
 	p := newProject(t, a)
 	p.flag(t, "checkout.new-flow")
 	p.switchOn(t, "checkout.new-flow", "production")
@@ -245,7 +249,10 @@ func TestAKillSwitchOnOneReplicaIsStreamedByAnotherWithinTwoSeconds(t *testing.T
 	s.started(t)
 	version(t, s.next(t), before)
 	series := `flagnetic_ruleset_propagation_seconds_count{environment="` + p.environmentID(t, "production").String() + `"}`
-	count := testkit.Metric(t, b.Scrape(t), series)
+	// The series is absent until b observes a version of the environment, as
+	// it does not when its first answer comes before the switch's
+	// notification: an absent series counts no observation.
+	count := max(testkit.Metric(t, b.Scrape(t), series), 0)
 
 	start := time.Now()
 	p.kill(t, "checkout.new-flow", "production")
