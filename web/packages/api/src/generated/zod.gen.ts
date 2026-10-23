@@ -684,6 +684,61 @@ export const zVariationInput = z.object({
   description: zDescription.optional(),
 });
 
+export const zExperimentStatus = z.enum(["draft", "running", "stopped", "archived"]);
+
+/**
+ * The share of the allocated traffic one variation of the experiment's
+ * flag gets. The order of an experiment's weights fixes the cumulative
+ * bucket ranges.
+ *
+ */
+export const zExperimentWeight = z.object({
+  variation: z.string(),
+  weight: z.int().gte(0).lte(10000),
+});
+
+export const zExperiment = z.object({
+  id: z.uuid(),
+  key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
+  name: zName,
+  hypothesis: z.string().max(2000),
+  owner: z.uuid(),
+  tags: z.array(z.string()),
+  flag: z.string(),
+  unit_type: z.string(),
+  variations: z.array(zExperimentWeight),
+  traffic_allocation: z.int().gte(0).lte(10000),
+  inclusion_salt: z.string().regex(/^[0-9a-f]{16}$/),
+  variation_salt: z.string().regex(/^[0-9a-f]{16}$/),
+  status: zExperimentStatus,
+  expected_end_at: z.iso.date().nullable(),
+  started_at: z.iso.datetime().nullable(),
+  stopped_at: z.iso.datetime().nullable(),
+  archived_at: z.iso.datetime().nullable(),
+  created_by: z.uuid().nullable(),
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
+  version: zVersion,
+});
+
+export const zExperimentList = z.object({
+  items: z.array(zExperiment),
+  next_cursor: z.string().nullable(),
+});
+
+export const zExperimentCreate = z.object({
+  key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
+  name: zName,
+  hypothesis: z.string().max(2000).optional(),
+  owner: z.uuid().optional(),
+  tags: z.array(z.string().min(1).max(64)).max(50).optional(),
+  flag: z.string(),
+  unit_type: z.string(),
+  variations: z.array(zExperimentWeight).min(2).max(50),
+  traffic_allocation: z.int().gte(0).lte(10000).optional(),
+  expected_end_at: z.iso.date().optional(),
+});
+
 export const zFlagDefinition = z.object({
   id: z.uuid(),
   key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
@@ -1049,6 +1104,11 @@ export const zLimit = z.int().gte(1).lte(200).default(50);
  * The flag's key.
  */
 export const zFlagKey = z.string();
+
+/**
+ * The experiment's key.
+ */
+export const zExperimentKey = z.string();
 
 /**
  * The segment's key.
@@ -1782,6 +1842,41 @@ export const zRegenerateRolloutSaltPath = z.object({
  * The configuration as it is now.
  */
 export const zRegenerateRolloutSaltResponse = zFlagConfiguration;
+
+export const zListExperimentsPath = z.object({
+  project: z.string(),
+});
+
+export const zListExperimentsQuery = z.object({
+  cursor: z.string().optional(),
+  limit: z.int().gte(1).lte(200).optional().default(50),
+});
+
+/**
+ * One page of experiments.
+ */
+export const zListExperimentsResponse = zExperimentList;
+
+export const zCreateExperimentBody = zExperimentCreate;
+
+export const zCreateExperimentPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * Created.
+ */
+export const zCreateExperimentResponse = zExperiment;
+
+export const zGetExperimentPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+/**
+ * The experiment; its `ETag` is its version.
+ */
+export const zGetExperimentResponse = zExperiment;
 
 export const zListSegmentsPath = z.object({
   project: z.string(),

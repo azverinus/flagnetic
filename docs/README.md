@@ -4,6 +4,7 @@
 - [Glossary](glossary.md): the vocabulary the code, the API, the docs and the console use.
 - [Access](access.md): permissions, roles, grants, scopes and API tokens.
 - [Flags](flags.md): flag definitions, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch, revert, copy and compare.
+- [Experiments](experiments.md): creating an experiment on a flag, its salts and weights.
 - [Segments](segments.md) and [Targeting](targeting.md): reusable sets of conditions, and the operators and limits of every condition.
 - [Operations](operations.md) and the [configuration reference](configuration.md): running the server, how changes reach SDKs across replicas, and what to watch.
 

@@ -111,6 +111,7 @@ const actionLabels: Record<string, MessageDescriptor> = {
   "flag.killed": msg`Kill switch used`,
   "flag.reverted": msg`Configuration reverted`,
   "flag.configuration_copied": msg`Configuration copied from another environment`,
+  "experiment.created": msg`Experiment created`,
   "segment.created": msg`Segment created`,
   "segment.updated": msg`Segment updated`,
   "segment.deleted": msg`Segment deleted`,

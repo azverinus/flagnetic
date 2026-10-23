@@ -20,7 +20,7 @@ The open-source flag products keep a paid tier, and the features a real team nee
 
 Each arrives in a later release:
 
-- **Experiments**: deterministic bucketing is in the ruleset format and the SDK already, but experiments cannot be created, exposures are not stored and there is no analysis.
+- **Experiments**: they can be created and read, but a rule cannot serve one yet, they cannot be started, exposures are not stored and there is no analysis.
 - **Reports** on the evaluation summaries SDKs send, such as flags no SDK evaluates any more.
 - **Governance**: protected environments with change requests, scheduled changes, webhooks.
 - **Identity**: OIDC, SAML and SCIM.

@@ -925,6 +925,112 @@ export type VariationInput = {
   description?: Description;
 };
 
+export type ExperimentStatus = "draft" | "running" | "stopped" | "archived";
+
+/**
+ * The share of the allocated traffic one variation of the experiment's
+ * flag gets. The order of an experiment's weights fixes the cumulative
+ * bucket ranges.
+ *
+ */
+export type ExperimentWeight = {
+  /**
+   * The key of a variation of the experiment's flag.
+   */
+  variation: string;
+  /**
+   * In basis points (0.01 %); the weights of an experiment sum to 10,000.
+   */
+  weight: number;
+};
+
+export type Experiment = {
+  id: string;
+  /**
+   * Names the experiment in rules and in the exposures SDKs report; unique, case sensitively, in the project, and never changes.
+   */
+  key: string;
+  name: Name;
+  /**
+   * What the experiment expects to find, written before it runs.
+   */
+  hypothesis: string;
+  /**
+   * The member accountable for the experiment.
+   */
+  owner: string;
+  tags: Array<string>;
+  /**
+   * The key of the flag whose variations the experiment compares.
+   */
+  flag: string;
+  /**
+   * The key of the declared unit type whose units are split.
+   */
+  unit_type: string;
+  variations: Array<ExperimentWeight>;
+  /**
+   * The share of units included, in basis points.
+   */
+  traffic_allocation: number;
+  /**
+   * Decides whether a unit is included; no other experiment or rollout of the project has it.
+   */
+  inclusion_salt: string;
+  /**
+   * Decides which variation an included unit gets; no other experiment or rollout of the project has it.
+   */
+  variation_salt: string;
+  status: ExperimentStatus;
+  expected_end_at: string | null;
+  started_at: string | null;
+  stopped_at: string | null;
+  archived_at: string | null;
+  /**
+   * The member who created the experiment; null when a project token did.
+   */
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  version: Version;
+};
+
+export type ExperimentList = {
+  items: Array<Experiment>;
+  /**
+   * Pass as `cursor` for the next page; null on the last.
+   */
+  next_cursor: string | null;
+};
+
+export type ExperimentCreate = {
+  /**
+   * Names the experiment in rules and in the exposures SDKs report; unique, case sensitively, in the project, and never changes.
+   */
+  key: string;
+  name: Name;
+  hypothesis?: string;
+  /**
+   * An active member holding a grant in the project, or an instance admin (`invalid_owner` otherwise); the calling member when absent, which a project token cannot leave it.
+   */
+  owner?: string;
+  tags?: Array<string>;
+  /**
+   * The key of a flag of the project that is not archived.
+   */
+  flag: string;
+  /**
+   * The key of a unit type the project declares.
+   */
+  unit_type: string;
+  variations: Array<ExperimentWeight>;
+  /**
+   * Every unit's (10,000) when absent.
+   */
+  traffic_allocation?: number;
+  expected_end_at?: string;
+};
+
 export type FlagDefinition = {
   id: string;
   /**
@@ -1452,6 +1558,11 @@ export type Limit = number;
  * The flag's key.
  */
 export type FlagKey = string;
+
+/**
+ * The experiment's key.
+ */
+export type ExperimentKey = string;
 
 /**
  * The segment's key.
@@ -5198,6 +5309,175 @@ export type RegenerateRolloutSaltResponses = {
 
 export type RegenerateRolloutSaltResponse =
   RegenerateRolloutSaltResponses[keyof RegenerateRolloutSaltResponses];
+
+export type ListExperimentsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: {
+    /**
+     * The `next_cursor` of the previous page.
+     */
+    cursor?: string;
+    /**
+     * How many entries a page holds at most.
+     */
+    limit?: number;
+  };
+  url: "/projects/{project}/experiments";
+};
+
+export type ListExperimentsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListExperimentsError = ListExperimentsErrors[keyof ListExperimentsErrors];
+
+export type ListExperimentsResponses = {
+  /**
+   * One page of experiments.
+   */
+  200: ExperimentList;
+};
+
+export type ListExperimentsResponse = ListExperimentsResponses[keyof ListExperimentsResponses];
+
+export type CreateExperimentData = {
+  body: ExperimentCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/experiments";
+};
+
+export type CreateExperimentErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateExperimentError = CreateExperimentErrors[keyof CreateExperimentErrors];
+
+export type CreateExperimentResponses = {
+  /**
+   * Created.
+   */
+  201: Experiment;
+};
+
+export type CreateExperimentResponse = CreateExperimentResponses[keyof CreateExperimentResponses];
+
+export type GetExperimentData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/experiments/{experiment}";
+};
+
+export type GetExperimentErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetExperimentError = GetExperimentErrors[keyof GetExperimentErrors];
+
+export type GetExperimentResponses = {
+  /**
+   * The experiment; its `ETag` is its version.
+   */
+  200: Experiment;
+};
+
+export type GetExperimentResponse = GetExperimentResponses[keyof GetExperimentResponses];
 
 export type ListSegmentsData = {
   body?: never;

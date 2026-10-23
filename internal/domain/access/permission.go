@@ -77,6 +77,11 @@ const (
 	// environment's SDK keys and edits their allowed origins. Reading them
 	// is project.read: a listed key never carries its value.
 	PermSDKKeyManage Permission = "sdk_key.manage"
+	// PermExperimentEdit creates experiments, changes them, moves them
+	// through their statuses and acknowledges their alerts.
+	PermExperimentEdit Permission = "experiment.edit"
+	// PermExperimentDelete deletes draft experiments.
+	PermExperimentDelete Permission = "experiment.delete"
 )
 
 // catalog is every permission an operation can require. Each context adds
@@ -102,6 +107,11 @@ var catalog = []PermissionSpec{
 	// project token may hold it: an SDK key reaches one environment's
 	// delivery and never changes who has access to the project.
 	{Name: PermSDKKeyManage, Scope: ScopeProjectAdmin},
+	// An experiment is run by the pipeline that ships the flag it compares,
+	// under a scope of its own so a token can be allowed to run experiments
+	// and not to write rules, or the other way round.
+	{Name: PermExperimentEdit, Scope: ScopeExperimentsWrite},
+	{Name: PermExperimentDelete, Scope: ScopeExperimentsWrite},
 }
 
 // Catalog returns the permission catalog.
@@ -191,15 +201,16 @@ var roles = []Role{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermDeclarationManage,
 		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
 		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete, PermSDKKeyManage,
+		PermExperimentEdit, PermExperimentDelete,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
 		PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete,
-		PermSDKKeyManage,
+		PermSDKKeyManage, PermExperimentEdit, PermExperimentDelete,
 	}},
 	{Name: RoleDeveloper, Permissions: []Permission{
 		PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert,
-		PermSegmentEdit,
+		PermSegmentEdit, PermExperimentEdit,
 	}},
 	{Name: RoleViewer, Permissions: []Permission{PermProjectRead}},
 }

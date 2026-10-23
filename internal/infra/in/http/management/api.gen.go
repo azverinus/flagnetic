@@ -94,6 +94,30 @@ func (e CredentialMethod) Valid() bool {
 	}
 }
 
+// Defines values for ExperimentStatus.
+const (
+	ExperimentStatusArchived ExperimentStatus = "archived"
+	ExperimentStatusDraft    ExperimentStatus = "draft"
+	ExperimentStatusRunning  ExperimentStatus = "running"
+	ExperimentStatusStopped  ExperimentStatus = "stopped"
+)
+
+// Valid indicates whether the value is a known member of the ExperimentStatus enum.
+func (e ExperimentStatus) Valid() bool {
+	switch e {
+	case ExperimentStatusArchived:
+		return true
+	case ExperimentStatusDraft:
+		return true
+	case ExperimentStatusRunning:
+		return true
+	case ExperimentStatusStopped:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FlagType.
 const (
 	FlagTypeBoolean FlagType = "boolean"
@@ -734,6 +758,97 @@ type EvaluationResult struct {
 
 	// Variation The served variation's key; absent for an error.
 	Variation *string `json:"variation,omitempty"`
+}
+
+// Experiment defines model for Experiment.
+type Experiment struct {
+	ArchivedAt *time.Time `json:"archived_at"`
+	CreatedAt  time.Time  `json:"created_at"`
+
+	// CreatedBy The member who created the experiment; null when a project token did.
+	CreatedBy     *openapi_types.UUID `json:"created_by"`
+	ExpectedEndAt *openapi_types.Date `json:"expected_end_at"`
+
+	// Flag The key of the flag whose variations the experiment compares.
+	Flag string `json:"flag"`
+
+	// Hypothesis What the experiment expects to find, written before it runs.
+	Hypothesis string             `json:"hypothesis"`
+	Id         openapi_types.UUID `json:"id"`
+
+	// InclusionSalt Decides whether a unit is included; no other experiment or rollout of the project has it.
+	InclusionSalt string `json:"inclusion_salt"`
+
+	// Key Names the experiment in rules and in the exposures SDKs report; unique, case sensitively, in the project, and never changes.
+	Key  string `json:"key"`
+	Name Name   `json:"name"`
+
+	// Owner The member accountable for the experiment.
+	Owner     openapi_types.UUID `json:"owner"`
+	StartedAt *time.Time         `json:"started_at"`
+	Status    ExperimentStatus   `json:"status"`
+	StoppedAt *time.Time         `json:"stopped_at"`
+	Tags      []string           `json:"tags"`
+
+	// TrafficAllocation The share of units included, in basis points.
+	TrafficAllocation int `json:"traffic_allocation"`
+
+	// UnitType The key of the declared unit type whose units are split.
+	UnitType  string    `json:"unit_type"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// VariationSalt Decides which variation an included unit gets; no other experiment or rollout of the project has it.
+	VariationSalt string             `json:"variation_salt"`
+	Variations    []ExperimentWeight `json:"variations"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+}
+
+// ExperimentCreate defines model for ExperimentCreate.
+type ExperimentCreate struct {
+	ExpectedEndAt *openapi_types.Date `json:"expected_end_at,omitempty"`
+
+	// Flag The key of a flag of the project that is not archived.
+	Flag       string  `json:"flag"`
+	Hypothesis *string `json:"hypothesis,omitempty"`
+
+	// Key Names the experiment in rules and in the exposures SDKs report; unique, case sensitively, in the project, and never changes.
+	Key  string `json:"key"`
+	Name Name   `json:"name"`
+
+	// Owner An active member holding a grant in the project, or an instance admin (`invalid_owner` otherwise); the calling member when absent, which a project token cannot leave it.
+	Owner *openapi_types.UUID `json:"owner,omitempty"`
+	Tags  *[]string           `json:"tags,omitempty"`
+
+	// TrafficAllocation Every unit's (10,000) when absent.
+	TrafficAllocation *int `json:"traffic_allocation,omitempty"`
+
+	// UnitType The key of a unit type the project declares.
+	UnitType   string             `json:"unit_type"`
+	Variations []ExperimentWeight `json:"variations"`
+}
+
+// ExperimentList defines model for ExperimentList.
+type ExperimentList struct {
+	Items []Experiment `json:"items"`
+
+	// NextCursor Pass as `cursor` for the next page; null on the last.
+	NextCursor *string `json:"next_cursor"`
+}
+
+// ExperimentStatus defines model for ExperimentStatus.
+type ExperimentStatus string
+
+// ExperimentWeight The share of the allocated traffic one variation of the experiment's
+// flag gets. The order of an experiment's weights fixes the cumulative
+// bucket ranges.
+type ExperimentWeight struct {
+	// Variation The key of a variation of the experiment's flag.
+	Variation string `json:"variation"`
+
+	// Weight In basis points (0.01 %); the weights of an experiment sum to 10,000.
+	Weight int `json:"weight"`
 }
 
 // Flag A flag's definition with its configuration in every environment, by the environments' order.
@@ -1768,6 +1883,9 @@ type Cursor = string
 // EnvironmentKey defines model for EnvironmentKey.
 type EnvironmentKey = string
 
+// ExperimentKey defines model for ExperimentKey.
+type ExperimentKey = string
+
 // FlagKey defines model for FlagKey.
 type FlagKey = string
 
@@ -1980,6 +2098,15 @@ type UpdateEnvironmentParams struct {
 	// the current one `412 version_mismatch`, both judged after the request
 	// is validated.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListExperimentsParams defines parameters for ListExperiments.
+type ListExperimentsParams struct {
+	// Cursor The `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit How many entries a page holds at most.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListFlagsParams defines parameters for ListFlags.
@@ -2209,6 +2336,9 @@ type UpdateSdkKeyJSONRequestBody = SdkKeyPatch
 
 // RotateSdkKeyJSONRequestBody defines body for RotateSdkKey for application/json ContentType.
 type RotateSdkKeyJSONRequestBody = SdkKeyRotation
+
+// CreateExperimentJSONRequestBody defines body for CreateExperiment for application/json ContentType.
+type CreateExperimentJSONRequestBody = ExperimentCreate
 
 // CreateFlagJSONRequestBody defines body for CreateFlag for application/json ContentType.
 type CreateFlagJSONRequestBody = FlagCreate
@@ -3134,6 +3264,56 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
 	RotateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListExperiments The project's experiments
+	//
+	// The project's experiments by key in byte order (capitals before
+	// lower case). Page with `cursor` set to the `next_cursor` of the
+	// previous page.
+	//
+	// Corresponds with GET /projects/{project}/experiments (the `ListExperiments` operationId).
+	ListExperiments(ctx context.Context, project ProjectKey, params *ListExperimentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateExperimentWithBody Create an experiment
+	//
+	// The experiment arrives as a draft, with an inclusion salt and a
+	// variation salt the server draws: no other experiment or rollout of
+	// the project uses either, so two assignments are independent. It
+	// compares 2 to 50 distinct variations of a flag of the project that
+	// is not archived, each with a weight in basis points, the weights
+	// summing to 10,000, over units of a declared unit type. The traffic
+	// allocation is every unit's (10,000) when absent. The owner defaults
+	// to the calling member; a project token names one. A key in use is
+	// `already_exists`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
+	CreateExperimentWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateExperiment Create an experiment
+	//
+	// The experiment arrives as a draft, with an inclusion salt and a
+	// variation salt the server draws: no other experiment or rollout of
+	// the project uses either, so two assignments are independent. It
+	// compares 2 to 50 distinct variations of a flag of the project that
+	// is not archived, each with a weight in basis points, the weights
+	// summing to 10,000, over units of a declared unit type. The traffic
+	// allocation is every unit's (10,000) when absent. The owner defaults
+	// to the calling member; a project token names one. A key in use is
+	// `already_exists`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
+	CreateExperiment(ctx context.Context, project ProjectKey, body CreateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetExperiment An experiment
+	//
+	// The experiment with both its salts, so anyone can recompute a unit's buckets.
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment} (the `GetExperiment` operationId).
+	GetExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListFlags The project's flags
 	//
@@ -5228,6 +5408,96 @@ func (c *Client) RotateSdkKeyWithBody(ctx context.Context, project ProjectKey, e
 // Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
 func (c *Client) RotateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRotateSdkKeyRequest(c.Server, project, environment, sdkKey, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListExperiments The project's experiments
+//
+// The project's experiments by key in byte order (capitals before
+// lower case). Page with `cursor` set to the `next_cursor` of the
+// previous page.
+//
+// Corresponds with GET /projects/{project}/experiments (the `ListExperiments` operationId).
+func (c *Client) ListExperiments(ctx context.Context, project ProjectKey, params *ListExperimentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListExperimentsRequest(c.Server, project, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateExperimentWithBody Create an experiment
+//
+// The experiment arrives as a draft, with an inclusion salt and a
+// variation salt the server draws: no other experiment or rollout of
+// the project uses either, so two assignments are independent. It
+// compares 2 to 50 distinct variations of a flag of the project that
+// is not archived, each with a weight in basis points, the weights
+// summing to 10,000, over units of a declared unit type. The traffic
+// allocation is every unit's (10,000) when absent. The owner defaults
+// to the calling member; a project token names one. A key in use is
+// `already_exists`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
+func (c *Client) CreateExperimentWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateExperimentRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateExperiment Create an experiment
+//
+// The experiment arrives as a draft, with an inclusion salt and a
+// variation salt the server draws: no other experiment or rollout of
+// the project uses either, so two assignments are independent. It
+// compares 2 to 50 distinct variations of a flag of the project that
+// is not archived, each with a weight in basis points, the weights
+// summing to 10,000, over units of a declared unit type. The traffic
+// allocation is every unit's (10,000) when absent. The owner defaults
+// to the calling member; a project token names one. A key in use is
+// `already_exists`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
+func (c *Client) CreateExperiment(ctx context.Context, project ProjectKey, body CreateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateExperimentRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetExperiment An experiment
+//
+// The experiment with both its salts, so anyone can recompute a unit's buckets.
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment} (the `GetExperiment` operationId).
+func (c *Client) GetExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExperimentRequest(c.Server, project, experiment)
 	if err != nil {
 		return nil, err
 	}
@@ -8884,6 +9154,167 @@ func NewRotateSdkKeyRequestWithBody(server string, project ProjectKey, environme
 	return req, nil
 }
 
+// NewListExperimentsRequest constructs an http.Request for the ListExperiments method
+func NewListExperimentsRequest(server string, project ProjectKey, params *ListExperimentsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateExperimentRequest calls the generic CreateExperiment builder with application/json body
+func NewCreateExperimentRequest(server string, project ProjectKey, body CreateExperimentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateExperimentRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewCreateExperimentRequestWithBody constructs an http.Request for the CreateExperiment method, with any body, and a specified content type
+func NewCreateExperimentRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetExperimentRequest constructs an http.Request for the GetExperiment method
+func NewGetExperimentRequest(server string, project ProjectKey, experiment ExperimentKey) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListFlagsRequest constructs an http.Request for the ListFlags method
 func NewListFlagsRequest(server string, project ProjectKey, params *ListFlagsParams) (*http.Request, error) {
 	var err error
@@ -11739,6 +12170,60 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
 	RotateSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*RotateSdkKeyResponse, error)
+
+	// ListExperimentsWithResponse The project's experiments
+	//
+	// The project's experiments by key in byte order (capitals before
+	// lower case). Page with `cursor` set to the `next_cursor` of the
+	// previous page.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/experiments (the `ListExperiments` operationId).
+	ListExperimentsWithResponse(ctx context.Context, project ProjectKey, params *ListExperimentsParams, reqEditors ...RequestEditorFn) (*ListExperimentsResponse, error)
+
+	// CreateExperimentWithBodyWithResponse Create an experiment
+	//
+	// The experiment arrives as a draft, with an inclusion salt and a
+	// variation salt the server draws: no other experiment or rollout of
+	// the project uses either, so two assignments are independent. It
+	// compares 2 to 50 distinct variations of a flag of the project that
+	// is not archived, each with a weight in basis points, the weights
+	// summing to 10,000, over units of a declared unit type. The traffic
+	// allocation is every unit's (10,000) when absent. The owner defaults
+	// to the calling member; a project token names one. A key in use is
+	// `already_exists`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
+	CreateExperimentWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateExperimentResponse, error)
+
+	// CreateExperimentWithResponse Create an experiment
+	//
+	// The experiment arrives as a draft, with an inclusion salt and a
+	// variation salt the server draws: no other experiment or rollout of
+	// the project uses either, so two assignments are independent. It
+	// compares 2 to 50 distinct variations of a flag of the project that
+	// is not archived, each with a weight in basis points, the weights
+	// summing to 10,000, over units of a declared unit type. The traffic
+	// allocation is every unit's (10,000) when absent. The owner defaults
+	// to the calling member; a project token names one. A key in use is
+	// `already_exists`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
+	CreateExperimentWithResponse(ctx context.Context, project ProjectKey, body CreateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateExperimentResponse, error)
+
+	// GetExperimentWithResponse An experiment
+	//
+	// The experiment with both its salts, so anyone can recompute a unit's buckets.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment} (the `GetExperiment` operationId).
+	GetExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, reqEditors ...RequestEditorFn) (*GetExperimentResponse, error)
 
 	// ListFlagsWithResponse The project's flags
 	//
@@ -16587,6 +17072,248 @@ func (r RotateSdkKeyResponse) ContentType() string {
 	return ""
 }
 
+// ListExperimentsResponse401Headers the declared response headers of an HTTP 401 response for ListExperiments
+type ListExperimentsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListExperimentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExperimentList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListExperimentsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListExperimentsResponse) GetJSON200() *ExperimentList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListExperimentsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListExperimentsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListExperimentsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListExperimentsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListExperimentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListExperimentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListExperimentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListExperimentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateExperimentResponse201Headers the declared response headers of an HTTP 201 response for CreateExperiment
+type CreateExperimentResponse201Headers struct {
+	ETag *string
+}
+
+// CreateExperimentResponse401Headers the declared response headers of an HTTP 401 response for CreateExperiment
+type CreateExperimentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateExperimentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Experiment
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateExperimentResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateExperimentResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateExperimentResponse) GetJSON201() *Experiment {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateExperimentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateExperimentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateExperimentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateExperimentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateExperimentResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateExperimentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateExperimentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateExperimentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateExperimentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetExperimentResponse200Headers the declared response headers of an HTTP 200 response for GetExperiment
+type GetExperimentResponse200Headers struct {
+	ETag *string
+}
+
+// GetExperimentResponse401Headers the declared response headers of an HTTP 401 response for GetExperiment
+type GetExperimentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetExperimentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Experiment
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetExperimentResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetExperimentResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetExperimentResponse) GetJSON200() *Experiment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetExperimentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetExperimentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetExperimentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetExperimentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExperimentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExperimentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetExperimentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListFlagsResponse401Headers the declared response headers of an HTTP 401 response for ListFlags
 type ListFlagsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -20885,6 +21612,84 @@ func (c *ClientWithResponses) RotateSdkKeyWithResponse(ctx context.Context, proj
 		return nil, err
 	}
 	return ParseRotateSdkKeyResponse(rsp)
+}
+
+// ListExperimentsWithResponse The project's experiments
+//
+// The project's experiments by key in byte order (capitals before
+// lower case). Page with `cursor` set to the `next_cursor` of the
+// previous page.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/experiments (the `ListExperiments` operationId).
+func (c *ClientWithResponses) ListExperimentsWithResponse(ctx context.Context, project ProjectKey, params *ListExperimentsParams, reqEditors ...RequestEditorFn) (*ListExperimentsResponse, error) {
+	rsp, err := c.ListExperiments(ctx, project, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListExperimentsResponse(rsp)
+}
+
+// CreateExperimentWithBodyWithResponse Create an experiment
+//
+// The experiment arrives as a draft, with an inclusion salt and a
+// variation salt the server draws: no other experiment or rollout of
+// the project uses either, so two assignments are independent. It
+// compares 2 to 50 distinct variations of a flag of the project that
+// is not archived, each with a weight in basis points, the weights
+// summing to 10,000, over units of a declared unit type. The traffic
+// allocation is every unit's (10,000) when absent. The owner defaults
+// to the calling member; a project token names one. A key in use is
+// `already_exists`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
+func (c *ClientWithResponses) CreateExperimentWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateExperimentResponse, error) {
+	rsp, err := c.CreateExperimentWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateExperimentResponse(rsp)
+}
+
+// CreateExperimentWithResponse Create an experiment
+//
+// The experiment arrives as a draft, with an inclusion salt and a
+// variation salt the server draws: no other experiment or rollout of
+// the project uses either, so two assignments are independent. It
+// compares 2 to 50 distinct variations of a flag of the project that
+// is not archived, each with a weight in basis points, the weights
+// summing to 10,000, over units of a declared unit type. The traffic
+// allocation is every unit's (10,000) when absent. The owner defaults
+// to the calling member; a project token names one. A key in use is
+// `already_exists`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
+func (c *ClientWithResponses) CreateExperimentWithResponse(ctx context.Context, project ProjectKey, body CreateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateExperimentResponse, error) {
+	rsp, err := c.CreateExperiment(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateExperimentResponse(rsp)
+}
+
+// GetExperimentWithResponse An experiment
+//
+// The experiment with both its salts, so anyone can recompute a unit's buckets.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment} (the `GetExperiment` operationId).
+func (c *ClientWithResponses) GetExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, reqEditors ...RequestEditorFn) (*GetExperimentResponse, error) {
+	rsp, err := c.GetExperiment(ctx, project, experiment, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExperimentResponse(rsp)
 }
 
 // ListFlagsWithResponse The project's flags
@@ -25622,6 +26427,227 @@ func ParseRotateSdkKeyResponse(rsp *http.Response) (*RotateSdkKeyResponse, error
 	return response, nil
 }
 
+// ParseListExperimentsResponse parses an HTTP response from a ListExperimentsWithResponse call
+func ParseListExperimentsResponse(rsp *http.Response) (*ListExperimentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListExperimentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExperimentList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListExperimentsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateExperimentResponse parses an HTTP response from a CreateExperimentWithResponse call
+func ParseCreateExperimentResponse(rsp *http.Response) (*CreateExperimentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateExperimentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Experiment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateExperimentResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CreateExperimentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetExperimentResponse parses an HTTP response from a GetExperimentWithResponse call
+func ParseGetExperimentResponse(rsp *http.Response) (*GetExperimentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExperimentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Experiment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetExperimentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetExperimentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListFlagsResponse parses an HTTP response from a ListFlagsWithResponse call
 func ParseListFlagsResponse(rsp *http.Response) (*ListFlagsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -28514,6 +29540,15 @@ type ServerInterface interface {
 	// RotateSdkKey Rotate an SDK key
 	// (POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate)
 	RotateSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID)
+	// ListExperiments The project's experiments
+	// (GET /projects/{project}/experiments)
+	ListExperiments(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListExperimentsParams)
+	// CreateExperiment Create an experiment
+	// (POST /projects/{project}/experiments)
+	CreateExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// GetExperiment An experiment
+	// (GET /projects/{project}/experiments/{experiment})
+	GetExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListFlagsParams)
@@ -30550,6 +31585,122 @@ func (siw *ServerInterfaceWrapper) RotateSdkKey(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListExperiments operation middleware
+func (siw *ServerInterfaceWrapper) ListExperiments(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListExperimentsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListExperiments(w, r, project, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateExperiment operation middleware
+func (siw *ServerInterfaceWrapper) CreateExperiment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateExperiment(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetExperiment operation middleware
+func (siw *ServerInterfaceWrapper) GetExperiment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetExperiment(w, r, project, experiment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListFlags operation middleware
 func (siw *ServerInterfaceWrapper) ListFlags(w http.ResponseWriter, r *http.Request) {
 
@@ -32378,6 +33529,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}", wrapper.DeleteOverride)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}", wrapper.PutOverride)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt", wrapper.RegenerateRolloutSalt)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.ListExperiments)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.CreateExperiment)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.GetExperiment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/segments", wrapper.ListSegments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/segments", wrapper.CreateSegment)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/segments/{segment}", wrapper.DeleteSegment)
@@ -37433,6 +38587,296 @@ func (response RotateSdkKey422ApplicationProblemPlusJSONResponse) VisitRotateSdk
 	return err
 }
 
+type ListExperimentsRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Params  ListExperimentsParams
+}
+
+type ListExperimentsResponseObject interface {
+	VisitListExperimentsResponse(w http.ResponseWriter) error
+}
+
+type ListExperiments200JSONResponse ExperimentList
+
+func (response ListExperiments200JSONResponse) VisitListExperimentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExperiments400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListExperiments400ApplicationProblemPlusJSONResponse) VisitListExperimentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExperiments401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListExperiments401ApplicationProblemPlusJSONResponse) VisitListExperimentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExperiments403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListExperiments403ApplicationProblemPlusJSONResponse) VisitListExperimentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExperiments404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListExperiments404ApplicationProblemPlusJSONResponse) VisitListExperimentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateExperimentRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *CreateExperimentJSONRequestBody
+}
+
+type CreateExperimentResponseObject interface {
+	VisitCreateExperimentResponse(w http.ResponseWriter) error
+}
+
+type CreateExperiment201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateExperiment201JSONResponse struct {
+	Body    Experiment
+	Headers CreateExperiment201ResponseHeaders
+}
+
+func (response CreateExperiment201JSONResponse) VisitCreateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateExperiment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateExperiment401ApplicationProblemPlusJSONResponse) VisitCreateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateExperiment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateExperiment403ApplicationProblemPlusJSONResponse) VisitCreateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateExperiment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateExperiment404ApplicationProblemPlusJSONResponse) VisitCreateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateExperiment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateExperiment409ApplicationProblemPlusJSONResponse) VisitCreateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateExperiment422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateExperiment422ApplicationProblemPlusJSONResponse) VisitCreateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+}
+
+type GetExperimentResponseObject interface {
+	VisitGetExperimentResponse(w http.ResponseWriter) error
+}
+
+type GetExperiment200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetExperiment200JSONResponse struct {
+	Body    Experiment
+	Headers GetExperiment200ResponseHeaders
+}
+
+func (response GetExperiment200JSONResponse) VisitGetExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperiment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperiment401ApplicationProblemPlusJSONResponse) VisitGetExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperiment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperiment403ApplicationProblemPlusJSONResponse) VisitGetExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperiment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperiment404ApplicationProblemPlusJSONResponse) VisitGetExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFlagsRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  ListFlagsParams
@@ -41415,6 +42859,15 @@ type StrictServerInterface interface {
 	// RotateSdkKey Rotate an SDK key
 	// (POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate)
 	RotateSdkKey(ctx context.Context, request RotateSdkKeyRequestObject) (RotateSdkKeyResponseObject, error)
+	// ListExperiments The project's experiments
+	// (GET /projects/{project}/experiments)
+	ListExperiments(ctx context.Context, request ListExperimentsRequestObject) (ListExperimentsResponseObject, error)
+	// CreateExperiment Create an experiment
+	// (POST /projects/{project}/experiments)
+	CreateExperiment(ctx context.Context, request CreateExperimentRequestObject) (CreateExperimentResponseObject, error)
+	// GetExperiment An experiment
+	// (GET /projects/{project}/experiments/{experiment})
+	GetExperiment(ctx context.Context, request GetExperimentRequestObject) (GetExperimentResponseObject, error)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(ctx context.Context, request ListFlagsRequestObject) (ListFlagsResponseObject, error)
@@ -43119,6 +44572,93 @@ func (sh *strictHandler) RotateSdkKey(w http.ResponseWriter, r *http.Request, pr
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RotateSdkKeyResponseObject); ok {
 		if err := validResponse.VisitRotateSdkKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListExperiments operation middleware
+func (sh *strictHandler) ListExperiments(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListExperimentsParams) {
+	var request ListExperimentsRequestObject
+
+	request.Project = project
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListExperiments(ctx, request.(ListExperimentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListExperiments")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListExperimentsResponseObject); ok {
+		if err := validResponse.VisitListExperimentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateExperiment operation middleware
+func (sh *strictHandler) CreateExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request CreateExperimentRequestObject
+
+	request.Project = project
+
+	var body CreateExperimentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateExperiment(ctx, request.(CreateExperimentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateExperiment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateExperimentResponseObject); ok {
+		if err := validResponse.VisitCreateExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetExperiment operation middleware
+func (sh *strictHandler) GetExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey) {
+	var request GetExperimentRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetExperiment(ctx, request.(GetExperimentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetExperiment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetExperimentResponseObject); ok {
+		if err := validResponse.VisitGetExperimentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
