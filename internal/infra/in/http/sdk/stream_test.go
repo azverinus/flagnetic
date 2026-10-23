@@ -236,6 +236,10 @@ func TestLastEventIDDecidesWhetherTheCurrentVersionIsSent(t *testing.T) {
 
 func TestAKillSwitchOnOneReplicaIsStreamedByAnotherWithinTwoSeconds(t *testing.T) {
 	a, b := testkit.StartServer(t), testkit.StartServer(t)
+	// b observes the kill's propagation only once its listener hears the
+	// notification, and drops its propagation series when the listener comes
+	// up: wait for it before any write, so neither falls inside the test.
+	listening(t, b)
 	p := newProject(t, a)
 	p.flag(t, "checkout.new-flow")
 	p.switchOn(t, "checkout.new-flow", "production")
@@ -245,7 +249,10 @@ func TestAKillSwitchOnOneReplicaIsStreamedByAnotherWithinTwoSeconds(t *testing.T
 	s.started(t)
 	version(t, s.next(t), before)
 	series := `flagnetic_ruleset_propagation_seconds_count{environment="` + p.environmentID(t, "production").String() + `"}`
-	count := testkit.Metric(t, b.Scrape(t), series)
+	// The series is absent until b observes a version of the environment, as
+	// it does not when its first answer comes before the switch's
+	// notification: an absent series counts no observation.
+	count := max(testkit.Metric(t, b.Scrape(t), series), 0)
 
 	start := time.Now()
 	p.kill(t, "checkout.new-flow", "production")
@@ -275,6 +282,9 @@ func TestAKillSwitchOnOneReplicaIsStreamedByAnotherWithinTwoSeconds(t *testing.T
 func TestChangesArrivingWhileAnEnvironmentReloadsCoalesce(t *testing.T) {
 	fault := &pgdelivery.RulesetLoadFault{}
 	srv := testkit.StartServer(t, testkit.WithRulesetLoadFault(fault))
+	// The reloads counted below must be the changes': a listener coming up
+	// later would wake the environment and start one of its own.
+	listening(t, srv)
 	p := newProject(t, srv)
 	p.flag(t, "checkout.new-flow")
 	p.flag(t, "search.ranking")
@@ -301,6 +311,9 @@ func TestAMissedChangeIsCaughtUpOnTheNextHeartbeat(t *testing.T) {
 	c := fakeClock()
 	fault := &pgdelivery.RulesetLoadFault{}
 	srv := testkit.StartServer(t, testkit.WithClock(c), testkit.WithRulesetLoadFault(fault))
+	// The reloads counted below must be the change's: a listener coming up
+	// later would wake the environment and reload it on its own.
+	listening(t, srv)
 	p := newProject(t, srv)
 	p.flag(t, "checkout.new-flow")
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
@@ -410,11 +423,7 @@ func TestAVersionMissedWhileTheListenerWasDeafIsStreamedOnceItListensAgain(t *te
 	s.started(t)
 	s.next(t) // the current version
 
-	up := `flagnetic_listener_up{channel="rulesets"}`
-	fault.Silence()
-	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, b.Scrape(t), up) == 0 }) {
-		t.Fatal("b's listener was never found deaf")
-	}
+	deafen(t, b, fault)
 	p.switchOn(t, "checkout.new-flow", "production")
 	// Its notification lost, b hears of the version when its listener
 	// listens again, which wakes every environment it streams.
@@ -437,11 +446,7 @@ func TestAVersionMissedWhileTheListenerWasDeafIsCaughtUpByAHeartbeatWhenItsReloa
 	s.started(t)
 	s.next(t) // the current version
 
-	up := `flagnetic_listener_up{channel="rulesets"}`
-	deaf.Silence()
-	if !eventually(5*time.Second, func() bool { return testkit.Metric(t, b.Scrape(t), up) == 0 }) {
-		t.Fatal("b's listener was never found deaf")
-	}
+	deafen(t, b, deaf)
 	p.switchOn(t, "checkout.new-flow", "production")
 	// The reload woken by the listener listening again fails, its retry
 	// too: no notification ever names the version missed.

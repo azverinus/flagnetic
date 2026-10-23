@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -77,16 +77,64 @@ const setupTimeout = 10 * time.Second
 
 // Fault silences a listener's delivery while its connection stays open, the
 // way a pooler or a half-dead connection does, so a test can watch the ping
-// detect it.
-type Fault struct{ silenced atomic.Bool }
+// detect it. Once found deaf, the listener stays down until Restore instead
+// of reconnecting into the same silence: a listener that listened again
+// while silenced would report itself up and drop the next notification
+// before its ping found it deaf, so a test could not tell whether a write
+// it made while the listener was down was missed or heard.
+type Fault struct {
+	mu       sync.Mutex
+	silenced bool
+	// restored is closed by the Restore that ends the current silence.
+	restored chan struct{}
+}
 
-// Silence drops every notification from now on, pings included.
-func (f *Fault) Silence() { f.silenced.Store(true) }
+// Silence drops every notification from now on, pings included, and keeps
+// the listener from listening again until Restore.
+func (f *Fault) Silence() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if !f.silenced {
+		f.silenced = true
+		f.restored = make(chan struct{})
+	}
+}
 
-// Restore delivers notifications again.
-func (f *Fault) Restore() { f.silenced.Store(false) }
+// Restore delivers notifications again and lets the listener reconnect.
+func (f *Fault) Restore() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.silenced {
+		f.silenced = false
+		close(f.restored)
+	}
+}
 
-func (f *Fault) dropped() bool { return f != nil && f.silenced.Load() }
+func (f *Fault) dropped() bool {
+	if f == nil {
+		return false
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.silenced
+}
+
+// awaitRestored returns once the listener is not silenced or ctx ends.
+func (f *Fault) awaitRestored(ctx context.Context) {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	silenced, restored := f.silenced, f.restored
+	f.mu.Unlock()
+	if !silenced {
+		return
+	}
+	select {
+	case <-restored:
+	case <-ctx.Done():
+	}
+}
 
 var errDeaf = errors.New("the listener's own ping did not come back in time")
 
@@ -100,6 +148,10 @@ func Run(ctx context.Context, cfg *pgx.ConnConfig, channel string, h Handler, o 
 	l := listener{cfg: cfg, channel: channel, h: h, o: o}
 	backoff := o.MinBackoff
 	for {
+		o.Fault.awaitRestored(ctx)
+		if ctx.Err() != nil {
+			return
+		}
 		listened, err := l.recovered(ctx)
 		if ctx.Err() != nil {
 			return
