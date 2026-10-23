@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/azverinus/flagnetic v0.0.0
-	github.com/azverinus/flagnetic/eval v0.0.0
+	github.com/azverinus/flagnetic/eval v0.1.0
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.44.0

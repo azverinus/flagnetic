@@ -8,6 +8,6 @@ require (
 )
 
 require (
-	github.com/azverinus/flagnetic/eval v0.0.0 // indirect
+	github.com/azverinus/flagnetic/eval v0.1.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 )
