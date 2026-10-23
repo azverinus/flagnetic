@@ -1,0 +1,85 @@
+name: sdk-python
+
+# The Python SDK in sdks/python: lint and types, tests on the oldest and the
+# newest supported Python (the evaluator's conformance suite and the speed
+# guarantee among them), Unicode tables regenerated from Go and compared, and
+# the wheel and the sdist built and checked. ci.yml calls it behind a path
+# condition and ci-ok needs it.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: sdks/python
+
+jobs:
+  lint:
+    name: python lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: Install
+        run: uv sync --locked
+      - name: ruff
+        run: uv run ruff check .
+      - name: ruff format
+        run: uv run ruff format --check .
+      - name: mypy --strict
+        run: uv run mypy
+
+  # The regular expression engine folds case and names Unicode classes with
+  # Go's tables, not the interpreter's, so it matches the same characters on
+  # every Python. The file is what the generator prints.
+  tables:
+    name: python unicode tables
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Tables are what Go's unicode package gives
+        working-directory: .
+        run: |
+          go run ./sdks/python/scripts/_unicode_tables > sdks/python/src/flagnetic/_eval/_re2/unicode_tables.py
+          git diff --exit-code -- sdks/python
+
+  test:
+    name: python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest Python still supported upstream and the newest release.
+        python: ["3.11", "3.x"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: Install with the interpreter that was set up
+        run: |
+          echo "UV_PYTHON=$(command -v python)" >> "$GITHUB_ENV"
+          uv sync --locked
+      - name: Test
+        # Includes the p99 guarantee, which writes its figures to the job summary.
+        run: uv run pytest
+
+  package:
+    name: python wheel and sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: Build
+        run: uv build
+      - name: Check the metadata and the contents
+        run: |
+          python3 scripts/check_dist.py dist
+          uvx twine check --strict dist/*

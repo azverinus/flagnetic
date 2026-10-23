@@ -43,6 +43,8 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md). In short: domain rules in `internal/dom
 
 The repository holds several Go modules: the server at the root, and the modules published for other programs to import (the evaluator and the Go SDKs), each with its own `go.mod` and version. The committed `go.work` ties them together, so a change across modules builds and tests in one checkout, and `task check` runs every check once per module. A new module joins with its `use` line in `go.work`: CI reads the list from there and checks the module on the oldest and the newest supported Go release.
 
+The Python SDK in `sdks/python` is built and checked with [uv](https://docs.astral.sh/uv/) (it fetches the Python it needs): `uv sync`, then `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy` and `uv run pytest` in that directory, which CI runs on the oldest and the newest supported Python. Its regular expression engine takes case folding and Unicode classes from Go's tables; after a Go release that changes them, regenerate with `go run ./sdks/python/scripts/_unicode_tables > sdks/python/src/flagnetic/_eval/_re2/unicode_tables.py`, which CI compares.
+
 ## Tests
 
 Every change comes with tests at the seam that shows the behaviour:
