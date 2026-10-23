@@ -46,9 +46,13 @@ func TestEveryStoredHashIsASHA256(t *testing.T) {
 }
 
 // An index the migrations create is named after its table and what it
-// serves (sessions_member, flags_tags), with no type suffix, so a name read
-// in a query plan or an error says where to look. Indexes PostgreSQL names
-// itself, for a constraint or on a partition, are left alone.
+// serves (sessions_member, flags_tags), with no _idx suffix, so a name read
+// in a query plan or an error says where to look. Indexes that back a
+// primary key, unique or exclusion constraint of their own table are named
+// by PostgreSQL after the constraint, and indexes on a partition are named
+// after the partition, so both are left alone. A foreign key also records
+// the index it relies on, but that index belongs to the referenced table and
+// is still checked.
 func TestIndexNamesCarryNoTypeSuffix(t *testing.T) {
 	pool := testkit.Pool(t)
 	rows, err := pool.Query(t.Context(), `
@@ -58,7 +62,9 @@ func TestIndexNamesCarryNoTypeSuffix(t *testing.T) {
 		JOIN pg_class t ON t.oid = x.indrelid
 		WHERE t.relnamespace = current_schema()::regnamespace
 		  AND NOT t.relispartition
-		  AND NOT EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conindid = x.indexrelid)`)
+		  AND NOT EXISTS (
+			SELECT 1 FROM pg_constraint k
+			WHERE k.conindid = x.indexrelid AND k.conrelid = x.indrelid AND k.contype IN ('p', 'u', 'x'))`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,6 +83,6 @@ func TestIndexNamesCarryNoTypeSuffix(t *testing.T) {
 	}
 	slices.Sort(misnamed)
 	if len(misnamed) > 0 {
-		t.Errorf("indexes not named <table>_<what> without a type suffix:\n%s", strings.Join(misnamed, "\n"))
+		t.Errorf("indexes not named <table>_<what> without an _idx suffix:\n%s", strings.Join(misnamed, "\n"))
 	}
 }

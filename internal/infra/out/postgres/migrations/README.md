@@ -17,5 +17,5 @@ The schema of the server, applied in order by `flagnetic migrate`.
   constraint on existing rows) goes expand/contract: one release adds the new
   shape and writes both, a later one removes the old shape once nothing reads
   it.
-- Name an index `<table>_<what it serves>`, without a type suffix; the schema
-  tests check it.
+- Name an index `<table>_<what it serves>`, without an `_idx` suffix; the
+  schema tests check it.
