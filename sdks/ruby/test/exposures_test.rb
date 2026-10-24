@@ -212,8 +212,11 @@ class ExposuresTest < Minitest::Test
     c = client(flush_interval: 3600, stream: false)
     c.ready(timeout: 2)
     10_002.times { |i| c.alias("anonymous", "d-#{i}", "user", "u-#{i}") }
-    dropped = logged(:queue_dropped).select { |(_, f)| f[:cause] == "queue_full" }
-    refute_empty dropped
+    # Full batches leave for the failing server while the queue fills; the
+    # excess is dropped either then or when the unsent batches come back.
+    full = -> { logged(:queue_dropped).select { |(_, f)| f[:cause] == "queue_full" } }
+    assert(eventually(5) { full.call.any? })
+    dropped = full.call
     assert(dropped.all? { |(level, f)| level == :warn && f[:kind] == "exposure_or_alias" && f[:capacity] == 10_000 })
   end
 
