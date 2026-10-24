@@ -29,8 +29,8 @@ type AuditLog struct {
 // NewAuditLog returns the audit log on pool.
 func NewAuditLog(pool *pgxpool.Pool) *AuditLog { return &AuditLog{pool: pool} }
 
-// Record writes e as the handler that made the change built it.
-func (l *AuditLog) Record(ctx context.Context, e governance.Entry) error {
+// Append writes e as the handler that made the change built it.
+func (l *AuditLog) Append(ctx context.Context, e governance.Entry) error {
 	before, err := encode(e.Before)
 	if err != nil {
 		return fmt.Errorf("audit entry %s: before: %w", e.Action, err)

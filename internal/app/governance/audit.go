@@ -1,5 +1,5 @@
-// Package governance holds the use cases of the governance context: for now,
-// reading the audit log.
+// Package governance holds the use cases of the governance context: recording
+// the audit entries of every context and reading the audit log.
 package governance
 
 import (

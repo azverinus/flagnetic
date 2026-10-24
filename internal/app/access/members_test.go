@@ -13,6 +13,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -25,7 +26,7 @@ import (
 func TestTwoInstanceAdminsDemotedAtOnceLeaveOne(t *testing.T) {
 	pool := testkit.FreshPool(t)
 	c := clock.System{}
-	tx, store, audit := postgres.NewTransactor(pool), pgaccess.NewStore(pool), pggovernance.NewAuditLog(pool)
+	tx, store, audit := postgres.NewTransactor(pool), pgaccess.NewStore(pool), appgovernance.NewRecord(pggovernance.NewAuditLog(pool))
 	update := appaccess.NewUpdateMember(tx, store, audit, c, id.NewSource(c))
 	deactivate := appaccess.NewDeactivateMember(tx, store, audit, c, id.NewSource(c))
 	req := governance.Request{Actor: cli}
@@ -70,7 +71,7 @@ var cheap = password.Params{MemoryKiB: 64, Time: 1, Threads: 1, SaltLength: 16, 
 func TestAcceptingAnInvitationWhileItIsReplacedOrItsMemberDeactivatedEndsCleanly(t *testing.T) {
 	pool := testkit.Pool(t)
 	c := clock.System{}
-	tx, store, audit := postgres.NewTransactor(pool), pgaccess.NewStore(pool), pggovernance.NewAuditLog(pool)
+	tx, store, audit := postgres.NewTransactor(pool), pgaccess.NewStore(pool), appgovernance.NewRecord(pggovernance.NewAuditLog(pool))
 	ids := id.NewSource(c)
 	invite := appaccess.NewInviteMember(tx, store, audit, c, ids, rand.Reader)
 	reissue := appaccess.NewReissueInvitation(tx, store, audit, c, ids, rand.Reader)

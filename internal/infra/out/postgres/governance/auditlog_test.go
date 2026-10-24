@@ -31,7 +31,7 @@ func TestAnEntryIsReadBackAsRecorded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = log.Record(t.Context(), recorded); err != nil {
+	if err = log.Append(t.Context(), recorded); err != nil {
 		t.Fatal(err)
 	}
 	entries, err := log.Latest(t.Context(), 10)
@@ -63,7 +63,7 @@ func TestAnEntryOfValuesThatAreNotJSONIsRefused(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := log.Record(t.Context(), e); err == nil {
+		if err := log.Append(t.Context(), e); err == nil {
 			t.Errorf("%s: an unencodable value was recorded", name)
 		}
 	}
@@ -91,7 +91,7 @@ func TestAVersionIsFoundInTheBeforeOrAfterOfItsEntityInOneEnvironment(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = log.Record(t.Context(), e); err != nil {
+		if err = log.Append(t.Context(), e); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -57,6 +57,8 @@ Data crosses layers as: HTTP DTO → command → domain model → result → HTT
 
 A context reaches another only through an application port, never by importing the other context's adapters.
 
+Every context records its audit entries through an audit port of its own, and the governance context's `Record` service is what composition plugs into every one of them. It writes the entry in the caller's transaction, so an entry is kept exactly when its change is, and it is the one place every audited write passes: what an audit entry sets in motion beyond the log is added there, and no other context knows of it.
+
 ## Transactions
 
 A command handler is the unit of work. It wraps its work in `Transactor.Within(ctx, fn)`; repositories take the transaction from the context, or use the pool outside one. No port or domain type mentions the database driver. A command that touches several aggregates (applying a change request writes a flag configuration, its audit entry and an outbox row) does it all inside one `Within`. A `Within` inside another joins it, so a handler composed of others is still one unit of work. A query that must see one consistent view across several statements runs in `Transactor.Snapshot` (repeatable read, read only). Row locks are explicit repository methods, so the lock order of a use case is visible in its handler; a deadlock or serialization failure is not retried but answered as `unavailable`, because a retry would hide a lock order that is wrong. Side effects outside the database (webhooks, mail, sinks) go through an outbox written in the same transaction and delivered by workers.

@@ -19,6 +19,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -186,7 +187,7 @@ func TestARefusedBootstrapHashesNoPassword(t *testing.T) {
 	c := testkit.Clock()
 	hasher := &countingHasher{Hasher: password.NewHasher(password.DefaultParams)}
 	h := appaccess.NewBootstrap(postgres.NewTransactor(pool), pgaccess.NewStore(pool), hasher,
-		pggovernance.NewAuditLog(pool), c, id.NewSource(c), rand.Reader)
+		appgovernance.NewRecord(pggovernance.NewAuditLog(pool)), c, id.NewSource(c), rand.Reader)
 	_, err := h.Handle(t.Context(), appaccess.BootstrapCommand{
 		Email: "second@example.com", Password: secret.New("a long enough password"), Request: governance.Request{Actor: cli},
 	})

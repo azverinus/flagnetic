@@ -18,6 +18,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/password"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -47,7 +48,7 @@ func newSignInAt(t *testing.T, c clock.Clock, hasher appaccess.PasswordVerifier)
 	t.Helper()
 	pool := testkit.Pool(t)
 	return appaccess.NewSignIn(appaccess.SignInDeps{
-		Tx: postgres.NewTransactor(pool), Store: pgaccess.NewStore(pool), Settings: pgaccess.NewStore(pool), Hasher: hasher, Audit: pggovernance.NewAuditLog(pool),
+		Tx: postgres.NewTransactor(pool), Store: pgaccess.NewStore(pool), Settings: pgaccess.NewStore(pool), Hasher: hasher, Audit: appgovernance.NewRecord(pggovernance.NewAuditLog(pool)),
 		Clock: c, IDs: id.NewSource(c), Random: rand.Reader, Key: bytes.Repeat([]byte{1}, 32),
 	})
 }
