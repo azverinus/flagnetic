@@ -15,6 +15,9 @@ import type {
   ChangeMyPasswordData,
   ChangeMyPasswordErrors,
   ChangeMyPasswordResponses,
+  CheckHashUniformityData,
+  CheckHashUniformityErrors,
+  CheckHashUniformityResponses,
   CloneExperimentData,
   CloneExperimentErrors,
   CloneExperimentResponses,
@@ -114,6 +117,9 @@ import type {
   GetEnvironmentRulesetData,
   GetEnvironmentRulesetErrors,
   GetEnvironmentRulesetResponses,
+  GetExperimentAssignmentData,
+  GetExperimentAssignmentErrors,
+  GetExperimentAssignmentResponses,
   GetExperimentData,
   GetExperimentErrors,
   GetExperimentResponses,
@@ -2151,6 +2157,88 @@ export const cloneExperiment = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/experiments/{experiment}/clone",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * How the experiment treats one unit
+ *
+ * Which variation the experiment assigns one unit ID, from the
+ * experiment's own fields in whatever status it is, and the ClickHouse
+ * query that recomputes it in a warehouse. Both buckets are
+ * `murmur3_32("{salt}.{unit_id}") mod 10000`: the unit is included when
+ * its inclusion bucket is below the traffic allocation, and an
+ * included unit gets the variation whose range of cumulative weights,
+ * in the experiment's order, holds its variation bucket. It reads no
+ * event and records nothing. A missing, empty or over-256-byte
+ * `unit_id` is 400.
+ *
+ */
+export const getExperimentAssignment = <ThrowOnError extends boolean = false>(
+  options: Options<GetExperimentAssignmentData, ThrowOnError>,
+): RequestResult<GetExperimentAssignmentResponses, GetExperimentAssignmentErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetExperimentAssignmentResponses,
+    GetExperimentAssignmentErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/assignment",
+    ...options,
+  });
+
+/**
+ * Check the hash's uniformity on real unit IDs
+ *
+ * Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+ * 10000`, groups the 10000 buckets into `bins` bins of consecutive
+ * buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+ * in width by at most one bucket), and compares each bin's count with
+ * what a uniform hash expects of its width, `N × width / 10000`, by
+ * Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+ * `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+ * often as they occur. With `second_salt` it also tests that both
+ * salts' buckets are independent, as an experiment's inclusion and
+ * variation buckets must be: Pearson's test of independence on the
+ * `bins × bins` table of both bins, over its non-empty rows and
+ * columns. The same check runs offline as `flagnetic hash-check`, so
+ * unit IDs never have to leave a machine. It records nothing.
+ *
+ * Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+ * than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+ * or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+ * only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+ * empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+ *
+ */
+export const checkHashUniformity = <ThrowOnError extends boolean = false>(
+  options: Options<CheckHashUniformityData, ThrowOnError>,
+): RequestResult<CheckHashUniformityResponses, CheckHashUniformityErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CheckHashUniformityResponses,
+    CheckHashUniformityErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/hash-check",
     ...options,
     headers: {
       "Content-Type": "application/json",

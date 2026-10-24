@@ -244,6 +244,45 @@ func (e GrantSource) Valid() bool {
 	}
 }
 
+// Defines values for HashCheckVerdict.
+const (
+	HashCheckVerdictNotUniform HashCheckVerdict = "not_uniform"
+	HashCheckVerdictUniform    HashCheckVerdict = "uniform"
+)
+
+// Valid indicates whether the value is a known member of the HashCheckVerdict enum.
+func (e HashCheckVerdict) Valid() bool {
+	switch e {
+	case HashCheckVerdictNotUniform:
+		return true
+	case HashCheckVerdictUniform:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HashCheckIndependenceVerdict.
+const (
+	HashCheckIndependenceVerdictDependent   HashCheckIndependenceVerdict = "dependent"
+	HashCheckIndependenceVerdictIndependent HashCheckIndependenceVerdict = "independent"
+	HashCheckIndependenceVerdictUntestable  HashCheckIndependenceVerdict = "untestable"
+)
+
+// Valid indicates whether the value is a known member of the HashCheckIndependenceVerdict enum.
+func (e HashCheckIndependenceVerdict) Valid() bool {
+	switch e {
+	case HashCheckIndependenceVerdictDependent:
+		return true
+	case HashCheckIndependenceVerdictIndependent:
+		return true
+	case HashCheckIndependenceVerdictUntestable:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Lifetime.
 const (
 	LifetimePermanent Lifetime = "permanent"
@@ -1014,6 +1053,36 @@ type Experiment struct {
 	Version Version `json:"version"`
 }
 
+// ExperimentAssignment defines model for ExperimentAssignment.
+type ExperimentAssignment struct {
+	// Experiment The experiment's key.
+	Experiment string `json:"experiment"`
+
+	// Included Whether the inclusion bucket is below the traffic allocation.
+	Included bool `json:"included"`
+
+	// InclusionBucket `murmur3_32("{inclusion_salt}.{unit_id}") mod 10000`.
+	InclusionBucket int    `json:"inclusion_bucket"`
+	InclusionSalt   string `json:"inclusion_salt"`
+
+	// Sql A ClickHouse query recomputing both buckets, `included` and
+	// `variation` for the unit. Its subquery `(SELECT '<unit_id>' AS
+	// unit_id)` stands for any table with a `unit_id` column.
+	Sql               string `json:"sql"`
+	TrafficAllocation int    `json:"traffic_allocation"`
+	UnitId            string `json:"unit_id"`
+	UnitType          string `json:"unit_type"`
+
+	// Variation The variation the unit is assigned; null when it is not included.
+	Variation *string `json:"variation"`
+
+	// VariationBucket `murmur3_32("{variation_salt}.{unit_id}") mod 10000`. Given for a
+	// unit left out too: the bucket it would be assigned by should the
+	// allocation grow to include it.
+	VariationBucket int    `json:"variation_bucket"`
+	VariationSalt   string `json:"variation_salt"`
+}
+
 // ExperimentClone defines model for ExperimentClone.
 type ExperimentClone struct {
 	// Key The clone's key, unique, case sensitively, in the project (`already_exists`).
@@ -1352,6 +1421,72 @@ type GrantCreate struct {
 // GrantList defines model for GrantList.
 type GrantList struct {
 	Items []Grant `json:"items"`
+}
+
+// HashCheck defines model for HashCheck.
+type HashCheck struct {
+	Bins      int     `json:"bins"`
+	ChiSquare float64 `json:"chi_square"`
+
+	// Counts How many unit IDs fell into each bin, in bin order.
+	Counts []int `json:"counts"`
+
+	// Df The degrees of freedom, `bins − 1`.
+	Df int `json:"df"`
+
+	// Independence The test of independence, present only with `second_salt`.
+	Independence *HashCheckIndependence `json:"independence,omitempty"`
+
+	// Max The largest count of a bin.
+	Max int `json:"max"`
+
+	// Min The smallest count of a bin.
+	Min    int     `json:"min"`
+	PValue float64 `json:"p_value"`
+
+	// Salt The salt hashed with, the one given or the random one drawn.
+	Salt       string  `json:"salt"`
+	SecondSalt *string `json:"second_salt,omitempty"`
+
+	// Verdict `uniform` when `p_value` is at least 0.001.
+	Verdict HashCheckVerdict `json:"verdict"`
+}
+
+// HashCheckVerdict `uniform` when `p_value` is at least 0.001.
+type HashCheckVerdict string
+
+// HashCheckIndependence The test of independence, present only with `second_salt`.
+type HashCheckIndependence struct {
+	ChiSquare float64 `json:"chi_square"`
+
+	// Df (non-empty rows − 1) × (non-empty columns − 1).
+	Df     int     `json:"df"`
+	PValue float64 `json:"p_value"`
+
+	// Verdict `independent` when `p_value` is at least 0.001; `untestable` when
+	// there are no degrees of freedom, every unit ID having fallen into
+	// one bin under one of the salts.
+	Verdict HashCheckIndependenceVerdict `json:"verdict"`
+}
+
+// HashCheckIndependenceVerdict `independent` when `p_value` is at least 0.001; `untestable` when
+// there are no degrees of freedom, every unit ID having fallen into
+// one bin under one of the salts.
+type HashCheckIndependenceVerdict string
+
+// HashCheckRequest defines model for HashCheckRequest.
+type HashCheckRequest struct {
+	// Bins How many bins the 10000 buckets are grouped into, 2 to 10000.
+	Bins *int `json:"bins,omitempty"`
+
+	// Salt The salt to hash with, 1 to 256 bytes; a random one in an experiment salt's form when omitted.
+	Salt *string `json:"salt,omitempty"`
+
+	// SecondSalt A second salt, 1 to 256 bytes, to test both salts' buckets for independence.
+	SecondSalt *string `json:"second_salt,omitempty"`
+
+	// UnitIds 1000 to 200000 unit IDs, each 1 to 256 bytes, as often as each occurs.
+	UnitIds []string `json:"unit_ids"`
 }
 
 // Invitation What an invitation's link opens.
@@ -2500,6 +2635,12 @@ type UpdateExperimentParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// GetExperimentAssignmentParams defines parameters for GetExperimentAssignment.
+type GetExperimentAssignmentParams struct {
+	// UnitId A unit ID of the experiment's unit type, 1 to 256 bytes.
+	UnitId string `form:"unit_id" json:"unit_id"`
+}
+
 // RegenerateExperimentSaltsParams defines parameters for RegenerateExperimentSalts.
 type RegenerateExperimentSaltsParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
@@ -2777,6 +2918,9 @@ type RevertFlagConfigurationJSONRequestBody = FlagConfigurationRevert
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody = GrantCreate
+
+// CheckHashUniformityJSONRequestBody defines body for CheckHashUniformity for application/json ContentType.
+type CheckHashUniformityJSONRequestBody = HashCheckRequest
 
 // CreateSegmentJSONRequestBody defines body for CreateSegment for application/json ContentType.
 type CreateSegmentJSONRequestBody = SegmentCreate
@@ -3888,6 +4032,21 @@ type ClientInterface interface {
 	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
 	UpdateExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetExperimentAssignment How the experiment treats one unit
+	//
+	// Which variation the experiment assigns one unit ID, from the
+	// experiment's own fields in whatever status it is, and the ClickHouse
+	// query that recomputes it in a warehouse. Both buckets are
+	// `murmur3_32("{salt}.{unit_id}") mod 10000`: the unit is included when
+	// its inclusion bucket is below the traffic allocation, and an
+	// included unit gets the variation whose range of cumulative weights,
+	// in the experiment's order, holds its variation bucket. It reads no
+	// event and records nothing. A missing, empty or over-256-byte
+	// `unit_id` is 400.
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/assignment (the `GetExperimentAssignment` operationId).
+	GetExperimentAssignment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentAssignmentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CloneExperimentWithBody Clone an experiment into a new draft
 	//
 	// Copies an experiment of any status into a new draft under a new key,
@@ -4291,6 +4450,64 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
 	DeleteGrant(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CheckHashUniformityWithBody Check the hash's uniformity on real unit IDs
+	//
+	// Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+	// 10000`, groups the 10000 buckets into `bins` bins of consecutive
+	// buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+	// in width by at most one bucket), and compares each bin's count with
+	// what a uniform hash expects of its width, `N × width / 10000`, by
+	// Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+	// `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+	// often as they occur. With `second_salt` it also tests that both
+	// salts' buckets are independent, as an experiment's inclusion and
+	// variation buckets must be: Pearson's test of independence on the
+	// `bins × bins` table of both bins, over its non-empty rows and
+	// columns. The same check runs offline as `flagnetic hash-check`, so
+	// unit IDs never have to leave a machine. It records nothing.
+	//
+	// Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+	// than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
+	CheckHashUniformityWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CheckHashUniformity Check the hash's uniformity on real unit IDs
+	//
+	// Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+	// 10000`, groups the 10000 buckets into `bins` bins of consecutive
+	// buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+	// in width by at most one bucket), and compares each bin's count with
+	// what a uniform hash expects of its width, `N × width / 10000`, by
+	// Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+	// `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+	// often as they occur. With `second_salt` it also tests that both
+	// salts' buckets are independent, as an experiment's inclusion and
+	// variation buckets must be: Pearson's test of independence on the
+	// `bins × bins` table of both bins, over its non-empty rows and
+	// columns. The same check runs offline as `flagnetic hash-check`, so
+	// unit IDs never have to leave a machine. It records nothing.
+	//
+	// Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+	// than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
+	CheckHashUniformity(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetProjectMe What the caller holds in a project
 	//
@@ -6414,6 +6631,31 @@ func (c *Client) UpdateExperiment(ctx context.Context, project ProjectKey, exper
 	return c.Client.Do(req)
 }
 
+// GetExperimentAssignment How the experiment treats one unit
+//
+// Which variation the experiment assigns one unit ID, from the
+// experiment's own fields in whatever status it is, and the ClickHouse
+// query that recomputes it in a warehouse. Both buckets are
+// `murmur3_32("{salt}.{unit_id}") mod 10000`: the unit is included when
+// its inclusion bucket is below the traffic allocation, and an
+// included unit gets the variation whose range of cumulative weights,
+// in the experiment's order, holds its variation bucket. It reads no
+// event and records nothing. A missing, empty or over-256-byte
+// `unit_id` is 400.
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/assignment (the `GetExperimentAssignment` operationId).
+func (c *Client) GetExperimentAssignment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentAssignmentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExperimentAssignmentRequest(c.Server, project, experiment, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CloneExperimentWithBody Clone an experiment into a new draft
 //
 // Copies an experiment of any status into a new draft under a new key,
@@ -7098,6 +7340,84 @@ func (c *Client) CreateGrant(ctx context.Context, project ProjectKey, body Creat
 // Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
 func (c *Client) DeleteGrant(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteGrantRequest(c.Server, project, grant)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CheckHashUniformityWithBody Check the hash's uniformity on real unit IDs
+//
+// Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+// 10000`, groups the 10000 buckets into `bins` bins of consecutive
+// buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+// in width by at most one bucket), and compares each bin's count with
+// what a uniform hash expects of its width, `N × width / 10000`, by
+// Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+// `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+// often as they occur. With `second_salt` it also tests that both
+// salts' buckets are independent, as an experiment's inclusion and
+// variation buckets must be: Pearson's test of independence on the
+// `bins × bins` table of both bins, over its non-empty rows and
+// columns. The same check runs offline as `flagnetic hash-check`, so
+// unit IDs never have to leave a machine. It records nothing.
+//
+// Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+// than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
+func (c *Client) CheckHashUniformityWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCheckHashUniformityRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CheckHashUniformity Check the hash's uniformity on real unit IDs
+//
+// Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+// 10000`, groups the 10000 buckets into `bins` bins of consecutive
+// buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+// in width by at most one bucket), and compares each bin's count with
+// what a uniform hash expects of its width, `N × width / 10000`, by
+// Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+// `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+// often as they occur. With `second_salt` it also tests that both
+// salts' buckets are independent, as an experiment's inclusion and
+// variation buckets must be: Pearson's test of independence on the
+// `bins × bins` table of both bins, over its non-empty rows and
+// columns. The same check runs offline as `flagnetic hash-check`, so
+// unit IDs never have to leave a machine. It records nothing.
+//
+// Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+// than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
+func (c *Client) CheckHashUniformity(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCheckHashUniformityRequest(c.Server, project, body)
 	if err != nil {
 		return nil, err
 	}
@@ -10979,6 +11299,70 @@ func NewUpdateExperimentRequestWithBody(server string, project ProjectKey, exper
 	return req, nil
 }
 
+// NewGetExperimentAssignmentRequest constructs an http.Request for the GetExperimentAssignment method
+func NewGetExperimentAssignmentRequest(server string, project ProjectKey, experiment ExperimentKey, params *GetExperimentAssignmentParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/assignment", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "unit_id", params.UnitId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewCloneExperimentRequest calls the generic CloneExperiment builder with application/json body
 func NewCloneExperimentRequest(server string, project ProjectKey, experiment ExperimentKey, body CloneExperimentJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -12257,6 +12641,53 @@ func NewDeleteGrantRequest(server string, project ProjectKey, grant GrantID) (*h
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewCheckHashUniformityRequest calls the generic CheckHashUniformity builder with application/json body
+func NewCheckHashUniformityRequest(server string, project ProjectKey, body CheckHashUniformityJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCheckHashUniformityRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewCheckHashUniformityRequestWithBody constructs an http.Request for the CheckHashUniformity method, with any body, and a specified content type
+func NewCheckHashUniformityRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/hash-check", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -14172,6 +14603,23 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
 	UpdateExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateExperimentResponse, error)
 
+	// GetExperimentAssignmentWithResponse How the experiment treats one unit
+	//
+	// Which variation the experiment assigns one unit ID, from the
+	// experiment's own fields in whatever status it is, and the ClickHouse
+	// query that recomputes it in a warehouse. Both buckets are
+	// `murmur3_32("{salt}.{unit_id}") mod 10000`: the unit is included when
+	// its inclusion bucket is below the traffic allocation, and an
+	// included unit gets the variation whose range of cumulative weights,
+	// in the experiment's order, holds its variation bucket. It reads no
+	// event and records nothing. A missing, empty or over-256-byte
+	// `unit_id` is 400.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/assignment (the `GetExperimentAssignment` operationId).
+	GetExperimentAssignmentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentAssignmentParams, reqEditors ...RequestEditorFn) (*GetExperimentAssignmentResponse, error)
+
 	// CloneExperimentWithBodyWithResponse Clone an experiment into a new draft
 	//
 	// Copies an experiment of any status into a new draft under a new key,
@@ -14597,6 +15045,64 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with DELETE /projects/{project}/grants/{grant} (the `DeleteGrant` operationId).
 	DeleteGrantWithResponse(ctx context.Context, project ProjectKey, grant GrantID, reqEditors ...RequestEditorFn) (*DeleteGrantResponse, error)
+
+	// CheckHashUniformityWithBodyWithResponse Check the hash's uniformity on real unit IDs
+	//
+	// Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+	// 10000`, groups the 10000 buckets into `bins` bins of consecutive
+	// buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+	// in width by at most one bucket), and compares each bin's count with
+	// what a uniform hash expects of its width, `N × width / 10000`, by
+	// Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+	// `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+	// often as they occur. With `second_salt` it also tests that both
+	// salts' buckets are independent, as an experiment's inclusion and
+	// variation buckets must be: Pearson's test of independence on the
+	// `bins × bins` table of both bins, over its non-empty rows and
+	// columns. The same check runs offline as `flagnetic hash-check`, so
+	// unit IDs never have to leave a machine. It records nothing.
+	//
+	// Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+	// than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
+	CheckHashUniformityWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CheckHashUniformityResponse, error)
+
+	// CheckHashUniformityWithResponse Check the hash's uniformity on real unit IDs
+	//
+	// Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+	// 10000`, groups the 10000 buckets into `bins` bins of consecutive
+	// buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+	// in width by at most one bucket), and compares each bin's count with
+	// what a uniform hash expects of its width, `N × width / 10000`, by
+	// Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+	// `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+	// often as they occur. With `second_salt` it also tests that both
+	// salts' buckets are independent, as an experiment's inclusion and
+	// variation buckets must be: Pearson's test of independence on the
+	// `bins × bins` table of both bins, over its non-empty rows and
+	// columns. The same check runs offline as `flagnetic hash-check`, so
+	// unit IDs never have to leave a machine. It records nothing.
+	//
+	// Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+	// than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+	// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+	// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+	// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+	// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+	// whatever the server's limit for other bodies.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
+	CheckHashUniformityWithResponse(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*CheckHashUniformityResponse, error)
 
 	// GetProjectMeWithResponse What the caller holds in a project
 	//
@@ -20249,6 +20755,82 @@ func (r UpdateExperimentResponse) ContentType() string {
 	return ""
 }
 
+// GetExperimentAssignmentResponse401Headers the declared response headers of an HTTP 401 response for GetExperimentAssignment
+type GetExperimentAssignmentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetExperimentAssignmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExperimentAssignment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetExperimentAssignmentResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetExperimentAssignmentResponse) GetJSON200() *ExperimentAssignment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetExperimentAssignmentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetExperimentAssignmentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetExperimentAssignmentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetExperimentAssignmentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetExperimentAssignmentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExperimentAssignmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExperimentAssignmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetExperimentAssignmentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // CloneExperimentResponse201Headers the declared response headers of an HTTP 201 response for CloneExperiment
 type CloneExperimentResponse201Headers struct {
 	ETag *string
@@ -22078,6 +22660,89 @@ func (r DeleteGrantResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DeleteGrantResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CheckHashUniformityResponse401Headers the declared response headers of an HTTP 401 response for CheckHashUniformity
+type CheckHashUniformityResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CheckHashUniformityResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *HashCheck
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CheckHashUniformityResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CheckHashUniformityResponse) GetJSON200() *HashCheck {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CheckHashUniformityResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CheckHashUniformityResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CheckHashUniformityResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CheckHashUniformityResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CheckHashUniformityResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CheckHashUniformityResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CheckHashUniformityResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CheckHashUniformityResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CheckHashUniformityResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -25079,6 +25744,29 @@ func (c *ClientWithResponses) UpdateExperimentWithResponse(ctx context.Context, 
 	return ParseUpdateExperimentResponse(rsp)
 }
 
+// GetExperimentAssignmentWithResponse How the experiment treats one unit
+//
+// Which variation the experiment assigns one unit ID, from the
+// experiment's own fields in whatever status it is, and the ClickHouse
+// query that recomputes it in a warehouse. Both buckets are
+// `murmur3_32("{salt}.{unit_id}") mod 10000`: the unit is included when
+// its inclusion bucket is below the traffic allocation, and an
+// included unit gets the variation whose range of cumulative weights,
+// in the experiment's order, holds its variation bucket. It reads no
+// event and records nothing. A missing, empty or over-256-byte
+// `unit_id` is 400.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/assignment (the `GetExperimentAssignment` operationId).
+func (c *ClientWithResponses) GetExperimentAssignmentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentAssignmentParams, reqEditors ...RequestEditorFn) (*GetExperimentAssignmentResponse, error) {
+	rsp, err := c.GetExperimentAssignment(ctx, project, experiment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExperimentAssignmentResponse(rsp)
+}
+
 // CloneExperimentWithBodyWithResponse Clone an experiment into a new draft
 //
 // Copies an experiment of any status into a new draft under a new key,
@@ -25677,6 +26365,76 @@ func (c *ClientWithResponses) DeleteGrantWithResponse(ctx context.Context, proje
 		return nil, err
 	}
 	return ParseDeleteGrantResponse(rsp)
+}
+
+// CheckHashUniformityWithBodyWithResponse Check the hash's uniformity on real unit IDs
+//
+// Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+// 10000`, groups the 10000 buckets into `bins` bins of consecutive
+// buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+// in width by at most one bucket), and compares each bin's count with
+// what a uniform hash expects of its width, `N × width / 10000`, by
+// Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+// `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+// often as they occur. With `second_salt` it also tests that both
+// salts' buckets are independent, as an experiment's inclusion and
+// variation buckets must be: Pearson's test of independence on the
+// `bins × bins` table of both bins, over its non-empty rows and
+// columns. The same check runs offline as `flagnetic hash-check`, so
+// unit IDs never have to leave a machine. It records nothing.
+//
+// Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+// than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
+func (c *ClientWithResponses) CheckHashUniformityWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CheckHashUniformityResponse, error) {
+	rsp, err := c.CheckHashUniformityWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCheckHashUniformityResponse(rsp)
+}
+
+// CheckHashUniformityWithResponse Check the hash's uniformity on real unit IDs
+//
+// Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+// 10000`, groups the 10000 buckets into `bins` bins of consecutive
+// buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+// in width by at most one bucket), and compares each bin's count with
+// what a uniform hash expects of its width, `N × width / 10000`, by
+// Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+// `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+// often as they occur. With `second_salt` it also tests that both
+// salts' buckets are independent, as an experiment's inclusion and
+// variation buckets must be: Pearson's test of independence on the
+// `bins × bins` table of both bins, over its non-empty rows and
+// columns. The same check runs offline as `flagnetic hash-check`, so
+// unit IDs never have to leave a machine. It records nothing.
+//
+// Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+// than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+// or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+// only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+// empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+// Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+// whatever the server's limit for other bodies.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/hash-check (the `CheckHashUniformity` operationId).
+func (c *ClientWithResponses) CheckHashUniformityWithResponse(ctx context.Context, project ProjectKey, body CheckHashUniformityJSONRequestBody, reqEditors ...RequestEditorFn) (*CheckHashUniformityResponse, error) {
+	rsp, err := c.CheckHashUniformity(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCheckHashUniformityResponse(rsp)
 }
 
 // GetProjectMeWithResponse What the caller holds in a project
@@ -30978,6 +31736,73 @@ func ParseUpdateExperimentResponse(rsp *http.Response) (*UpdateExperimentRespons
 	return response, nil
 }
 
+// ParseGetExperimentAssignmentResponse parses an HTTP response from a GetExperimentAssignmentWithResponse call
+func ParseGetExperimentAssignmentResponse(rsp *http.Response) (*GetExperimentAssignmentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExperimentAssignmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExperimentAssignment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetExperimentAssignmentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseCloneExperimentResponse parses an HTTP response from a CloneExperimentWithResponse call
 func ParseCloneExperimentResponse(rsp *http.Response) (*CloneExperimentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -32684,6 +33509,80 @@ func ParseDeleteGrantResponse(rsp *http.Response) (*DeleteGrantResponse, error) 
 	return response, nil
 }
 
+// ParseCheckHashUniformityResponse parses an HTTP response from a CheckHashUniformityWithResponse call
+func ParseCheckHashUniformityResponse(rsp *http.Response) (*CheckHashUniformityResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CheckHashUniformityResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest HashCheck
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers CheckHashUniformityResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetProjectMeResponse parses an HTTP response from a GetProjectMeWithResponse call
 func ParseGetProjectMeResponse(rsp *http.Response) (*GetProjectMeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -34098,6 +34997,9 @@ type ServerInterface interface {
 	// UpdateExperiment Change a draft experiment
 	// (PATCH /projects/{project}/experiments/{experiment})
 	UpdateExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params UpdateExperimentParams)
+	// GetExperimentAssignment How the experiment treats one unit
+	// (GET /projects/{project}/experiments/{experiment}/assignment)
+	GetExperimentAssignment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentAssignmentParams)
 	// CloneExperiment Clone an experiment into a new draft
 	// (POST /projects/{project}/experiments/{experiment}/clone)
 	CloneExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey)
@@ -34158,6 +35060,9 @@ type ServerInterface interface {
 	// DeleteGrant Remove one grant
 	// (DELETE /projects/{project}/grants/{grant})
 	DeleteGrant(w http.ResponseWriter, r *http.Request, project ProjectKey, grant GrantID)
+	// CheckHashUniformity Check the hash's uniformity on real unit IDs
+	// (POST /projects/{project}/hash-check)
+	CheckHashUniformity(w http.ResponseWriter, r *http.Request, project ProjectKey)
 	// GetProjectMe What the caller holds in a project
 	// (GET /projects/{project}/me)
 	GetProjectMe(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -36891,6 +37796,57 @@ func (siw *ServerInterfaceWrapper) UpdateExperiment(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetExperimentAssignment operation middleware
+func (siw *ServerInterfaceWrapper) GetExperimentAssignment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetExperimentAssignmentParams
+
+	// ------------- Required query parameter "unit_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "unit_id", r.URL.Query(), &params.UnitId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "unit_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "unit_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetExperimentAssignment(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // CloneExperiment operation middleware
 func (siw *ServerInterfaceWrapper) CloneExperiment(w http.ResponseWriter, r *http.Request) {
 
@@ -38034,6 +38990,32 @@ func (siw *ServerInterfaceWrapper) DeleteGrant(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// CheckHashUniformity operation middleware
+func (siw *ServerInterfaceWrapper) CheckHashUniformity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CheckHashUniformity(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetProjectMe operation middleware
 func (siw *ServerInterfaceWrapper) GetProjectMe(w http.ResponseWriter, r *http.Request) {
 
@@ -38820,6 +39802,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.UpdateExperiment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/salts", wrapper.RegenerateExperimentSalts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/clone", wrapper.CloneExperiment)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/assignment", wrapper.GetExperimentAssignment)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/hash-check", wrapper.CheckHashUniformity)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.ListChangeRequests)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.CreateChangeRequest)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}", wrapper.GetChangeRequest)
@@ -45459,6 +46443,97 @@ func (response UpdateExperiment428ApplicationProblemPlusJSONResponse) VisitUpdat
 	return err
 }
 
+type GetExperimentAssignmentRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     GetExperimentAssignmentParams
+}
+
+type GetExperimentAssignmentResponseObject interface {
+	VisitGetExperimentAssignmentResponse(w http.ResponseWriter) error
+}
+
+type GetExperimentAssignment200JSONResponse ExperimentAssignment
+
+func (response GetExperimentAssignment200JSONResponse) VisitGetExperimentAssignmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentAssignment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentAssignment400ApplicationProblemPlusJSONResponse) VisitGetExperimentAssignmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentAssignment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentAssignment401ApplicationProblemPlusJSONResponse) VisitGetExperimentAssignmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentAssignment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentAssignment403ApplicationProblemPlusJSONResponse) VisitGetExperimentAssignmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentAssignment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentAssignment404ApplicationProblemPlusJSONResponse) VisitGetExperimentAssignmentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type CloneExperimentRequestObject struct {
 	Project    ProjectKey    `json:"project"`
 	Experiment ExperimentKey `json:"experiment"`
@@ -47937,6 +49012,112 @@ func (response DeleteGrant422ApplicationProblemPlusJSONResponse) VisitDeleteGran
 	return err
 }
 
+type CheckHashUniformityRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *CheckHashUniformityJSONRequestBody
+}
+
+type CheckHashUniformityResponseObject interface {
+	VisitCheckHashUniformityResponse(w http.ResponseWriter) error
+}
+
+type CheckHashUniformity200JSONResponse HashCheck
+
+func (response CheckHashUniformity200JSONResponse) VisitCheckHashUniformityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckHashUniformity400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CheckHashUniformity400ApplicationProblemPlusJSONResponse) VisitCheckHashUniformityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckHashUniformity401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CheckHashUniformity401ApplicationProblemPlusJSONResponse) VisitCheckHashUniformityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckHashUniformity403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CheckHashUniformity403ApplicationProblemPlusJSONResponse) VisitCheckHashUniformityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckHashUniformity404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CheckHashUniformity404ApplicationProblemPlusJSONResponse) VisitCheckHashUniformityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CheckHashUniformity422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CheckHashUniformity422ApplicationProblemPlusJSONResponse) VisitCheckHashUniformityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetProjectMeRequestObject struct {
 	Project ProjectKey `json:"project"`
 }
@@ -49762,6 +50943,9 @@ type StrictServerInterface interface {
 	// UpdateExperiment Change a draft experiment
 	// (PATCH /projects/{project}/experiments/{experiment})
 	UpdateExperiment(ctx context.Context, request UpdateExperimentRequestObject) (UpdateExperimentResponseObject, error)
+	// GetExperimentAssignment How the experiment treats one unit
+	// (GET /projects/{project}/experiments/{experiment}/assignment)
+	GetExperimentAssignment(ctx context.Context, request GetExperimentAssignmentRequestObject) (GetExperimentAssignmentResponseObject, error)
 	// CloneExperiment Clone an experiment into a new draft
 	// (POST /projects/{project}/experiments/{experiment}/clone)
 	CloneExperiment(ctx context.Context, request CloneExperimentRequestObject) (CloneExperimentResponseObject, error)
@@ -49822,6 +51006,9 @@ type StrictServerInterface interface {
 	// DeleteGrant Remove one grant
 	// (DELETE /projects/{project}/grants/{grant})
 	DeleteGrant(ctx context.Context, request DeleteGrantRequestObject) (DeleteGrantResponseObject, error)
+	// CheckHashUniformity Check the hash's uniformity on real unit IDs
+	// (POST /projects/{project}/hash-check)
+	CheckHashUniformity(ctx context.Context, request CheckHashUniformityRequestObject) (CheckHashUniformityResponseObject, error)
 	// GetProjectMe What the caller holds in a project
 	// (GET /projects/{project}/me)
 	GetProjectMe(ctx context.Context, request GetProjectMeRequestObject) (GetProjectMeResponseObject, error)
@@ -51862,6 +53049,34 @@ func (sh *strictHandler) UpdateExperiment(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// GetExperimentAssignment operation middleware
+func (sh *strictHandler) GetExperimentAssignment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentAssignmentParams) {
+	var request GetExperimentAssignmentRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetExperimentAssignment(ctx, request.(GetExperimentAssignmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetExperimentAssignment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetExperimentAssignmentResponseObject); ok {
+		if err := validResponse.VisitGetExperimentAssignmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // CloneExperiment operation middleware
 func (sh *strictHandler) CloneExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey) {
 	var request CloneExperimentRequestObject
@@ -52480,6 +53695,39 @@ func (sh *strictHandler) DeleteGrant(w http.ResponseWriter, r *http.Request, pro
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeleteGrantResponseObject); ok {
 		if err := validResponse.VisitDeleteGrantResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CheckHashUniformity operation middleware
+func (sh *strictHandler) CheckHashUniformity(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request CheckHashUniformityRequestObject
+
+	request.Project = project
+
+	var body CheckHashUniformityJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CheckHashUniformity(ctx, request.(CheckHashUniformityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CheckHashUniformity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CheckHashUniformityResponseObject); ok {
+		if err := validResponse.VisitCheckHashUniformityResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
