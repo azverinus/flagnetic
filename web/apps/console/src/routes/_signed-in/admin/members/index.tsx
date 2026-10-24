@@ -7,7 +7,6 @@ import {
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { UserPlusIcon } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
@@ -21,7 +20,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select, SelectItem } from "@/components/ui/select";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { formatDateTime, formatNumber } from "@/i18n/format";
 import { unwrap } from "@/lib/errors";
 import {
@@ -138,7 +137,7 @@ function MembersTable({
   empty: ReactNode;
 }) {
   const { i18n, t } = useLingui();
-  const columns = useMemo<ColumnDef<Member, unknown>[]>(
+  const columns = useMemo<TableColumn<Member>[]>(
     () => [
       {
         id: "member",

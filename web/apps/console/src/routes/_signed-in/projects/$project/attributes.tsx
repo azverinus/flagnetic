@@ -12,7 +12,6 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon, PlusIcon, TagsIcon, Trash2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -32,7 +31,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select, SelectItem } from "@/components/ui/select";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { formatNumber } from "@/i18n/format";
@@ -65,7 +64,7 @@ function Attributes() {
   const canManage = useCan(permission);
 
   const columns = useMemo(() => {
-    const columns: ColumnDef<AttributeListItem, unknown>[] = [
+    const columns: TableColumn<AttributeListItem>[] = [
       {
         id: "key",
         header: t`Key`,

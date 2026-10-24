@@ -1,10 +1,9 @@
 import type { Project } from "@flagnetic/api";
 import { useLingui } from "@lingui/react/macro";
 import { Link } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { type ReactNode, useMemo } from "react";
 
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { formatNumber } from "@/i18n/format";
 
 export type ProjectsTableProps = {
@@ -18,7 +17,7 @@ export type ProjectsTableProps = {
 /** Projects by name, each opening its overview, with its key and how many members it has. */
 export function ProjectsTable({ caption, projects, loading, empty }: ProjectsTableProps) {
   const { i18n, t } = useLingui();
-  const columns = useMemo<ColumnDef<Project, unknown>[]>(
+  const columns = useMemo<TableColumn<Project>[]>(
     () => [
       {
         id: "name",

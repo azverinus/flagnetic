@@ -1,12 +1,13 @@
 import { Trans } from "@lingui/react/macro";
 import type { QueryKey } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { RowData } from "@tanstack/react-table";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
+import type { TableColumn } from "@/components/ui/table";
 import { useListMutation } from "@/lib/mutations";
 
 /**
@@ -17,11 +18,11 @@ import { useListMutation } from "@/lib/mutations";
  * where the columns are memoized: a cell renderer that changed identity
  * would remount its row's buttons, and a dialog could not give focus back.
  */
-export function withRowActions<Row>(
-  columns: ColumnDef<Row, unknown>[],
+export function withRowActions<Row extends RowData>(
+  columns: TableColumn<Row>[],
   held: boolean,
   actions: (row: Row) => ReactNode,
-): ColumnDef<Row, unknown>[] {
+): TableColumn<Row>[] {
   if (!held) return columns;
   return [
     ...columns,

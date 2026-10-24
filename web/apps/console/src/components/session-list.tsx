@@ -2,7 +2,6 @@ import { revokeMySession, revokeMySessions, type Session } from "@flagnetic/api"
 import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { LogOutIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -12,7 +11,7 @@ import { RowAction, withRowActions } from "@/components/row-dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { formatDateTime } from "@/i18n/format";
 import { deviceName } from "@/lib/device";
 import { unwrap } from "@/lib/errors";
@@ -28,9 +27,9 @@ export function currentFirst(sessions: readonly Session[]): Session[] {
  * The columns of a list of sessions: the device, this one marked, its
  * address, and when it signed in, was last seen and ends at the latest.
  */
-export function useSessionColumns(): ColumnDef<Session, unknown>[] {
+export function useSessionColumns(): TableColumn<Session>[] {
   const { i18n, t } = useLingui();
-  return useMemo<ColumnDef<Session, unknown>[]>(
+  return useMemo<TableColumn<Session>[]>(
     () => [
       {
         id: "device",
@@ -101,7 +100,7 @@ export function SessionList() {
   );
 
   const sessionColumns = useSessionColumns();
-  const columns = useMemo<ColumnDef<Session, unknown>[]>(() => {
+  const columns = useMemo<TableColumn<Session>[]>(() => {
     return withRowActions(sessionColumns, true, (session) => {
       if (session.current) return null;
       const device = deviceName(i18n, session.user_agent);

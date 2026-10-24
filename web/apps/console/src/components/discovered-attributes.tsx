@@ -6,7 +6,6 @@ import {
 } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { CheckIcon, EyeOffIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -18,7 +17,7 @@ import { DialogForm } from "@/components/ui/dialog-form";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Select, SelectItem } from "@/components/ui/select";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { formatNumber } from "@/i18n/format";
 import { useCan } from "@/lib/access";
 import { declarableTypes, observedTypeName, typeName } from "@/lib/attribute-types";
@@ -45,7 +44,7 @@ export function DiscoveredAttributes({ project }: DiscoveredAttributesProps) {
   const [dismissing, setDismissing] = useState<DiscoveredAttribute>();
 
   const columns = useMemo(() => {
-    const columns: ColumnDef<DiscoveredAttribute, unknown>[] = [
+    const columns: TableColumn<DiscoveredAttribute>[] = [
       {
         id: "key",
         header: t`Key`,

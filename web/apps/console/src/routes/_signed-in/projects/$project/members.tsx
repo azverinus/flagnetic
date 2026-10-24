@@ -2,7 +2,6 @@ import { deleteGrant, type Grant, type ProjectMember } from "@flagnetic/api";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { createFileRoute } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { PlusIcon, Trash2Icon, UserPlusIcon, UsersIcon } from "lucide-react";
 import { useContext, useMemo, useState } from "react";
 
@@ -16,7 +15,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { AccessContext, useCan } from "@/lib/access";
 import { type Permission, roleName } from "@/lib/access-names";
 import { unwrap } from "@/lib/errors";
@@ -61,7 +60,7 @@ function Members() {
   const [removing, setRemoving] = useState<GrantOf>();
 
   const columns = useMemo(() => {
-    const columns: ColumnDef<ProjectMember, unknown>[] = [
+    const columns: TableColumn<ProjectMember>[] = [
       {
         id: "member",
         header: t`Member`,

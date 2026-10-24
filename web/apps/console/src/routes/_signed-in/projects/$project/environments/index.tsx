@@ -9,7 +9,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -25,7 +24,7 @@ import { DialogForm } from "@/components/ui/dialog-form";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { useCan } from "@/lib/access";
 import type { Permission } from "@/lib/access-names";
 import { ApiError, unwrap } from "@/lib/errors";
@@ -52,8 +51,8 @@ function Environments() {
 
   const canManage = useCan(permission);
 
-  const columns = useMemo<ColumnDef<Environment, unknown>[]>(() => {
-    const columns: ColumnDef<Environment, unknown>[] = [
+  const columns = useMemo<TableColumn<Environment>[]>(() => {
+    const columns: TableColumn<Environment>[] = [
       {
         id: "key",
         header: t`Key`,
