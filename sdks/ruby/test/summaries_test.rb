@@ -182,4 +182,36 @@ class SummariesTest < Minitest::Test
     refute_nil second
     assert_operator second.at - first.at, :>=, 0.95
   end
+
+  def test_a_background_flush_through_an_events_outage_does_not_hold_back_a_flag_change
+    @server.on_events { |_| [503, {}, ""] }
+    @server.publish(document(1, { "on" => false }))
+    c = client(summary_interval: 1.5, timing: { request_timeout: 0.3 })
+    c.ready(timeout: 2)
+    c.bool("on", default: true)
+    assert(eventually(3) { @server.events_requests.any? })
+
+    @server.publish(document(2, { "on" => true }))
+    assert(eventually(0.8) { c.bool("on", default: false) })
+  end
+
+  def test_close_flushes_and_stops_within_its_one_timeout
+    @server.publish(document(1, { "on" => true }))
+    c = client(summary_interval: 3600, stream: false, timing: { poll_down: 0.05 })
+    c.ready(timeout: 2)
+    @server.on_events do |_|
+      sleep 2
+      nil
+    end
+    @server.on_ruleset do |_|
+      sleep 2
+      nil
+    end
+    c.bool("on", default: false)
+    sleep 0.1 # the background thread is now inside a fetch that hangs
+
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    c.close(timeout: 0.5)
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 0.8
+  end
 end

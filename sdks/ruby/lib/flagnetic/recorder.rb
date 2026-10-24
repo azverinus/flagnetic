@@ -5,8 +5,8 @@ require "time"
 module Flagnetic
   # Recorder holds in memory what an offline client would report, so a
   # test can assert on it: the running evaluation counts, every evaluation
-  # summary a flush, close or the reporting interval would have sent, and
-  # every exposure and alias the client recorded. It is thread-safe.
+  # summary a flush or close would have sent, and every exposure and alias
+  # the client recorded. It is thread-safe.
   class Recorder
     # SummaryCount is one row of an evaluation summary: how often a flag
     # served a variation for an evaluation reason. It carries no unit IDs
@@ -53,7 +53,7 @@ module Flagnetic
 
     # summary returns the running evaluation counts since construction or
     # the last reset, ordered by flag, variation and reason. Closing a
-    # window (flush, close, the reporting interval) does not touch it.
+    # window (flush, close) does not touch it.
     def summary
       rows = @mutex.synchronize { @counts.dup }
       rows.map { |(flag, variation, reason), n| SummaryCount.new(flag:, variation:, reason:, count: n).freeze }

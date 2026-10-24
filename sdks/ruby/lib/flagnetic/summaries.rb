@@ -11,9 +11,8 @@ module Flagnetic
   # reason), the ruleset version at the interval's end, no unit IDs. A
   # window whose report failed merges into the next one rather than being
   # retried under its own event ID; one older than an hour is dropped
-  # instead. Offline: the window still rotates on flush, close and the
-  # reporting interval, but goes to the Recorder instead of the events
-  # endpoint.
+  # instead. Offline: the window rotates only on flush and close, and goes
+  # to the Recorder instead of the events endpoint.
   class Summaries
     include Reporter
 

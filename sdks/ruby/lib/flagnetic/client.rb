@@ -236,10 +236,12 @@ module Flagnetic
     end
 
     # close flushes the queued exposures and aliases and the current window
-    # of evaluation counts within timeout seconds, then stops the stream
-    # and polling, waiting at most timeout seconds more. Getters keep
+    # of evaluation counts, then stops the stream and polling, all within
+    # timeout seconds: what the flush leaves of the timeout is what the
+    # background thread gets to end before it is killed. Getters keep
     # serving the held ruleset.
     def close(timeout: 5)
+      started = now
       do_flush(timeout) unless @closed
       worker = @fork_mutex.synchronize do
         @closed = true
@@ -248,7 +250,7 @@ module Flagnetic
         w
       end
       if worker && @pid == Process.pid
-        worker.stop(timeout)
+        worker.stop([timeout - (now - started), 0].max)
       else
         worker&.abandon
       end

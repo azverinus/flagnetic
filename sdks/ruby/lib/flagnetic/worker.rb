@@ -89,11 +89,16 @@ module Flagnetic
     end
 
     # drive flushes queue once when it is due; a queue that is off is nil
-    # and this is a no-op. It never lets a flush failure stop the loop.
-    def drive(queue, budget)
+    # and this is a no-op. It never lets a flush failure stop the loop. The
+    # budget is the interval but at most one request timeout: this thread
+    # also fetches the ruleset and reads the stream's messages, so a flush
+    # retrying through an events outage for a whole minute would hold back
+    # every flag change for that minute. A flush cut short keeps what it
+    # did not deliver and is due again after its backoff.
+    def drive(queue, interval)
       return unless queue&.due?(now)
 
-      queue.flush_once(budget)
+      queue.flush_once([interval, @timing.request_timeout].min)
     rescue StandardError => e
       @client.__send__(:log, :error, :worker_failed, cause: "#{e.class}: #{e.message}")
     end

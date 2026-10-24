@@ -6,7 +6,7 @@ require "zlib"
 require "stringio"
 
 module Flagnetic
-  # EventBatch builds and sends the events endpoint.s envelope for exposures,
+  # EventBatch builds and sends the events endpoint's envelope for exposures,
   # aliases and evaluation summaries alike: the gzip body, batching under
   # the endpoint's limits, and what the platform's answer means for the
   # caller. Shared by Exposures and Summaries; it holds no queue and no
