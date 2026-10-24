@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/azverinus/flagnetic/compare/sdks/go-openfeature/v0.1.0...sdks/go-openfeature/v0.1.1) (2026-10-24)
+
+
+### Dependencies
+
+* **sdk-go-openfeature:** bump open-feature/go-sdk to 1.19.0 ([#72](https://github.com/azverinus/flagnetic/issues/72)) ([2ffdebd](https://github.com/azverinus/flagnetic/commit/2ffdebdf2ddddb94e53f2545589e02a5f5982725))
+
 ## 0.1.0 (2026-10-23)
 
 
