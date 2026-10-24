@@ -582,6 +582,29 @@ func TestARuleServingAnExperimentIsRefusedWhenTheExperimentCannotBeServed(t *tes
 	}
 }
 
+func TestARuleAlreadyServingAnExperimentKeepsServingItWhateverItsStatus(t *testing.T) {
+	c := initial()
+	held := mint.RuleID()
+	c.Rules = []flags.Rule{{ID: held, Serve: flags.Serve{Kind: flags.ServeExperiment, Experiment: "stopped_title"}}}
+
+	// Another rule joins, and the stopped experiment's rule keeps its place:
+	// stopping an experiment never blocks the configuration's other edits.
+	in := base()
+	in.Rules = []flags.RuleInput{{ID: &held, Serve: experimentServe("stopped_title")}, {Serve: serveVariation("b")}}
+	got, _, err := replace(c, in, nil)
+	if err != nil || len(got.Rules) != 2 || got.Rules[0].ID != held || got.Rules[0].Serve.Experiment != "stopped_title" {
+		t.Fatalf("keeping the rule = %+v, %v", got.Rules, err)
+	}
+
+	// The same rule turned to another experiment that cannot be served is
+	// refused as a new rule would be.
+	in.Rules = []flags.RuleInput{{ID: &held, Serve: experimentServe("archived_title")}}
+	_, _, err = replace(c, in, nil)
+	if got := configurationViolations(t, err); !slices.Equal(got, []string{"/rules/0/serve/experiment experiment_not_servable"}) {
+		t.Errorf("violations = %v", got)
+	}
+}
+
 func TestExperimentsHoldingAFlagAreReferencesToArchiveOrRemoveFromIt(t *testing.T) {
 	experiments := []flags.ExperimentRef{
 		{Key: "draft_title", Status: "draft", Weights: []flags.ExperimentWeight{{Variation: "a", Weight: 5000}, {Variation: "b", Weight: 5000}}},

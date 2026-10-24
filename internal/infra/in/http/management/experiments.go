@@ -166,6 +166,19 @@ func (a *api) RegenerateExperimentSalts(ctx context.Context, req RegenerateExper
 	return RegenerateExperimentSalts200JSONResponse{Body: experimentOut(e), Headers: RegenerateExperimentSalts200ResponseHeaders{ETag: etag(e.Version)}}, nil
 }
 
+// StartExperiment starts a draft experiment.
+func (a *api) StartExperiment(ctx context.Context, req StartExperimentRequestObject) (StartExperimentResponseObject, error) {
+	cmd, err := experimentCommand(ctx, req.Experiment, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	e, err := a.h.StartExperiment.Handle(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	return StartExperiment200JSONResponse{Body: experimentOut(e), Headers: StartExperiment200ResponseHeaders{ETag: etag(e.Version)}}, nil
+}
+
 // CloneExperiment copies an experiment into a new draft.
 func (a *api) CloneExperiment(ctx context.Context, req CloneExperimentRequestObject) (CloneExperimentResponseObject, error) {
 	e, err := a.h.CloneExperiment.Handle(ctx, appexperiments.CloneExperimentCommand{

@@ -25,6 +25,8 @@ type UpdateExperimentDeps struct {
 	Flags     Flags
 	UnitTypes UnitTypes
 	Owners    Owners
+	Holders   Holders
+	Rulesets  Rulesets
 	Recorder  Recorder
 }
 
@@ -50,7 +52,10 @@ type UpdateExperimentCommand struct {
 // Handle applies the change and returns the experiment as it is after it. The
 // change is validated first, then judged against the version it was based on;
 // a change to the values the experiment already has stores and records
-// nothing. A draft is in no ruleset, so no ruleset moves.
+// nothing. A draft is in no ruleset, and a running experiment's description
+// is in none either, so neither moves a ruleset; a running experiment's
+// traffic allocation is embedded in its holders' rulesets, so growing it
+// moves exactly those on, and is recorded as the allocation change it is.
 func (h *UpdateExperiment) Handle(ctx context.Context, cmd UpdateExperimentCommand) (experiments.Experiment, error) {
 	now := h.d.Recorder.now()
 	var out experiments.Experiment
@@ -80,8 +85,15 @@ func (h *UpdateExperiment) Handle(ctx context.Context, cmd UpdateExperimentComma
 		if err := h.d.Store.UpdateExperiment(ctx, after); err != nil {
 			return err
 		}
+		action := "experiment.updated"
+		if after.Status == experiments.StatusRunning && after.TrafficAllocation != before.TrafficAllocation {
+			action = "experiment.traffic_allocation_changed"
+			if err := bumpHolders(ctx, h.d.Holders, h.d.Rulesets, after); err != nil {
+				return err
+			}
+		}
 		return h.d.Recorder.record(ctx, now, cmd.Request, governance.Record{
-			Project: cmd.Project, Action: "experiment.updated", Entity: experimentEntity(after),
+			Project: cmd.Project, Action: action, Entity: experimentEntity(after),
 			Before: experimentValues(before), After: experimentValues(after),
 		})
 	})

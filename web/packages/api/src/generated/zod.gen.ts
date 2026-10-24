@@ -860,8 +860,12 @@ export const zOverrideInput = z.object({
  * serves a draft or running experiment of its flag
  * (`unknown_experiment`, `experiment_of_another_flag` and
  * `experiment_not_servable` otherwise), and several rules may serve
- * the same one. While the experiment is a draft its rules are left
- * out of the ruleset SDKs receive.
+ * the same one; a rule that served the experiment already keeps
+ * serving it whatever its status, so stopping or archiving it never
+ * blocks an edit of the other rules. While the experiment is a draft,
+ * stopped or archived its rules are left out of the ruleset SDKs
+ * receive; while it runs they carry its unit type, salts, traffic
+ * allocation and weights.
  *
  */
 export const zServe = z.object({
@@ -1196,6 +1200,26 @@ export const zEvaluationRequest = z.object({
 });
 
 /**
+ * The running experiment a result comes from, as an SDK's exposure
+ * carries it: present with reason `experiment`, and with reason
+ * `override` when the unit, without the override, would be in a
+ * running experiment. Recomputing either bucket takes the salt and
+ * the unit: `murmur3_32(salt + "." + unit_id) % 10000`.
+ *
+ */
+export const zEvaluatedExperiment = z.object({
+  key: z.string(),
+  variation: z.string(),
+  unit_type: z.string(),
+  unit_id: z.string(),
+  inclusion_salt: z.string(),
+  variation_salt: z.string(),
+  inclusion_bucket: z.int(),
+  variation_bucket: z.int(),
+  override: z.boolean(),
+});
+
+/**
  * What one flag serves the context, and why, as the reference
  * evaluator computes it. `type` and `automatic_exposure` are absent
  * only for `flag_not_found`.
@@ -1207,6 +1231,7 @@ export const zEvaluationResult = z.object({
   variation: z.string().optional(),
   reason: z.string(),
   rule_id: z.uuid().optional(),
+  experiment: zEvaluatedExperiment.optional(),
   automatic_exposure: z.boolean().optional(),
   prerequisite: z.string().optional(),
   bucket: z.int().optional(),
@@ -2131,6 +2156,20 @@ export const zRegenerateExperimentSaltsPath = z.object({
  * The experiment with its new salts.
  */
 export const zRegenerateExperimentSaltsResponse = zExperiment;
+
+export const zStartExperimentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zStartExperimentPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+/**
+ * The experiment, running.
+ */
+export const zStartExperimentResponse = zExperiment;
 
 export const zCloneExperimentBody = zExperimentClone;
 

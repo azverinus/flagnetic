@@ -291,6 +291,9 @@ import type {
   SignOutData,
   SignOutErrors,
   SignOutResponses,
+  StartExperimentData,
+  StartExperimentErrors,
+  StartExperimentResponses,
   UpdateAttributeData,
   UpdateAttributeErrors,
   UpdateAttributeResponses,
@@ -2098,13 +2101,20 @@ export const getExperiment = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Change a draft experiment
+ * Change an experiment
  *
  * Changes any of the name, hypothesis, owner, tags, flag, unit type,
  * variations, traffic allocation or expected end date of a draft, as a
- * create judges them; the key never changes (`immutable`). Only a draft
- * is changed (`not_draft`). A change to the values the experiment
- * already has changes nothing and records nothing.
+ * create judges them; the key never changes (`immutable`). A running
+ * experiment changes its name, hypothesis, owner, tags and expected
+ * end date, and grows its traffic allocation: a change to its flag,
+ * unit type or weights is `frozen` (409, a violation per field), and a
+ * smaller allocation is `traffic_allocation_decrease` (409). Growing it
+ * moves the ruleset of every environment holding a rule serving the
+ * experiment and includes more units without moving any unit already
+ * included. Past running nothing is changed (`not_draft`). A change to
+ * the values the experiment already has changes nothing and records
+ * nothing.
  *
  */
 export const updateExperiment = <ThrowOnError extends boolean = false>(
@@ -2159,6 +2169,41 @@ export const regenerateExperimentSalts = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/experiments/{experiment}/salts",
+    ...options,
+  });
+
+/**
+ * Start a draft experiment
+ *
+ * Starts the experiment: its flag, unit type and weights are frozen
+ * from now on, and in the same transaction the ruleset of every
+ * environment holding a rule serving it moves on to carry them, so it
+ * begins everywhere at once; no other environment's ruleset moves. An
+ * experiment no environment holds starts all the same, and reaches an
+ * environment when a rule there serves it. Only a draft starts
+ * (`not_draft`): there is no restart, a stopped experiment is rerun as
+ * a clone. A draft missing anything a running experiment needs is
+ * refused `experiment_not_ready`, with one violation per missing
+ * item: its flag archived (`flag_archived` on `/flag`), its unit type
+ * no longer declared (`undeclared_unit_type` on `/unit_type`), weights
+ * no longer valid against the flag (on `/variations`), no hypothesis
+ * or no expected end date (`required` on `/hypothesis` and
+ * `/expected_end_at`).
+ *
+ */
+export const startExperiment = <ThrowOnError extends boolean = false>(
+  options: Options<StartExperimentData, ThrowOnError>,
+): RequestResult<StartExperimentResponses, StartExperimentErrors, ThrowOnError> =>
+  (options.client ?? client).post<StartExperimentResponses, StartExperimentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/start",
     ...options,
   });
 

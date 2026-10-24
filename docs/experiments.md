@@ -33,7 +33,29 @@ Every write to an existing experiment names the version it is based on in `If-Ma
 
 A draft is edited in full with `PATCH /projects/{project}/experiments/{experiment}` (`experiment.edit`): name, hypothesis, owner, tags, flag, unit type, variations, traffic allocation and expected end date, each judged as a create judges it. Fields left out stay as they are; the key never changes (`422 invalid_experiment`, `immutable` on `/key`). A change to the values the experiment already has changes nothing: the version stays and nothing is recorded. Changing the flag or the variations judges the variations against the flag as it will be.
 
-`POST /projects/{project}/experiments/{experiment}/salts` (`experiment.edit`) draws a new inclusion salt and variation salt, again apart from every salt of the project's experiments and rollouts. `DELETE /projects/{project}/experiments/{experiment}` (`experiment.delete`, maintainers and owners) deletes the experiment. Editing, regenerating salts and deleting are for drafts only: any other status is refused `409 not_draft`.
+## Starting an experiment
+
+`POST /projects/{project}/experiments/{experiment}/start` (`experiment.edit`, with `If-Match`) starts a draft. In the same transaction the ruleset of every environment holding a rule that serves the experiment moves on to a new version carrying it, so the experiment begins in all of them at once; the rulesets of the other environments do not move. An experiment no environment holds starts all the same, and reaches an environment when a rule there serves it.
+
+A draft missing anything a running experiment needs is refused `422 experiment_not_ready`, with one violation per missing item, so they can all be fixed at once:
+
+| Pointer | Code | When |
+|---|---|---|
+| `/flag` | `flag_archived` | The flag is archived. |
+| `/unit_type` | `undeclared_unit_type` | The unit type is no longer declared. |
+| `/variations` and below | the codes of a create | The weights are no longer valid against the flag. |
+| `/hypothesis` | `required` | The experiment has no hypothesis. |
+| `/expected_end_at` | `required` | The experiment has no expected end date. |
+
+Only a draft starts (`409 not_draft`): there is no restart, and a stopped experiment is rerun as a [clone](#cloning) with new salts. There is no pause either: the flag's kill switch is the pause.
+
+## A running experiment
+
+While an experiment runs, its rules carry what decides each unit's variation: the unit type, both salts, the traffic allocation and the weights in the experiment's order. Its flag, unit type and weights are frozen: a `PATCH` changing any of them is refused `409 frozen`, with a `frozen` violation on each of `/flag`, `/unit_type` and `/variations` it would change (naming one with the value it has already changes nothing). The name, hypothesis, owner, tags and expected end date stay editable, and change no ruleset.
+
+The traffic allocation only grows: a smaller one is refused `409 traffic_allocation_decrease`. Growing it moves on the ruleset of every environment holding the experiment, and includes more units without moving any unit already included, since the inclusion bucket of a unit never changes. It is recorded as `experiment.traffic_allocation_changed`.
+
+`POST /projects/{project}/experiments/{experiment}/salts` (`experiment.edit`) draws a new inclusion salt and variation salt, again apart from every salt of the project's experiments and rollouts. `DELETE /projects/{project}/experiments/{experiment}` (`experiment.delete`, maintainers and owners) deletes the experiment. Regenerating salts and deleting are for drafts only: any other status is refused `409 not_draft`; past the draft, editing follows [what a running experiment allows](#a-running-experiment).
 
 ## Cloning
 
@@ -79,4 +101,4 @@ The form takes the key, name, hypothesis, flag, unit type, weights, traffic allo
 
 ## Audit
 
-Every write records one entry (see [The audit log](access.md#the-audit-log)): `experiment.created` and `experiment.cloned` with the experiment after it (a clone also names the experiment it was copied from), `experiment.updated` and `experiment.salts_regenerated` with the experiment before and after, and `experiment.deleted` with the experiment before.
+Every write records one entry (see [The audit log](access.md#the-audit-log)): `experiment.created` and `experiment.cloned` with the experiment after it (a clone also names the experiment it was copied from), `experiment.updated`, `experiment.salts_regenerated`, `experiment.started` and `experiment.traffic_allocation_changed` (a change of a running experiment's allocation, whatever else the same `PATCH` changed) with the experiment before and after, and `experiment.deleted` with the experiment before.

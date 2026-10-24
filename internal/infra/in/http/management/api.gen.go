@@ -940,6 +940,30 @@ type EnvironmentProtection struct {
 	Protected bool `json:"protected"`
 }
 
+// EvaluatedExperiment The running experiment a result comes from, as an SDK's exposure
+// carries it: present with reason `experiment`, and with reason
+// `override` when the unit, without the override, would be in a
+// running experiment. Recomputing either bucket takes the salt and
+// the unit: `murmur3_32(salt + "." + unit_id) % 10000`.
+type EvaluatedExperiment struct {
+	// InclusionBucket The unit is included when it is below the traffic allocation.
+	InclusionBucket int    `json:"inclusion_bucket"`
+	InclusionSalt   string `json:"inclusion_salt"`
+	Key             string `json:"key"`
+
+	// Override Whether an override influenced the result; analysis leaves such exposures out.
+	Override bool   `json:"override"`
+	UnitId   string `json:"unit_id"`
+	UnitType string `json:"unit_type"`
+
+	// Variation The served variation; the override's when an override decided the result.
+	Variation string `json:"variation"`
+
+	// VariationBucket Picks the variation by the weights' cumulative ranges.
+	VariationBucket int    `json:"variation_bucket"`
+	VariationSalt   string `json:"variation_salt"`
+}
+
 // Evaluation defines model for Evaluation.
 type Evaluation struct {
 	// Flags The result of each flag evaluated, by flag key.
@@ -993,16 +1017,23 @@ type EvaluationResult struct {
 	// ErrorCode Why the result is an error: `flag_not_found`, `prerequisite_cycle` or `inconsistent_ruleset`.
 	ErrorCode *string `json:"error_code,omitempty"`
 
+	// Experiment The running experiment a result comes from, as an SDK's exposure
+	// carries it: present with reason `experiment`, and with reason
+	// `override` when the unit, without the override, would be in a
+	// running experiment. Recomputing either bucket takes the salt and
+	// the unit: `murmur3_32(salt + "." + unit_id) % 10000`.
+	Experiment *EvaluatedExperiment `json:"experiment,omitempty"`
+
 	// OverrideInfluenced Whether an override decided the result, directly or through a prerequisite.
 	OverrideInfluenced bool `json:"override_influenced"`
 
 	// Prerequisite The key of the flag-level prerequisite that failed, for reason `prerequisite_failed`.
 	Prerequisite *string `json:"prerequisite,omitempty"`
 
-	// Reason `off`, `override`, `rule`, `rollout`, `fallthrough`, `prerequisite_failed` or `error`.
+	// Reason `off`, `override`, `rule`, `rollout`, `experiment`, `fallthrough`, `prerequisite_failed` or `error`.
 	Reason string `json:"reason"`
 
-	// RuleId The rule that served, for reasons `rule` and `rollout`.
+	// RuleId The rule that served, for reasons `rule`, `rollout` and `experiment`.
 	RuleId *openapi_types.UUID `json:"rule_id,omitempty"`
 
 	// Salt The salt of the rollout that served, for reason `rollout`.
@@ -1903,8 +1934,12 @@ type Rule struct {
 	// serves a draft or running experiment of its flag
 	// (`unknown_experiment`, `experiment_of_another_flag` and
 	// `experiment_not_servable` otherwise), and several rules may serve
-	// the same one. While the experiment is a draft its rules are left
-	// out of the ruleset SDKs receive.
+	// the same one; a rule that served the experiment already keeps
+	// serving it whatever its status, so stopping or archiving it never
+	// blocks an edit of the other rules. While the experiment is a draft,
+	// stopped or archived its rules are left out of the ruleset SDKs
+	// receive; while it runs they carry its unit type, salts, traffic
+	// allocation and weights.
 	Serve Serve `json:"serve"`
 }
 
@@ -1926,8 +1961,12 @@ type RuleInput struct {
 	// serves a draft or running experiment of its flag
 	// (`unknown_experiment`, `experiment_of_another_flag` and
 	// `experiment_not_servable` otherwise), and several rules may serve
-	// the same one. While the experiment is a draft its rules are left
-	// out of the ruleset SDKs receive.
+	// the same one; a rule that served the experiment already keeps
+	// serving it whatever its status, so stopping or archiving it never
+	// blocks an edit of the other rules. While the experiment is a draft,
+	// stopped or archived its rules are left out of the ruleset SDKs
+	// receive; while it runs they carry its unit type, salts, traffic
+	// allocation and weights.
 	Serve Serve `json:"serve"`
 }
 
@@ -2125,8 +2164,12 @@ type SegmentPatch struct {
 // serves a draft or running experiment of its flag
 // (`unknown_experiment`, `experiment_of_another_flag` and
 // `experiment_not_servable` otherwise), and several rules may serve
-// the same one. While the experiment is a draft its rules are left
-// out of the ruleset SDKs receive.
+// the same one; a rule that served the experiment already keeps
+// serving it whatever its status, so stopping or archiving it never
+// blocks an edit of the other rules. While the experiment is a draft,
+// stopped or archived its rules are left out of the ruleset SDKs
+// receive; while it runs they carry its unit type, salts, traffic
+// allocation and weights.
 type Serve struct {
 	// Experiment The key of the experiment served, for kind `experiment`.
 	Experiment *string `json:"experiment,omitempty"`
@@ -2661,6 +2704,16 @@ type GetExperimentAssignmentParams struct {
 
 // RegenerateExperimentSaltsParams defines parameters for RegenerateExperimentSalts.
 type RegenerateExperimentSaltsParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// StartExperimentParams defines parameters for StartExperiment.
+type StartExperimentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
 	// answered it (`"7"`, or `7`). Required: without it the write is
 	// refused `428 precondition_required`, and with any other version than
@@ -4039,26 +4092,40 @@ type ClientInterface interface {
 	// Corresponds with GET /projects/{project}/experiments/{experiment} (the `GetExperiment` operationId).
 	GetExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateExperimentWithBody Change a draft experiment
+	// UpdateExperimentWithBody Change an experiment
 	//
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
-	// create judges them; the key never changes (`immutable`). Only a draft
-	// is changed (`not_draft`). A change to the values the experiment
-	// already has changes nothing and records nothing.
+	// create judges them; the key never changes (`immutable`). A running
+	// experiment changes its name, hypothesis, owner, tags and expected
+	// end date, and grows its traffic allocation: a change to its flag,
+	// unit type or weights is `frozen` (409, a violation per field), and a
+	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
+	// moves the ruleset of every environment holding a rule serving the
+	// experiment and includes more units without moving any unit already
+	// included. Past running nothing is changed (`not_draft`). A change to
+	// the values the experiment already has changes nothing and records
+	// nothing.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
 	UpdateExperimentWithBody(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateExperiment Change a draft experiment
+	// UpdateExperiment Change an experiment
 	//
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
-	// create judges them; the key never changes (`immutable`). Only a draft
-	// is changed (`not_draft`). A change to the values the experiment
-	// already has changes nothing and records nothing.
+	// create judges them; the key never changes (`immutable`). A running
+	// experiment changes its name, hypothesis, owner, tags and expected
+	// end date, and grows its traffic allocation: a change to its flag,
+	// unit type or weights is `frozen` (409, a violation per field), and a
+	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
+	// moves the ruleset of every environment holding a rule serving the
+	// experiment and includes more units without moving any unit already
+	// included. Past running nothing is changed (`not_draft`). A change to
+	// the values the experiment already has changes nothing and records
+	// nothing.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4119,6 +4186,26 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/experiments/{experiment}/salts (the `RegenerateExperimentSalts` operationId).
 	RegenerateExperimentSalts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartExperiment Start a draft experiment
+	//
+	// Starts the experiment: its flag, unit type and weights are frozen
+	// from now on, and in the same transaction the ruleset of every
+	// environment holding a rule serving it moves on to carry them, so it
+	// begins everywhere at once; no other environment's ruleset moves. An
+	// experiment no environment holds starts all the same, and reaches an
+	// environment when a rule there serves it. Only a draft starts
+	// (`not_draft`): there is no restart, a stopped experiment is rerun as
+	// a clone. A draft missing anything a running experiment needs is
+	// refused `experiment_not_ready`, with one violation per missing
+	// item: its flag archived (`flag_archived` on `/flag`), its unit type
+	// no longer declared (`undeclared_unit_type` on `/unit_type`), weights
+	// no longer valid against the flag (on `/variations`), no hypothesis
+	// or no expected end date (`required` on `/hypothesis` and
+	// `/expected_end_at`).
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/start (the `StartExperiment` operationId).
+	StartExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StartExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListFlags The project's flags
 	//
@@ -6650,13 +6737,20 @@ func (c *Client) GetExperiment(ctx context.Context, project ProjectKey, experime
 	return c.Client.Do(req)
 }
 
-// UpdateExperimentWithBody Change a draft experiment
+// UpdateExperimentWithBody Change an experiment
 //
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
-// create judges them; the key never changes (`immutable`). Only a draft
-// is changed (`not_draft`). A change to the values the experiment
-// already has changes nothing and records nothing.
+// create judges them; the key never changes (`immutable`). A running
+// experiment changes its name, hypothesis, owner, tags and expected
+// end date, and grows its traffic allocation: a change to its flag,
+// unit type or weights is `frozen` (409, a violation per field), and a
+// smaller allocation is `traffic_allocation_decrease` (409). Growing it
+// moves the ruleset of every environment holding a rule serving the
+// experiment and includes more units without moving any unit already
+// included. Past running nothing is changed (`not_draft`). A change to
+// the values the experiment already has changes nothing and records
+// nothing.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6673,13 +6767,20 @@ func (c *Client) UpdateExperimentWithBody(ctx context.Context, project ProjectKe
 	return c.Client.Do(req)
 }
 
-// UpdateExperiment Change a draft experiment
+// UpdateExperiment Change an experiment
 //
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
-// create judges them; the key never changes (`immutable`). Only a draft
-// is changed (`not_draft`). A change to the values the experiment
-// already has changes nothing and records nothing.
+// create judges them; the key never changes (`immutable`). A running
+// experiment changes its name, hypothesis, owner, tags and expected
+// end date, and grows its traffic allocation: a change to its flag,
+// unit type or weights is `frozen` (409, a violation per field), and a
+// smaller allocation is `traffic_allocation_decrease` (409). Growing it
+// moves the ruleset of every environment holding a rule serving the
+// experiment and includes more units without moving any unit already
+// included. Past running nothing is changed (`not_draft`). A change to
+// the values the experiment already has changes nothing and records
+// nothing.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6781,6 +6882,36 @@ func (c *Client) CloneExperiment(ctx context.Context, project ProjectKey, experi
 // Corresponds with POST /projects/{project}/experiments/{experiment}/salts (the `RegenerateExperimentSalts` operationId).
 func (c *Client) RegenerateExperimentSalts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRegenerateExperimentSaltsRequest(c.Server, project, experiment, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StartExperiment Start a draft experiment
+//
+// Starts the experiment: its flag, unit type and weights are frozen
+// from now on, and in the same transaction the ruleset of every
+// environment holding a rule serving it moves on to carry them, so it
+// begins everywhere at once; no other environment's ruleset moves. An
+// experiment no environment holds starts all the same, and reaches an
+// environment when a rule there serves it. Only a draft starts
+// (`not_draft`): there is no restart, a stopped experiment is rerun as
+// a clone. A draft missing anything a running experiment needs is
+// refused `experiment_not_ready`, with one violation per missing
+// item: its flag archived (`flag_archived` on `/flag`), its unit type
+// no longer declared (`undeclared_unit_type` on `/unit_type`), weights
+// no longer valid against the flag (on `/variations`), no hypothesis
+// or no expected end date (`required` on `/hypothesis` and
+// `/expected_end_at`).
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/start (the `StartExperiment` operationId).
+func (c *Client) StartExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StartExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartExperimentRequest(c.Server, project, experiment, params)
 	if err != nil {
 		return nil, err
 	}
@@ -11607,6 +11738,62 @@ func NewRegenerateExperimentSaltsRequest(server string, project ProjectKey, expe
 	return req, nil
 }
 
+// NewStartExperimentRequest constructs an http.Request for the StartExperiment method
+func NewStartExperimentRequest(server string, project ProjectKey, experiment ExperimentKey, params *StartExperimentParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/start", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewListFlagsRequest constructs an http.Request for the ListFlags method
 func NewListFlagsRequest(server string, project ProjectKey, params *ListFlagsParams) (*http.Request, error) {
 	var err error
@@ -14725,26 +14912,40 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /projects/{project}/experiments/{experiment} (the `GetExperiment` operationId).
 	GetExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, reqEditors ...RequestEditorFn) (*GetExperimentResponse, error)
 
-	// UpdateExperimentWithBodyWithResponse Change a draft experiment
+	// UpdateExperimentWithBodyWithResponse Change an experiment
 	//
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
-	// create judges them; the key never changes (`immutable`). Only a draft
-	// is changed (`not_draft`). A change to the values the experiment
-	// already has changes nothing and records nothing.
+	// create judges them; the key never changes (`immutable`). A running
+	// experiment changes its name, hypothesis, owner, tags and expected
+	// end date, and grows its traffic allocation: a change to its flag,
+	// unit type or weights is `frozen` (409, a violation per field), and a
+	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
+	// moves the ruleset of every environment holding a rule serving the
+	// experiment and includes more units without moving any unit already
+	// included. Past running nothing is changed (`not_draft`). A change to
+	// the values the experiment already has changes nothing and records
+	// nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
 	UpdateExperimentWithBodyWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateExperimentResponse, error)
 
-	// UpdateExperimentWithResponse Change a draft experiment
+	// UpdateExperimentWithResponse Change an experiment
 	//
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
-	// create judges them; the key never changes (`immutable`). Only a draft
-	// is changed (`not_draft`). A change to the values the experiment
-	// already has changes nothing and records nothing.
+	// create judges them; the key never changes (`immutable`). A running
+	// experiment changes its name, hypothesis, owner, tags and expected
+	// end date, and grows its traffic allocation: a change to its flag,
+	// unit type or weights is `frozen` (409, a violation per field), and a
+	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
+	// moves the ruleset of every environment holding a rule serving the
+	// experiment and includes more units without moving any unit already
+	// included. Past running nothing is changed (`not_draft`). A change to
+	// the values the experiment already has changes nothing and records
+	// nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -14809,6 +15010,28 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/experiments/{experiment}/salts (the `RegenerateExperimentSalts` operationId).
 	RegenerateExperimentSaltsWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams, reqEditors ...RequestEditorFn) (*RegenerateExperimentSaltsResponse, error)
+
+	// StartExperimentWithResponse Start a draft experiment
+	//
+	// Starts the experiment: its flag, unit type and weights are frozen
+	// from now on, and in the same transaction the ruleset of every
+	// environment holding a rule serving it moves on to carry them, so it
+	// begins everywhere at once; no other environment's ruleset moves. An
+	// experiment no environment holds starts all the same, and reaches an
+	// environment when a rule there serves it. Only a draft starts
+	// (`not_draft`): there is no restart, a stopped experiment is rerun as
+	// a clone. A draft missing anything a running experiment needs is
+	// refused `experiment_not_ready`, with one violation per missing
+	// item: its flag archived (`flag_archived` on `/flag`), its unit type
+	// no longer declared (`undeclared_unit_type` on `/unit_type`), weights
+	// no longer valid against the flag (on `/variations`), no hypothesis
+	// or no expected end date (`required` on `/hypothesis` and
+	// `/expected_end_at`).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/start (the `StartExperiment` operationId).
+	StartExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StartExperimentParams, reqEditors ...RequestEditorFn) (*StartExperimentResponse, error)
 
 	// ListFlagsWithResponse The project's flags
 	//
@@ -21277,6 +21500,117 @@ func (r RegenerateExperimentSaltsResponse) ContentType() string {
 	return ""
 }
 
+// StartExperimentResponse200Headers the declared response headers of an HTTP 200 response for StartExperiment
+type StartExperimentResponse200Headers struct {
+	ETag *string
+}
+
+// StartExperimentResponse401Headers the declared response headers of an HTTP 401 response for StartExperiment
+type StartExperimentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type StartExperimentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Experiment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *StartExperimentResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *StartExperimentResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r StartExperimentResponse) GetJSON200() *Experiment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r StartExperimentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r StartExperimentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r StartExperimentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r StartExperimentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r StartExperimentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r StartExperimentResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r StartExperimentResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r StartExperimentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r StartExperimentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StartExperimentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StartExperimentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StartExperimentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListFlagsResponse401Headers the declared response headers of an HTTP 401 response for ListFlags
 type ListFlagsResponse401Headers struct {
 	WWWAuthenticate *string
@@ -25977,13 +26311,20 @@ func (c *ClientWithResponses) GetExperimentWithResponse(ctx context.Context, pro
 	return ParseGetExperimentResponse(rsp)
 }
 
-// UpdateExperimentWithBodyWithResponse Change a draft experiment
+// UpdateExperimentWithBodyWithResponse Change an experiment
 //
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
-// create judges them; the key never changes (`immutable`). Only a draft
-// is changed (`not_draft`). A change to the values the experiment
-// already has changes nothing and records nothing.
+// create judges them; the key never changes (`immutable`). A running
+// experiment changes its name, hypothesis, owner, tags and expected
+// end date, and grows its traffic allocation: a change to its flag,
+// unit type or weights is `frozen` (409, a violation per field), and a
+// smaller allocation is `traffic_allocation_decrease` (409). Growing it
+// moves the ruleset of every environment holding a rule serving the
+// experiment and includes more units without moving any unit already
+// included. Past running nothing is changed (`not_draft`). A change to
+// the values the experiment already has changes nothing and records
+// nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -25996,13 +26337,20 @@ func (c *ClientWithResponses) UpdateExperimentWithBodyWithResponse(ctx context.C
 	return ParseUpdateExperimentResponse(rsp)
 }
 
-// UpdateExperimentWithResponse Change a draft experiment
+// UpdateExperimentWithResponse Change an experiment
 //
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
-// create judges them; the key never changes (`immutable`). Only a draft
-// is changed (`not_draft`). A change to the values the experiment
-// already has changes nothing and records nothing.
+// create judges them; the key never changes (`immutable`). A running
+// experiment changes its name, hypothesis, owner, tags and expected
+// end date, and grows its traffic allocation: a change to its flag,
+// unit type or weights is `frozen` (409, a violation per field), and a
+// smaller allocation is `traffic_allocation_decrease` (409). Growing it
+// moves the ruleset of every environment holding a rule serving the
+// experiment and includes more units without moving any unit already
+// included. Past running nothing is changed (`not_draft`). A change to
+// the values the experiment already has changes nothing and records
+// nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26096,6 +26444,34 @@ func (c *ClientWithResponses) RegenerateExperimentSaltsWithResponse(ctx context.
 		return nil, err
 	}
 	return ParseRegenerateExperimentSaltsResponse(rsp)
+}
+
+// StartExperimentWithResponse Start a draft experiment
+//
+// Starts the experiment: its flag, unit type and weights are frozen
+// from now on, and in the same transaction the ruleset of every
+// environment holding a rule serving it moves on to carry them, so it
+// begins everywhere at once; no other environment's ruleset moves. An
+// experiment no environment holds starts all the same, and reaches an
+// environment when a rule there serves it. Only a draft starts
+// (`not_draft`): there is no restart, a stopped experiment is rerun as
+// a clone. A draft missing anything a running experiment needs is
+// refused `experiment_not_ready`, with one violation per missing
+// item: its flag archived (`flag_archived` on `/flag`), its unit type
+// no longer declared (`undeclared_unit_type` on `/unit_type`), weights
+// no longer valid against the flag (on `/variations`), no hypothesis
+// or no expected end date (`required` on `/hypothesis` and
+// `/expected_end_at`).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/start (the `StartExperiment` operationId).
+func (c *ClientWithResponses) StartExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StartExperimentParams, reqEditors ...RequestEditorFn) (*StartExperimentResponse, error) {
+	rsp, err := c.StartExperiment(ctx, project, experiment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartExperimentResponse(rsp)
 }
 
 // ListFlagsWithResponse The project's flags
@@ -32354,6 +32730,111 @@ func ParseRegenerateExperimentSaltsResponse(rsp *http.Response) (*RegenerateExpe
 	return response, nil
 }
 
+// ParseStartExperimentResponse parses an HTTP response from a StartExperimentWithResponse call
+func ParseStartExperimentResponse(rsp *http.Response) (*StartExperimentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StartExperimentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Experiment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers StartExperimentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers StartExperimentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListFlagsResponse parses an HTTP response from a ListFlagsWithResponse call
 func ParseListFlagsResponse(rsp *http.Response) (*ListFlagsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -35359,7 +35840,7 @@ type ServerInterface interface {
 	// GetExperiment An experiment
 	// (GET /projects/{project}/experiments/{experiment})
 	GetExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey)
-	// UpdateExperiment Change a draft experiment
+	// UpdateExperiment Change an experiment
 	// (PATCH /projects/{project}/experiments/{experiment})
 	UpdateExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params UpdateExperimentParams)
 	// GetExperimentAssignment How the experiment treats one unit
@@ -35371,6 +35852,9 @@ type ServerInterface interface {
 	// RegenerateExperimentSalts Regenerate a draft's salts
 	// (POST /projects/{project}/experiments/{experiment}/salts)
 	RegenerateExperimentSalts(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params RegenerateExperimentSaltsParams)
+	// StartExperiment Start a draft experiment
+	// (POST /projects/{project}/experiments/{experiment}/start)
+	StartExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params StartExperimentParams)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListFlagsParams)
@@ -38365,6 +38849,65 @@ func (siw *ServerInterfaceWrapper) RegenerateExperimentSalts(w http.ResponseWrit
 	handler.ServeHTTP(w, r)
 }
 
+// StartExperiment operation middleware
+func (siw *ServerInterfaceWrapper) StartExperiment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StartExperimentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartExperiment(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListFlags operation middleware
 func (siw *ServerInterfaceWrapper) ListFlags(w http.ResponseWriter, r *http.Request) {
 
@@ -40226,6 +40769,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.GetExperiment)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.UpdateExperiment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/salts", wrapper.RegenerateExperimentSalts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/start", wrapper.StartExperiment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/clone", wrapper.CloneExperiment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/assignment", wrapper.GetExperimentAssignment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/hash-check", wrapper.CheckHashUniformity)
@@ -47375,6 +47919,171 @@ func (response RegenerateExperimentSalts428ApplicationProblemPlusJSONResponse) V
 	return err
 }
 
+type StartExperimentRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     StartExperimentParams
+}
+
+type StartExperimentResponseObject interface {
+	VisitStartExperimentResponse(w http.ResponseWriter) error
+}
+
+type StartExperiment200ResponseHeaders struct {
+	ETag *string
+}
+
+type StartExperiment200JSONResponse struct {
+	Body    Experiment
+	Headers StartExperiment200ResponseHeaders
+}
+
+func (response StartExperiment200JSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartExperiment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response StartExperiment400ApplicationProblemPlusJSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartExperiment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response StartExperiment401ApplicationProblemPlusJSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartExperiment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response StartExperiment403ApplicationProblemPlusJSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartExperiment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response StartExperiment404ApplicationProblemPlusJSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartExperiment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response StartExperiment409ApplicationProblemPlusJSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartExperiment412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response StartExperiment412ApplicationProblemPlusJSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartExperiment422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response StartExperiment422ApplicationProblemPlusJSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartExperiment428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response StartExperiment428ApplicationProblemPlusJSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListFlagsRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  ListFlagsParams
@@ -51502,7 +52211,7 @@ type StrictServerInterface interface {
 	// GetExperiment An experiment
 	// (GET /projects/{project}/experiments/{experiment})
 	GetExperiment(ctx context.Context, request GetExperimentRequestObject) (GetExperimentResponseObject, error)
-	// UpdateExperiment Change a draft experiment
+	// UpdateExperiment Change an experiment
 	// (PATCH /projects/{project}/experiments/{experiment})
 	UpdateExperiment(ctx context.Context, request UpdateExperimentRequestObject) (UpdateExperimentResponseObject, error)
 	// GetExperimentAssignment How the experiment treats one unit
@@ -51514,6 +52223,9 @@ type StrictServerInterface interface {
 	// RegenerateExperimentSalts Regenerate a draft's salts
 	// (POST /projects/{project}/experiments/{experiment}/salts)
 	RegenerateExperimentSalts(ctx context.Context, request RegenerateExperimentSaltsRequestObject) (RegenerateExperimentSaltsResponseObject, error)
+	// StartExperiment Start a draft experiment
+	// (POST /projects/{project}/experiments/{experiment}/start)
+	StartExperiment(ctx context.Context, request StartExperimentRequestObject) (StartExperimentResponseObject, error)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(ctx context.Context, request ListFlagsRequestObject) (ListFlagsResponseObject, error)
@@ -53729,6 +54441,34 @@ func (sh *strictHandler) RegenerateExperimentSalts(w http.ResponseWriter, r *htt
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RegenerateExperimentSaltsResponseObject); ok {
 		if err := validResponse.VisitRegenerateExperimentSaltsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartExperiment operation middleware
+func (sh *strictHandler) StartExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params StartExperimentParams) {
+	var request StartExperimentRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartExperiment(ctx, request.(StartExperimentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartExperiment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartExperimentResponseObject); ok {
+		if err := validResponse.VisitStartExperimentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

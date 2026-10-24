@@ -101,3 +101,29 @@ func (s *Store) experimentRefs(ctx context.Context, where string, arg any) ([]fl
 	}
 	return out, rows.Err()
 }
+
+// HoldingEnvironments returns the environments of project whose
+// configuration of some flag has a rule serving the experiment keyed key,
+// each once.
+func (s *Store) HoldingEnvironments(ctx context.Context, project workspace.ProjectID, key string) ([]workspace.EnvironmentID, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT DISTINCT c.environment_id
+		FROM flag_configurations c
+		JOIN flags f ON f.id = c.flag_id
+		WHERE f.project_id = $1
+		  AND c.document @> jsonb_build_object('rules', jsonb_build_array(
+		      jsonb_build_object('serve', jsonb_build_object('kind', 'experiment', 'experiment', $2::text))))`,
+		project.Bytes(), key)
+	if err != nil {
+		return nil, fmt.Errorf("reading the environments holding an experiment: %w", err)
+	}
+	envs, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (workspace.EnvironmentID, error) {
+		var env [16]byte
+		err := row.Scan(&env)
+		return id.FromBytes[workspace.Environment](env), err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading the environments holding an experiment: %w", err)
+	}
+	return envs, nil
+}
