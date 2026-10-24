@@ -99,6 +99,14 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`Archive the flag first; only an archived flag can be deleted.`);
     case "archived":
       return i18n._(msg`The flag is archived. Restore it to change its configurations.`);
+    case "not_draft":
+      return i18n._(msg`Only a draft experiment can be changed this way.`);
+    case "frozen":
+      return i18n._(
+        msg`The experiment's status no longer lets these fields change: its flag, unit type and weights stay as they started.`,
+      );
+    case "traffic_allocation_decrease":
+      return i18n._(msg`A running experiment's traffic allocation can only grow.`);
     case "not_a_rollout":
       return i18n._(msg`Only a rule serving a rollout has a salt.`);
     case "key_immutable":
@@ -237,6 +245,20 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
       );
     case "invalid_value":
       return i18n._(msg`This value is not valid here.`);
+    case "unknown_flag":
+      return i18n._(msg`The project has no such flag.`);
+    case "flag_archived":
+      return i18n._(msg`The flag is archived; choose one that is not.`);
+    case "undeclared_unit_type":
+      return i18n._(msg`The project declares no such unit type.`);
+    case "unknown_variation":
+      return i18n._(msg`The flag has no such variation.`);
+    case "invalid_weight":
+      return i18n._(msg`Enter a percentage from 0 to 100, at most two decimals.`);
+    case "invalid_weights_sum":
+      return i18n._(msg`The weights must sum to 100.00 %.`);
+    case "invalid_count":
+      return i18n._(msg`Compare 2 to 50 variations.`);
     case "invalid_owner":
       return i18n._(
         msg`The owner must be an active member holding a role in the project, or an instance admin.`,

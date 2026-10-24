@@ -1,12 +1,14 @@
-import type { Condition, Serve, Variation } from "@flagnetic/api";
+import type { Condition, ExperimentStatus, Serve, Variation } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { ReactNode } from "react";
 
-import { formatDateTime } from "@/i18n/format";
+import { formatDateTime, formatDay } from "@/i18n/format";
 import { describeCondition, describeServe } from "@/lib/conditions";
+import { experimentStatusName, percentText } from "@/lib/experiments";
 import type {
   ConfigurationChange,
   DefinitionChange,
+  ExperimentChange,
   NamedChange,
   OverrideValue,
   RuleDetail,
@@ -485,6 +487,142 @@ export function DefinitionDiff({
     <ChangeList label={t`Changes to the definition`}>
       {changes.map((change, index) => (
         <DefinitionChangeItem key={index} change={change} nameOf={nameOf} />
+      ))}
+    </ChangeList>
+  );
+}
+
+function ExperimentChangeItem({
+  change,
+  nameOf,
+}: {
+  change: ExperimentChange;
+  nameOf: (member: string) => string;
+}) {
+  const { i18n, t } = useLingui();
+  switch (change.kind) {
+    case "tag": {
+      const { tag } = change;
+      return (
+        <li>
+          {change.change === "added" ? (
+            <Trans>
+              Tag added: <Value>{tag}</Value>.
+            </Trans>
+          ) : (
+            <Trans>
+              Tag removed: <Value>{tag}</Value>.
+            </Trans>
+          )}
+        </li>
+      );
+    }
+    case "weights": {
+      const weights = change.after
+        .map(({ variation, weight }) => `${variation} ${percentText(i18n, weight)} %`)
+        .join(", ");
+      return (
+        <li>
+          <Trans>
+            Weights changed to <Value>{weights}</Value>.
+          </Trans>
+        </li>
+      );
+    }
+    case "traffic_allocation": {
+      const [before, after] = [percentText(i18n, change.before), percentText(i18n, change.after)];
+      return (
+        <li>
+          <Trans>
+            Traffic allocation changed from {before} % to {after} %.
+          </Trans>
+        </li>
+      );
+    }
+    case "field": {
+      const text = (value: string | null): string => {
+        if (value === null) return t`none`;
+        if (change.field === "owner") return nameOf(value);
+        if (change.field === "status") return experimentStatusName(i18n, value as ExperimentStatus);
+        if (change.field === "expected_end_at") return formatDay(i18n, value);
+        return value;
+      };
+      const [before, after] = [text(change.before), text(change.after)];
+      switch (change.field) {
+        case "status":
+          return (
+            <li>
+              <Trans>
+                Status changed from {before} to {after}.
+              </Trans>
+            </li>
+          );
+        case "name":
+          return (
+            <li>
+              <Trans>
+                Name changed from “{before}” to “{after}”.
+              </Trans>
+            </li>
+          );
+        case "hypothesis":
+          return (
+            <li>
+              <Trans>Hypothesis changed.</Trans>
+            </li>
+          );
+        case "owner":
+          return (
+            <li>
+              <Trans>
+                Owner changed from {before} to {after}.
+              </Trans>
+            </li>
+          );
+        case "flag":
+          return (
+            <li>
+              <Trans>
+                Flag changed from <Value>{before}</Value> to <Value>{after}</Value>.
+              </Trans>
+            </li>
+          );
+        case "unit_type":
+          return (
+            <li>
+              <Trans>
+                Unit type changed from <Value>{before}</Value> to <Value>{after}</Value>.
+              </Trans>
+            </li>
+          );
+        case "expected_end_at":
+          return (
+            <li>
+              <Trans>
+                Expected end changed from {before} to {after}.
+              </Trans>
+            </li>
+          );
+      }
+    }
+  }
+}
+
+/** What changed in an experiment, item by item. */
+export function ExperimentDiff({
+  changes,
+  nameOf,
+}: {
+  changes: readonly ExperimentChange[];
+  /** A member's name by identifier, for a change of owner. */
+  nameOf: (member: string) => string;
+}) {
+  const { t } = useLingui();
+  if (changes.length === 0) return <Nothing />;
+  return (
+    <ChangeList label={t`Changes to the experiment`}>
+      {changes.map((change, index) => (
+        <ExperimentChangeItem key={index} change={change} nameOf={nameOf} />
       ))}
     </ChangeList>
   );

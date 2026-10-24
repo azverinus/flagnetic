@@ -39,6 +39,10 @@ import {
   type SdkKey,
   listFlags,
   getFlag,
+  listExperiments,
+  getExperiment,
+  type Experiment,
+  type ExperimentList,
   listSegments,
   getSegment,
   listSegmentUsages,
@@ -61,6 +65,7 @@ import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
 import { type AuditSearch, auditQueryOf } from "./audit";
 import { unwrap } from "./errors";
+import { type ExperimentsSearch, listExperimentsQueryOf } from "./experiments";
 import { type FlagsSearch, listFlagsQueryOf } from "./flags";
 
 /** The caller: who is signed in, and with which credential. */
@@ -218,6 +223,32 @@ export function flagChoicesQuery(project: string) {
       } while (cursor);
       return items;
     },
+  });
+}
+
+/** What every read of a project's experiments is cached under. */
+export function experimentsQueryKey(project: string) {
+  return ["projects", project, "experiments"] as const;
+}
+
+/**
+ * One page of a project's experiments for a search. The page shown stays
+ * while the next one loads, so paging and filtering do not blank the table.
+ */
+export function experimentsQuery(project: string, search: ExperimentsSearch) {
+  return queryOptions<ExperimentList>({
+    queryKey: [...experimentsQueryKey(project), "list", search],
+    queryFn: () =>
+      unwrap(listExperiments({ path: { project }, query: listExperimentsQueryOf(search) })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function experimentQuery(project: string, experiment: string) {
+  return queryOptions<Experiment>({
+    queryKey: [...experimentsQueryKey(project), "detail", experiment],
+    queryFn: () => unwrap(getExperiment({ path: { project, experiment } })),
+    retry: false,
   });
 }
 

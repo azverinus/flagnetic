@@ -71,6 +71,12 @@ flagnetic hash-check --second-salt 7e1d4c90b2a6f3d1 user-ids.txt
 
 It reads one unit ID per line from the file, or from standard input without one or with `-`, takes `--salt`, `--second-salt` and `--bins` as the API takes them, needs neither a database nor a configuration, and prints the API's answer as JSON. A list it cannot check exits 1, naming each line or flag at fault on standard error.
 
+## In the console
+
+**Experiments** in the project navigation lists the project's experiments with their status, flag, owner, tags, expected end and holding environments: the environments whose rules serve the experiment, read from its flag. The list filters by status, flag, owner and tag, includes archived experiments on request, and pages forward and back; the filters are kept in the address. **New experiment**, offered to a member holding `experiment.edit`, creates a draft.
+
+The form takes the key, name, hypothesis, flag, unit type, weights, traffic allocation, expected end date, owner and tags. Choosing a flag fills the weights with its variations split evenly; weights and the traffic allocation are typed as percentages with at most two decimals, and the total is shown as they are typed. The form saves only what could start: weights summing to exactly 100.00 %, a hypothesis and an expected end date, though the API accepts a draft without the last two. Fields the experiment's status no longer lets change are shown disabled with the reason. On an experiment's page, **Save** sends what changed under the version the page was opened at; if someone saved the experiment meanwhile, saving shows who and when with a diff of their change, and offers to reload, losing the edits, or to keep the edits and save them onto the newer version.
+
 ## Audit
 
 Every write records one entry (see [The audit log](access.md#the-audit-log)): `experiment.created` and `experiment.cloned` with the experiment after it (a clone also names the experiment it was copied from), `experiment.updated` and `experiment.salts_regenerated` with the experiment before and after, and `experiment.deleted` with the experiment before.
