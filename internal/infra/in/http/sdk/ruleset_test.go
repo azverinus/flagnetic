@@ -40,6 +40,28 @@ func TestAServerKeyDownloadsItsEnvironmentsRulesetWithItsVersionAsETag(t *testin
 	}
 }
 
+func TestTheRulesetReportsWhetherItsEnvironmentIsProtected(t *testing.T) {
+	srv := testkit.StartServer(t)
+	p := newProject(t, srv)
+	_, production := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	_, staging := p.sdkKey(t, "staging", management.SdkKeyKindServer)
+
+	before := decode(t, ruleset(t, srv, production).Body)
+	if !before.Environment.Protected || decode(t, ruleset(t, srv, staging).Body).Environment.Protected {
+		t.Fatalf("a new project: production protected = %v, staging protected = true; want production alone", before.Environment.Protected)
+	}
+	res := do(p.admin.SetEnvironmentProtectionWithResponse(t.Context(), p.key, "production",
+		&management.SetEnvironmentProtectionParams{IfMatch: ptr(`"1"`)}, management.EnvironmentProtection{Protected: false}))
+	if res.StatusCode() != http.StatusOK {
+		t.Fatalf("unprotecting = %d: %s", res.StatusCode(), res.Body)
+	}
+	after := decode(t, ruleset(t, srv, production).Body)
+	if after.Environment.Protected || after.Version <= before.Version {
+		t.Errorf("after unprotecting: protected = %v, version %d after %d; want unprotected under a later version",
+			after.Environment.Protected, after.Version, before.Version)
+	}
+}
+
 func TestIfNoneMatchNamingTheCurrentVersionIsAnswered304ComparedWeakly(t *testing.T) {
 	srv := testkit.StartServer(t)
 	p := newProject(t, srv)

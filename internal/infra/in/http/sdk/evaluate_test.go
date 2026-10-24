@@ -186,8 +186,8 @@ func TestAClientKeyIsAnsweredServedValuesWithoutHowTheyWereReached(t *testing.T)
 	_, server := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	rs := ruleset(t, srv, server)
 	version, _ := strconv.ParseInt(strings.Trim(rs.HTTPResponse.Header.Get("ETag"), `"`), 10, 64)
-	if ev.SchemaVersion != 1 || ev.RulesetVersion != version || ev.Environment.Key != "production" || ev.Environment.Protected {
-		t.Errorf("envelope = schema %d, ruleset %d, environment %+v; want 1, %d, production unprotected",
+	if ev.SchemaVersion != 1 || ev.RulesetVersion != version || ev.Environment.Key != "production" || !ev.Environment.Protected {
+		t.Errorf("envelope = schema %d, ruleset %d, environment %+v; want 1, %d, production protected",
 			ev.SchemaVersion, ev.RulesetVersion, ev.Environment, version)
 	}
 	if !bytes.Contains(a.body, []byte(`"ignored_attributes":[]`)) {

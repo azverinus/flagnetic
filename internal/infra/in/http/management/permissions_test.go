@@ -58,6 +58,13 @@ func matrix(t *testing.T) []matrixRow {
 			res := do(c.CreateEnvironmentWithResponse(t.Context(), p.Key, management.EnvironmentCreate{Key: projectKey(), Name: "Matrix"}))
 			return res.StatusCode(), res.Body
 		}},
+		{"environment.protect", "setEnvironmentProtection", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			// Production is protected already, so a caller holding the
+			// permission changes nothing and every call is based on version 1.
+			res := do(c.SetEnvironmentProtectionWithResponse(t.Context(), p.Key, "production",
+				&management.SetEnvironmentProtectionParams{IfMatch: ifMatch(1)}, management.EnvironmentProtection{Protected: true}))
+			return res.StatusCode(), res.Body
+		}},
 		{"declaration.manage", "createUnitType", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
 			res := do(c.CreateUnitTypeWithResponse(t.Context(), p.Key, management.UnitTypeCreate{Key: projectKey(), Name: "Matrix"}))
 			return res.StatusCode(), res.Body
@@ -165,6 +172,7 @@ func TestThePermissionMatrixHoldsRowByRow(t *testing.T) {
 		"project.read":              {access.RoleViewer, access.RoleDeveloper, access.RoleMaintainer, access.RoleOwner},
 		"project.update":            {access.RoleOwner},
 		"environment.manage":        {access.RoleMaintainer, access.RoleOwner},
+		"environment.protect":       {access.RoleOwner},
 		"declaration.manage":        {access.RoleMaintainer, access.RoleOwner},
 		"grant.manage":              {access.RoleOwner},
 		"project_token.manage":      {access.RoleOwner},
@@ -216,7 +224,7 @@ func TestProjectMeAnswersGrantsAndPermissionsPerRole(t *testing.T) {
 		access.RoleDeveloper: {"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "experiment.edit", "change_request.propose"},
 		access.RoleMaintainer: {"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive",
 			"flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose"},
-		access.RoleOwner: {"project.read", "project.update", "environment.manage", "declaration.manage", "grant.manage", "project_token.manage",
+		access.RoleOwner: {"project.read", "project.update", "environment.manage", "environment.protect", "declaration.manage", "grant.manage", "project_token.manage",
 			"flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "experiment.edit", "experiment.delete", "change_request.propose"},
 	} {
 		got := projectMe(t, testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(p), role)), p.Key)

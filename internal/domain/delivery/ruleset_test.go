@@ -132,6 +132,20 @@ func TestMaterializeCarriesWhatSDKsEvaluateAndNothingElse(t *testing.T) {
 	}
 }
 
+func TestMaterializeMarksAProtectedEnvironment(t *testing.T) {
+	doc, err := delivery.Materialize(delivery.Materials{Environment: "production", Protected: true, Version: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rs, err := eval.Decode(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rs.Protected() || !bytes.Contains(doc, []byte(`"environment":{"key":"production","protected":true}`)) {
+		t.Errorf("document = %s, want production marked protected", doc)
+	}
+}
+
 func TestADraftTakesThePlaceOfItsFlagsConfiguration(t *testing.T) {
 	f := newFlag("banner", flags.TypeString, "a", `"A"`, "b", `"B"`)
 	other := newFlag("other", flags.TypeString, "a", `"A"`, "b", `"B"`)

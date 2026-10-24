@@ -18,6 +18,7 @@ export type Permission =
   | "project.read"
   | "project.update"
   | "environment.manage"
+  | "environment.protect"
   | "declaration.manage"
   | "grant.manage"
   | "project_token.manage"
@@ -38,6 +39,7 @@ const permissionNames: Record<Permission, MessageDescriptor> = {
   "project.read": msg`view the project`,
   "project.update": msg`edit the project`,
   "environment.manage": msg`manage environments`,
+  "environment.protect": msg`protect environments`,
   "declaration.manage": msg`manage unit types and attributes`,
   "grant.manage": msg`manage who has access`,
   "project_token.manage": msg`manage project tokens`,

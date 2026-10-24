@@ -20,6 +20,9 @@ import (
 type Materials struct {
 	// Environment is the environment's key.
 	Environment string
+	// Protected marks a protected environment, in which SDKs ignore local
+	// overrides.
+	Protected bool
 	// Version is the environment's ruleset version.
 	Version    int64
 	UnitTypes  []workspace.UnitType
@@ -55,7 +58,7 @@ func (m Materials) With(c flags.Configuration) Materials {
 func Materialize(m Materials) ([]byte, error) {
 	rs := eval.Ruleset{
 		SchemaVersion: eval.SchemaVersion, Version: m.Version, Scope: eval.ScopeServer,
-		Environment: &eval.Environment{Key: m.Environment},
+		Environment: &eval.Environment{Key: m.Environment, Protected: m.Protected},
 		UnitTypes:   make([]string, 0, len(m.UnitTypes)), Attributes: make([]eval.Attribute, 0, len(m.Attributes)),
 		Segments: make([]eval.Segment, 0, len(m.Segments)), Flags: []eval.Flag{},
 	}

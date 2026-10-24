@@ -22,6 +22,9 @@ type Environment struct {
 	UpdatedAt time.Time
 	// Version counts the environment's accepted changes, from 1.
 	Version int64
+	// Protected marks an environment whose ruleset changes only through an
+	// approved change request; SDKs ignore local overrides in it.
+	Protected bool
 }
 
 // EnvironmentID identifies an environment.
@@ -65,6 +68,17 @@ func (e Environment) Change(c EnvironmentChange, now time.Time) (Environment, bo
 	out := e
 	out.Name, out.UpdatedAt, out.Version = f.name, now, e.Version+1
 	return out, true, nil
+}
+
+// Protect returns the environment protected or not as protected says, at
+// now, and whether that changed anything.
+func (e Environment) Protect(protected bool, now time.Time) (Environment, bool) {
+	if e.Protected == protected {
+		return e, false
+	}
+	out := e
+	out.Protected, out.UpdatedAt, out.Version = protected, now, e.Version+1
+	return out, true
 }
 
 // CanDeleteEnvironment refuses to delete one of a project's count
@@ -319,15 +333,20 @@ type IDs interface {
 	Attribute() AttributeID
 }
 
+// protectedByDefault is the default environment a new project creates
+// protected, so changes to what its users are served are reviewed from the
+// start without anyone having to remember to ask for it.
+const protectedByDefault = "production"
+
 // DefaultsOf returns what p is created with, at its creation time:
-// development, staging and production environments in that order, the user
-// and anonymous unit types, and the standard attributes.
+// development, staging and production environments in that order, production
+// protected, the user and anonymous unit types, and the standard attributes.
 func DefaultsOf(p Project, ids IDs) ProjectDefaults {
 	var d ProjectDefaults
 	for i, e := range defaultEnvironments {
 		d.Environments = append(d.Environments, Environment{
 			ID: ids.Environment(), Project: p.ID, Key: e.Key, Name: e.Name, SortOrder: i + 1,
-			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt, Version: 1,
+			CreatedAt: p.CreatedAt, UpdatedAt: p.CreatedAt, Version: 1, Protected: e.Key == protectedByDefault,
 		})
 	}
 	for _, u := range defaultUnitTypes {

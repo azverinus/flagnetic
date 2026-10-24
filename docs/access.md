@@ -11,6 +11,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `project.read` | every ordinary read in a project, its audit log included, and the uniformity check | `read` | |
 | `project.update` | renaming a project and changing its description | `project:admin` | |
 | `environment.manage` | creating, renaming and deleting environments | `project:admin` | |
+| `environment.protect` | protecting an environment and stopping protecting it | `project:admin` | ✓ |
 | `declaration.manage` | declaring, renaming and deleting unit types and attributes; declaring and dismissing discovered attributes | `flags:write` | |
 | `grant.manage` | making and removing grants | `project:admin` | ✓ |
 | `project_token.manage` | listing, creating and revoking project tokens | `project:admin` | ✓ |
@@ -26,7 +27,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `experiment.delete` | deleting draft experiments | `experiments:write` | |
 | `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening and cancelling one's own, copying any | `flags:write` | |
 
-A permission marked members only changes who has access to a project, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)).
+A permission marked members only changes who has access to a project or whose review a change needs, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)): a pipeline cannot unprotect an environment, write it and protect it again.
 
 A refusal for a missing permission answers `403 forbidden` and names the permission in the problem's `permission` member, so a script can ask for exactly that. An unknown project answers `404 not_found` before any permission is judged.
 
@@ -54,6 +55,7 @@ A role is a fixed list of permissions. The four built-in roles are the same on e
 | `project.read` | ✓ | ✓ | ✓ | ✓ |
 | `project.update` | | | | ✓ |
 | `environment.manage` | | | ✓ | ✓ |
+| `environment.protect` | | | | ✓ |
 | `declaration.manage` | | | ✓ | ✓ |
 | `grant.manage` | | | | ✓ |
 | `project_token.manage` | | | | ✓ |
@@ -94,7 +96,7 @@ A personal access token (`fn_pat_…`) acts for the member who created it, with 
 
 ### Project tokens
 
-A project token (`fn_prj_…`) belongs to a project rather than to a person, for a pipeline. An owner creates it holding one built-in role in the project, fixed for its life (`/projects/{project}/tokens`). Its permissions are its role's narrowed by its scopes, minus `grant.manage` and `project_token.manage`: whatever its role, a project token never changes who has access to the project. It reaches its own project and `GET /me` alone (`403 forbidden` anywhere else, the project list included), never carries `instance:admin`, and keeps working when the member who created it leaves. The console's project tokens screen, shown to an owner, lists them with their role, scopes, expiry, creator and last use, creates one showing its value once, and revokes one.
+A project token (`fn_prj_…`) belongs to a project rather than to a person, for a pipeline. An owner creates it holding one built-in role in the project, fixed for its life (`/projects/{project}/tokens`). Its permissions are its role's narrowed by its scopes, minus `grant.manage`, `project_token.manage` and `environment.protect`: whatever its role, a project token never changes who has access to the project nor which environments are protected. It reaches its own project and `GET /me` alone (`403 forbidden` anywhere else, the project list included), never carries `instance:admin`, and keeps working when the member who created it leaves. The console's project tokens screen, shown to an owner, lists them with their role, scopes, expiry, creator and last use, creates one showing its value once, and revokes one.
 
 ### Only a session creates a credential
 

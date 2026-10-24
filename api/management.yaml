@@ -766,6 +766,52 @@ paths:
           $ref: "#/components/responses/VersionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/environments/{environment}/protection:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+    put:
+      operationId: setEnvironmentProtection
+      description: >-
+        Protects the environment or stops protecting it. In a protected
+        environment, a write that would change what its SDKs receive goes
+        through an approved change request, and SDKs ignore local overrides.
+        The environment's ruleset version moves, so SDKs learn the change.
+        Asking for the protection the environment already has changes
+        nothing and records nothing. Recorded in the audit log as
+        `environment.protected` or `environment.unprotected`.
+      x-permission: environment.protect
+      tags: [environments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentProtection"
+      responses:
+        "200":
+          description: As protected or not.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Environment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/environments/{environment}/evaluate:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -4752,7 +4798,7 @@ components:
             $ref: "#/components/schemas/Permission"
     Environment:
       type: object
-      required: [id, key, name, sort_order, version]
+      required: [id, key, name, sort_order, version, protected]
       properties:
         id:
           type: string
@@ -4766,6 +4812,13 @@ components:
           description: Where the environment is listed among its project's, the first created first.
         version:
           $ref: "#/components/schemas/Version"
+        protected:
+          type: boolean
+          description: >-
+            Whether a change to what the environment's SDKs receive needs an
+            approved change request. Set through
+            `PUT …/environments/{environment}/protection`. A new project's
+            production environment starts protected.
     EnvironmentList:
       type: object
       required: [items]
@@ -4782,6 +4835,12 @@ components:
           $ref: "#/components/schemas/Key"
         name:
           $ref: "#/components/schemas/Name"
+    EnvironmentProtection:
+      type: object
+      required: [protected]
+      properties:
+        protected:
+          type: boolean
     EnvironmentPatch:
       type: object
       properties:

@@ -282,6 +282,9 @@ import type {
   RotateSdkKeyData,
   RotateSdkKeyErrors,
   RotateSdkKeyResponses,
+  SetEnvironmentProtectionData,
+  SetEnvironmentProtectionErrors,
+  SetEnvironmentProtectionResponses,
   SignInData,
   SignInErrors,
   SignInResponses,
@@ -944,6 +947,33 @@ export const updateEnvironment = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/environments/{environment}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Protects the environment or stops protecting it. In a protected environment, a write that would change what its SDKs receive goes through an approved change request, and SDKs ignore local overrides. The environment's ruleset version moves, so SDKs learn the change. Asking for the protection the environment already has changes nothing and records nothing. Recorded in the audit log as `environment.protected` or `environment.unprotected`.
+ */
+export const setEnvironmentProtection = <ThrowOnError extends boolean = false>(
+  options: Options<SetEnvironmentProtectionData, ThrowOnError>,
+): RequestResult<SetEnvironmentProtectionResponses, SetEnvironmentProtectionErrors, ThrowOnError> =>
+  (options.client ?? client).put<
+    SetEnvironmentProtectionResponses,
+    SetEnvironmentProtectionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/environments/{environment}/protection",
     ...options,
     headers: {
       "Content-Type": "application/json",

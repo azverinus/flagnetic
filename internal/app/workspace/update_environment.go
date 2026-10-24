@@ -8,8 +8,9 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/precondition"
 )
 
-// EnvironmentUpdater stores an environment's changed name.
+// EnvironmentUpdater stores an environment's changed name or protection.
 type EnvironmentUpdater interface {
+	ProjectLocker
 	// EnvironmentByKey returns the environment, locking its row when lock is
 	// set, or ErrNotFound.
 	EnvironmentByKey(ctx context.Context, project workspace.ProjectID, key string, lock bool) (workspace.Environment, error)
@@ -45,7 +46,13 @@ func (h *UpdateEnvironment) Handle(ctx context.Context, cmd UpdateEnvironmentCom
 	now := h.rec.clock.Now()
 	var out workspace.Environment
 	err := h.tx.Within(ctx, func(ctx context.Context) error {
-		before, err := h.store.EnvironmentByKey(ctx, cmd.Project, cmd.Key, true)
+		// The project's row, not the environment's: whether an environment
+		// is protected decides which writes in the project may change its
+		// ruleset, and those writes hold the project's row alone.
+		if _, err := h.store.LockProject(ctx, cmd.Project); err != nil {
+			return err
+		}
+		before, err := h.store.EnvironmentByKey(ctx, cmd.Project, cmd.Key, false)
 		if err != nil {
 			return notFound(err, "environment")
 		}

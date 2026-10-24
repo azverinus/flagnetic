@@ -14,6 +14,10 @@ Flagnetic 0.1.0 is the first release, a developer preview. From it on:
 
 What 0.1 does not have yet: experiments (every exposure an SDK posts is rejected `unknown_experiment` until they exist), governance beyond roles and the audit log: protected environments, change requests, scheduled changes and webhooks (`environment.protected` is `false` everywhere, so local overrides work in every environment), single sign-on, and SDKs other than Go and its OpenFeature provider. It needs PostgreSQL 16 or later.
 
+### Protected environments
+
+0.1 serves `environment.protected` as `false` in every ruleset and evaluate answer, so local overrides work everywhere. A server with protected environments serves the real value: an environment an owner protects, and the production environment of every project created on that server, answer `true`, and a server SDK ignores local overrides there, as it always promised. Environments that existed before the upgrade stay unprotected until an owner protects them, so an upgrade alone changes nothing an SDK does. Protecting or unprotecting an environment moves its ruleset version, so SDKs pick the change up like any other. A test that sets local overrides against a protected environment should use an unprotected one, such as development, or the SDK's test client.
+
 ## Compatibility table
 
 One row per SDK line: an SDK major version, or the version within a major from which a new `schema_version` range applies. `N.x` covers every `N.y.z`; `≥ N.y.z` covers `N.y.z` and later within major `N`, and where two rows cover a version the later one applies. Server is the lowest Flagnetic server release that serves the path and the range.

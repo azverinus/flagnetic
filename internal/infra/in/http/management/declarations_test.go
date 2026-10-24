@@ -435,9 +435,9 @@ func TestEveryWorkspaceWriteRecordsAnAuditEntry(t *testing.T) {
 		{"unit_type.deleted", deviceID + " device", "", `{"description":"","key":"device","name":"Phone"}`, ""},
 		{"unit_type.updated", deviceID + " device", "", `{"description":"","key":"device","name":"Device"}`, `{"description":"","key":"device","name":"Phone"}`},
 		{"unit_type.created", deviceID + " device", "", "", `{"description":"","key":"device","name":"Device"}`},
-		{"environment.deleted", qaID + " qa", qaID, `{"key":"qa","name":"Quality","sort_order":4}`, ""},
-		{"environment.updated", qaID + " qa", qaID, `{"key":"qa","name":"QA","sort_order":4}`, `{"key":"qa","name":"Quality","sort_order":4}`},
-		{"environment.created", qaID + " qa", qaID, "", `{"key":"qa","name":"QA","sort_order":4}`},
+		{"environment.deleted", qaID + " qa", qaID, `{"key":"qa","name":"Quality","protected":false,"sort_order":4}`, ""},
+		{"environment.updated", qaID + " qa", qaID, `{"key":"qa","name":"QA","protected":false,"sort_order":4}`, `{"key":"qa","name":"Quality","protected":false,"sort_order":4}`},
+		{"environment.created", qaID + " qa", qaID, "", `{"key":"qa","name":"QA","protected":false,"sort_order":4}`},
 	}
 	if !slices.Equal(got, want) {
 		t.Errorf("entries =\n%+v\nwant\n%+v\n(refused and empty changes record nothing)", got, want)

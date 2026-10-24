@@ -4,6 +4,14 @@ A change request proposes a change for someone to review before it is made. For 
 
 Every operation below needs the `change_request.propose` permission (token scope `flags:write`, developer and above), reads need `project.read`. A project token proposes like a member of its role: it is the author of its change requests and acts on its own only.
 
+## Protected environments
+
+An environment is protected when changes to what its SDKs receive should be reviewed as change requests. An owner protects an environment or stops protecting it with `PUT /projects/{project}/environments/{environment}/protection` and `{"protected": true}` or `false`, under `If-Match` on the environment's version; it needs `environment.protect`, which only owners hold and no project token exercises. Asking for the protection an environment already has changes nothing. Each change is recorded in the audit log as `environment.protected` or `environment.unprotected`, and `protected` is part of every environment the API answers.
+
+The production environment of a project created from this release on starts protected; the other environments, and every environment that existed before the upgrade, start unprotected, so an upgrade does not stop a script writing production directly. Protect production yourself where you want its changes reviewed.
+
+SDKs read the protection from their ruleset and evaluate answers (`environment.protected`), and a server SDK ignores local overrides in a protected environment. Protecting or unprotecting an environment moves its ruleset version, so SDKs learn it at once. Writes to a protected environment are not refused yet: the protection only marks the environment for now.
+
 ## States
 
 | State | |

@@ -1450,6 +1450,14 @@ msgid "Environment not found"
 msgstr "Environment not found"
 
 #: src/lib/audit.ts
+msgid "Environment protected"
+msgstr "Environment protected"
+
+#: src/lib/audit.ts
+msgid "Environment unprotected"
+msgstr "Environment unprotected"
+
+#: src/lib/audit.ts
 msgid "Environment updated"
 msgstr "Environment updated"
 
@@ -2802,6 +2810,10 @@ msgstr "Projects"
 #: src/lib/access-names.ts
 msgid "propose changes as change requests"
 msgstr "propose changes as change requests"
+
+#: src/lib/access-names.ts
+msgid "protect environments"
+msgstr "protect environments"
 
 #: src/components/sdk-keys.tsx
 msgid "Put it in the client SDK’s configuration. It ships inside the browser or the app, so anyone can read it: it learns only the values served to a context, never the ruleset."

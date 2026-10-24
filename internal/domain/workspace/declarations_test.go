@@ -56,6 +56,25 @@ func TestAnEnvironmentIsRenamedButKeepsItsKey(t *testing.T) {
 	}
 }
 
+func TestAnEnvironmentIsProtectedAndUnprotected(t *testing.T) {
+	e, _ := workspace.NewEnvironment(id.New[workspace.Environment](ids()), newProjectID(), "qa", "QA", 4, now)
+	if e.Protected {
+		t.Fatal("a new environment is protected")
+	}
+	later := now.Add(time.Hour)
+	protected, changed := e.Protect(true, later)
+	if !changed || !protected.Protected || protected.Version != 2 || !protected.UpdatedAt.Equal(later) || protected.Name != "QA" {
+		t.Errorf("protected = %+v, %v", protected, changed)
+	}
+	if same, changed := protected.Protect(true, later.Add(time.Hour)); changed || same != protected {
+		t.Errorf("protecting again = %+v, %v, want no change", same, changed)
+	}
+	unprotected, changed := protected.Protect(false, later)
+	if !changed || unprotected.Protected || unprotected.Version != 3 {
+		t.Errorf("unprotected = %+v, %v", unprotected, changed)
+	}
+}
+
 func TestTheLastEnvironmentCannotBeDeleted(t *testing.T) {
 	if err := workspace.CanDeleteEnvironment(2); err != nil {
 		t.Errorf("one of two: %v", err)
@@ -155,6 +174,11 @@ func TestANewProjectHasItsDefaults(t *testing.T) {
 	if strings.Join(envs, ",") != "development,staging,production" || strings.Join(units, ",") != "user,anonymous" ||
 		len(d.Attributes) != 10 {
 		t.Errorf("defaults = %v %v %d attributes", envs, units, len(d.Attributes))
+	}
+	for _, e := range d.Environments {
+		if e.Protected != (e.Key == "production") {
+			t.Errorf("%s protected = %v, want production alone protected", e.Key, e.Protected)
+		}
 	}
 	seen := map[string]bool{}
 	for _, a := range d.Attributes {

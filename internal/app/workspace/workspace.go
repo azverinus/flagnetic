@@ -45,6 +45,8 @@ type ProjectLocker interface {
 type Rulesets interface {
 	// Project marks the ruleset of every environment of project changed.
 	Project(ctx context.Context, project workspace.ProjectID) error
+	// Environment marks the ruleset of environment changed.
+	Environment(ctx context.Context, environment workspace.EnvironmentID) error
 }
 
 // DeclarationGuard refuses to delete a unit type or attribute that rules,

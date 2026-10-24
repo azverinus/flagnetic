@@ -32,9 +32,10 @@ type PermissionSpec struct {
 	// Scope is the token scope the permission falls under: a token exercises
 	// the permission only when it carries the scope.
 	Scope Scope
-	// MembersOnly marks a permission that changes who has access, which a
-	// project token never exercises whatever its role, so a pipeline
-	// credential cannot be turned into a way in.
+	// MembersOnly marks a permission that changes who has access or whose
+	// review a change needs, which a project token never exercises whatever
+	// its role, so a pipeline credential cannot be turned into a way in or
+	// around review.
 	MembersOnly bool
 }
 
@@ -47,6 +48,9 @@ const (
 	PermProjectUpdate Permission = "project.update"
 	// PermEnvironmentManage creates, renames and deletes environments.
 	PermEnvironmentManage Permission = "environment.manage"
+	// PermEnvironmentProtect protects an environment, so its ruleset changes
+	// only through approved change requests, or stops protecting it.
+	PermEnvironmentProtect Permission = "environment.protect"
 	// PermDeclarationManage creates, renames and deletes unit types and
 	// attributes.
 	PermDeclarationManage Permission = "declaration.manage"
@@ -95,6 +99,10 @@ var catalog = []PermissionSpec{
 	{Name: PermProjectRead, Scope: ScopeRead},
 	{Name: PermProjectUpdate, Scope: ScopeProjectAdmin},
 	{Name: PermEnvironmentManage, Scope: ScopeProjectAdmin},
+	// Protection decides whose review a change to an environment needs, so
+	// like access itself it stays with members: a pipeline holding it could
+	// unprotect an environment, write it and protect it again.
+	{Name: PermEnvironmentProtect, Scope: ScopeProjectAdmin, MembersOnly: true},
 	// Unit types and attributes are what flags target, so changing them
 	// falls under the scope of a pipeline that writes flags.
 	{Name: PermDeclarationManage, Scope: ScopeFlagsWrite},
@@ -206,7 +214,7 @@ type Role struct {
 // roles lists the built-in roles, the most powerful first.
 var roles = []Role{
 	{Name: RoleOwner, Permissions: []Permission{
-		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermDeclarationManage,
+		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermEnvironmentProtect, PermDeclarationManage,
 		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
 		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete, PermSDKKeyManage,
 		PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose,

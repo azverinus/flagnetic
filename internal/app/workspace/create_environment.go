@@ -91,5 +91,5 @@ func environmentEntity(e workspace.Environment) governance.Entity {
 
 // environmentValues are what an audit entry records of an environment.
 func environmentValues(e workspace.Environment) map[string]any {
-	return map[string]any{"key": e.Key, "name": e.Name, "sort_order": e.SortOrder}
+	return map[string]any{"key": e.Key, "name": e.Name, "sort_order": e.SortOrder, "protected": e.Protected}
 }

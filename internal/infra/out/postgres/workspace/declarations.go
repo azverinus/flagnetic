@@ -15,20 +15,20 @@ import (
 // CreateEnvironment stores e.
 func (s *Store) CreateEnvironment(ctx context.Context, e workspace.Environment) error {
 	_, err := s.db(ctx).Exec(ctx, `
-		INSERT INTO environments (id, project_id, key, name, sort_order, created_at, updated_at, version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		e.ID.Bytes(), e.Project.Bytes(), e.Key, e.Name, e.SortOrder, e.CreatedAt, e.UpdatedAt, e.Version)
+		INSERT INTO environments (id, project_id, key, name, sort_order, created_at, updated_at, version, protected)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		e.ID.Bytes(), e.Project.Bytes(), e.Key, e.Name, e.SortOrder, e.CreatedAt, e.UpdatedAt, e.Version, e.Protected)
 	return keyTaken(err)
 }
 
-const environmentColumns = `id, project_id, key, name, sort_order, created_at, updated_at, version`
+const environmentColumns = `id, project_id, key, name, sort_order, created_at, updated_at, version, protected`
 
 func scanEnvironment(row pgx.Row) (workspace.Environment, error) {
 	var (
 		e      workspace.Environment
 		ek, pk [16]byte
 	)
-	if err := row.Scan(&ek, &pk, &e.Key, &e.Name, &e.SortOrder, &e.CreatedAt, &e.UpdatedAt, &e.Version); err != nil {
+	if err := row.Scan(&ek, &pk, &e.Key, &e.Name, &e.SortOrder, &e.CreatedAt, &e.UpdatedAt, &e.Version, &e.Protected); err != nil {
 		return workspace.Environment{}, err
 	}
 	e.ID, e.Project = id.FromBytes[workspace.Environment](ek), id.FromBytes[workspace.Project](pk)
@@ -155,10 +155,10 @@ func (s *Store) CountEnvironments(ctx context.Context, project workspace.Project
 	return n, err
 }
 
-// UpdateEnvironment stores e's name and version.
+// UpdateEnvironment stores e's name, protection and version.
 func (s *Store) UpdateEnvironment(ctx context.Context, e workspace.Environment) error {
-	_, err := s.db(ctx).Exec(ctx, `UPDATE environments SET name = $2, updated_at = $3, version = $4 WHERE id = $1`,
-		e.ID.Bytes(), e.Name, e.UpdatedAt, e.Version)
+	_, err := s.db(ctx).Exec(ctx, `UPDATE environments SET name = $2, protected = $3, updated_at = $4, version = $5 WHERE id = $1`,
+		e.ID.Bytes(), e.Name, e.Protected, e.UpdatedAt, e.Version)
 	return err
 }
 
