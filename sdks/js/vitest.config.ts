@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
+import type { BrowserCommand } from "vitest/node";
+import { CrossOriginServer } from "./test/support/cross-origin-server.js";
 
 // The repository root: the conformance suite lives in conformance/ beside the SDKs.
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -16,6 +18,25 @@ const chromium = {
   screenshotFailures: false,
   instances: [{ browser: "chromium" as const }],
 };
+
+// The browser client's own tests run in Chromium, Firefox and WebKit against
+// a server on another origin. FLAGNETIC_BROWSERS narrows the engines, as CI
+// does to run one per job.
+const engines = (process.env.FLAGNETIC_BROWSERS ?? "chromium,firefox,webkit").split(",") as ("chromium" | "firefox" | "webkit")[];
+
+// The cross-origin server lives in Node; the page drives it through these
+// commands, the only way a test in the browser reaches back into Node.
+const crossOrigin = new CrossOriginServer();
+const crossOriginStart: BrowserCommand = () => crossOrigin.start();
+const crossOriginReset: BrowserCommand = () => {
+  crossOrigin.reset();
+};
+const crossOriginServe: BrowserCommand<[sdkKey: string, doc: unknown]> = (_ctx, sdkKey, doc) => {
+  crossOrigin.serve(sdkKey, doc);
+};
+const crossOriginRequests: BrowserCommand = () => crossOrigin.requests();
+const crossOriginSend: BrowserCommand<[text: string]> = (_ctx, text) => crossOrigin.send(text);
+const commands = { crossOriginStart, crossOriginReset, crossOriginServe, crossOriginRequests, crossOriginSend };
 
 export default defineConfig({
   server: { fs: { allow: [repoRoot] } },
@@ -51,6 +72,19 @@ export default defineConfig({
           include: ["test/**/*.test.{ts,tsx}"],
           exclude: ["test/**/*.node.test.{ts,tsx}", "test/**/*.browser.test.ts", "test/**/*.p99.test.ts"],
           browser: chromium,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "browsers",
+          include: ["test/**/*.browser.test.ts"],
+          browser: {
+            ...chromium,
+            provider: playwright(),
+            instances: engines.map((browser) => ({ browser })),
+            commands,
+          },
         },
       },
     ],

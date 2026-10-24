@@ -1,6 +1,7 @@
 // The server-mode client: holds a ruleset in memory and evaluates locally.
 // Delivery fetches and streams; this module owns the fallback chain's stage,
 // the getters, local overrides and the listeners.
+import { LocalOverrideRefused, LocalOverridesNotAllowed } from "../internal/overrides.js";
 import { decodeRuleset, type Context, type Result, type Ruleset } from "../evaluator/evaluate.js";
 import type { JsonValue } from "../evaluator/ruleset.js";
 import { fitsFlagType, flagTypeOf } from "../internal/detail.js";
@@ -769,22 +770,6 @@ export class FlagneticServer {
   }
 }
 
-/** Thrown by `overrides.set` on a client built without the `allowOverrides` option. */
-export class LocalOverridesNotAllowed extends Error {
-  constructor() {
-    super("flagnetic: local overrides need the allowOverrides option");
-    this.name = "LocalOverridesNotAllowed";
-  }
-}
-
-/** Thrown by `overrides.set` while the held ruleset belongs to a protected environment. */
-export class LocalOverrideRefused extends Error {
-  constructor(key: string) {
-    super(`flagnetic: local override of ${JSON.stringify(key)} refused in a protected environment`);
-    this.name = "LocalOverrideRefused";
-  }
-}
-
 /**
  * Local overrides: substitutions of flag values inside this process that
  * never reach the server. An overridden flag reads reason `local_override`,
@@ -851,6 +836,8 @@ export class LocalOverrides {
     return out;
   }
 }
+
+export { LocalOverrideRefused, LocalOverridesNotAllowed };
 
 /** The flag type a value belongs to: boolean, string, number, anything else JSON. */
 export { flagTypeOf as typeOfValue } from "../internal/detail.js";

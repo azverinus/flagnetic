@@ -2,7 +2,8 @@ name: sdk-js
 
 # The JavaScript SDK: lint, types, the evaluator against the conformance
 # suite on the supported Node releases and in a browser, the evaluation
-# budget, and the built package. ci.yml calls it when the SDK, the
+# budget, the browser client in Chromium, Firefox and WebKit, and the built
+# package with its size budget. ci.yml calls it when the SDK, the
 # conformance suite, the SDK protocol or this workflow changes.
 on:
   workflow_call:
@@ -45,6 +46,8 @@ jobs:
         run: pnpm build
       - name: Package (entry points in ESM and CJS, types, no dependencies, publint)
         run: pnpm check:package
+      - name: Size budget of flagnetic/client
+        run: pnpm check:size
       # Last step: it removes the optional peers from node_modules. The
       # entry points must still load and the types still resolve without them.
       - name: Package again without the optional peers
@@ -78,7 +81,8 @@ jobs:
       - name: Evaluation p99 over 1,000 flags
         run: pnpm test:p99
 
-  # The same suite in a browser, with the fixtures bundled.
+  # The same suite in a browser, with the fixtures bundled: the evaluator's
+  # conformance and the browser client's unit and protocol tests.
   browser:
     name: browser (chromium)
     runs-on: ubuntu-latest
@@ -98,3 +102,32 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Conformance suite in Chromium
         run: pnpm test:browser
+
+  # The browser client against a server on another origin, in each engine.
+  browsers:
+    name: browser client (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: sdks/js/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: sdks/js/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Install the browser
+        run: pnpm exec playwright install --with-deps "$FLAGNETIC_BROWSERS"
+        env:
+          FLAGNETIC_BROWSERS: ${{ matrix.browser }}
+      - name: Browser client, cross-origin
+        run: pnpm test:browsers
+        env:
+          FLAGNETIC_BROWSERS: ${{ matrix.browser }}
