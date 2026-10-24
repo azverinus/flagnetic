@@ -15,8 +15,7 @@ func ChiSquarePValue(x float64, df int) float64 {
 }
 
 const (
-	gammaEpsilon    = 1e-15
-	gammaIterations = 10000
+	gammaEpsilon = 1e-15
 	// gammaTiny keeps the continued fraction's denominators off zero.
 	gammaTiny = 1e-300
 )
@@ -32,6 +31,15 @@ func regularizedGammaQ(a, x float64) float64 {
 	return upperFraction(a, x)
 }
 
+// gammaIterations bounds both expansions. Near x = a either needs a few
+// times √a terms to converge, so the bound grows with a: an independence
+// test over 10,000 × 10,000 bins has about 10⁸ degrees of freedom, a = 5·10⁷,
+// and a fixed bound of 10,000 terms would stop the series early and
+// overstate the p-value.
+func gammaIterations(a float64) int {
+	return 10000 + int(20*math.Sqrt(a))
+}
+
 // gammaPrefix is x^a e^(−x) / Γ(a), computed in logarithms so that a large x
 // underflows to 0 instead of overflowing.
 func gammaPrefix(a, x float64) float64 {
@@ -43,7 +51,7 @@ func gammaPrefix(a, x float64) float64 {
 func lowerSeries(a, x float64) float64 {
 	term := 1 / a
 	sum := term
-	for n := 1; n < gammaIterations; n++ {
+	for n, limit := 1, gammaIterations(a); n < limit; n++ {
 		term *= x / (a + float64(n))
 		sum += term
 		if math.Abs(term) < math.Abs(sum)*gammaEpsilon {
@@ -59,7 +67,7 @@ func upperFraction(a, x float64) float64 {
 	c := 1 / gammaTiny
 	d := 1 / b
 	h := d
-	for i := 1; i < gammaIterations; i++ {
+	for i, limit := 1, gammaIterations(a); i < limit; i++ {
 		an := -float64(i) * (float64(i) - a)
 		b += 2
 		d = an*d + b

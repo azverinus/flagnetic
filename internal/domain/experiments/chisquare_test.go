@@ -85,3 +85,19 @@ func TestChiSquarePValueAgreesAcrossBothMethods(t *testing.T) {
 		}
 	}
 }
+
+// An independence test over many bins has up to about 10⁸ degrees of
+// freedom; there the distribution is close to normal and the Wilson–Hilferty
+// approximation is accurate to far better than the tolerance, on both sides
+// of the mean.
+func TestChiSquarePValueWithVeryManyDegreesOfFreedom(t *testing.T) {
+	const df = 99_980_001
+	for _, x := range []float64{99_960_000, 99_970_000, 99_980_000, 99_990_000, 100_000_000, 100_020_000} {
+		k := float64(df)
+		z := (math.Cbrt(x/k) - (1 - 2/(9*k))) / math.Sqrt(2/(9*k))
+		want := 0.5 * math.Erfc(z/math.Sqrt2)
+		if got := experiments.ChiSquarePValue(x, df); math.Abs(got-want) > 1e-4 {
+			t.Errorf("ChiSquarePValue(%g, %d) = %.6g, want %.6g", x, df, got, want)
+		}
+	}
+}
