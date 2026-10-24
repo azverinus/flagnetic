@@ -354,7 +354,7 @@ func (s *Store) SaveExposures(ctx context.Context, exposures []events.ExposureRe
 		return []any{
 			x.EventID.Bytes(), x.Key.Project.Bytes(), x.Key.Environment.Bytes(), x.Key.ID.Bytes(), x.Experiment.Bytes(),
 			e.ExperimentKey, e.FlagKey, e.VariationKey, e.UnitType, e.UnitID, e.Reason, e.Override, e.RulesetVersion,
-			x.SDK.Name, x.SDK.Version, nullable(x.SDK.Platform), nullable(e.AppVersion), e.OccurredAt, x.ReceivedAt,
+			x.SDK.Name, x.SDK.Version, nullable(e.Platform), nullable(e.AppVersion), e.OccurredAt, x.ReceivedAt,
 		}, nil
 	}))
 	if err != nil {
@@ -392,7 +392,7 @@ func (s *Store) CountRejections(ctx context.Context, environment workspace.Envir
 }
 
 // RejectionCountsOf returns how many exposures of experiment were refused in
-// environment for each reason, in the order of the reasons.
+// environment for each reason.
 func (s *Store) RejectionCountsOf(ctx context.Context, experiment experiments.ExperimentID,
 	environment workspace.EnvironmentID,
 ) (map[events.RejectionCode]int64, error) {
@@ -401,6 +401,7 @@ func (s *Store) RejectionCountsOf(ctx context.Context, experiment experiments.Ex
 	if err != nil {
 		return nil, fmt.Errorf("reading refused exposures: %w", err)
 	}
+	defer rows.Close()
 	out := map[events.RejectionCode]int64{}
 	for rows.Next() {
 		var (
@@ -440,7 +441,6 @@ func (s *Store) Exposures(ctx context.Context, environment workspace.Environment
 		x.EventID = id.FromBytes[delivery.Event](event)
 		x.Key.ID, x.Key.Environment = id.FromBytes[delivery.SDKKey](keyID), environment
 		x.Experiment = id.FromBytes[experiments.Experiment](experiment)
-		x.SDK.Platform = e.Platform
 		e.OccurredAt, x.ReceivedAt = e.OccurredAt.UTC(), x.ReceivedAt.UTC()
 		return x, scanErr
 	})

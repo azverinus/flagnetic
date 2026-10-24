@@ -55,7 +55,7 @@ func exposureEvent(n int, changes map[string]any) map[string]any {
 	return with(map[string]any{
 		"type": "exposure", "event_id": eventID(protocolTime, n), "occurred_at": protocolTime.Format(time.RFC3339),
 		"experiment_key": "checkout_test", "flag_key": "checkout", "variation_key": "true", "unit_type": "user",
-		"unit_id": "u-1001", "platform": "linux", "app_version": "1.18.0", "evaluation_reason": "experiment",
+		"unit_id": "u-1001", "platform": "android", "app_version": "1.18.0", "evaluation_reason": "experiment",
 		"override": false, "ruleset_version": 1,
 	}, changes)
 }
@@ -139,12 +139,12 @@ func TestAnExposureOfAnExperimentIsStoredOnce(t *testing.T) {
 	}
 	x := stored[0]
 	if x.EventID.String() != eventID(protocolTime, 1) || x.Experiment != f.experiment || x.SDK.Name != "flagnetic-dart" ||
-		x.SDK.Platform != "linux" || !x.ReceivedAt.Equal(protocolTime) {
+		!x.ReceivedAt.Equal(protocolTime) {
 		t.Errorf("first exposure = %+v", x)
 	}
 	want := events.Exposure{
 		OccurredAt: protocolTime, ExperimentKey: "checkout_test", FlagKey: "checkout", VariationKey: "true", UnitType: "user",
-		UnitID: "u-1001", Platform: "linux", Reason: "experiment", RulesetVersion: 1,
+		UnitID: "u-1001", Platform: "android", Reason: "experiment", RulesetVersion: 1,
 	}
 	if x.Exposure != want {
 		t.Errorf("first exposure = %+v, want %+v", x.Exposure, want)
