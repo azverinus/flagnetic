@@ -220,6 +220,22 @@ def _refuse_constant(name: str) -> Any:
     raise ValueError(f"{name} is not JSON")
 
 
+def parse(document: str | bytes | bytearray) -> Any:
+    """Reads the JSON text of a ruleset document, as Go's decoder reads it.
+
+    Raises RulesetError when the text is not JSON.
+    """
+    if not isinstance(document, str):
+        # UTF-8 only, with no byte order mark and each invalid sequence
+        # read as U+FFFD, as Go decodes a document; json.loads would
+        # otherwise also guess UTF-16 and UTF-32 from the bytes.
+        document = bytes(document).decode("utf-8", errors="replace")
+    try:
+        return json.loads(document, parse_constant=_refuse_constant)
+    except (ValueError, RecursionError) as err:
+        raise RulesetError(f"decode ruleset: {err}") from err
+
+
 def decode(document: str | bytes | bytearray | Mapping[str, Any]) -> Ruleset:
     """Reads a ruleset document: JSON text, or the object it decodes to.
 
@@ -230,18 +246,7 @@ def decode(document: str | bytes | bytearray | Mapping[str, Any]) -> Ruleset:
     a flag that reaches any of them returns reason error with
     inconsistent_ruleset, so one defective flag never takes the others down.
     """
-    if isinstance(document, (str, bytes, bytearray)):
-        if not isinstance(document, str):
-            # UTF-8 only, with no byte order mark and each invalid sequence
-            # read as U+FFFD, as Go decodes a document; json.loads would
-            # otherwise also guess UTF-16 and UTF-32 from the bytes.
-            document = bytes(document).decode("utf-8", errors="replace")
-        try:
-            raw: Any = json.loads(document, parse_constant=_refuse_constant)
-        except (ValueError, RecursionError) as err:
-            raise RulesetError(f"decode ruleset: {err}") from err
-    else:
-        raw = document
+    raw: Any = parse(document) if isinstance(document, (str, bytes, bytearray)) else document
     top = _object(raw, "the document")
     schema_version = top.get("schema_version")
     if type(schema_version) is not int or schema_version != SCHEMA_VERSION:
