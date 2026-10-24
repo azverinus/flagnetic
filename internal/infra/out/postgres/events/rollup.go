@@ -160,9 +160,9 @@ func (s *Store) FirstExposures(ctx context.Context, units []events.UnitKey) (map
 		}
 		f.Seen = make(map[string]events.Seen, len(seen))
 		for v, x := range seen {
-			last, err := id.Parse[delivery.Event](x.LastID)
-			if err != nil {
-				return nil, fmt.Errorf("decoding the first exposure of unit %q: %w", u.UnitID, err)
+			last, parseErr := id.Parse[delivery.Event](x.LastID)
+			if parseErr != nil {
+				return nil, fmt.Errorf("decoding the first exposure of unit %q: %w", u.UnitID, parseErr)
 			}
 			f.Seen[v] = events.Seen{Count: x.Count, LastAt: x.LastAt.UTC(), LastID: last}
 		}
@@ -402,9 +402,9 @@ func (s *Store) ExposureTimeline(ctx context.Context, environment workspace.Envi
 	}
 	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (events.ExposureTimelineDay, error) {
 		var d events.ExposureTimelineDay
-		err := row.Scan(&d.Day, &d.Variation, &d.Exposures, &d.Overridden, &d.FirstExposures)
+		scanErr := row.Scan(&d.Day, &d.Variation, &d.Exposures, &d.Overridden, &d.FirstExposures)
 		d.Day = d.Day.UTC()
-		return d, err
+		return d, scanErr
 	})
 	if err != nil {
 		return nil, fmt.Errorf("reading the exposure timeline: %w", err)
@@ -444,9 +444,9 @@ func (s *Store) Conflicts(ctx context.Context, environment workspace.Environment
 	}
 	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (events.Conflict, error) {
 		var c events.Conflict
-		err := row.Scan(&c.UnitType, &c.UnitID, &c.FirstVariation, &c.ConflictingVariation, &c.ConflictingAt)
+		scanErr := row.Scan(&c.UnitType, &c.UnitID, &c.FirstVariation, &c.ConflictingVariation, &c.ConflictingAt)
 		c.ConflictingAt = c.ConflictingAt.UTC()
-		return c, err
+		return c, scanErr
 	})
 	if err != nil {
 		return nil, fmt.Errorf("reading conflicts: %w", err)
