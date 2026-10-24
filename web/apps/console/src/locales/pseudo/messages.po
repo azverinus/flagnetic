@@ -1570,7 +1570,23 @@ msgid "Expected removal changed from {before} to {after}."
 msgstr ""
 
 #: src/lib/audit.ts
+msgid "Experiment cloned"
+msgstr ""
+
+#: src/lib/audit.ts
 msgid "Experiment created"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Experiment deleted"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Experiment salts regenerated"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Experiment updated"
 msgstr ""
 
 #: src/components/token-list.tsx
