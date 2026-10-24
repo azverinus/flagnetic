@@ -37,7 +37,7 @@ A draft is edited in full with `PATCH /projects/{project}/experiments/{experimen
 
 ## Cloning
 
-`POST /projects/{project}/experiments/{experiment}/clone` (`experiment.edit`) copies an experiment of any status into a new draft. The body names the clone's `key` and, optionally, its `name` (the source's otherwise). The hypothesis, tags, flag, unit type, weights, traffic allocation and expected end date are copied; the salts are new, so a rerun never reuses an assignment; there is no decision. The owner is the calling member, or the source's owner for a project token. The clone is judged as a create is, so a source whose flag has been archived cannot be cloned. The source is not changed, so cloning takes no `If-Match`.
+`POST /projects/{project}/experiments/{experiment}/clone` (`experiment.edit`) copies an experiment of any status into a new draft. The body names the clone's `key` and, optionally, its `name` (the source's otherwise). The hypothesis, tags, flag, unit type, weights, traffic allocation and expected end date are copied; the salts are new, so a rerun never reuses an assignment; there is no decision. The owner is the calling member, or the source's owner for a project token. The clone is judged as a create is. The source is not changed, so cloning takes no `If-Match`.
 
 ## Salts
 

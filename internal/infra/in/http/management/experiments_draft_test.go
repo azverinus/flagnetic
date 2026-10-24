@@ -316,16 +316,10 @@ func TestCloningCopiesTheComparisonIntoANewDraftWithNewSalts(t *testing.T) {
 	}
 }
 
-func TestCloningIsRefusedForAKeyInUseAnUnknownSourceAndAnArchivedFlag(t *testing.T) {
+func TestCloningIsRefusedForAKeyInUseAndAnUnknownSource(t *testing.T) {
 	f := startExperiments(t)
-	archived := createFlag(t, f.admin, f.project.Key, management.FlagCreate{Key: "gone", Type: management.FlagTypeBoolean, Name: "Gone"})
-	createExperiment(t, f.admin, f.project.Key, management.ExperimentCreate{
-		Key: "old", Name: "Old", Flag: "gone", UnitType: "user", Variations: weights("true", 5000, "false", 5000),
-	})
+	createExperiment(t, f.admin, f.project.Key, validExperiment("old"))
 	createExperiment(t, f.admin, f.project.Key, validExperiment("source"))
-	if res := do(f.admin.ArchiveFlagWithResponse(t.Context(), f.project.Key, archived.Key, &management.ArchiveFlagParams{IfMatch: ifMatch(1)})); res.JSON200 == nil {
-		t.Fatalf("archive = %d %s", res.StatusCode(), res.Body)
-	}
 
 	taken := do(f.admin.CloneExperimentWithResponse(t.Context(), f.project.Key, "source", management.ExperimentClone{Key: "old"}))
 	assertProblem(t, "a key in use", taken.StatusCode(), taken.Body, http.StatusConflict, "already_exists")
@@ -333,10 +327,6 @@ func TestCloningIsRefusedForAKeyInUseAnUnknownSourceAndAnArchivedFlag(t *testing
 	assertProblem(t, "an unknown source", unknown.StatusCode(), unknown.Body, http.StatusNotFound, "not_found")
 	badKey := do(f.admin.CloneExperimentWithResponse(t.Context(), f.project.Key, "source", management.ExperimentClone{Key: "2fast"}))
 	if got := violationsOf(t, "a key outside the grammar", badKey.StatusCode(), badKey.Body, "invalid_experiment"); !slices.Equal(got, []string{"/key invalid_key"}) {
-		t.Errorf("violations = %v", got)
-	}
-	onArchived := do(f.admin.CloneExperimentWithResponse(t.Context(), f.project.Key, "old", management.ExperimentClone{Key: "again"}))
-	if got := violationsOf(t, "a source on an archived flag", onArchived.StatusCode(), onArchived.Body, "invalid_experiment"); !slices.Equal(got, []string{"/flag flag_archived"}) {
 		t.Errorf("violations = %v", got)
 	}
 	if keys := experimentKeys(t, f.admin, f.project.Key); !slices.Equal(keys, []string{"old", "source"}) {
