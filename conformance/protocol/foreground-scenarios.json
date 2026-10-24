@@ -355,6 +355,13 @@
             },
             "status": 200
           }
+        },
+        {
+          "note": "one evaluate between the resume and the reopened stream",
+          "no_request": {
+            "for_ms": 3000,
+            "path": "/sdk/v1/evaluate"
+          }
         }
       ]
     },

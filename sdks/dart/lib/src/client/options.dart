@@ -197,8 +197,9 @@ final class ClientOptions {
   /// zero evaluates at once.
   final Duration rulesetEventJitter;
 
-  /// The source of every random wait; a [Random] when null. A test injects a
-  /// fixed one to pin a wait.
+  /// The source of the wait after a ruleset event and of the evaluate retry
+  /// backoff; a [Random] when null. A test injects a fixed one to pin a wait.
+  /// The stream's reconnect and the event flush draw their own.
   final Random? random;
 
   /// The time the minimum refetch gap is measured against; `DateTime.now`

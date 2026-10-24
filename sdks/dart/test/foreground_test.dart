@@ -198,6 +198,51 @@ void main() {
         await (await server.next(
           path: evaluatePath,
         )).respondJson(afterKillSwitch);
+        // The resume and the reopened stream ask for one evaluate between
+        // them, not one each.
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(count(server, evaluatePath), 2);
+      },
+    );
+
+    test('refetches on resume when the stream cannot reopen', () async {
+      final server = await MockServer.start();
+      final (client, _) = await streaming(server);
+      client
+        ..background()
+        ..foreground();
+      await (await server.next(path: streamPath)).respond(503);
+      await (await server.next(
+        path: evaluatePath,
+      )).respondJson(afterKillSwitch);
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      expect(count(server, evaluatePath), 2);
+    });
+
+    test(
+      'evaluates on a later reconnect after a resume within the gap',
+      () async {
+        var now = DateTime.utc(2026, 1, 1);
+        final server = await MockServer.start();
+        final (client, _) = await streaming(
+          server,
+          minimumRefetchGap: const Duration(seconds: 10),
+          clock: () => now,
+        );
+        client
+          ..background()
+          ..foreground();
+        // The reopened stream fails, so the resume never connects; the
+        // connect after it is a reconnect like any other and catches up.
+        await (await server.next(path: streamPath)).respond(503);
+        now = now.add(const Duration(seconds: 11));
+        await (await server.next(
+          path: streamPath,
+          timeout: const Duration(seconds: 2),
+        )).respondStream();
+        await (await server.next(
+          path: evaluatePath,
+        )).respondJson(afterKillSwitch);
       },
     );
 
