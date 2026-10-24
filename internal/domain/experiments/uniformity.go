@@ -85,9 +85,16 @@ func CheckUniformity(r UniformityRequest) (Uniformity, error) {
 	if err := checkUniformityRequest(r); err != nil {
 		return Uniformity{}, err
 	}
-	b := newBinning(r.Bins)
+	// The number of bins is the caller's and sizes every table below, so its
+	// bound stands here, where the memory is taken, as well as among the
+	// request's violations.
+	bins := r.Bins
+	if bins < minUniformityBins || bins > eval.Buckets {
+		return Uniformity{}, errBinsOutOfRange
+	}
+	b := newBinning(bins)
 	first := b.of(r.Salt, r.UnitIDs)
-	u := Uniformity{Salt: r.Salt, SecondSalt: r.SecondSalt, Bins: r.Bins, Counts: make([]int, r.Bins), DF: r.Bins - 1}
+	u := Uniformity{Salt: r.Salt, SecondSalt: r.SecondSalt, Bins: bins, Counts: make([]int, bins), DF: bins - 1}
 	for _, bin := range first {
 		u.Counts[bin]++
 	}
@@ -101,10 +108,16 @@ func CheckUniformity(r UniformityRequest) (Uniformity, error) {
 	u.PValue = ChiSquarePValue(u.ChiSquare, u.DF)
 	u.Verdict = verdict(u.PValue, VerdictUniform, VerdictNotUniform)
 	if r.SecondSalt != nil {
-		u.Independence = independence(first, b.of(*r.SecondSalt, r.UnitIDs), r.Bins)
+		u.Independence = independence(first, b.of(*r.SecondSalt, r.UnitIDs), bins)
 	}
 	return u, nil
 }
+
+// errBinsOutOfRange refuses a number of bins outside 2 to 10,000; the
+// request's check names it as a violation first.
+var errBinsOutOfRange = apperrors.Invalid("invalid_uniformity_check", "a uniformity check groups the buckets into 2 to 10,000 bins",
+	apperrors.Violation{Pointer: "/bins", Code: "out_of_range", Detail: "a uniformity check groups the buckets into 2 to 10,000 bins",
+		Params: map[string]any{"min": minUniformityBins, "max": eval.Buckets}})
 
 func checkUniformityRequest(r UniformityRequest) error {
 	c := newCheck()

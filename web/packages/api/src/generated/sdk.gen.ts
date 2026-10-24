@@ -2220,6 +2220,8 @@ export const getExperimentAssignment = <ThrowOnError extends boolean = false>(
  * or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
  * only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
  * empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+ * Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+ * whatever the server's limit for other bodies.
  *
  */
 export const checkHashUniformity = <ThrowOnError extends boolean = false>(
