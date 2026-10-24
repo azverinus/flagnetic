@@ -4204,8 +4204,9 @@ type ClientInterface interface {
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
 	// create judges them; the key never changes (`immutable`). A running
-	// experiment changes its name, hypothesis, owner, tags and expected
-	// end date, and grows its traffic allocation: a change to its flag,
+	// experiment changes its name, hypothesis (never to an empty one,
+	// `required` on `/hypothesis`), owner, tags and expected end date, and
+	// grows its traffic allocation: a change to its flag,
 	// unit type or weights is `frozen` (409, a violation per field), and a
 	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
 	// moves the ruleset of every environment holding a rule serving the
@@ -4224,8 +4225,9 @@ type ClientInterface interface {
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
 	// create judges them; the key never changes (`immutable`). A running
-	// experiment changes its name, hypothesis, owner, tags and expected
-	// end date, and grows its traffic allocation: a change to its flag,
+	// experiment changes its name, hypothesis (never to an empty one,
+	// `required` on `/hypothesis`), owner, tags and expected end date, and
+	// grows its traffic allocation: a change to its flag,
 	// unit type or weights is `frozen` (409, a violation per field), and a
 	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
 	// moves the ruleset of every environment holding a rule serving the
@@ -6898,8 +6900,9 @@ func (c *Client) GetExperiment(ctx context.Context, project ProjectKey, experime
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
 // create judges them; the key never changes (`immutable`). A running
-// experiment changes its name, hypothesis, owner, tags and expected
-// end date, and grows its traffic allocation: a change to its flag,
+// experiment changes its name, hypothesis (never to an empty one,
+// `required` on `/hypothesis`), owner, tags and expected end date, and
+// grows its traffic allocation: a change to its flag,
 // unit type or weights is `frozen` (409, a violation per field), and a
 // smaller allocation is `traffic_allocation_decrease` (409). Growing it
 // moves the ruleset of every environment holding a rule serving the
@@ -6928,8 +6931,9 @@ func (c *Client) UpdateExperimentWithBody(ctx context.Context, project ProjectKe
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
 // create judges them; the key never changes (`immutable`). A running
-// experiment changes its name, hypothesis, owner, tags and expected
-// end date, and grows its traffic allocation: a change to its flag,
+// experiment changes its name, hypothesis (never to an empty one,
+// `required` on `/hypothesis`), owner, tags and expected end date, and
+// grows its traffic allocation: a change to its flag,
 // unit type or weights is `frozen` (409, a violation per field), and a
 // smaller allocation is `traffic_allocation_decrease` (409). Growing it
 // moves the ruleset of every environment holding a rule serving the
@@ -15368,8 +15372,9 @@ type ClientWithResponsesInterface interface {
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
 	// create judges them; the key never changes (`immutable`). A running
-	// experiment changes its name, hypothesis, owner, tags and expected
-	// end date, and grows its traffic allocation: a change to its flag,
+	// experiment changes its name, hypothesis (never to an empty one,
+	// `required` on `/hypothesis`), owner, tags and expected end date, and
+	// grows its traffic allocation: a change to its flag,
 	// unit type or weights is `frozen` (409, a violation per field), and a
 	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
 	// moves the ruleset of every environment holding a rule serving the
@@ -15388,8 +15393,9 @@ type ClientWithResponsesInterface interface {
 	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
 	// variations, traffic allocation or expected end date of a draft, as a
 	// create judges them; the key never changes (`immutable`). A running
-	// experiment changes its name, hypothesis, owner, tags and expected
-	// end date, and grows its traffic allocation: a change to its flag,
+	// experiment changes its name, hypothesis (never to an empty one,
+	// `required` on `/hypothesis`), owner, tags and expected end date, and
+	// grows its traffic allocation: a change to its flag,
 	// unit type or weights is `frozen` (409, a violation per field), and a
 	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
 	// moves the ruleset of every environment holding a rule serving the
@@ -27050,8 +27056,9 @@ func (c *ClientWithResponses) GetExperimentWithResponse(ctx context.Context, pro
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
 // create judges them; the key never changes (`immutable`). A running
-// experiment changes its name, hypothesis, owner, tags and expected
-// end date, and grows its traffic allocation: a change to its flag,
+// experiment changes its name, hypothesis (never to an empty one,
+// `required` on `/hypothesis`), owner, tags and expected end date, and
+// grows its traffic allocation: a change to its flag,
 // unit type or weights is `frozen` (409, a violation per field), and a
 // smaller allocation is `traffic_allocation_decrease` (409). Growing it
 // moves the ruleset of every environment holding a rule serving the
@@ -27076,8 +27083,9 @@ func (c *ClientWithResponses) UpdateExperimentWithBodyWithResponse(ctx context.C
 // Changes any of the name, hypothesis, owner, tags, flag, unit type,
 // variations, traffic allocation or expected end date of a draft, as a
 // create judges them; the key never changes (`immutable`). A running
-// experiment changes its name, hypothesis, owner, tags and expected
-// end date, and grows its traffic allocation: a change to its flag,
+// experiment changes its name, hypothesis (never to an empty one,
+// `required` on `/hypothesis`), owner, tags and expected end date, and
+// grows its traffic allocation: a change to its flag,
 // unit type or weights is `frozen` (409, a violation per field), and a
 // smaller allocation is `traffic_allocation_decrease` (409). Growing it
 // moves the ruleset of every environment holding a rule serving the

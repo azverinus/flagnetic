@@ -166,3 +166,17 @@ func TestARunningExperimentsAllocationNeverShrinks(t *testing.T) {
 		t.Errorf("the same allocation = changed %v, %v", changed, err)
 	}
 }
+
+func TestARunningExperimentKeepsAHypothesis(t *testing.T) {
+	e := running(t)
+	for _, blank := range []string{"", "  "} {
+		_, changed, err := e.Change(experiments.Change{Hypothesis: ptr(blank)}, later)
+		if got := violations(t, err); changed || !slices.Equal(got, []string{"/hypothesis required"}) {
+			t.Errorf("hypothesis %q: violations %v, changed %v", blank, got, changed)
+		}
+	}
+	// A draft may still clear its own: it is required only to start.
+	if _, _, err := draft(t).Change(experiments.Change{Hypothesis: ptr("")}, later); err != nil {
+		t.Errorf("clearing a draft's hypothesis = %v", err)
+	}
+}

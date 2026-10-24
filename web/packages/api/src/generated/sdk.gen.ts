@@ -2115,8 +2115,9 @@ export const getExperiment = <ThrowOnError extends boolean = false>(
  * Changes any of the name, hypothesis, owner, tags, flag, unit type,
  * variations, traffic allocation or expected end date of a draft, as a
  * create judges them; the key never changes (`immutable`). A running
- * experiment changes its name, hypothesis, owner, tags and expected
- * end date, and grows its traffic allocation: a change to its flag,
+ * experiment changes its name, hypothesis (never to an empty one,
+ * `required` on `/hypothesis`), owner, tags and expected end date, and
+ * grows its traffic allocation: a change to its flag,
  * unit type or weights is `frozen` (409, a violation per field), and a
  * smaller allocation is `traffic_allocation_decrease` (409). Growing it
  * moves the ruleset of every environment holding a rule serving the
