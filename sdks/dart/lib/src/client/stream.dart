@@ -191,10 +191,15 @@ final class RulesetStream {
   int _generation = 0;
 
   /// Connects, and keeps the stream connected until [suspend] or [close].
-  void start() {
+  /// True when this call began a connect, which then ends in exactly one of
+  /// `onConnected`, `onFailed` or `onRefused` unless [suspend] or [close]
+  /// comes first; false when the stream is
+  /// closed or already connecting or connected.
+  bool start() {
     _suspended = false;
-    if (_closed || _running) return;
+    if (_closed || _running) return false;
     unawaited(_connect());
+    return true;
   }
 
   /// Drops the connection until [start]: the app went to the background,

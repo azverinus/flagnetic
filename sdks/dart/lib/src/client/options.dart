@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'store.dart';
 import 'types.dart';
 
@@ -41,6 +43,9 @@ final class OfflineSource {
   Object? read() => _read();
 }
 
+/// Whether the code was compiled for the web, where the stream is opt-in.
+const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');
+
 /// How a client behaves. Every duration is configurable so that a test can
 /// run a whole scenario in milliseconds.
 final class ClientOptions {
@@ -68,7 +73,10 @@ final class ClientOptions {
     this.sendExposures = true,
     this.sendSummaries = true,
     this.allowOverrides = false,
-    this.sse = false,
+    this.sse,
+    this.rulesetEventJitter = const Duration(seconds: 3),
+    this.random,
+    this.clock,
     this.streamBackoff = const Duration(seconds: 1),
     this.streamBackoffCap = const Duration(seconds: 30),
     this.streamCloseJitter = const Duration(seconds: 2),
@@ -172,10 +180,34 @@ final class ClientOptions {
   /// refusal on top of this option.
   final bool allowOverrides;
 
-  /// Subscribe to the ruleset stream, so a kill switch reaches the app within
-  /// about two seconds plus one evaluate. Off by default: a mobile client
-  /// keeps no connection open unless the app asks for one.
-  final bool sse;
+  /// Whether to hold the ruleset stream while the app is in the foreground,
+  /// so a kill switch reaches the app within about 5 s: the stream closes in
+  /// the background, opens again on `foreground`, and a change waits up to
+  /// [rulesetEventJitter] before the app evaluates.
+  ///
+  /// When null the stream is held on iOS, Android and desktop and is off on
+  /// the web, where a connection per tab is the app's choice (the browser
+  /// client behaves the same). Off, values stay fresh within [pollInterval]
+  /// (five minutes by default) and at every `foreground`.
+  final bool? sse;
+
+  /// The longest random wait between a `ruleset` event and the evaluate it
+  /// asks for, so that the apps open when a kill switch is flipped do not
+  /// all evaluate at once. The wait is uniform from zero to this duration;
+  /// zero evaluates at once.
+  final Duration rulesetEventJitter;
+
+  /// The source of the wait after a ruleset event and of the evaluate retry
+  /// backoff; a [Random] when null. A test injects a fixed one to pin a wait.
+  /// The stream's reconnect and the event flush draw their own.
+  final Random? random;
+
+  /// The time the minimum refetch gap is measured against; `DateTime.now`
+  /// when null.
+  final DateTime Function()? clock;
+
+  /// [sse] resolved: the explicit choice, else the platform's default.
+  bool get streamEnabled => sse ?? !_isWeb;
 
   /// The first reconnect bound after a stream error; each further failure
   /// doubles it up to [streamBackoffCap], and the attempt waits a random

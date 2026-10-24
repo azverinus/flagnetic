@@ -55,6 +55,19 @@ typedef StageListener = void Function(Stage stage);
 
 enum _Outcome { success, failure, refused, noRetry }
 
+/// What the connect that [FlagneticClient.foreground] began owes the resume.
+enum _Resume {
+  /// The resume came within the minimum refetch gap of the last attempt: the
+  /// connect evaluates nothing, since the values are as fresh as the gap
+  /// allows and the stream carries any change from here on.
+  withinGap,
+
+  /// The resume asks for an evaluate. The connect makes it, after the stream
+  /// is open so that no version is missed between the two, or the failed
+  /// connect makes it without the stream; never both.
+  refetch,
+}
+
 /// What asked for an evaluate. All of them coalesce into one in-flight
 /// request; only [foreground] is throttled by the minimum refetch gap.
 enum _Trigger {
@@ -103,7 +116,9 @@ final class FlagneticClient {
 
   /// The keys this connection writes: its own values and its own event queue.
   final StoreKeys _keys;
-  final Random _jitter = Random();
+  late final Random _jitter = _options.random ?? Random();
+  Timer? _rulesetWait;
+  _Resume? _resume;
   Transport? _transport;
 
   ValuesDocument? _values;
@@ -197,7 +212,7 @@ final class FlagneticClient {
     // sent, so it goes out once, with the event IDs it was recorded under.
     unawaited(_ingest!.load());
     _ingest!.start();
-    if (!_options.sse) {
+    if (!_options.streamEnabled) {
       _trigger(_Trigger.start);
       return;
     }
@@ -221,17 +236,37 @@ final class FlagneticClient {
       lastEventId: () => _values?.rulesetVersion.toString(),
       onRuleset: (version) {
         final held = _values?.rulesetVersion;
-        if (held == null || version > held) _trigger(_Trigger.ruleset);
+        if (held == null || version > held) _waitThenEvaluate();
       },
-      onConnected: () => _trigger(_Trigger.start),
+      onConnected: () {
+        final resume = _resume;
+        _resume = null;
+        if (resume == _Resume.withinGap) {
+          _scheduleInterval();
+          return;
+        }
+        _trigger(_Trigger.start);
+      },
       onFailed: () {
-        if (!_fetchedOnce) _trigger(_Trigger.start);
+        final resume = _resume;
+        _resume = null;
+        if (resume == _Resume.refetch) {
+          _trigger(_Trigger.foreground);
+        } else if (!_fetchedOnce) {
+          _trigger(_Trigger.start);
+        }
       },
       onRefused: (status) {
         _keyRefused(status);
+        final resume = _resume;
+        _resume = null;
         // The stream is done for good; the fetch loop must still start, so
         // that a key restored by an operator recovers without a restart.
-        if (!_fetchedOnce) _trigger(_Trigger.start);
+        if (resume == _Resume.refetch) {
+          _trigger(_Trigger.foreground);
+        } else if (!_fetchedOnce) {
+          _trigger(_Trigger.start);
+        }
       },
       log: _log,
     )..start();
@@ -369,10 +404,17 @@ final class FlagneticClient {
     try {
       if (_closed) return;
       _foreground = true;
-      _rulesetStream?.start();
+      final reopening = _rulesetStream?.start() ?? false;
       _ingest?.setForeground(foreground: true);
       if (_withinRefetchGap) {
+        _resume = reopening ? _Resume.withinGap : null;
         _scheduleInterval();
+        return;
+      }
+      if (reopening) {
+        // The reopened stream's connect evaluates anyway; the resume's
+        // evaluate waits for it instead of adding a second request.
+        _resume = _Resume.refetch;
         return;
       }
       _trigger(_Trigger.foreground);
@@ -389,6 +431,9 @@ final class FlagneticClient {
       _foreground = false;
       _timer?.cancel();
       _timer = null;
+      _rulesetWait?.cancel();
+      _rulesetWait = null;
+      _resume = null;
       // The stream is radio too: it closes with everything else.
       unawaited(_rulesetStream?.suspend() ?? Future<void>.value());
       // Best effort: what does not get out stays in the store for the next
@@ -614,6 +659,8 @@ final class FlagneticClient {
     try {
       _timer?.cancel();
       _timer = null;
+      _rulesetWait?.cancel();
+      _rulesetWait = null;
       await _rulesetStream?.close();
       if (!_firstValues.isCompleted) _firstValues.complete();
       for (final waiter in _waiters) {
@@ -870,6 +917,23 @@ final class FlagneticClient {
     scheduleMicrotask(_fetch);
   }
 
+  /// A ruleset event above the held version asks for an evaluate after a
+  /// random wait, so that the apps a kill switch reaches do not evaluate
+  /// together. Events during the wait share it, and the evaluate it ends in
+  /// reads the newest version, so a second event adds no request.
+  void _waitThenEvaluate() {
+    if (_rulesetWait != null) return;
+    final wait = _options.rulesetEventJitter * _jitter.nextDouble();
+    if (wait == Duration.zero) {
+      _trigger(_Trigger.ruleset);
+      return;
+    }
+    _rulesetWait = Timer(wait, () {
+      _rulesetWait = null;
+      _trigger(_Trigger.ruleset);
+    });
+  }
+
   /// [_trigger], with a future completing when the attempt it asks for has
   /// finished.
   Future<void> _refetch(_Trigger trigger) {
@@ -882,10 +946,11 @@ final class FlagneticClient {
     return waiter.future;
   }
 
+  DateTime _now() => (_options.clock ?? DateTime.now)();
+
   bool get _withinRefetchGap {
     final last = _lastAttempt;
-    return last != null &&
-        DateTime.now().difference(last) < _options.minimumRefetchGap;
+    return last != null && _now().difference(last) < _options.minimumRefetchGap;
   }
 
   /// The interval between fetches, never below the minimum poll interval.
@@ -907,7 +972,7 @@ final class FlagneticClient {
     _again = false;
     _timer?.cancel();
     _timer = null;
-    _lastAttempt = DateTime.now();
+    _lastAttempt = _now();
     // Whoever asked before this attempt started is answered by it; a
     // trigger arriving while it runs waits for the follow-up.
     final waiting = _waiters;

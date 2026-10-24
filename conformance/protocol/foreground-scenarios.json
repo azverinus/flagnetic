@@ -1,0 +1,559 @@
+{
+  "scenarios": [
+    {
+      "name": "client: a ruleset event waits up to 3 seconds before the evaluate it asks for",
+      "mode": "client",
+      "covers": "foreground stream: the stream is held in the foreground; a change evaluates after a random wait of 0–3 s, so apps open at a kill switch do not evaluate at once",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/stream",
+            "absent_headers": [
+              "Last-Event-ID"
+            ]
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "no_request": {
+            "for_ms": 3000,
+            "path": "/sdk/v1/evaluate"
+          }
+        },
+        {
+          "note": "a kill switch",
+          "stream_send": "event: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "delay_ms": {
+              "min": 0,
+              "max": 3000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "no_request": {
+            "for_ms": 3000,
+            "path": "/sdk/v1/evaluate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: events during the wait share one evaluate",
+      "mode": "client",
+      "covers": "foreground stream: a version heard again within the wait adds no request",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/stream",
+            "absent_headers": [
+              "Last-Event-ID"
+            ]
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "note": "the same kill switch twice",
+          "stream_send": "event: ruleset\nid: 2\ndata: {\"version\":2}\n\nevent: ruleset\nid: 2\ndata: {\"version\":2}\n\n"
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "one evaluate for both",
+          "request": {
+            "delay_ms": {
+              "min": 0,
+              "max": 3000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "no_request": {
+            "for_ms": 3000,
+            "path": "/sdk/v1/evaluate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: the background closes the stream and the foreground refetches",
+      "mode": "client",
+      "covers": "foreground stream: closed in the background with nothing fetched there, reopened with Last-Event-ID on resume, and the resume refetches once the 10 s minimum gap has passed",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/stream",
+            "absent_headers": [
+              "Last-Event-ID"
+            ]
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "call": {
+            "op": "background"
+          }
+        },
+        {
+          "note": "the SDK closes the stream",
+          "stream_closed": {
+            "within_ms": 3000
+          }
+        },
+        {
+          "no_request": {
+            "for_ms": 3000
+          }
+        },
+        {
+          "advance_ms": 11000
+        },
+        {
+          "call": {
+            "op": "foreground"
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/stream",
+            "headers": {
+              "Last-Event-ID": "1"
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            }
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the resume refetches",
+          "request": {
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "one evaluate between the resume and the reopened stream",
+          "no_request": {
+            "for_ms": 3000,
+            "path": "/sdk/v1/evaluate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: a resume within 10 seconds of the last fetch evaluates nothing",
+      "mode": "client",
+      "covers": "foreground stream: the resume reopens the stream but refetches at most once per 10 s",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 3600000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": true,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/stream",
+            "absent_headers": [
+              "Last-Event-ID"
+            ]
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "note": "the preamble and the version held",
+          "stream_send": "retry: 3000\n\nevent: ruleset\nid: 1\ndata: {\"version\":1}\n\n"
+        },
+        {
+          "call": {
+            "op": "background"
+          }
+        },
+        {
+          "stream_closed": {
+            "within_ms": 3000
+          }
+        },
+        {
+          "advance_ms": 5000
+        },
+        {
+          "call": {
+            "op": "foreground"
+          }
+        },
+        {
+          "request": {
+            "method": "GET",
+            "path": "/sdk/v1/stream",
+            "headers": {
+              "Last-Event-ID": "1"
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            }
+          },
+          "respond": {
+            "headers": {
+              "Cache-Control": "no-cache",
+              "Content-Type": "text/event-stream"
+            },
+            "status": 200,
+            "stream": true
+          }
+        },
+        {
+          "no_request": {
+            "for_ms": 5000,
+            "path": "/sdk/v1/evaluate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: with the stream off the poll is the bound",
+      "mode": "client",
+      "covers": "foreground stream: with the stream switched off no connection opens and the poll, 300 s here, carries every change",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 300000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "request": {
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        },
+        {
+          "no_request": {
+            "for_ms": 290000
+          }
+        },
+        {
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          },
+          "note": "the poll",
+          "request": {
+            "delay_ms": {
+              "min": 300000,
+              "max": 300000
+            },
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "method": "POST",
+            "path": "/sdk/v1/evaluate"
+          },
+          "respond": {
+            "body": "server/evaluation-after-kill-switch.json",
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "114",
+              "Vary": "Accept-Encoding"
+            },
+            "status": 200
+          }
+        }
+      ]
+    }
+  ]
+}

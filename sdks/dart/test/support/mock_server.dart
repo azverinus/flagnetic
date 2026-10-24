@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flagnetic/flagnetic.dart';
 import 'package:test/test.dart';
@@ -97,12 +98,14 @@ final class Exchange {
     },
   }) async {
     _answered = true;
-    final response = _request.response
-      ..statusCode = 200
-      ..bufferOutput = false;
-    response.headers.contentLength = -1;
-    headers.forEach(response.headers.set);
-    final open = OpenStream._(response);
+    // The socket is written by hand: a stream the SDK ends can only be told
+    // from a quiet one by reading the socket, which `HttpResponse` hides.
+    final socket = await _request.response.detachSocket(writeHeaders: false);
+    final head = StringBuffer('HTTP/1.1 200 OK\r\nConnection: close\r\n');
+    headers.forEach((name, value) => head.write('$name: $value\r\n'));
+    head.write('\r\n');
+    final open = OpenStream._(socket);
+    socket.add(utf8.encode(head.toString()));
     await open.send(': open\n\n');
     return open;
   }
@@ -117,20 +120,37 @@ final class Exchange {
 
 /// A change stream the test holds open and writes to.
 final class OpenStream {
-  OpenStream._(this._response);
+  OpenStream._(this._socket) {
+    _socket.listen(
+      (_) {},
+      onDone: () => _gone = true,
+      onError: (Object _) => _gone = true,
+      cancelOnError: true,
+    );
+  }
 
-  final HttpResponse _response;
+  final Socket _socket;
+  bool _gone = false;
 
   /// Writes [bytes] and flushes, so the SDK reads them at once.
   Future<void> send(String bytes) async {
-    _response.add(utf8.encode(bytes));
-    await _response.flush();
+    _socket.add(utf8.encode(bytes));
+    await _socket.flush();
+  }
+
+  /// Whether the SDK ends the connection within [timeout].
+  Future<bool> closedBySdk(Duration timeout) async {
+    final deadline = DateTime.now().add(timeout);
+    while (!_gone && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    return _gone;
   }
 
   /// Ends the stream from the server's side.
   Future<void> closeStream() async {
     try {
-      await _response.close();
+      await _socket.close();
     } on Object {
       // The SDK already went away.
     }
@@ -297,7 +317,10 @@ ClientOptions scaledOptions({
   int storedUnitSets = 4,
   Duration requestTimeout = const Duration(seconds: 5),
   Duration closeTimeout = const Duration(seconds: 2),
-  bool sse = false,
+  bool? sse = false,
+  Duration rulesetEventJitter = Duration.zero,
+  Random? random,
+  DateTime Function()? clock,
   Duration minimumRefetchGap = const Duration(milliseconds: 10),
   Duration streamSilenceTimeout = const Duration(milliseconds: 45),
   Duration flushInterval = const Duration(hours: 1),
@@ -334,6 +357,9 @@ ClientOptions scaledOptions({
   minimumPollInterval: const Duration(milliseconds: 30),
   minimumRefetchGap: minimumRefetchGap,
   sse: sse,
+  rulesetEventJitter: rulesetEventJitter,
+  random: random,
+  clock: clock,
   streamBackoff: const Duration(milliseconds: 1),
   streamBackoffCap: const Duration(milliseconds: 30),
   streamCloseJitter: const Duration(milliseconds: 2),
