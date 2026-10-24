@@ -335,6 +335,7 @@ msgstr ""
 msgid "A session ends this long after its last request."
 msgstr ""
 
+#: src/lib/experiments.ts
 #: src/lib/flags.ts
 msgid "A tag has at most 64 characters."
 msgstr ""
@@ -485,6 +486,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "An attribute's type is fixed once it is declared."
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "An experiment has at most 50 tags."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx

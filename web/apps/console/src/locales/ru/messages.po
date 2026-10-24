@@ -335,6 +335,7 @@ msgstr "Через столько времени после входа сеан�
 msgid "A session ends this long after its last request."
 msgstr "Через столько времени после последнего запроса сеанс завершается."
 
+#: src/lib/experiments.ts
 #: src/lib/flags.ts
 msgid "A tag has at most 64 characters."
 msgstr "Тег — не более 64 символов."
@@ -486,6 +487,10 @@ msgstr "Разрешённые источники"
 #: src/lib/problem-messages.ts
 msgid "An attribute's type is fixed once it is declared."
 msgstr "Тип атрибута после объявления не меняется."
+
+#: src/lib/experiments.ts
+msgid "An experiment has at most 50 tags."
+msgstr "У эксперимента не больше 50 тегов."
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "An experiment starts as a draft and changes nothing until it is started."

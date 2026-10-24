@@ -11,7 +11,6 @@ import {
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
-import { tagsSchema } from "./flags";
 import { nameSchema } from "./forms";
 
 /** The basis points of a whole: weights and traffic allocations are written in them. */
@@ -345,6 +344,9 @@ export const experimentFieldPointer =
 /** The longest hypothesis the API keeps. */
 const hypothesisRule = zExperimentCreate.shape.hypothesis.unwrap();
 
+/** The server's rules for an experiment's tags: how many, and how long each. */
+const tagRules = zExperimentCreate.shape.tags.unwrap();
+
 export type ExperimentIssues = {
   /** What is wrong with each field but the weights, by the field's name. */
   fields: Map<ExperimentField | "key", string>;
@@ -392,8 +394,11 @@ export function experimentIssues(
     }
   }
   if (open("tags")) {
-    const tags = tagsSchema(i18n).safeParse(values.tags);
-    if (!tags.success) fields.set("tags", tags.error.issues[0]?.message ?? "");
+    if (!values.tags.every((tag) => tagRules.element.safeParse(tag).success)) {
+      fields.set("tags", i18n._(msg`A tag has at most 64 characters.`));
+    } else if (!tagRules.safeParse(values.tags).success) {
+      fields.set("tags", i18n._(msg`An experiment has at most 50 tags.`));
+    }
   }
   if (open("flag") && values.flag === "") fields.set("flag", i18n._(msg`Choose a flag.`));
   if (open("unit_type") && values.unit_type === "") {

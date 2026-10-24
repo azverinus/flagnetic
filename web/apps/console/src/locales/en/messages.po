@@ -335,6 +335,7 @@ msgstr "A session ends this long after it opened, however much it is used. Lower
 msgid "A session ends this long after its last request."
 msgstr "A session ends this long after its last request."
 
+#: src/lib/experiments.ts
 #: src/lib/flags.ts
 msgid "A tag has at most 64 characters."
 msgstr "A tag has at most 64 characters."
@@ -486,6 +487,10 @@ msgstr "Allowed origins"
 #: src/lib/problem-messages.ts
 msgid "An attribute's type is fixed once it is declared."
 msgstr "An attribute's type is fixed once it is declared."
+
+#: src/lib/experiments.ts
+msgid "An experiment has at most 50 tags."
+msgstr "An experiment has at most 50 tags."
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "An experiment starts as a draft and changes nothing until it is started."
