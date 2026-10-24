@@ -326,11 +326,11 @@ func TestAnExposureIsCheckedAgainstItsExperimentInOrder(t *testing.T) {
 }
 
 func TestAnOverrideExposureMayNameAnyVariationOfTheFlag(t *testing.T) {
-	x := exposed(t, map[string]any{"variation_key": "legacy", "override": true, "evaluation_reason": "override"})
+	x := exposed(t, map[string]any{"variation_key": "classic", "override": true, "evaluation_reason": "override"})
 	if got := events.CheckExposure(x, onboarding(), true); got != nil {
 		t.Errorf("override exposure of a variation the experiment does not weigh = %+v, want accepted", got)
 	}
-	plain := exposed(t, map[string]any{"variation_key": "legacy"})
+	plain := exposed(t, map[string]any{"variation_key": "classic"})
 	if got := events.CheckExposure(plain, onboarding(), true); got == nil || got.Code != events.RejectUnknownVariation {
 		t.Errorf("the same without override = %+v, want unknown_variation", got)
 	}

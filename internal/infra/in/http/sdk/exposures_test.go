@@ -254,11 +254,11 @@ func TestAClientKeyLearnsNothingOfAnExperimentButTheCodeOfARefusal(t *testing.T)
 
 func TestAnOverrideExposureMayNameAnyVariationOfTheFlag(t *testing.T) {
 	f := startExposures(t)
-	f.p.flagWithVariations(t, "banner", "short", "Try", "long", "Start", "legacy", "Old")
+	f.p.flagWithVariations(t, "banner", "short", "Try", "long", "Start", "classic", "Old")
 	f.p.experiment(t, "banner_test", "banner", "user", "short", 5000, "long", 5000)
 	exposure := func(n int, changes map[string]any) map[string]any {
 		return with(with(exposureEvent(n, nil), map[string]any{
-			"experiment_key": "banner_test", "flag_key": "banner", "variation_key": "legacy",
+			"experiment_key": "banner_test", "flag_key": "banner", "variation_key": "classic",
 		}), changes)
 	}
 	got := batchResult(t, f.srv, f.server, batch(
