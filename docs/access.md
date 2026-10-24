@@ -8,7 +8,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 
 | Permission | Allows | Token scope | Members only |
 |---|---|---|---|
-| `project.read` | every ordinary read in a project, its audit log included | `read` | |
+| `project.read` | every ordinary read in a project, its audit log included, and the uniformity check | `read` | |
 | `project.update` | renaming a project and changing its description | `project:admin` | |
 | `environment.manage` | creating, renaming and deleting environments | `project:admin` | |
 | `declaration.manage` | declaring, renaming and deleting unit types and attributes; declaring and dismissing discovered attributes | `flags:write` | |
