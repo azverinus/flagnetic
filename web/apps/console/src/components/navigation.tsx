@@ -6,6 +6,7 @@ import { Link, type LinkProps } from "@tanstack/react-router";
 import {
   BoxesIcon,
   FlagIcon,
+  FlaskConicalIcon,
   HistoryIcon,
   LayersIcon,
   KeyRoundIcon,
@@ -59,6 +60,12 @@ const projectScreens = [
     to: "/projects/$project/flags",
     label: msg`Flags`,
     icon: FlagIcon,
+    permission: "project.read",
+  },
+  {
+    to: "/projects/$project/experiments",
+    label: msg`Experiments`,
+    icon: FlaskConicalIcon,
     permission: "project.read",
   },
   {

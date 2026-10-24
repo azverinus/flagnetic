@@ -233,6 +233,7 @@ msgid "A key never changes once it is set."
 msgstr "Ключ, однажды заданный, больше не меняется."
 
 #: src/lib/project-members.ts
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "A member without a grant here"
 msgstr "Участник без роли в этом проекте"
@@ -297,6 +298,10 @@ msgstr "В правиле — не более {maxConditionsText} условий
 #: src/components/tester-panel.tsx
 msgid "A rule's rollout served: the unit's bucket is below its percentage."
 msgstr "Сработала раскатка правила: корзина единицы ниже её процента."
+
+#: src/lib/problem-messages.ts
+msgid "A running experiment's traffic allocation can only grow."
+msgstr "Охват запущенного эксперимента можно только увеличивать."
 
 #: src/components/segment-fields.tsx
 msgid "A segment compares declared attributes only; one without conditions holds every context."
@@ -449,6 +454,7 @@ msgid "Add unit"
 msgstr "Добавить единицу"
 
 #: src/components/variations-editor.tsx
+#: src/components/weights-input.tsx
 msgid "Add variation"
 msgstr "Добавить вариант"
 
@@ -481,6 +487,10 @@ msgstr "Разрешённые источники"
 msgid "An attribute's type is fixed once it is declared."
 msgstr "Тип атрибута после объявления не меняется."
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "An experiment starts as a draft and changes nothing until it is started."
+msgstr "Эксперимент создаётся черновиком и ничего не меняет, пока его не запустят."
+
 #: src/components/member-actions.tsx
 msgid "An instance admin administers every project, every member and the instance's settings."
 msgstr "Администратор экземпляра управляет всеми проектами, всеми участниками и настройками экземпляра."
@@ -505,6 +515,10 @@ msgstr "Для этого ID единицы действует переопре�
 msgid "Another member already has this email address."
 msgstr "Этот адрес электронной почты уже есть у другого участника."
 
+#: src/lib/experiments.ts
+msgid "Another row has this variation."
+msgstr "Этот вариант уже есть в другой строке."
+
 #: src/lib/flags.ts
 msgid "Another variation has this key."
 msgstr "Этот ключ уже есть у другого варианта."
@@ -518,10 +532,15 @@ msgstr "Любое"
 msgid "Any environments"
 msgstr "Любые окружения"
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Any flag"
+msgstr "Любой флаг"
+
 #: src/components/sdk-keys.tsx
 msgid "Any origin"
 msgstr "Любой источник"
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any owner"
 msgstr "Любой владелец"
@@ -529,6 +548,10 @@ msgstr "Любой владелец"
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any state"
 msgstr "Любое состояние"
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Any status"
+msgstr "Любой статус"
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any type"
@@ -590,6 +613,7 @@ msgstr "Архивировать флаг"
 msgid "Archive the flag first; only an archived flag can be deleted."
 msgstr "Сначала архивируйте флаг: удалить можно только архивный."
 
+#: src/lib/experiments.ts
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archived"
 msgstr "В архиве"
@@ -607,6 +631,7 @@ msgstr "Отправлен в архив."
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
 msgstr "Не меньше 12 символов или столько, сколько требует этот экземпляр. Подобрать пароль мешает именно длина."
 
+#: src/lib/experiments.ts
 #: src/lib/problem-messages.ts
 msgid "At most {max} characters."
 msgstr "Не более {max} символов."
@@ -796,6 +821,10 @@ msgid "Changes to the definition"
 msgstr "Изменения определения"
 
 #: src/components/structural-diff-view.tsx
+msgid "Changes to the experiment"
+msgstr "Изменения эксперимента"
+
+#: src/components/structural-diff-view.tsx
 msgid "Changes to the segment"
 msgstr "Изменения сегмента"
 
@@ -808,12 +837,18 @@ msgid "Checked top to bottom; the first whose conditions all hold serves. Reorde
 msgstr "Проверяются сверху вниз; срабатывает первое правило, все условия которого выполнены. Порядок меняется перетаскиванием, стрелками или клавишами Alt+стрелка вверх и вниз."
 
 #: src/components/condition-row.tsx
+#: src/components/experiment-fields.tsx
 #: src/components/prerequisites-section.tsx
 msgid "Choose a flag"
 msgstr "Выберите флаг"
 
+#: src/components/experiment-fields.tsx
+msgid "Choose a flag to set the weights of its variations."
+msgstr "Выберите флаг, чтобы задать веса его вариантов."
+
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
+#: src/lib/experiments.ts
 msgid "Choose a flag."
 msgstr "Выберите флаг."
 
@@ -864,10 +899,12 @@ msgstr "Выберите тип"
 msgid "Choose a type."
 msgstr "Выберите тип."
 
+#: src/components/experiment-fields.tsx
 #: src/components/rule-editor.tsx
 msgid "Choose a unit type"
 msgstr "Выберите тип единицы"
 
+#: src/lib/experiments.ts
 #: src/lib/rule-editor.ts
 msgid "Choose a unit type."
 msgstr "Выберите тип единицы."
@@ -875,11 +912,13 @@ msgstr "Выберите тип единицы."
 #: src/components/condition-row.tsx
 #: src/components/prerequisites-section.tsx
 #: src/components/rule-editor.tsx
+#: src/components/weights-input.tsx
 msgid "Choose a variation"
 msgstr "Выберите вариант"
 
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
+#: src/lib/experiments.ts
 #: src/lib/rule-editor.ts
 msgid "Choose a variation."
 msgstr "Выберите вариант."
@@ -913,6 +952,10 @@ msgstr "Выберите одну из предложенных областей
 msgid "Choose one of the offered types."
 msgstr "Выберите один из предложенных типов."
 
+#: src/lib/experiments.ts
+msgid "Choose the day the experiment is expected to end: it starts only with one."
+msgstr "Выберите день, когда эксперимент должен закончиться: без него он не запустится."
+
 #: src/lib/conditions.ts
 #: src/lib/tester.ts
 msgid "Choose true or false."
@@ -927,6 +970,7 @@ msgid "Chosen tags"
 msgstr "Выбранные теги"
 
 #: src/components/audit-log.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Clear filters"
@@ -958,6 +1002,14 @@ msgstr "Командная строка"
 #: src/components/compare-environments.tsx
 msgid "Compare"
 msgstr "Сравнить"
+
+#: src/lib/experiments.ts
+msgid "Compare {minVariations} to {maxVariations} variations."
+msgstr "Сравнивайте от {minVariations} до {maxVariations} вариантов."
+
+#: src/lib/problem-messages.ts
+msgid "Compare 2 to 50 variations."
+msgstr "Сравнивайте от 2 до 50 вариантов."
 
 #: src/components/compare-environments.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -1045,6 +1097,10 @@ msgstr "Скопировать {source} в {to}"
 msgid "Copy configuration"
 msgstr "Скопировать конфигурацию"
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Could not be read"
+msgstr "Не удалось прочитать"
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Create attribute"
 msgstr "Создать атрибут"
@@ -1052,6 +1108,10 @@ msgstr "Создать атрибут"
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Create environment"
 msgstr "Создать окружение"
+
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+msgid "Create experiment"
+msgstr "Создать эксперимент"
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Create flag"
@@ -1271,9 +1331,21 @@ msgstr "не равно"
 msgid "Download ruleset"
 msgstr "Скачать набор правил"
 
+#: src/lib/experiments.ts
+msgid "Draft"
+msgstr "Черновик"
+
 #: src/components/rule-editor.tsx
 msgid "Drag rule {position}"
 msgstr "Перетащить правило {position}"
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Each experiment compares variations of one flag over the units of one unit type; a flag's rule serves it in the environments that hold it."
+msgstr "Каждый эксперимент сравнивает варианты одного флага на единицах одного типа; его отдаёт правило флага в тех окружениях, где оно есть."
+
+#: src/components/weights-input.tsx
+msgid "Each variation's share of the units the traffic allocation includes; the shares sum to 100.00 %."
+msgstr "Доля каждого варианта среди единиц, попавших в охват; в сумме доли дают 100,00 %."
 
 #: src/components/member-actions.tsx
 msgid "Edit"
@@ -1371,6 +1443,11 @@ msgstr "Введите число."
 msgid "Enter a pattern in RE2 syntax, which has no look-around or back-references."
 msgstr "Введите шаблон в синтаксисе RE2: без просмотра вперёд и назад и без обратных ссылок."
 
+#: src/lib/experiments.ts
+#: src/lib/problem-messages.ts
+msgid "Enter a percentage from 0 to 100, at most two decimals."
+msgstr "Введите процент от 0 до 100, не больше двух знаков после запятой."
+
 #: src/lib/rule-editor.ts
 msgid "Enter a percentage from 0 to 100, to two decimal places."
 msgstr "Введите процент от 0 до 100, не больше двух знаков после запятой."
@@ -1402,6 +1479,10 @@ msgstr "Введите целое число."
 #: src/components/member-form.tsx
 msgid "Enter an email address."
 msgstr "Введите адрес электронной почты."
+
+#: src/lib/experiments.ts
+msgid "Enter every weight to see the total."
+msgstr "Введите все веса, чтобы увидеть сумму."
 
 #: src/lib/variations.ts
 msgid "Enter JSON other than null."
@@ -1560,6 +1641,15 @@ msgstr "Все, кто может входить в этот экземпляр.
 msgid "Expand the sidebar"
 msgstr "Развернуть боковую панель"
 
+#: src/components/experiment-fields.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Expected end"
+msgstr "Ожидаемое окончание"
+
+#: src/components/structural-diff-view.tsx
+msgid "Expected end changed from {before} to {after}."
+msgstr "Ожидаемое окончание изменено: было {before}, стало {after}."
+
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Expected removal"
@@ -1568,6 +1658,10 @@ msgstr "Ожидаемое удаление"
 #: src/components/structural-diff-view.tsx
 msgid "Expected removal changed from {before} to {after}."
 msgstr "Ожидаемое удаление изменено: было {before}, стало {after}."
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Experiment"
+msgstr "Эксперимент"
 
 #: src/lib/audit.ts
 msgid "Experiment cloned"
@@ -1581,6 +1675,10 @@ msgstr "Эксперимент создан"
 msgid "Experiment deleted"
 msgstr "Эксперимент удалён"
 
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "Experiment not found"
+msgstr "Эксперимент не найден"
+
 #: src/lib/audit.ts
 msgid "Experiment salts regenerated"
 msgstr "Соли эксперимента перегенерированы"
@@ -1588,6 +1686,12 @@ msgstr "Соли эксперимента перегенерированы"
 #: src/lib/audit.ts
 msgid "Experiment updated"
 msgstr "Эксперимент изменён"
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/routes/_signed-in/projects/$project/experiments/route.tsx
+msgid "Experiments"
+msgstr "Эксперименты"
 
 #: src/components/token-list.tsx
 #: src/lib/sdk-keys.ts
@@ -1621,6 +1725,10 @@ msgstr "Поле"
 msgid "Filter the audit log"
 msgstr "Фильтры журнала аудита"
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Filter the experiments"
+msgstr "Фильтр экспериментов"
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Filter the flags"
 msgstr "Фильтр флагов"
@@ -1635,6 +1743,7 @@ msgid "First seen"
 msgstr "Впервые замечен"
 
 #: src/components/configuration-editor.tsx
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Fix what is marked above before saving."
 msgstr "Перед сохранением исправьте отмеченное выше."
@@ -1649,7 +1758,9 @@ msgid "Fixed once the project is created, since SDKs and scripts use it."
 msgstr "Не меняется после создания проекта: по нему проект находят SDK и скрипты."
 
 #. A kind of entity in the audit log.
+#: src/components/experiment-fields.tsx
 #: src/lib/audit.ts
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Flag"
 msgstr "Флаг"
@@ -1665,6 +1776,10 @@ msgstr "Флаг (предусловие {position})"
 #: src/lib/audit.ts
 msgid "Flag archived"
 msgstr "Флаг архивирован"
+
+#: src/components/structural-diff-view.tsx
+msgid "Flag changed from <0>{before}</0> to <1>{after}</1>."
+msgstr "Флаг изменён: был <0>{before}</0>, стал <1>{after}</1>."
 
 #: src/lib/audit.ts
 msgid "Flag created"
@@ -1716,6 +1831,10 @@ msgstr "С"
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
 msgid "Go to the environments"
 msgstr "К окружениям"
+
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "Go to the experiments"
+msgstr "К экспериментам"
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Go to the flags"
@@ -1778,6 +1897,10 @@ msgstr "История"
 msgid "History of the flag"
 msgstr "История флага"
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Holding environments"
+msgstr "Окружения с правилом"
+
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
 msgstr "Имя флага в коде, например checkout.newFlow: буквы, цифры, ., - и _. Не меняется."
@@ -1797,6 +1920,14 @@ msgstr "Имя проекта для SDK и скриптов: строчные �
 #: src/components/profile-form.tsx
 msgid "How the instance knows you. An instance admin can change it."
 msgstr "По нему вас знает экземпляр. Изменить его может администратор экземпляра."
+
+#: src/components/experiment-fields.tsx
+msgid "Hypothesis"
+msgstr "Гипотеза"
+
+#: src/components/structural-diff-view.tsx
+msgid "Hypothesis changed."
+msgstr "Гипотеза изменена."
 
 #: src/components/ui/reveal-secret.tsx
 msgid "I have stored it somewhere safe"
@@ -1821,6 +1952,10 @@ msgstr "в сегменте {segment}"
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "In what SDKs receive."
 msgstr "По тому, что получают SDK."
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Include archived experiments"
+msgstr "Показывать архивные эксперименты"
 
 #. An audit entry that belongs to no project.
 #. An audit entry that belongs to no project.
@@ -1957,6 +2092,7 @@ msgstr "JSON"
 
 #: src/components/conflict-banner.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Keep my edits"
 msgstr "Оставить мои правки"
@@ -1970,6 +2106,7 @@ msgid "Kept in this browser, and used on the sign-in page too. System follows yo
 msgstr "Хранится в этом браузере и применяется и на странице входа. Вариант «Как в системе» следует настройке устройства."
 
 #: src/components/discovered-attributes.tsx
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/sdk-inventory.tsx
@@ -2182,6 +2319,7 @@ msgstr "соответствует шаблону"
 msgid "Maximum token lifetime"
 msgstr "Наибольший срок действия токена"
 
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Me ({myName})"
 msgstr "Я ({myName})"
@@ -2249,6 +2387,7 @@ msgstr "Переместить правило {position} ниже"
 msgid "Move rule {position} up"
 msgstr "Переместить правило {position} выше"
 
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/sdk-keys.tsx
@@ -2273,6 +2412,10 @@ msgstr "Название изменено: было «{before}», стало «{
 #: src/components/search-field.tsx
 msgid "Name or email"
 msgstr "Имя или адрес почты"
+
+#: src/components/experiment-fields.tsx
+msgid "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _. It never changes."
+msgstr "Имя эксперимента в правилах и в показах, которые присылают SDK: буквы, цифры, ., - и _. Никогда не меняется."
 
 #: src/lib/access.ts
 msgid "Needs the permission to {name}, held by {list}."
@@ -2305,6 +2448,11 @@ msgstr "Новый атрибут"
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "New environment"
 msgstr "Новое окружение"
+
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "New experiment"
+msgstr "Новый эксперимент"
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -2342,6 +2490,7 @@ msgid "Newest entries"
 msgstr "Самые новые записи"
 
 #: src/components/flag-history.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Next"
 msgstr "Далее"
@@ -2357,6 +2506,10 @@ msgstr "Без условий: подходит любой контекст."
 #: src/components/audit-log.tsx
 msgid "No entry matches these filters."
 msgstr "Нет записей, подходящих под эти фильтры."
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "No experiment matches these filters."
+msgstr "Под эти фильтры не подходит ни один эксперимент."
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "No flag matches these filters."
@@ -2410,6 +2563,10 @@ msgstr "Проектов пока нет"
 #: src/components/tester-panel.tsx
 msgid "No rule matched: the fallthrough variation is served."
 msgstr "Ни одно правило не совпало: отдаётся вариант без совпадений."
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "No rule serves it"
+msgstr "Ни одно правило его не отдаёт"
 
 #: src/components/rule-editor.tsx
 msgid "No rules: every context receives the fallthrough variation."
@@ -2560,6 +2717,10 @@ msgstr "Объект с таким ключом уже существует."
 msgid "Only {name} creates their tokens. Project tokens they created belong to their projects, not to them."
 msgstr "Свои токены создаёт только сам участник {name}. Созданные им токены проектов принадлежат проектам, а не ему."
 
+#: src/lib/problem-messages.ts
+msgid "Only a draft experiment can be changed this way."
+msgstr "Так можно изменить только черновик эксперимента."
+
 #: src/lib/flag-detail.ts
 msgid "Only a draft or running experiment can be served."
 msgstr "Подключить можно только черновик или запущенный эксперимент."
@@ -2630,8 +2791,10 @@ msgid "Overview"
 msgstr "Обзор"
 
 #. The name of a built-in role.
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/lib/access-names.ts
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -2649,6 +2812,10 @@ msgstr "Страница не найдена"
 #: src/components/audit-log.tsx
 msgid "Pages of entries"
 msgstr "Страницы записей"
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Pages of experiments"
+msgstr "Страницы экспериментов"
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Pages of flags"
@@ -2728,6 +2895,7 @@ msgstr "Удалено предусловие: <0>{flag}</0> отдаёт <1>{be
 msgid "Prerequisites"
 msgstr "Предусловия"
 
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Press Enter after each tag."
@@ -2738,6 +2906,7 @@ msgid "Press Enter after each value."
 msgstr "Нажимайте Enter после каждого значения."
 
 #: src/components/flag-history.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Previous"
 msgstr "Назад"
@@ -2862,6 +3031,7 @@ msgstr "Сменить соль?"
 
 #: src/components/conflict-banner.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Reload and lose my edits"
 msgstr "Перезагрузить, потеряв мои правки"
@@ -2911,6 +3081,7 @@ msgid "Remove unit {n}"
 msgstr "Удалить единицу {n}"
 
 #: src/components/variations-editor.tsx
+#: src/components/weights-input.tsx
 msgid "Remove variation {n}"
 msgstr "Удалить вариант {n}"
 
@@ -3127,6 +3298,10 @@ msgstr "Правила"
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Rules of these flags use the segment and evaluate by what it holds once saved:"
 msgstr "Правила этих флагов используют сегмент и после сохранения вычисляются по его новому содержимому:"
+
+#: src/lib/experiments.ts
+msgid "Running"
+msgstr "Запущен"
 
 #: src/components/tester-panel.tsx
 msgid "Salt"
@@ -3380,6 +3555,10 @@ msgstr "На сервере что-то пошло не так."
 msgid "Sort by"
 msgstr "Сортировка"
 
+#: src/components/weights-input.tsx
+msgid "Split evenly"
+msgstr "Поровну"
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Standard"
 msgstr "Стандартный"
@@ -3388,6 +3567,7 @@ msgstr "Стандартный"
 msgid "Standard attributes are part of every project, so they cannot be deleted."
 msgstr "Стандартные атрибуты есть в каждом проекте, поэтому их нельзя удалить."
 
+#: src/lib/experiments.ts
 #: src/lib/flags.ts
 msgid "Start with a letter; then letters, digits, ., - and _, at most 128 in all."
 msgstr "Начните с буквы; дальше буквы, цифры, ., - и _, всего не более 128."
@@ -3408,8 +3588,17 @@ msgstr "Состояние"
 #: src/components/sdk-keys.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Status"
 msgstr "Статус"
+
+#: src/components/structural-diff-view.tsx
+msgid "Status changed from {before} to {after}."
+msgstr "Статус изменён: был «{before}», стал «{after}»."
+
+#: src/lib/experiments.ts
+msgid "Stopped"
+msgstr "Остановлен"
 
 #. An attribute type.
 #: src/lib/attribute-types.ts
@@ -3456,6 +3645,7 @@ msgctxt "theme"
 msgid "System"
 msgstr "Как в системе"
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Tag"
 msgstr "Тег"
@@ -3468,7 +3658,9 @@ msgstr "Добавлен тег <0>{tag}</0>."
 msgid "Tag removed: <0>{tag}</0>."
 msgstr "Удалён тег <0>{tag}</0>."
 
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -3553,6 +3745,10 @@ msgstr "В истории конфигурации в этом окружени�
 msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
 msgstr "Язык консоли на всех устройствах, где вы входите. «Как в браузере» — первый из языков браузера, который есть в консоли."
 
+#: src/components/experiment-fields.tsx
+msgid "The day the experiment is expected to have its answer."
+msgstr "День, к которому эксперимент должен дать ответ."
+
 #: src/components/flag-definition-sheet.tsx
 msgid "The definition is saved."
 msgstr "Определение сохранено."
@@ -3584,6 +3780,34 @@ msgstr "В окружении уже 10 действующих ключей эт
 #: src/components/compare-environments.tsx
 msgid "The environments serve differently where marked."
 msgstr "Окружения отдают разное там, где отмечено."
+
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+msgid "The experiment {key} is created."
+msgstr "Эксперимент {key} создан."
+
+#: src/lib/experiments.ts
+msgid "The experiment is archived: nothing about it changes any more."
+msgstr "Эксперимент в архиве: в нём больше ничего не меняется."
+
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+msgid "The experiment is created as a draft: nothing changes for users until a rule serves it and it starts."
+msgstr "Эксперимент создаётся черновиком: для пользователей ничего не меняется, пока его не отдаёт правило и он не запущен."
+
+#: src/lib/problem-messages.ts
+msgid "The experiment is running: its flag, unit type and weights no longer change."
+msgstr "Эксперимент запущен: его флаг, тип единицы и веса больше не меняются."
+
+#: src/lib/experiments.ts
+msgid "The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid, and its traffic allocation can only grow, so no included unit ever leaves."
+msgstr "Эксперимент запущен: флаг, тип единицы и веса остаются как при запуске, чтобы сравнение оставалось честным, а охват можно только увеличивать, чтобы ни одна попавшая в него единица не выбыла."
+
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "The experiment is saved."
+msgstr "Эксперимент сохранён."
+
+#: src/lib/experiments.ts
+msgid "The experiment is stopped: only its name, hypothesis, owner, tags and expected end date still change."
+msgstr "Эксперимент остановлен: менять можно только название, гипотезу, владельца, теги и ожидаемое окончание."
 
 #: src/components/auth-settings-form.tsx
 msgid "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
@@ -3623,10 +3847,16 @@ msgstr "Флаг не удалось вычислить."
 
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
+#: src/lib/experiments.ts
 #: src/lib/flag-detail.ts
+#: src/lib/problem-messages.ts
 #: src/lib/rule-editor.ts
 msgid "The flag has no such variation."
 msgstr "У флага нет такого варианта."
+
+#: src/lib/problem-messages.ts
+msgid "The flag is archived; choose one that is not."
+msgstr "Флаг в архиве; выберите неархивный."
 
 #: src/components/flag-history.tsx
 #: src/lib/problem-messages.ts
@@ -3641,6 +3871,10 @@ msgstr "Флаг создаётся выключенным во всех окр�
 #: src/components/tester-panel.tsx
 msgid "The flag is off here: the off variation is served."
 msgstr "Здесь флаг выключен: отдаётся вариант при выключении."
+
+#: src/components/experiment-fields.tsx
+msgid "The flag whose variations the experiment compares."
+msgstr "Флаг, варианты которого сравнивает эксперимент."
 
 #: src/lib/flag-detail.ts
 msgid "The flags would require each other in a cycle: {path}."
@@ -3661,6 +3895,10 @@ msgstr "Тайм-аут бездействия не может быть боль
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
 msgstr "Виды единиц, которым отдаётся флаг, например пользователь или устройство. Ключ не должен совпадать с ключами атрибутов и никогда не меняется."
+
+#: src/components/experiment-fields.tsx
+msgid "The member accountable for the experiment."
+msgstr "Участник, отвечающий за эксперимент."
 
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
@@ -3727,6 +3965,10 @@ msgstr "Пароль не должен содержать ваш адрес эл
 msgid "The passwords do not match."
 msgstr "Пароли не совпадают."
 
+#: src/lib/problem-messages.ts
+msgid "The project declares no such unit type."
+msgstr "В проекте нет такого типа единицы."
+
 #: src/lib/conditions.ts
 #: src/lib/flag-detail.ts
 #: src/lib/tester.ts
@@ -3741,6 +3983,10 @@ msgstr "В проекте не объявлен такой тип единицы
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
 msgid "The project has no environment with this key. It may have been deleted."
 msgstr "В проекте нет окружения с таким ключом. Возможно, его удалили."
+
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "The project has no experiment with this key. It may have been deleted."
+msgstr "В проекте нет эксперимента с таким ключом. Возможно, его удалили."
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "The project has no flag with this key. It may have been deleted."
@@ -3760,6 +4006,7 @@ msgid "The project has no such flag, or it is archived."
 msgstr "В проекте нет такого флага, или он в архиве."
 
 #: src/lib/flag-detail.ts
+#: src/lib/problem-messages.ts
 msgid "The project has no such flag."
 msgstr "В проекте нет такого флага."
 
@@ -3854,6 +4101,10 @@ msgstr "Сервер недоступен. Попробуйте ещё раз ч
 msgid "The session is revoked."
 msgstr "Сеанс отозван."
 
+#: src/components/experiment-fields.tsx
+msgid "The share of units included in the experiment; the others get what the flag's other rules serve."
+msgstr "Доля единиц, попадающих в эксперимент; остальные получают то, что отдают другие правила флага."
+
 #: src/components/sdk-keys.tsx
 msgid "The sites the key may be used from, such as https://app.example.com. Leave it empty to allow any origin."
 msgstr "Сайты, откуда можно использовать ключ, например https://app.example.com. Оставьте пустым, чтобы разрешить любой источник."
@@ -3886,6 +4137,15 @@ msgstr "Значение вне допустимого диапазона."
 msgid "The values the flag can serve. A key names a variation in rules and results; a name defaults to the key."
 msgstr "Значения, которые может отдавать флаг. Ключ называет вариант в правилах и результатах; название по умолчанию равно ключу."
 
+#: src/lib/problem-messages.ts
+msgid "The weights must sum to 100.00 %."
+msgstr "Сумма весов должна быть 100,00 %."
+
+#: src/lib/experiments.ts
+msgid "The weights sum to {sum} %; they must sum to {whole} %."
+msgstr "Сумма весов {sum} %, а должна быть {whole} %."
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "The whole tag"
 msgstr "Тег целиком"
@@ -4026,9 +4286,17 @@ msgstr "В этом проекте уже есть тип единицы или 
 msgid "This project already has an environment with that key."
 msgstr "В этом проекте уже есть окружение с таким ключом."
 
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+msgid "This project already has an experiment with that key."
+msgstr "В проекте уже есть эксперимент с таким ключом."
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "This project has no attribute yet."
 msgstr "В этом проекте пока нет атрибутов."
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "This project has no experiment yet."
+msgstr "В проекте пока нет экспериментов."
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "This project has no flag yet."
@@ -4115,6 +4383,22 @@ msgstr "Слишком много попыток входа из вашей се
 msgid "Too many."
 msgstr "Слишком много."
 
+#: src/components/weights-input.tsx
+msgid "Total: —"
+msgstr "Сумма: —"
+
+#: src/components/weights-input.tsx
+msgid "Total: {totalText} %"
+msgstr "Сумма: {totalText} %"
+
+#: src/components/experiment-fields.tsx
+msgid "Traffic allocation (%)"
+msgstr "Охват (%)"
+
+#: src/components/structural-diff-view.tsx
+msgid "Traffic allocation changed from {before} % to {after} %."
+msgstr "Охват изменён: был {before} %, стал {after} %."
+
 #: src/components/navigation.tsx
 #: src/components/query-error.tsx
 msgid "Try again"
@@ -4157,6 +4441,7 @@ msgid "Unit of the session idle timeout"
 msgstr "Единица тайм-аута бездействия сеанса"
 
 #. A kind of entity in the audit log.
+#: src/components/experiment-fields.tsx
 #: src/components/overrides-section.tsx
 #: src/lib/audit.ts
 msgid "Unit type"
@@ -4169,6 +4454,10 @@ msgstr "Тип единицы (правило {position})"
 #: src/components/tester-panel.tsx
 msgid "Unit type (unit {n})"
 msgstr "Тип единицы (единица {n})"
+
+#: src/components/structural-diff-view.tsx
+msgid "Unit type changed from <0>{before}</0> to <1>{after}</1>."
+msgstr "Тип единицы изменён: был <0>{before}</0>, стал <1>{after}</1>."
 
 #: src/lib/audit.ts
 msgid "Unit type declared"
@@ -4265,6 +4554,7 @@ msgid "Variation (rule {position})"
 msgstr "Вариант (правило {position})"
 
 #: src/components/variations-editor.tsx
+#: src/components/weights-input.tsx
 msgid "Variation {n}"
 msgstr "Вариант {n}"
 
@@ -4287,6 +4577,10 @@ msgstr "Вариант <0>{key}</0> отдаёт <1/> вместо <2/>."
 #: src/components/variations-editor.tsx
 msgid "Variations"
 msgstr "Варианты"
+
+#: src/components/weights-input.tsx
+msgid "Variations and weights"
+msgstr "Варианты и веса"
 
 #: src/components/structural-diff-view.tsx
 msgid "Variations reordered: <0>{order}</0>."
@@ -4313,6 +4607,14 @@ msgstr "просматривать проект"
 msgid "Viewer"
 msgstr "Наблюдатель"
 
+#: src/components/weights-input.tsx
+msgid "Weight of variation {n} (%)"
+msgstr "Вес варианта {n} (%)"
+
+#: src/components/structural-diff-view.tsx
+msgid "Weights changed to <0>{weights}</0>."
+msgstr "Веса изменены на <0>{weights}</0>."
+
 #: src/routes/_signed-in/index.tsx
 msgid "Welcome, {name}. Choose a project to work in."
 msgstr "Здравствуйте, {name}. Выберите проект для работы."
@@ -4324,6 +4626,10 @@ msgstr "Что есть у участника {name}"
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
 msgstr "То, что таргетинг знает о единице. Стандартные атрибуты есть в каждом проекте: их можно переименовать, но не удалить. Тип после объявления не меняется."
+
+#: src/components/experiment-fields.tsx
+msgid "What the experiment expects to find, written before it runs."
+msgstr "Что эксперимент должен показать; пишется до запуска."
 
 #: src/components/compare-environments.tsx
 msgid "What the flag serves in two environments, judged by what SDKs receive: rule descriptions and override notes do not count."
@@ -4353,6 +4659,14 @@ msgstr "Откуда проект отдаёт значения. Ключ пос
 msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
 msgstr "Не удалось узнать, какие флаги используют сегмент; правила тех, что используют, после сохранения вычисляются по его новому содержимому."
 
+#: src/lib/experiments.ts
+msgid "While the experiment runs its allocation can only grow, from {from} %."
+msgstr "Пока эксперимент запущен, охват можно только увеличивать, от {from} %."
+
+#: src/components/experiment-fields.tsx
+msgid "Whose units are split: users, accounts, devices."
+msgstr "Чьи единицы делятся: пользователи, аккаунты, устройства."
+
 #: src/components/overrides-section.tsx
 msgid "Why the unit has this override, such as the test it is for. Never sent to SDKs."
 msgstr "Зачем у единицы это переопределение, например для какого теста. В SDK не передаётся."
@@ -4360,6 +4674,10 @@ msgstr "Зачем у единицы это переопределение, на
 #: src/components/compare-environments.tsx
 msgid "With"
 msgstr "С"
+
+#: src/lib/experiments.ts
+msgid "Write the hypothesis: an experiment starts only with one."
+msgstr "Напишите гипотезу: без неё эксперимент не запустится."
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Yes"

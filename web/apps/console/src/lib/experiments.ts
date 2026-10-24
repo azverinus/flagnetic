@@ -5,12 +5,14 @@ import {
   type ExperimentWeight,
   type Flag,
   type ListExperimentsData,
+  zExperimentCreate,
   zExperimentStatus,
 } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
-import { dayOf, startOfDay } from "./flags";
+import { tagsSchema } from "./flags";
+import { nameSchema } from "./forms";
 
 /** The basis points of a whole: weights and traffic allocations are written in them. */
 export const wholeBasisPoints = 10_000;
@@ -282,7 +284,7 @@ export type ExperimentValues = {
   variations: WeightDraft[];
   /** A percentage, as the weights are. */
   traffic_allocation: string;
-  /** A day, YYYY-MM-DD, in the member's time zone. */
+  /** A day, YYYY-MM-DD, as the API takes it. */
   expected_end_at: string;
 };
 
@@ -298,7 +300,7 @@ export function experimentValues(i18n: I18n, experiment: Experiment): Experiment
     unit_type: experiment.unit_type,
     variations: weightDrafts(i18n, experiment.variations),
     traffic_allocation: percentText(i18n, experiment.traffic_allocation),
-    expected_end_at: experiment.expected_end_at ? dayOf(experiment.expected_end_at) : "",
+    expected_end_at: experiment.expected_end_at ?? "",
   };
 }
 
@@ -332,8 +334,98 @@ export function experimentPatchOf(base: Experiment, values: ExperimentValues): E
     patch.traffic_allocation = allocation;
   }
   const day = values.expected_end_at;
-  if (day !== "" && (base.expected_end_at === null || dayOf(base.expected_end_at) !== day)) {
-    patch.expected_end_at = startOfDay(day);
-  }
+  if (day !== "" && day !== base.expected_end_at) patch.expected_end_at = day;
   return patch;
+}
+
+/** The fields whose refusals the experiment form shows under them, by their pointers. */
+export const experimentFieldPointer =
+  /^\/(key|name|hypothesis|owner|tags(\/\d+)?|flag|unit_type|variations(\/\d+\/(variation|weight))?|traffic_allocation|expected_end_at)$/;
+
+/** The longest hypothesis the API keeps. */
+const hypothesisRule = zExperimentCreate.shape.hypothesis.unwrap();
+
+export type ExperimentIssues = {
+  /** What is wrong with each field but the weights, by the field's name. */
+  fields: Map<ExperimentField | "key", string>;
+  weights: { rows: WeightIssue[]; total: string | undefined };
+  any: boolean;
+};
+
+/**
+ * What keeps the form from being saved: everything the server refuses
+ * and everything a start needs, so a saved draft can always start. A
+ * field the experiment's status locks is not judged, since it is not
+ * sent; an experiment already saved (`base`) has a key that never changes,
+ * and while it runs its allocation can only grow.
+ */
+export function experimentIssues(
+  i18n: I18n,
+  values: ExperimentValues,
+  context: { variations: readonly string[]; base?: Experiment },
+): ExperimentIssues {
+  const { base } = context;
+  const locked = lockedFields(base?.status ?? "draft");
+  const fields = new Map<ExperimentField | "key", string>();
+  const open = (field: ExperimentField) => !locked.has(field);
+
+  if (!base && !zExperimentCreate.shape.key.safeParse(values.key.trim()).success) {
+    fields.set(
+      "key",
+      i18n._(msg`Start with a letter; then letters, digits, ., - and _, at most 128 in all.`),
+    );
+  }
+  if (open("name")) {
+    const name = nameSchema(i18n).safeParse(values.name);
+    if (!name.success) fields.set("name", name.error.issues[0]?.message ?? "");
+  }
+  if (open("hypothesis")) {
+    const hypothesis = values.hypothesis.trim();
+    if (hypothesis === "") {
+      fields.set(
+        "hypothesis",
+        i18n._(msg`Write the hypothesis: an experiment starts only with one.`),
+      );
+    } else if (!hypothesisRule.safeParse(hypothesis).success) {
+      const max = hypothesisRule.maxLength ?? 0;
+      fields.set("hypothesis", i18n._(msg`At most ${max} characters.`));
+    }
+  }
+  if (open("tags")) {
+    const tags = tagsSchema(i18n).safeParse(values.tags);
+    if (!tags.success) fields.set("tags", tags.error.issues[0]?.message ?? "");
+  }
+  if (open("flag") && values.flag === "") fields.set("flag", i18n._(msg`Choose a flag.`));
+  if (open("unit_type") && values.unit_type === "") {
+    fields.set("unit_type", i18n._(msg`Choose a unit type.`));
+  }
+  if (open("traffic_allocation")) {
+    const allocation = parsePercent(values.traffic_allocation);
+    if (allocation === undefined) {
+      fields.set(
+        "traffic_allocation",
+        i18n._(msg`Enter a percentage from 0 to 100, at most two decimals.`),
+      );
+    } else if (base?.status === "running" && allocation < base.traffic_allocation) {
+      const from = percentText(i18n, base.traffic_allocation);
+      fields.set(
+        "traffic_allocation",
+        i18n._(msg`While the experiment runs its allocation can only grow, from ${from} %.`),
+      );
+    }
+  }
+  if (open("expected_end_at") && values.expected_end_at === "") {
+    fields.set(
+      "expected_end_at",
+      i18n._(msg`Choose the day the experiment is expected to end: it starts only with one.`),
+    );
+  }
+  const weights = open("variations")
+    ? weightIssues(i18n, values.variations, context.variations)
+    : { rows: [], total: undefined };
+  return {
+    fields,
+    weights,
+    any: fields.size > 0 || weights.rows.length > 0 || weights.total !== undefined,
+  };
 }

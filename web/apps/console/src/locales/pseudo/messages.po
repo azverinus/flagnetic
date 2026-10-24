@@ -233,6 +233,7 @@ msgid "A key never changes once it is set."
 msgstr ""
 
 #: src/lib/project-members.ts
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "A member without a grant here"
 msgstr ""
@@ -296,6 +297,10 @@ msgstr ""
 
 #: src/components/tester-panel.tsx
 msgid "A rule's rollout served: the unit's bucket is below its percentage."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "A running experiment's traffic allocation can only grow."
 msgstr ""
 
 #: src/components/segment-fields.tsx
@@ -449,6 +454,7 @@ msgid "Add unit"
 msgstr ""
 
 #: src/components/variations-editor.tsx
+#: src/components/weights-input.tsx
 msgid "Add variation"
 msgstr ""
 
@@ -481,6 +487,10 @@ msgstr ""
 msgid "An attribute's type is fixed once it is declared."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "An experiment starts as a draft and changes nothing until it is started."
+msgstr ""
+
 #: src/components/member-actions.tsx
 msgid "An instance admin administers every project, every member and the instance's settings."
 msgstr ""
@@ -505,6 +515,10 @@ msgstr ""
 msgid "Another member already has this email address."
 msgstr ""
 
+#: src/lib/experiments.ts
+msgid "Another row has this variation."
+msgstr ""
+
 #: src/lib/flags.ts
 msgid "Another variation has this key."
 msgstr ""
@@ -518,16 +532,25 @@ msgstr ""
 msgid "Any environments"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Any flag"
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 msgid "Any origin"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any owner"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any state"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Any status"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -590,6 +613,7 @@ msgstr ""
 msgid "Archive the flag first; only an archived flag can be deleted."
 msgstr ""
 
+#: src/lib/experiments.ts
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archived"
 msgstr ""
@@ -607,6 +631,7 @@ msgstr ""
 msgid "At least 12 characters, or as many as this instance asks for. Length is what makes a password hard to guess."
 msgstr ""
 
+#: src/lib/experiments.ts
 #: src/lib/problem-messages.ts
 msgid "At most {max} characters."
 msgstr ""
@@ -796,6 +821,10 @@ msgid "Changes to the definition"
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
+msgid "Changes to the experiment"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
 msgid "Changes to the segment"
 msgstr ""
 
@@ -808,12 +837,18 @@ msgid "Checked top to bottom; the first whose conditions all hold serves. Reorde
 msgstr ""
 
 #: src/components/condition-row.tsx
+#: src/components/experiment-fields.tsx
 #: src/components/prerequisites-section.tsx
 msgid "Choose a flag"
 msgstr ""
 
+#: src/components/experiment-fields.tsx
+msgid "Choose a flag to set the weights of its variations."
+msgstr ""
+
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
+#: src/lib/experiments.ts
 msgid "Choose a flag."
 msgstr ""
 
@@ -864,10 +899,12 @@ msgstr ""
 msgid "Choose a type."
 msgstr ""
 
+#: src/components/experiment-fields.tsx
 #: src/components/rule-editor.tsx
 msgid "Choose a unit type"
 msgstr ""
 
+#: src/lib/experiments.ts
 #: src/lib/rule-editor.ts
 msgid "Choose a unit type."
 msgstr ""
@@ -875,11 +912,13 @@ msgstr ""
 #: src/components/condition-row.tsx
 #: src/components/prerequisites-section.tsx
 #: src/components/rule-editor.tsx
+#: src/components/weights-input.tsx
 msgid "Choose a variation"
 msgstr ""
 
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
+#: src/lib/experiments.ts
 #: src/lib/rule-editor.ts
 msgid "Choose a variation."
 msgstr ""
@@ -913,6 +952,10 @@ msgstr ""
 msgid "Choose one of the offered types."
 msgstr ""
 
+#: src/lib/experiments.ts
+msgid "Choose the day the experiment is expected to end: it starts only with one."
+msgstr ""
+
 #: src/lib/conditions.ts
 #: src/lib/tester.ts
 msgid "Choose true or false."
@@ -927,6 +970,7 @@ msgid "Chosen tags"
 msgstr ""
 
 #: src/components/audit-log.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Clear filters"
@@ -957,6 +1001,14 @@ msgstr ""
 
 #: src/components/compare-environments.tsx
 msgid "Compare"
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "Compare {minVariations} to {maxVariations} variations."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Compare 2 to 50 variations."
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -1045,12 +1097,20 @@ msgstr ""
 msgid "Copy configuration"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Could not be read"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Create attribute"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "Create environment"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+msgid "Create experiment"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
@@ -1271,8 +1331,20 @@ msgstr ""
 msgid "Download ruleset"
 msgstr ""
 
+#: src/lib/experiments.ts
+msgid "Draft"
+msgstr ""
+
 #: src/components/rule-editor.tsx
 msgid "Drag rule {position}"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Each experiment compares variations of one flag over the units of one unit type; a flag's rule serves it in the environments that hold it."
+msgstr ""
+
+#: src/components/weights-input.tsx
+msgid "Each variation's share of the units the traffic allocation includes; the shares sum to 100.00 %."
 msgstr ""
 
 #: src/components/member-actions.tsx
@@ -1371,6 +1443,11 @@ msgstr ""
 msgid "Enter a pattern in RE2 syntax, which has no look-around or back-references."
 msgstr ""
 
+#: src/lib/experiments.ts
+#: src/lib/problem-messages.ts
+msgid "Enter a percentage from 0 to 100, at most two decimals."
+msgstr ""
+
 #: src/lib/rule-editor.ts
 msgid "Enter a percentage from 0 to 100, to two decimal places."
 msgstr ""
@@ -1401,6 +1478,10 @@ msgstr ""
 
 #: src/components/member-form.tsx
 msgid "Enter an email address."
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "Enter every weight to see the total."
 msgstr ""
 
 #: src/lib/variations.ts
@@ -1560,6 +1641,15 @@ msgstr ""
 msgid "Expand the sidebar"
 msgstr ""
 
+#: src/components/experiment-fields.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Expected end"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
+msgid "Expected end changed from {before} to {after}."
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Expected removal"
@@ -1567,6 +1657,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Expected removal changed from {before} to {after}."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Experiment"
 msgstr ""
 
 #: src/lib/audit.ts
@@ -1581,12 +1675,22 @@ msgstr ""
 msgid "Experiment deleted"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "Experiment not found"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Experiment salts regenerated"
 msgstr ""
 
 #: src/lib/audit.ts
 msgid "Experiment updated"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+#: src/routes/_signed-in/projects/$project/experiments/route.tsx
+msgid "Experiments"
 msgstr ""
 
 #: src/components/token-list.tsx
@@ -1621,6 +1725,10 @@ msgstr ""
 msgid "Filter the audit log"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Filter the experiments"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Filter the flags"
 msgstr ""
@@ -1635,6 +1743,7 @@ msgid "First seen"
 msgstr ""
 
 #: src/components/configuration-editor.tsx
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Fix what is marked above before saving."
 msgstr ""
@@ -1649,7 +1758,9 @@ msgid "Fixed once the project is created, since SDKs and scripts use it."
 msgstr ""
 
 #. A kind of entity in the audit log.
+#: src/components/experiment-fields.tsx
 #: src/lib/audit.ts
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Flag"
 msgstr ""
@@ -1664,6 +1775,10 @@ msgstr ""
 
 #: src/lib/audit.ts
 msgid "Flag archived"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
+msgid "Flag changed from <0>{before}</0> to <1>{after}</1>."
 msgstr ""
 
 #: src/lib/audit.ts
@@ -1715,6 +1830,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
 msgid "Go to the environments"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "Go to the experiments"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -1778,6 +1897,10 @@ msgstr ""
 msgid "History of the flag"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Holding environments"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "How code names the flag, such as checkout.newFlow: letters, digits, ., - and _. It never changes."
 msgstr ""
@@ -1796,6 +1919,14 @@ msgstr ""
 
 #: src/components/profile-form.tsx
 msgid "How the instance knows you. An instance admin can change it."
+msgstr ""
+
+#: src/components/experiment-fields.tsx
+msgid "Hypothesis"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
+msgid "Hypothesis changed."
 msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
@@ -1820,6 +1951,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "In what SDKs receive."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Include archived experiments"
 msgstr ""
 
 #. An audit entry that belongs to no project.
@@ -1957,6 +2092,7 @@ msgstr ""
 
 #: src/components/conflict-banner.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Keep my edits"
 msgstr ""
@@ -1970,6 +2106,7 @@ msgid "Kept in this browser, and used on the sign-in page too. System follows yo
 msgstr ""
 
 #: src/components/discovered-attributes.tsx
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/sdk-inventory.tsx
@@ -2182,6 +2319,7 @@ msgstr ""
 msgid "Maximum token lifetime"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Me ({myName})"
 msgstr ""
@@ -2249,6 +2387,7 @@ msgstr ""
 msgid "Move rule {position} up"
 msgstr ""
 
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/sdk-keys.tsx
@@ -2272,6 +2411,10 @@ msgstr ""
 
 #: src/components/search-field.tsx
 msgid "Name or email"
+msgstr ""
+
+#: src/components/experiment-fields.tsx
+msgid "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _. It never changes."
 msgstr ""
 
 #: src/lib/access.ts
@@ -2304,6 +2447,11 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 msgid "New environment"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "New experiment"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
@@ -2342,6 +2490,7 @@ msgid "Newest entries"
 msgstr ""
 
 #: src/components/flag-history.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Next"
 msgstr ""
@@ -2356,6 +2505,10 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "No entry matches these filters."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "No experiment matches these filters."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -2409,6 +2562,10 @@ msgstr ""
 
 #: src/components/tester-panel.tsx
 msgid "No rule matched: the fallthrough variation is served."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "No rule serves it"
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -2560,6 +2717,10 @@ msgstr ""
 msgid "Only {name} creates their tokens. Project tokens they created belong to their projects, not to them."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Only a draft experiment can be changed this way."
+msgstr ""
+
 #: src/lib/flag-detail.ts
 msgid "Only a draft or running experiment can be served."
 msgstr ""
@@ -2630,8 +2791,10 @@ msgid "Overview"
 msgstr ""
 
 #. The name of a built-in role.
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/lib/access-names.ts
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -2648,6 +2811,10 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "Pages of entries"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Pages of experiments"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -2728,6 +2895,7 @@ msgstr ""
 msgid "Prerequisites"
 msgstr ""
 
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Press Enter after each tag."
@@ -2738,6 +2906,7 @@ msgid "Press Enter after each value."
 msgstr ""
 
 #: src/components/flag-history.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Previous"
 msgstr ""
@@ -2862,6 +3031,7 @@ msgstr ""
 
 #: src/components/conflict-banner.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Reload and lose my edits"
 msgstr ""
@@ -2911,6 +3081,7 @@ msgid "Remove unit {n}"
 msgstr ""
 
 #: src/components/variations-editor.tsx
+#: src/components/weights-input.tsx
 msgid "Remove variation {n}"
 msgstr ""
 
@@ -3126,6 +3297,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Rules of these flags use the segment and evaluate by what it holds once saved:"
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "Running"
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -3380,6 +3555,10 @@ msgstr ""
 msgid "Sort by"
 msgstr ""
 
+#: src/components/weights-input.tsx
+msgid "Split evenly"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "Standard"
 msgstr ""
@@ -3388,6 +3567,7 @@ msgstr ""
 msgid "Standard attributes are part of every project, so they cannot be deleted."
 msgstr ""
 
+#: src/lib/experiments.ts
 #: src/lib/flags.ts
 msgid "Start with a letter; then letters, digits, ., - and _, at most 128 in all."
 msgstr ""
@@ -3408,7 +3588,16 @@ msgstr ""
 #: src/components/sdk-keys.tsx
 #: src/routes/_signed-in/admin/members/$member.tsx
 #: src/routes/_signed-in/admin/members/index.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Status"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
+msgid "Status changed from {before} to {after}."
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "Stopped"
 msgstr ""
 
 #. An attribute type.
@@ -3456,6 +3645,7 @@ msgctxt "theme"
 msgid "System"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Tag"
 msgstr ""
@@ -3468,7 +3658,9 @@ msgstr ""
 msgid "Tag removed: <0>{tag}</0>."
 msgstr ""
 
+#: src/components/experiment-fields.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -3553,6 +3745,10 @@ msgstr ""
 msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
 msgstr ""
 
+#: src/components/experiment-fields.tsx
+msgid "The day the experiment is expected to have its answer."
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 msgid "The definition is saved."
 msgstr ""
@@ -3583,6 +3779,34 @@ msgstr ""
 
 #: src/components/compare-environments.tsx
 msgid "The environments serve differently where marked."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+msgid "The experiment {key} is created."
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "The experiment is archived: nothing about it changes any more."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+msgid "The experiment is created as a draft: nothing changes for users until a rule serves it and it starts."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The experiment is running: its flag, unit type and weights no longer change."
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid, and its traffic allocation can only grow, so no included unit ever leaves."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "The experiment is saved."
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "The experiment is stopped: only its name, hypothesis, owner, tags and expected end date still change."
 msgstr ""
 
 #: src/components/auth-settings-form.tsx
@@ -3623,9 +3847,15 @@ msgstr ""
 
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
+#: src/lib/experiments.ts
 #: src/lib/flag-detail.ts
+#: src/lib/problem-messages.ts
 #: src/lib/rule-editor.ts
 msgid "The flag has no such variation."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The flag is archived; choose one that is not."
 msgstr ""
 
 #: src/components/flag-history.tsx
@@ -3640,6 +3870,10 @@ msgstr ""
 
 #: src/components/tester-panel.tsx
 msgid "The flag is off here: the off variation is served."
+msgstr ""
+
+#: src/components/experiment-fields.tsx
+msgid "The flag whose variations the experiment compares."
 msgstr ""
 
 #: src/lib/flag-detail.ts
@@ -3660,6 +3894,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The kinds of unit a flag is served to, such as a user or a device. A key is shared with the attributes and never changes."
+msgstr ""
+
+#: src/components/experiment-fields.tsx
+msgid "The member accountable for the experiment."
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
@@ -3727,6 +3965,10 @@ msgstr ""
 msgid "The passwords do not match."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "The project declares no such unit type."
+msgstr ""
+
 #: src/lib/conditions.ts
 #: src/lib/flag-detail.ts
 #: src/lib/tester.ts
@@ -3740,6 +3982,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
 msgid "The project has no environment with this key. It may have been deleted."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "The project has no experiment with this key. It may have been deleted."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -3760,6 +4006,7 @@ msgid "The project has no such flag, or it is archived."
 msgstr ""
 
 #: src/lib/flag-detail.ts
+#: src/lib/problem-messages.ts
 msgid "The project has no such flag."
 msgstr ""
 
@@ -3854,6 +4101,10 @@ msgstr ""
 msgid "The session is revoked."
 msgstr ""
 
+#: src/components/experiment-fields.tsx
+msgid "The share of units included in the experiment; the others get what the flag's other rules serve."
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 msgid "The sites the key may be used from, such as https://app.example.com. Leave it empty to allow any origin."
 msgstr ""
@@ -3886,6 +4137,15 @@ msgstr ""
 msgid "The values the flag can serve. A key names a variation in rules and results; a name defaults to the key."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "The weights must sum to 100.00 %."
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "The weights sum to {sum} %; they must sum to {whole} %."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "The whole tag"
 msgstr ""
@@ -4026,8 +4286,16 @@ msgstr ""
 msgid "This project already has an environment with that key."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
+msgid "This project already has an experiment with that key."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "This project has no attribute yet."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "This project has no experiment yet."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -4115,6 +4383,22 @@ msgstr ""
 msgid "Too many."
 msgstr ""
 
+#: src/components/weights-input.tsx
+msgid "Total: —"
+msgstr ""
+
+#: src/components/weights-input.tsx
+msgid "Total: {totalText} %"
+msgstr ""
+
+#: src/components/experiment-fields.tsx
+msgid "Traffic allocation (%)"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
+msgid "Traffic allocation changed from {before} % to {after} %."
+msgstr ""
+
 #: src/components/navigation.tsx
 #: src/components/query-error.tsx
 msgid "Try again"
@@ -4157,6 +4441,7 @@ msgid "Unit of the session idle timeout"
 msgstr ""
 
 #. A kind of entity in the audit log.
+#: src/components/experiment-fields.tsx
 #: src/components/overrides-section.tsx
 #: src/lib/audit.ts
 msgid "Unit type"
@@ -4168,6 +4453,10 @@ msgstr ""
 
 #: src/components/tester-panel.tsx
 msgid "Unit type (unit {n})"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
+msgid "Unit type changed from <0>{before}</0> to <1>{after}</1>."
 msgstr ""
 
 #: src/lib/audit.ts
@@ -4265,6 +4554,7 @@ msgid "Variation (rule {position})"
 msgstr ""
 
 #: src/components/variations-editor.tsx
+#: src/components/weights-input.tsx
 msgid "Variation {n}"
 msgstr ""
 
@@ -4286,6 +4576,10 @@ msgstr ""
 
 #: src/components/variations-editor.tsx
 msgid "Variations"
+msgstr ""
+
+#: src/components/weights-input.tsx
+msgid "Variations and weights"
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
@@ -4313,6 +4607,14 @@ msgstr ""
 msgid "Viewer"
 msgstr ""
 
+#: src/components/weights-input.tsx
+msgid "Weight of variation {n} (%)"
+msgstr ""
+
+#: src/components/structural-diff-view.tsx
+msgid "Weights changed to <0>{weights}</0>."
+msgstr ""
+
 #: src/routes/_signed-in/index.tsx
 msgid "Welcome, {name}. Choose a project to work in."
 msgstr ""
@@ -4323,6 +4625,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 msgid "What targeting reads about a unit. The standard attributes are in every project; they can be renamed but not deleted. A type never changes once declared."
+msgstr ""
+
+#: src/components/experiment-fields.tsx
+msgid "What the experiment expects to find, written before it runs."
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -4353,12 +4659,24 @@ msgstr ""
 msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
 msgstr ""
 
+#: src/lib/experiments.ts
+msgid "While the experiment runs its allocation can only grow, from {from} %."
+msgstr ""
+
+#: src/components/experiment-fields.tsx
+msgid "Whose units are split: users, accounts, devices."
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "Why the unit has this override, such as the test it is for. Never sent to SDKs."
 msgstr ""
 
 #: src/components/compare-environments.tsx
 msgid "With"
+msgstr ""
+
+#: src/lib/experiments.ts
+msgid "Write the hypothesis: an experiment starts only with one."
 msgstr ""
 
 #: src/routes/_signed-in/admin/members/$member.tsx

@@ -7,6 +7,7 @@ import { activateForTests } from "@/test/render";
 import {
   evenWeights,
   type ExperimentValues,
+  experimentIssues,
   experimentPatchOf,
   holdingEnvironments,
   isExperimentsFiltered,
@@ -193,7 +194,7 @@ describe("a saved experiment's patch", () => {
       { variation: "treatment", weight: 5000 },
     ],
     traffic_allocation: 10_000,
-    expected_end_at: new Date(2026, 11, 1).toISOString(),
+    expected_end_at: "2026-12-01",
   } as Experiment;
   const values: ExperimentValues = {
     key: "checkout-test",
@@ -236,7 +237,73 @@ describe("a saved experiment's patch", () => {
         { variation: "treatment", weight: 6000 },
       ],
       traffic_allocation: 2550,
-      expected_end_at: new Date(2026, 11, 15).toISOString(),
+      expected_end_at: "2026-12-15",
     });
+  });
+});
+
+describe("the experiment form's issues", () => {
+  const flagVariations = ["control", "treatment"];
+  const filled: ExperimentValues = {
+    key: "checkout-test",
+    name: "Checkout",
+    hypothesis: "Shorter wins.",
+    owner: "me",
+    tags: [],
+    flag: "checkout",
+    unit_type: "user",
+    variations: [
+      { variation: "control", weight: "50" },
+      { variation: "treatment", weight: "50" },
+    ],
+    traffic_allocation: "100",
+    expected_end_at: "2026-12-01",
+  };
+
+  it("are none for an experiment that can start", () => {
+    const issues = experimentIssues(i18n, filled, { variations: flagVariations });
+    expect([...issues.fields]).toEqual([]);
+    expect(issues.weights).toEqual({ rows: [], total: undefined });
+    expect(issues.any).toBe(false);
+  });
+
+  it("ask for everything a start needs", () => {
+    const issues = experimentIssues(
+      i18n,
+      {
+        ...filled,
+        key: "1st",
+        name: " ",
+        hypothesis: "",
+        flag: "",
+        unit_type: "",
+        traffic_allocation: "101",
+        expected_end_at: "",
+      },
+      { variations: [] },
+    );
+    expect(Object.fromEntries(issues.fields)).toEqual({
+      key: "Start with a letter; then letters, digits, ., - and _, at most 128 in all.",
+      name: "Enter a name.",
+      hypothesis: "Write the hypothesis: an experiment starts only with one.",
+      flag: "Choose a flag.",
+      unit_type: "Choose a unit type.",
+      traffic_allocation: "Enter a percentage from 0 to 100, at most two decimals.",
+      expected_end_at: "Choose the day the experiment is expected to end: it starts only with one.",
+    });
+    expect(issues.any).toBe(true);
+  });
+
+  it("refuse shrinking a running experiment's allocation and skip what its status locks", () => {
+    const base = { status: "running", traffic_allocation: 5000 } as Experiment;
+    const issues = experimentIssues(
+      i18n,
+      { ...filled, traffic_allocation: "40", variations: [] },
+      { variations: flagVariations, base },
+    );
+    expect(Object.fromEntries(issues.fields)).toEqual({
+      traffic_allocation: "While the experiment runs its allocation can only grow, from 50.00 %.",
+    });
+    expect(issues.weights).toEqual({ rows: [], total: undefined });
   });
 });

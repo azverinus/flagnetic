@@ -2,7 +2,7 @@ import { i18n } from "@lingui/core";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type WeightDraft, weightIssues } from "@/lib/experiments";
 import { activateForTests, renderWithProviders } from "@/test/render";
@@ -17,7 +17,11 @@ const variations = [
   { key: "other", name: "other" },
 ];
 
-let latest: WeightDraft[] = [];
+/** Every change the input made, the rows it changed them to. */
+const changes = vi.fn<(rows: WeightDraft[]) => void>();
+const latest = () => changes.mock.lastCall?.[0] ?? [];
+
+beforeEach(() => changes.mockClear());
 
 function Input({
   start,
@@ -29,12 +33,14 @@ function Input({
   disabled?: boolean;
 }) {
   const [rows, setRows] = useState(start);
-  latest = rows;
   const keys = variations.map((variation) => variation.key);
   return (
     <WeightsInput
       rows={rows}
-      onChange={setRows}
+      onChange={(next) => {
+        setRows(next);
+        changes(next);
+      }}
       variations={variations}
       issues={checked ? weightIssues(i18n, rows, keys) : undefined}
       disabled={disabled}
@@ -97,21 +103,21 @@ describe("the weights input", () => {
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Split evenly" }));
-    expect(latest.map((row) => row.weight)).toEqual(["33.34", "33.33", "33.33"]);
+    expect(latest().map((row) => row.weight)).toEqual(["33.34", "33.33", "33.33"]);
     expect(screen.getByText("Total: 100.00 %")).toBeInTheDocument();
   });
 
   it("adds a row for the next variation the flag has and none once every one is in", async () => {
     renderWithProviders(<Input start={half} />);
     await userEvent.click(screen.getByRole("button", { name: "Add variation" }));
-    expect(latest).toEqual([...half, { variation: "other", weight: "0.00" }]);
+    expect(latest()).toEqual([...half, { variation: "other", weight: "0.00" }]);
     expect(screen.getByRole("button", { name: "Add variation" })).toBeDisabled();
   });
 
   it("removes a row", async () => {
     renderWithProviders(<Input start={[...half, { variation: "other", weight: "0" }]} />);
     await userEvent.click(screen.getByRole("button", { name: "Remove variation 1" }));
-    expect(latest).toEqual([
+    expect(latest()).toEqual([
       { variation: "treatment", weight: "50.00" },
       { variation: "other", weight: "0" },
     ]);

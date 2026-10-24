@@ -19,6 +19,14 @@ export function formatInstant(i18n: I18n, value: Date | string): string {
   );
 }
 
+/** A calendar day (YYYY-MM-DD) as the member's language writes a date, the same day everywhere. */
+export function formatDay(i18n: I18n, day: string): string {
+  const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+  return new Intl.DateTimeFormat(i18n.locale, { dateStyle: "medium" }).format(
+    new Date(year, month - 1, date),
+  );
+}
+
 export function formatNumber(i18n: I18n, value: number): string {
   return new Intl.NumberFormat(i18n.locale).format(value);
 }

@@ -1,5 +1,7 @@
 import type {
   Condition,
+  Experiment,
+  ExperimentWeight,
   FlagConfiguration,
   FlagDefinition,
   Prerequisite,
@@ -442,6 +444,68 @@ export function diffNamed(before: NamedLike, after: NamedLike): NamedChange[] {
       before: before.description ?? "",
       after: after.description ?? "",
     });
+  }
+  return changes;
+}
+
+/** The parts of an experiment a member edits. */
+export type ExperimentLike = Pick<
+  Experiment,
+  | "name"
+  | "hypothesis"
+  | "owner"
+  | "tags"
+  | "flag"
+  | "unit_type"
+  | "variations"
+  | "traffic_allocation"
+  | "expected_end_at"
+  | "status"
+>;
+
+export type ExperimentChange =
+  | {
+      kind: "field";
+      field: "name" | "hypothesis" | "owner" | "flag" | "unit_type" | "expected_end_at" | "status";
+      before: string | null;
+      after: string | null;
+    }
+  | { kind: "traffic_allocation"; before: number; after: number }
+  | { kind: "weights"; after: ExperimentWeight[] }
+  | { kind: "tag"; change: "added" | "removed"; tag: string };
+
+/** What changed from one version of an experiment to another, field by field. */
+export function diffExperiments(before: ExperimentLike, after: ExperimentLike): ExperimentChange[] {
+  const changes: ExperimentChange[] = [];
+  const fields = [
+    "status",
+    "name",
+    "hypothesis",
+    "owner",
+    "flag",
+    "unit_type",
+    "expected_end_at",
+  ] as const;
+  for (const field of fields) {
+    if (before[field] !== after[field]) {
+      changes.push({ kind: "field", field, before: before[field], after: after[field] });
+    }
+  }
+  if (fingerprint(before.variations) !== fingerprint(after.variations)) {
+    changes.push({ kind: "weights", after: after.variations });
+  }
+  if (before.traffic_allocation !== after.traffic_allocation) {
+    changes.push({
+      kind: "traffic_allocation",
+      before: before.traffic_allocation,
+      after: after.traffic_allocation,
+    });
+  }
+  for (const tag of before.tags) {
+    if (!after.tags.includes(tag)) changes.push({ kind: "tag", change: "removed", tag });
+  }
+  for (const tag of after.tags) {
+    if (!before.tags.includes(tag)) changes.push({ kind: "tag", change: "added", tag });
   }
   return changes;
 }

@@ -11,6 +11,8 @@ export type TagsInputProps = {
   ref?: Ref<HTMLInputElement>;
   /** Called once the text input loses focus, after what was typed is added. */
   onBlur?: () => void;
+  /** Whether the tags can no longer change: nothing is added or removed. */
+  disabled?: boolean;
   /** Passed to the text input, so a `Field` names and describes it. */
   id?: string;
   "aria-describedby"?: string;
@@ -24,7 +26,7 @@ export type TagsInputProps = {
  * submits the form the field is in. Each tag carries a button that
  * removes it.
  */
-export function TagsInput({ value, onChange, onBlur, ...input }: TagsInputProps) {
+export function TagsInput({ value, onChange, onBlur, disabled, ...input }: TagsInputProps) {
   const { t } = useLingui();
   const [typed, setTyped] = useState("");
 
@@ -50,6 +52,7 @@ export function TagsInput({ value, onChange, onBlur, ...input }: TagsInputProps)
       className={cn(
         "flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-2 py-1 shadow-xs",
         input["aria-invalid"] && "border-destructive",
+        disabled && "cursor-not-allowed opacity-50",
       )}
     >
       {value.length > 0 ? (
@@ -63,6 +66,7 @@ export function TagsInput({ value, onChange, onBlur, ...input }: TagsInputProps)
               <button
                 type="button"
                 aria-label={t`Remove tag ${tag}`}
+                disabled={disabled}
                 className="rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                 onClick={() => onChange(value.filter((other) => other !== tag))}
               >
@@ -75,6 +79,7 @@ export function TagsInput({ value, onChange, onBlur, ...input }: TagsInputProps)
       <input
         {...input}
         autoComplete="off"
+        disabled={disabled}
         className="h-7 min-w-24 flex-1 rounded-sm bg-transparent px-1 text-sm"
         value={typed}
         onChange={(event) => setTyped(event.target.value)}
