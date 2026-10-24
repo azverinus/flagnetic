@@ -252,7 +252,10 @@ final class RulesetStream {
     }
     if (generation != _generation || _gone) {
       if (generation == _generation) _running = false;
-      unawaited(stream.body.drain<void>().catchError((Object _) {}));
+      // An answered stream never ends by itself: draining it would hold its
+      // connection until close, one more for every hide and show while a
+      // connect is pending, and a browser allows only a few per origin.
+      unawaited(stream.body.listen(null).cancel().catchError((Object _) {}));
       return;
     }
     if (stream.status != 200) {

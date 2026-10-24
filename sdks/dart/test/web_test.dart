@@ -174,6 +174,24 @@ void main() {
     await acceptBatch(beacon);
   });
 
+  test('a page closing after it was hidden beacons what came since', () async {
+    final (client, server) = await started();
+    await fresh(client, server);
+    showPage('hidden');
+    // Nothing queued yet: the hide has nothing to beacon.
+    client.alias(
+      fromUnitType: 'anonymous',
+      fromUnitId: 'd-8f1c',
+      toUnitType: 'user',
+      toUnitId: 'u-1001',
+    );
+    _window.dispatchEvent(_Event('pagehide'));
+    final beacon = await server.next(path: '/sdk/v1/events');
+    expect(beacon.query['sdk_key'], clientKey);
+    expect([for (final e in eventsOf(beacon)) e['type']], ['alias']);
+    await acceptBatch(beacon);
+  });
+
   test('the beacons stay within the quota; the rest goes later', () async {
     final server = await remote.startServer();
     final client = Flagnetic.client(

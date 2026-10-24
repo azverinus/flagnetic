@@ -141,14 +141,17 @@ final class Ingest {
   /// Follows the application: the interval runs while it is foregrounded,
   /// and going to the background flushes best effort: by beacon in a
   /// browser, where the page may be gone before a request is answered, and
-  /// by a request elsewhere.
+  /// by a request elsewhere. Every call to the background flushes, not only
+  /// the first: a page hidden and then closed has its last events
+  /// recorded in between.
   void setForeground({required bool foreground}) {
-    if (foreground == _foreground) return;
-    _foreground = foreground;
     if (foreground) {
+      if (_foreground) return;
+      _foreground = true;
       _arm();
       return;
     }
+    _foreground = false;
     _timer?.cancel();
     _timer = null;
     if (!_beacon()) unawaited(flush());
