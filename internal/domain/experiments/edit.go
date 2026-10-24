@@ -59,6 +59,12 @@ func (e Experiment) Change(ch Change, now time.Time) (Experiment, bool, error) {
 	}
 	if ch.Hypothesis != nil {
 		out.Hypothesis = c.hypothesis(*ch.Hypothesis)
+		// Starting requires a hypothesis, so that an experiment says what it
+		// tests for as long as it runs and after it stops; only a draft may
+		// be without one.
+		if out.Hypothesis == "" && e.Status != StatusDraft {
+			c.add("/hypothesis", "required", "an experiment past its draft says what it expects to find", nil)
+		}
 	}
 	if ch.Owner != nil && ch.Owner.Member != e.Owner {
 		out.Owner = c.owner(*ch.Owner)

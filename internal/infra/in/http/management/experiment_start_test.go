@@ -312,6 +312,11 @@ func TestARunningExperimentEditsItsDescriptionAndOnlyGrowsItsAllocation(t *testi
 	if !slices.Equal(fields, []string{"/unit_type frozen", "/variations frozen"}) {
 		t.Errorf("frozen violations = %v", fields)
 	}
+	blank := patchExperiment(t, f.admin, f.project.Key, "title_test", 3, management.ExperimentPatch{Hypothesis: ptr("")})
+	if got := violationsOf(t, "clearing the hypothesis", blank.StatusCode(), blank.Body, "invalid_experiment"); !slices.Equal(got,
+		[]string{"/hypothesis required"}) {
+		t.Errorf("violations = %v", got)
+	}
 	shrink := patchExperiment(t, f.admin, f.project.Key, "title_test", 3, management.ExperimentPatch{TrafficAllocation: ptr(6999)})
 	assertProblem(t, "shrinking the allocation", shrink.StatusCode(), shrink.Body, http.StatusConflict, "traffic_allocation_decrease")
 	for what, status := range map[string]int{
