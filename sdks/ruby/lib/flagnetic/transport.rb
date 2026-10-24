@@ -12,6 +12,10 @@ module Flagnetic
     # Response is the outcome of a ruleset fetch; body is decompressed.
     Response = Struct.new(:status, :body, keyword_init: true)
 
+    # EventsResponse is the outcome of an events POST; EventBatch classifies
+    # it. body is decompressed; retry_after is the raw header value.
+    EventsResponse = Struct.new(:status, :body, :retry_after, keyword_init: true)
+
     attr_reader :stream_uri, :timeout
 
     def initialize(sdk_key:, base_url:, platform:, timeout:)
@@ -21,9 +25,32 @@ module Flagnetic
 
       @ruleset_uri = URI("#{base}#{SDK_API_PATH}/ruleset")
       @stream_uri = URI("#{base}#{SDK_API_PATH}/stream")
+      @events_uri = URI("#{base}#{SDK_API_PATH}/events")
+      @platform = platform
       @sdk_key = sdk_key.to_s
       @user_agent = "flagnetic-ruby/#{VERSION} (#{platform})"
       @timeout = timeout
+    end
+
+    # identity is this SDK's entry in an events envelope's sdk member.
+    def identity
+      { "name" => "flagnetic-ruby", "version" => VERSION, "platform" => @platform }
+    end
+
+    # post_events POSTs a gzipped events batch and returns the raw
+    # response; EventBatch classifies it. It raises on network errors and
+    # timeouts, as fetch_ruleset does. timeout bounds this one call, so a
+    # flush bounded by a budget shorter than the client's own
+    # request_timeout still returns within it.
+    def post_events(gzipped_body, timeout = @timeout)
+      request = Net::HTTP::Post.new(@events_uri)
+      headers.each { |k, v| request[k] = v }
+      request["Content-Type"] = "application/json"
+      request["Content-Encoding"] = "gzip"
+      request["Flagnetic-Schema-Version"] = SCHEMA_VERSION_MAX.to_s
+      request.body = gzipped_body
+      response = http_for(@events_uri, timeout).start { |h| h.request(request) }
+      EventsResponse.new(status: response.code.to_i, body: response.body.to_s, retry_after: response["Retry-After"])
     end
 
     # fetch_ruleset GETs the ruleset, revalidating the held version with

@@ -30,10 +30,11 @@ module Flagnetic
     # the timing option exists for tests and is not part of the API.
     Timing = Struct.new(:request_timeout, :fetch_base, :fetch_cap, :unauthorized_cap, :stream_base, :stream_cap,
                         :stream_stable, :close_jitter, :silence, :poll_connected, :poll_down, :event_retries,
-                        keyword_init: true)
+                        :exposure_flush, :summary_flush, keyword_init: true)
     DEFAULT_TIMING = Timing.new(
       request_timeout: 10, fetch_base: 1, fetch_cap: 300, unauthorized_cap: 900, stream_base: 1, stream_cap: 30,
-      stream_stable: 60, close_jitter: 2, silence: 45, poll_connected: 300, poll_down: 30, event_retries: [1, 2, 4]
+      stream_stable: 60, close_jitter: 2, silence: 45, poll_connected: 300, poll_down: 30, event_retries: [1, 2, 4],
+      exposure_flush: 2, summary_flush: 60
     ).freeze
     MIN_POLL_INTERVAL = 30
     TYPES = %w[boolean string number json].freeze
@@ -58,10 +59,27 @@ module Flagnetic
     #   connected (default 300, at least 30).
     # - request_timeout: seconds per request (default 10).
     # - allow_overrides: enables local_overrides (logged as a warning).
-    # - platform: sent in User-Agent (default "server").
+    # - platform: sent in User-Agent and the events envelope, and an
+    #   exposure's platform where the context names none (default
+    #   "server").
+    # - app_version: the application's version, sent with every evaluation
+    #   summary and as an exposure's app_version where the context names
+    #   none.
+    # - flush_interval: seconds between flushes of the exposure and alias
+    #   queue (default 2); also how long one batch may be retried before
+    #   its events go back into the queue, and how long a repeat per
+    #   experiment, unit and variation is suppressed for.
+    # - summary_interval: seconds between evaluation summary reports
+    #   (default 60); also how long one report may be retried before its
+    #   window merges into the next.
+    # - send_summaries: false stops evaluation summaries from being counted
+    #   and sent (default true).
+    # - send_exposures: false stops exposure and alias from sending
+    #   anything (default true; logged as a warning at construction).
     def initialize(sdk_key = nil, base_url: nil, offline: nil, offline_file: nil, store: nil, logger: nil,
                    stream: true, poll_interval: 300, request_timeout: 10, allow_overrides: false,
-                   platform: "server", timing: nil)
+                   platform: "server", app_version: nil, flush_interval: 2, summary_interval: 60,
+                   send_summaries: true, send_exposures: true, timing: nil)
       if sdk_key.to_s.start_with?("fn_cli_")
         raise ArgumentError, "Flagnetic::Client is server mode and needs a server key (fn_srv_...); " \
                              "a client key (fn_cli_...) belongs to a client-mode SDK"
@@ -69,9 +87,14 @@ module Flagnetic
 
       @log = Logging.adapt(logger)
       @allow_overrides = allow_overrides
+      @send_summaries = send_summaries != false
+      @send_exposures = send_exposures != false
+      @platform = platform
+      @app_version = app_version&.to_s
       init_state
       log(:warn, :local_overrides_allowed) if allow_overrides
-      @timing = build_timing(poll_interval, request_timeout, timing)
+      log(:warn, :exposures_disabled) unless @send_exposures
+      @timing = build_timing(poll_interval, request_timeout, flush_interval, summary_interval, timing)
 
       if offline || offline_file
         start_offline(offline, offline_file)
@@ -96,12 +119,7 @@ module Flagnetic
     # int serves a number flag as an Integer for context, or default. A
     # served number that is not whole serves default with error
     # type_mismatch rather than a truncated value.
-    def int(key, default:, context: nil)
-      detail = serve(key, "number", default, context)
-      return detail.value if detail.reason == :fallback
-
-      whole(detail.value) || mismatch(nil, key.to_s, "number", "int", default).value
-    end
+    def int(key, default:, context: nil) = serve(key, "number", default, context, int: true).value
 
     # json serves a JSON flag's value, parsed and frozen, for context, or
     # default.
@@ -154,6 +172,10 @@ module Flagnetic
     # transition. Returns a callable that unregisters it.
     def on_stage(&block) = listen(@stage_listeners, block)
 
+    # recorder is the in-memory Recorder of an offline client, holding what
+    # it would have sent; nil online.
+    attr_reader :recorder
+
     # local_overrides manages substitutions of flag values inside this
     # process; see LocalOverrides.
     def local_overrides = LocalOverrides.new(self)
@@ -170,9 +192,55 @@ module Flagnetic
       true
     end
 
-    # close stops the stream and polling, waiting at most timeout seconds.
-    # Getters keep serving the held ruleset.
+    # exposure records that the unit described by context encountered the
+    # behaviour flag key serves: it looks up the most recent detail of key
+    # for context and sends an exposure only when it carries an experiment
+    # block; otherwise nothing is sent and exposure_skipped names why, at
+    # debug. A local override or a flag never evaluated with an experiment
+    # sends nothing. A repeat for the same experiment, unit and variation is
+    # suppressed for at least flush_interval seconds; the platform's own
+    # deduplication by event ID is what analysis relies on. It never raises.
+    def exposure(key, context: nil)
+      ensure_worker
+      @exposures&.exposure(context, key.to_s)
+      nil
+    rescue StandardError => e
+      log(:error, :evaluation_failed, flag: key.to_s, cause: "#{e.class}: #{e.message}")
+      nil
+    end
+
+    # alias records that two unit IDs belong to the same person, typically
+    # an anonymous ID and a user ID after sign-up. It changes no context:
+    # an experiment spanning sign-up keeps hashing on the unit type it
+    # declared, and the alias is what lets analysis join the two. It never
+    # raises.
+    def alias(from_unit_type, from_unit_id, to_unit_type, to_unit_id)
+      ensure_worker
+      @exposures&.add_alias(from_unit_type, from_unit_id, to_unit_type, to_unit_id)
+      nil
+    rescue StandardError => e
+      log(:error, :evaluation_failed, flag: "alias", cause: "#{e.class}: #{e.message}")
+      nil
+    end
+
+    # flush sends what is queued of exposures and aliases, then closes the
+    # window of evaluation counts and sends it as one or more evaluation
+    # summaries, waiting at most timeout seconds for the platform's answer.
+    # Nothing queued and nothing evaluated is nothing sent. An offline
+    # client hands both to its Recorder instead, at once. It never raises;
+    # events that fail stay queued and a window that fails merges into the
+    # next one.
+    def flush(timeout: 5)
+      do_flush(timeout)
+      true
+    end
+
+    # close flushes the queued exposures and aliases and the current window
+    # of evaluation counts within timeout seconds, then stops the stream
+    # and polling, waiting at most timeout seconds more. Getters keep
+    # serving the held ruleset.
     def close(timeout: 5)
+      do_flush(timeout) unless @closed
       worker = @fork_mutex.synchronize do
         @closed = true
         w = @worker
@@ -232,10 +300,12 @@ module Flagnetic
       @closed = false
     end
 
-    def build_timing(poll_interval, request_timeout, overrides)
+    def build_timing(poll_interval, request_timeout, flush_interval, summary_interval, overrides)
       Timing.new(**DEFAULT_TIMING.to_h,
                  poll_connected: [poll_interval, MIN_POLL_INTERVAL].max,
                  request_timeout: request_timeout,
+                 exposure_flush: flush_interval,
+                 summary_flush: summary_interval,
                  **overrides.to_h).freeze
     end
 
@@ -247,6 +317,8 @@ module Flagnetic
         else
           -> { document }
         end
+      @recorder = Recorder.new
+      build_reporters(nil, @recorder)
       begin
         load_offline
       rescue OfflineError => e
@@ -259,13 +331,42 @@ module Flagnetic
       @stream_enabled = stream
       @transport = Transport.new(sdk_key: sdk_key, base_url: base_url, platform: platform,
                                  timeout: @timing.request_timeout)
+      build_reporters(@transport, nil)
       @store = store && FileStore.new(store)
       load_store if @store
       @worker = Worker.new(self, @transport, @timing, stream: stream)
     end
 
+    # build_reporters constructs the evaluation summary counter and the
+    # exposure and alias queue, unless send_summaries or send_exposures
+    # turned either off, in which case counting and every call are no-ops.
+    # Online they post through transport; offline they hand what they
+    # would have sent to recorder at once.
+    def build_reporters(transport, recorder)
+      if @send_summaries
+        @summaries = Summaries.new(transport: transport, timing: @timing, log: method(:log_hook),
+                                   record: recorder&.method(:record), app_version: @app_version,
+                                   ruleset_version: -> { @loaded&.ruleset&.version })
+      end
+      return unless @send_exposures
+
+      @exposures = Exposures.new(transport: transport, timing: @timing, log: method(:log_hook),
+                                 record: recorder&.method(:record_event), platform: @platform,
+                                 app_version: @app_version, wake: -> { @worker&.wake })
+    end
+
+    # log_hook adapts Client#log's keyword arguments to the (level, event,
+    # fields) callable Exposures and Summaries expect.
+    def log_hook(level, event, fields) = log(level, event, **fields)
+
+    # exposures and summaries are read by Worker to drive their periodic
+    # flush; nil when either is off.
+    attr_reader :exposures, :summaries
+
     # ensure_worker restarts the background thread in a forked child: the
-    # thread that ran in the parent does not exist there.
+    # thread that ran in the parent does not exist there. The child's
+    # exposure and alias queue and evaluation summary window start empty;
+    # the parent, which never reaches restart_worker, keeps its own.
     def ensure_worker
       return if @pid == Process.pid
 
@@ -282,44 +383,87 @@ module Flagnetic
           @worker.abandon
           @worker = Worker.new(self, @transport, @timing, stream: @stream_enabled)
         end
+        @exposures&.reset_after_fork
+        @summaries&.reset_after_fork
         @pid = Process.pid
       end
     end
 
+    # do_flush sends the exposure and alias queue and the evaluation
+    # summary window at once, each on its own thread bounded by timeout,
+    # so one deadline covers both rather than a slow queue eating the
+    # window's share of it; both threads are always joined, whichever
+    # raises or times out first.
+    def do_flush(timeout)
+      ensure_worker
+      started = now
+      threads = [@exposures, @summaries].compact.map do |reporter|
+        Thread.new do
+          reporter.flush_once(timeout)
+        rescue StandardError => e
+          log(:error, :worker_failed, cause: "#{e.class}: #{e.message}")
+        end
+      end
+      threads.each { |t| t.join([timeout - (now - started), 0].max) }
+    rescue StandardError => e
+      log(:error, :worker_failed, cause: "#{e.class}: #{e.message}")
+    end
+
     # --- evaluation -------------------------------------------------------
 
-    def serve(key, type, default, context)
+    def serve(key, type, default, context, int: false)
       ensure_worker
       key = key.to_s
       loaded = @loaded
-      begin
-        evaluate(loaded, key, type, default, context)
+      detail, automatic = begin
+        served = evaluate(loaded, key, type, default, context)
+        int ? integral(loaded, key, default, *served) : served
       rescue StandardError => e
         log(:error, :evaluation_failed, flag: key, cause: "#{e.class}: #{e.message}")
-        fallback(loaded, default, :general)
+        [fallback(loaded, default, :general), false]
       end
+      report(key, detail, automatic, context)
+      detail
     rescue StandardError
       Detail.new(value: default, reason: :fallback, error_code: :general, stage: @stage)
     end
 
+    # report counts a served detail for the evaluation summary (and an
+    # offline client's recorder) and hands it to the exposure queue, which
+    # remembers an experiment block for a later exposure call and records
+    # the exposure at once for a flag with automatic exposure. A failure
+    # here never changes what was served.
+    def report(key, detail, automatic, context)
+      @recorder&.count(key, detail)
+      @summaries&.count(key, detail)
+      @exposures&.evaluated(context, key, detail, automatic)
+    rescue StandardError => e
+      log(:error, :evaluation_failed, flag: key, cause: "#{e.class}: #{e.message}")
+    end
+
+    # evaluate returns the served detail and whether the flag opts into
+    # automatic exposure: only meaningful together with an experiment
+    # block, which every early return here lacks.
     def evaluate(loaded, key, type, default, context)
       if (override = local_override(loaded, key))
-        return mismatch(loaded, key, override[0], type, default) if override[0] != type
+        return [mismatch(loaded, key, override[0], type, default), false] if override[0] != type
 
-        return base(loaded, value: override[1], reason: :local_override)
+        return [base(loaded, value: override[1], reason: :local_override), false]
       end
-      return fallback(nil, default, :no_ruleset) unless loaded
+      return [fallback(nil, default, :no_ruleset), false] unless loaded
 
       flag = loaded.ruleset.flag(key)
-      return fallback(loaded, default, :flag_not_found) unless flag && TYPES.include?(flag.type)
-      return mismatch(loaded, key, flag.type, type, default) if flag.type != type
+      return [fallback(loaded, default, :flag_not_found), false] unless flag && TYPES.include?(flag.type)
+      return [mismatch(loaded, key, flag.type, type, default), false] if flag.type != type
 
       result = loaded.ruleset.evaluate(key, context)
-      return fallback(loaded, default, result.error_code) if result.reason == :error
-      return fallback(loaded, default, :inconsistent_ruleset) unless value_of?(type, result.value)
+      return [fallback(loaded, default, result.error_code), false] if result.reason == :error
+      return [fallback(loaded, default, :inconsistent_ruleset), false] unless value_of?(type, result.value)
 
-      base(loaded, value: result.value, reason: result.reason, variation: result.variation,
-                   rule_id: result.rule_id, overridden: result.override_influenced, experiment: result.experiment)
+      detail = base(loaded, value: result.value, reason: result.reason, variation: result.variation,
+                            rule_id: result.rule_id, overridden: result.override_influenced,
+                            experiment: result.experiment)
+      [detail, flag.automatic_exposure]
     end
 
     def base(loaded, **fields)
@@ -335,6 +479,18 @@ module Flagnetic
         log(:warn, :type_mismatch, flag: key, flag_type: flag_type, requested_type: requested)
       end
       fallback(loaded, default, :type_mismatch)
+    end
+
+    # integral serves a number for the int getter as an Integer; one that is
+    # not whole is a type mismatch rather than a truncated value, and is
+    # counted as the fallback it serves.
+    def integral(loaded, key, default, detail, automatic)
+      return [detail, automatic] if detail.reason == :fallback
+
+      value = whole(detail.value)
+      return [mismatch(loaded, key, "number", "int", default), false] unless value
+
+      [Detail.new(**detail.to_h, value: value), automatic]
     end
 
     # whole is a served number as an Integer, or nil when it is not whole.

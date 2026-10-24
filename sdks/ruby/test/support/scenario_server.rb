@@ -19,6 +19,9 @@ class ScenarioServer
 
       Zlib::GzipReader.new(StringIO.new(body)).read
     end
+
+    # events is the decoded body's events array.
+    def events = JSON.parse(decoded_body)["events"]
   end
 
   attr_reader :base_url
