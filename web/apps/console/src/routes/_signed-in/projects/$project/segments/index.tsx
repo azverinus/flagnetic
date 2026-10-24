@@ -2,7 +2,6 @@ import type { SegmentListItem } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { PlusIcon, UsersRoundIcon } from "lucide-react";
 import { useMemo } from "react";
 
@@ -15,7 +14,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select, SelectItem } from "@/components/ui/select";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { formatNumber } from "@/i18n/format";
 import { segmentsQuery } from "@/lib/queries";
 import { filterSegments, type SegmentsSearch, validateSegmentsSearch } from "@/lib/segments";
@@ -147,7 +146,7 @@ function SegmentsTable({
   loading: boolean;
 }) {
   const { i18n, t } = useLingui();
-  const columns = useMemo<ColumnDef<SegmentListItem, unknown>[]>(
+  const columns = useMemo<TableColumn<SegmentListItem>[]>(
     () => [
       {
         id: "segment",

@@ -1,12 +1,11 @@
 import type { SdkInventoryItem } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 
 import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { kindName } from "@/lib/sdk-keys";
 import { sdkInventoryQuery } from "@/lib/queries";
 
@@ -29,7 +28,7 @@ export function SdkInventory({ project, environment }: SdkInventoryProps) {
   const { i18n, t } = useLingui();
   const inventory = useQuery(sdkInventoryQuery(project, environment));
 
-  const columns = useMemo<ColumnDef<SdkInventoryItem, unknown>[]>(
+  const columns = useMemo<TableColumn<SdkInventoryItem>[]>(
     () => [
       {
         id: "sdk",

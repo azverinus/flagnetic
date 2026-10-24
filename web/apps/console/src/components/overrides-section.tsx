@@ -8,7 +8,6 @@ import {
 } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { XIcon } from "lucide-react";
 import { type FormEvent, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -19,7 +18,7 @@ import { Field } from "@/components/ui/field";
 import { FormRefusal } from "@/components/ui/form-page";
 import { Input } from "@/components/ui/input";
 import { Select, SelectItem } from "@/components/ui/select";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { useCan, useMissingPermissionReason } from "@/lib/access";
 import { ApiError, unwrap } from "@/lib/errors";
 import { configurationViolationMessage, overrideIssues } from "@/lib/flag-detail";
@@ -91,7 +90,7 @@ export function OverridesSection({
 
   const removing = remove.isPending;
   const removeOverride = remove.mutate;
-  const columns = useMemo<ColumnDef<Override, unknown>[]>(
+  const columns = useMemo<TableColumn<Override>[]>(
     () => [
       { id: "unit_type", header: t`Unit type`, accessorKey: "unit_type" },
       {

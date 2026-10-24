@@ -1,7 +1,6 @@
 import type { AuditEntry } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { HistoryIcon } from "lucide-react";
 import { type ComponentType, type FormEvent, type ReactNode, useMemo, useState } from "react";
 
@@ -11,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectItem } from "@/components/ui/select";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { formatInstant } from "@/i18n/format";
 import {
   actionLabel,
@@ -77,7 +76,7 @@ export function AuditEntriesTable({
   place,
 }: AuditEntriesTableProps) {
   const { i18n, t } = useLingui();
-  const columns = useMemo<ColumnDef<AuditEntry, unknown>[]>(
+  const columns = useMemo<TableColumn<AuditEntry>[]>(
     () => [
       {
         id: "time",

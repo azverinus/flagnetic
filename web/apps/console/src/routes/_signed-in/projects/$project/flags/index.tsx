@@ -4,7 +4,6 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { FlagIcon, ListChecksIcon, PercentIcon, PlusIcon } from "lucide-react";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 
@@ -18,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/ui/page-header";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { formatInstant } from "@/i18n/format";
 import { cn } from "@/lib/cn";
 import {
@@ -466,7 +465,7 @@ function FlagsTable({
   environments: readonly Environment[];
 }) {
   const { i18n, t } = useLingui();
-  const columns = useMemo<ColumnDef<FlagListItem, unknown>[]>(
+  const columns = useMemo<TableColumn<FlagListItem>[]>(
     () => [
       {
         id: "flag",
@@ -484,7 +483,7 @@ function FlagsTable({
         ),
       },
       { id: "type", header: t`Type`, cell: ({ row }) => flagTypeName(i18n, row.original.type) },
-      ...environments.map((env): ColumnDef<FlagListItem, unknown> => ({
+      ...environments.map((env): TableColumn<FlagListItem> => ({
         id: `state-${env.key}`,
         header: env.name,
         cell: ({ row }) => (

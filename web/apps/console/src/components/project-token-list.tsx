@@ -6,7 +6,6 @@ import {
 } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { PlusIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -16,7 +15,7 @@ import { useRevocableTokens } from "@/components/token-list";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { RevealSecretDialog } from "@/components/ui/reveal-secret";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { roleName } from "@/lib/access-names";
 import { unwrap } from "@/lib/errors";
 import { projectTokenScopes, type TokenPolicy } from "@/lib/personal-tokens";
@@ -47,7 +46,7 @@ export function ProjectTokenList({ project, roles, policy, names }: ProjectToken
   const tokens = useQuery(list);
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<{ value: string }>();
-  const kindColumns = useMemo<ColumnDef<ProjectToken, unknown>[]>(
+  const kindColumns = useMemo<TableColumn<ProjectToken>[]>(
     () => [
       { id: "role", header: t`Role`, cell: ({ row }) => roleName(i18n, row.original.role) },
       {

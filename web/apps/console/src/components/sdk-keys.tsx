@@ -11,7 +11,6 @@ import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { BanIcon, PencilIcon, PlusIcon, RotateCwIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
@@ -31,7 +30,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RevealSecretDialog } from "@/components/ui/reveal-secret";
 import { Select, SelectItem } from "@/components/ui/select";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { useCan } from "@/lib/access";
 import { ApiError, unwrap } from "@/lib/errors";
 import { nameSchema } from "@/lib/forms";
@@ -79,8 +78,8 @@ export function SdkKeys({ project, environment }: SdkKeysProps) {
   const [revoking, setRevoking] = useState<SdkKey>();
   const [revealed, setRevealed] = useState<Revealed>();
 
-  const columns = useMemo<ColumnDef<SdkKey, unknown>[]>(() => {
-    const columns: ColumnDef<SdkKey, unknown>[] = [
+  const columns = useMemo<TableColumn<SdkKey>[]>(() => {
+    const columns: TableColumn<SdkKey>[] = [
       { id: "name", header: t`Name`, cell: ({ row }) => row.original.name },
       { id: "kind", header: t`Kind`, cell: ({ row }) => kindName(i18n, row.original.kind) },
       {

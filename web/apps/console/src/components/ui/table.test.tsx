@@ -1,13 +1,13 @@
-import type { ColumnDef } from "@tanstack/react-table";
 import { screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TableColumn } from "@/components/ui/table";
 import { renderWithProviders } from "@/test/render";
 
 import { Table } from "./table";
 
 type Row = { key: string; name: string };
-const columns: ColumnDef<Row, unknown>[] = [
+const columns: TableColumn<Row>[] = [
   { accessorKey: "key", header: "Key" },
   { accessorKey: "name", header: "Name" },
 ];

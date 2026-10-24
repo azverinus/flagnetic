@@ -2,17 +2,24 @@ import { Trans } from "@lingui/react/macro";
 import {
   type ColumnDef,
   flexRender,
-  getCoreRowModel,
   type RowData,
-  useReactTable,
+  tableFeatures,
+  useTable,
 } from "@tanstack/react-table";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 
+// The console's tables only lay rows out: the API sorts, filters and pages
+// them, so the tables register no features of their own.
+const features = tableFeatures({});
+
+/** A column of a {@link Table} listing rows of `T`. */
+export type TableColumn<T extends RowData> = ColumnDef<typeof features, T, unknown>;
+
 export type TableProps<T extends RowData> = {
-  columns: ColumnDef<T, unknown>[];
+  columns: TableColumn<T>[];
   data: readonly T[];
   /** What the table lists, for a screen reader; shown above it unless hidden. */
   caption: ReactNode;
@@ -54,19 +61,15 @@ export function Table<T extends RowData>({
   getRowId,
   className,
 }: TableProps<T>) {
-  // The table instance changes identity on every render by design; the
-  // console is not compiled with the React Compiler, which is what the rule
-  // guards against memoizing it.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
+  const table = useTable({
+    features,
     columns,
     data: data as T[],
-    getCoreRowModel: getCoreRowModel(),
     getRowId,
   });
   const sticky = (index: number) =>
     stickyFirstColumn && index === 0 ? stickyClassName : undefined;
-  const width = table.getVisibleLeafColumns().length;
+  const width = table.getAllLeafColumns().length;
 
   const wrapper = useRef<HTMLDivElement>(null);
   const captionId = useId();
@@ -136,7 +139,7 @@ export function Table<T extends RowData>({
           ) : (
             table.getRowModel().rows.map((row) => (
               <tr key={row.id} className="border-b hover:bg-muted/40">
-                {row.getVisibleCells().map((cell, index) => (
+                {row.getAllCells().map((cell, index) => (
                   <td key={cell.id} className={cn("px-3 py-2 align-middle", sticky(index))}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>

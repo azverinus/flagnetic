@@ -1,7 +1,6 @@
 import { type ApiToken, createMyToken, revokeMyToken } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { type QueryKey, useQuery } from "@tanstack/react-query";
-import type { ColumnDef } from "@tanstack/react-table";
 import { PlusIcon, Trash2Icon } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -13,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
 import { RevealSecretDialog } from "@/components/ui/reveal-secret";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { formatDateTime } from "@/i18n/format";
 import { unwrap } from "@/lib/errors";
 import { useListMutation } from "@/lib/mutations";
@@ -34,10 +33,10 @@ import { useNowPassing } from "@/lib/use-now";
 export function useTokenColumns<Token extends ApiToken>(
   now: Date,
   /** Memoized by the caller, so the cells keep their identity between renders. */
-  kindColumns?: readonly ColumnDef<Token, unknown>[],
-): ColumnDef<Token, unknown>[] {
+  kindColumns?: readonly TableColumn<Token>[],
+): TableColumn<Token>[] {
   const { i18n, t } = useLingui();
-  return useMemo<ColumnDef<Token, unknown>[]>(() => {
+  return useMemo<TableColumn<Token>[]>(() => {
     const stateName: Record<TokenState, string> = {
       active: t`Active`,
       expired: t`Expired`,
@@ -188,8 +187,8 @@ export function useRevocableTokens<Token extends ApiToken>(
   tokens: Token[] | undefined,
   revokeToken: (token: Token) => Promise<unknown>,
   list: QueryKey,
-  kindColumns?: readonly ColumnDef<Token, unknown>[],
-): { columns: ColumnDef<Token, unknown>[]; revokeDialog: ReactNode } {
+  kindColumns?: readonly TableColumn<Token>[],
+): { columns: TableColumn<Token>[]; revokeDialog: ReactNode } {
   const { t } = useLingui();
   const now = useNowPassing(
     (tokens ?? []).filter((token) => !token.revoked_at).map((token) => token.expires_at),
@@ -200,7 +199,7 @@ export function useRevocableTokens<Token extends ApiToken>(
     toast.success(t`The token is revoked.`);
   });
   const tokenColumns = useTokenColumns(now, kindColumns);
-  const columns = useMemo<ColumnDef<Token, unknown>[]>(() => {
+  const columns = useMemo<TableColumn<Token>[]>(() => {
     return withRowActions(tokenColumns, true, (token) => {
       if (token.revoked_at) return null;
       const { name } = token;

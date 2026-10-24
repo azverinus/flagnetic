@@ -11,7 +11,6 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import type { ColumnDef } from "@tanstack/react-table";
 import { BoxesIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -28,7 +27,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
-import { Table } from "@/components/ui/table";
+import { Table, type TableColumn } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { formatNumber } from "@/i18n/format";
 import { useCan } from "@/lib/access";
@@ -59,7 +58,7 @@ function UnitTypes() {
   const canManage = useCan(permission);
 
   const columns = useMemo(() => {
-    const columns: ColumnDef<UnitTypeListItem, unknown>[] = [
+    const columns: TableColumn<UnitTypeListItem>[] = [
       {
         id: "key",
         header: t`Key`,
