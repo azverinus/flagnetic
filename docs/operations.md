@@ -249,7 +249,6 @@ Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNET
 | `flagnetic_events_ingested_total` | `kind` | [Events](sdks/events.md) SDKs posted that were stored, by kind (`evaluation_summary`, `alias`). |
 | `flagnetic_events_dropped_total` | `reason` | Events SDKs posted that were not stored, by reason: a rejection code, `duplicate` for an event received before, or `unknown_flag` for a summary row naming a flag the project does not have. |
 | `flagnetic_rollup_lag_seconds` | `stream` | Age of the oldest committed raw event a rollup has not read yet (`exposures`), 0 when it has read them all. It grows while a long transaction anywhere in the database holds the rollups back. |
-| `flagnetic_rollup_rows_total` | `stream` | Raw events a rollup read. |
 | `flagnetic_sdk_inventory_dropped_total` | `reason` | Sightings of SDKs the [SDK inventory](sdks/keys.md#which-sdks-use-an-environment) did not record, by reason: `key_full` for a new row of a key that holds 200 rows already, `queue_full` for a new row while the replica held 1,024 rows waiting for its round, `write_failed` for sightings lost because writing them failed. Each round that drops any also logs one warning, `SDK inventory sightings dropped`, with the counts. |
 | `go_*`, `process_*` | | The Go runtime and the process. |
 

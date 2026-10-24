@@ -22,8 +22,7 @@ const rollupInterval = 10 * time.Second
 
 // RollupMetrics are the series every rollup stream reports.
 type RollupMetrics struct {
-	lag  *prometheus.GaugeVec
-	rows *prometheus.CounterVec
+	lag *prometheus.GaugeVec
 }
 
 // NewRollupMetrics registers the rollup streams' series on reg.
@@ -33,12 +32,8 @@ func NewRollupMetrics(reg prometheus.Registerer) *RollupMetrics {
 			Namespace: metrics.Namespace, Subsystem: "rollup", Name: "lag_seconds",
 			Help: "Age of the oldest committed raw event a rollup stream has not read yet, 0 when it has read them all; it grows while a long transaction holds the snapshot horizon back.",
 		}, []string{"stream"}),
-		rows: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: metrics.Namespace, Subsystem: "rollup", Name: "rows_total",
-			Help: "Raw event rows a rollup stream read.",
-		}, []string{"stream"}),
 	}
-	reg.MustRegister(m.lag, m.rows)
+	reg.MustRegister(m.lag)
 	return m
 }
 
@@ -56,7 +51,6 @@ type Rollup interface {
 // they take turns on the stream's lock in PostgreSQL.
 func RollupStream(name string, stream events.Stream, r Rollup, m *RollupMetrics) Worker {
 	m.lag.WithLabelValues(string(stream))
-	m.rows.WithLabelValues(string(stream))
 	return Worker{
 		Name: name, Interval: rollupInterval,
 		// A stream far behind catches up in bounded batches, each committed
@@ -64,8 +58,7 @@ func RollupStream(name string, stream events.Stream, r Rollup, m *RollupMetrics)
 		// and the next goes on from there.
 		Timeout: time.Minute,
 		Round: func(ctx context.Context) error {
-			n, err := r.Handle(ctx)
-			m.rows.WithLabelValues(string(stream)).Add(float64(n))
+			_, err := r.Handle(ctx)
 			lag, lagErr := r.Lag(ctx)
 			if lagErr == nil {
 				m.lag.WithLabelValues(string(stream)).Set(lag.Seconds())
