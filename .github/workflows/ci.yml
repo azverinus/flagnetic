@@ -84,6 +84,32 @@ jobs:
       - name: Scan reachable code
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
+  # The npm lockfiles, development dependencies included: the code
+  # generators and test runners there execute on developer machines and in
+  # CI. Unlike govulncheck this cannot tell reachable code from the rest,
+  # so it fails on high and critical advisories only. It runs on every pull
+  # request and nightly, as an advisory can appear without a change here.
+  npm-audit:
+    name: pnpm audit (${{ matrix.dir }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: [web, sdks/js]
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: ${{ matrix.dir }}/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: No high or critical advisories
+        run: pnpm audit --audit-level high
+
   tidy:
     name: go mod tidy and generate
     runs-on: ubuntu-latest
@@ -557,7 +583,7 @@ jobs:
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, tidy, console, changes, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, docker, modules, module, released, dart-changes, dart, sdk-js]
+    needs: [lint, test, vuln, npm-audit, tidy, console, changes, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, docker, modules, module, released, dart-changes, dart, sdk-js]
     if: always()
     runs-on: ubuntu-latest
     steps:

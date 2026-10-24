@@ -43,6 +43,27 @@ updates:
     ignore:
       - dependency-name: "github.com/azverinus/flagnetic"
       - dependency-name: "github.com/azverinus/flagnetic/*"
+  # The console and the JavaScript SDK. Grouped per directory, so a week of
+  # updates is one pull request each; security updates still open on their
+  # own as soon as an advisory is published.
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(console)"
+    groups:
+      console:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /sdks/js
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(sdk-js)"
+    groups:
+      sdk-js:
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

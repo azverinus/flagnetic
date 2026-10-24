@@ -200,10 +200,12 @@ tasks:
       - go tool cover -html=coverage.out
 
   vuln:
-    desc: Scan the reachable code of every module for known vulnerabilities
+    desc: Scan the reachable Go code of every module and the npm lockfiles for known vulnerabilities
     cmds:
       - for: { var: MODULES, split: "\n" }
         cmd: cd '{{.ITEM}}' && {{.GOVULNCHECK}} ./...
+      - for: [web, sdks/js]
+        cmd: cd '{{.ITEM}}' && pnpm audit --audit-level high
 
   tidy:
     desc: Fail if the go.mod of any module is not tidy
