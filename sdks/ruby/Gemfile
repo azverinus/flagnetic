@@ -6,4 +6,8 @@ gemspec
 
 gem "minitest", "~> 5.25"
 gem "rake", "~> 13.0"
+# RSpec runs only the example group that proves Flagnetic::Testing::Helpers
+# under RSpec; the gem's own tests are Minitest.
+gem "rspec-core", "~> 3.13"
+gem "rspec-expectations", "~> 3.13"
 gem "rubocop", "~> 1.71.0", require: false

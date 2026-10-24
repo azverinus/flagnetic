@@ -31,7 +31,12 @@ A client key (`fn_cli_...`) is refused at construction with an `ArgumentError`. 
 | `request_timeout:` | Seconds per request (default 10). |
 | `store:` | Path of a file keeping the last good ruleset across restarts. It is read at construction and rewritten on every accepted ruleset. |
 | `logger:` | A callable receiving `(level, event, fields)`, or a standard `Logger`. Default: warnings and errors to `$stderr`. |
-| `platform:` | The platform in the `User-Agent` (`flagnetic-ruby/<version> (<platform>)`, default `"server"`). |
+| `platform:` | The platform in the `User-Agent` (`flagnetic-ruby/<version> (<platform>)`) and the events envelope, and an exposure's `platform` when the context names none (default `"server"`). |
+| `app_version:` | The application's version, sent with every evaluation summary and as an exposure's `app_version` when the context names none. |
+| `flush_interval:` | Seconds between sends of the exposure and alias queue (default 2); 500 queued events are sent at once. |
+| `summary_interval:` | Seconds between evaluation summaries (default 60). |
+| `send_summaries:` | `false` stops counting and sending evaluation summaries. |
+| `send_exposures:` | `false` makes `exposure` and `alias` send nothing (logged as `exposures_disabled`). |
 | `offline:`, `offline_file:` | A ruleset document (JSON text, a `Hash` or a callable returning one) or the path of one. No request is ever made, the stage is `:fresh`, and `reload` re-reads the source. |
 | `allow_overrides:` | Enables local overrides. |
 
@@ -48,6 +53,26 @@ client = Flagnetic::Client.new(key, base_url: url, allow_overrides: true)
 client.local_overrides.set("new_checkout", true) # raises LocalOverridesNotAllowed without allow_overrides
 client.local_overrides.remove("new_checkout")
 ```
+
+## Events
+
+The client reports what it served so that experiments can be analysed:
+
+```ruby
+context = { units: { user: "u-1001" }, attributes: { platform: "linux", app_version: "1.18.0" } }
+client.string("pricing", default: "standard", context: context)
+client.exposure("pricing", context: context) # the unit saw the behaviour the flag decided
+client.alias("anonymous", "d-8f1c", "user", "u-1001") # after sign-up
+client.flush(timeout: 5)
+```
+
+- **Evaluation summaries.** Every evaluation is counted per flag, variation and reason (`fallback` and `local_override` included, never a unit ID or a value) and sent every `summary_interval` as one or more `evaluation_summary` events of at most 1,000 rows, with the version of the ruleset held at the interval's end. A report that fails merges into the next one; one older than an hour is dropped.
+- **Exposures.** Evaluating records nothing on its own. `exposure` sends the experiment block of the latest evaluation of that flag for that context, or nothing when it carried none (`exposure_skipped` at debug says why). A flag with automatic exposure sends one as it is evaluated. A repeat for the same experiment, unit and variation is sent once per `flush_interval`.
+- **Aliases.** `alias` links the unit ID used before sign-up to the one after it; it changes no context.
+- **Delivery.** Events go gzipped to `POST /sdk/v1/events` in batches of at most 500, each with a UUIDv7 event ID kept across retries, so the server drops a resend as a duplicate. A 429, a 5xx or a network error is retried with backoff (evaluation summaries wait for `Retry-After`, capped at five minutes); a 401 or 403 logs `key_revoked` and keeps the events; an event the server rejects is logged as `queue_dropped` and never sent again. The queue holds 10,000 events and drops the oldest beyond that.
+- `flush(timeout:)` sends what is queued and the current window and waits at most `timeout` seconds; `close(timeout:)` flushes first. A forked child starts with an empty queue and window.
+
+An offline client sends nothing: it hands every summary, exposure and alias to its `recorder`.
 
 Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on the text:
 
@@ -69,8 +94,56 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `listener_failed` | error | `cause` |
 | `store_failed` | error | `path`, `cause` |
 | `worker_failed` | error | `cause` |
+| `exposure_skipped` | debug | `flag`, `cause` (`no_experiment`, `no_detail`, `repeat`) |
+| `exposures_disabled` | warn | |
+| `ingest_failed` | warn | `kind`, `events`, `retry_in`, `status`, `error` |
+| `queue_dropped` | warn | `kind` (`exposure_or_alias`, `evaluation_summary`), `cause` (`queue_full`, `client_error`, `refused_by_the_platform`, `window_older_than_one_hour`) and what was dropped |
 
 A ruleset from a newer server may hold constructs this SDK does not know. The client logs `rule_unsupported` once per flag and ruleset version, and the flag serves its default with the error code `inconsistent_ruleset`.
+
+## Flagnetic.client
+
+`Flagnetic.client` is the process-wide client: assign one with `Flagnetic.client = ...`, or set `Flagnetic.client_builder` to a callable that builds it on first use, once. It raises `Flagnetic::NotConfigured` until either is set.
+
+## Testing
+
+`Flagnetic::Testing` builds offline clients for tests: they make no request and keep what they would have sent in a recorder.
+
+```ruby
+require "flagnetic/testing"
+
+client = Flagnetic::Testing.offline(values: { "new_checkout" => true, "banner" => "spring" })
+client = Flagnetic::Testing.offline(File.read("ruleset.json")) # or a Hash, or file: "ruleset.json"
+
+client.set("banner", "autumn") # served to everyone as fallthrough; a new key is added
+client.reload                  # back to the source
+
+client.recorder.summary              # running counts per flag, variation and reason
+client.recorder.evaluation_summaries # what flush would have sent
+client.recorder.exposures            # what exposure and automatic exposure recorded
+client.recorder.aliases
+client.recorder.reset
+```
+
+`with_flags` and `with_ruleset` make such a client `Flagnetic.client` for a block and restore the previous one afterwards, even when the block raises. They are process-wide, so tests running in parallel threads must not use them. Include the helpers in RSpec or Minitest:
+
+```ruby
+RSpec.configure { |config| config.include Flagnetic::Testing::Helpers }
+
+class ActiveSupport::TestCase
+  include Flagnetic::Testing::Helpers
+end
+
+with_flags(new_checkout: true) do |client|
+  get "/checkout"
+  assert client.recorder.summary.any? { |row| row.flag == "new_checkout" }
+end
+
+with_ruleset(file: "test/fixtures/flags.json") do |client|
+  post "/checkout"
+  assert_equal ["checkout_v2"], client.recorder.exposures.map(&:experiment_key)
+end
+```
 
 ## Evaluator
 
@@ -116,6 +189,6 @@ go run ./sdks/ruby/script/_unicode_tables > sdks/ruby/lib/flagnetic/eval/unicode
 
 ```bash
 bundle install
-bundle exec rake test   # unit tests, every conformance fixture, the protocol scenarios and the p99 test
+bundle exec rake test   # unit tests, every conformance fixture, the protocol scenarios, the RSpec helpers and the p99 test
 bundle exec rubocop
 ```
