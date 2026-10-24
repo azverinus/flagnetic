@@ -306,7 +306,8 @@ func (c Configuration) write(basis Configuration, f Flag, in ConfigurationInput,
 }
 
 // input returns c as a write gives it whole, every rule with its
-// identifier and every rollout with its salt.
+// identifier, every rollout with its salt and every experiment serve with
+// its experiment.
 func (c Configuration) input() ConfigurationInput {
 	in := ConfigurationInput{
 		On: c.On, OffVariation: c.OffVariation, Fallthrough: c.Fallthrough, Prerequisites: c.Prerequisites,
@@ -316,7 +317,7 @@ func (c Configuration) input() ConfigurationInput {
 		in.Overrides[i] = OverrideInput{UnitType: o.UnitType, UnitID: o.UnitID, Variation: o.Variation, Note: &o.Note}
 	}
 	for i, rule := range c.Rules {
-		serve := ServeInput{Kind: rule.Serve.Kind, Variation: rule.Serve.Variation}
+		serve := ServeInput{Kind: rule.Serve.Kind, Variation: rule.Serve.Variation, Experiment: rule.Serve.Experiment}
 		if rule.Serve.Kind == ServeRollout {
 			serve.UnitType, serve.Percentage, serve.Salt = rule.Serve.UnitType, &rule.Serve.Percentage, rule.Serve.Salt
 		}
