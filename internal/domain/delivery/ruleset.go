@@ -29,6 +29,8 @@ type Materials struct {
 	Flags []flags.Flag
 	// Configurations are the flags' configurations in the environment.
 	Configurations []flags.Configuration
+	// Experiments are the project's experiments, whatever their status.
+	Experiments []flags.ExperimentRef
 }
 
 // With returns the materials with c in place of the configuration of c's
@@ -69,6 +71,10 @@ func Materialize(m Materials) ([]byte, error) {
 		rs.Segments = append(rs.Segments, eval.Segment{Key: s.Key, Private: s.Private, Conditions: conditions(s.Conditions)})
 	}
 	slices.SortFunc(rs.Segments, func(a, b eval.Segment) int { return cmp.Compare(a.Key, b.Key) })
+	experiments := make(map[string]flags.ExperimentRef, len(m.Experiments))
+	for _, e := range m.Experiments {
+		experiments[e.Key] = e
+	}
 	configured := make(map[flags.FlagID]flags.Configuration, len(m.Configurations))
 	for _, c := range m.Configurations {
 		configured[c.Flag] = c
@@ -78,7 +84,7 @@ func Materialize(m Materials) ([]byte, error) {
 		if f.ArchivedAt != nil || !ok {
 			continue
 		}
-		rs.Flags = append(rs.Flags, flagOf(f, c))
+		rs.Flags = append(rs.Flags, flagOf(f, c, experiments))
 	}
 	slices.SortFunc(rs.Flags, func(a, b eval.Flag) int { return cmp.Compare(a.Key, b.Key) })
 	doc, err := json.Marshal(rs)
@@ -88,14 +94,17 @@ func Materialize(m Materials) ([]byte, error) {
 	return doc, nil
 }
 
-// flagOf returns f configured by c as a ruleset carries it.
-func flagOf(f flags.Flag, c flags.Configuration) eval.Flag {
+// flagOf returns f configured by c as a ruleset carries it. A rule serving
+// an experiment that is not running is left out: preparing an experiment
+// must change nothing any application is served, and one that stopped has
+// its rules rewritten away.
+func flagOf(f flags.Flag, c flags.Configuration, experiments map[string]flags.ExperimentRef) eval.Flag {
 	out := eval.Flag{
 		Key: f.Key, Type: string(f.Type), AutomaticExposure: f.AutomaticExposure,
 		Variations: make([]eval.Variation, len(f.Variations)),
 		On:         c.On, OffVariation: c.OffVariation, Fallthrough: c.Fallthrough,
 		Prerequisites: make([]eval.Prerequisite, len(c.Prerequisites)), Overrides: make([]eval.Override, len(c.Overrides)),
-		Rules: make([]eval.Rule, len(c.Rules)),
+		Rules: make([]eval.Rule, 0, len(c.Rules)),
 	}
 	for i, v := range f.Variations {
 		out.Variations[i] = eval.Variation{Key: v.Key, Value: v.Value}
@@ -106,14 +115,35 @@ func flagOf(f flags.Flag, c flags.Configuration) eval.Flag {
 	for i, o := range c.Overrides {
 		out.Overrides[i] = eval.Override{UnitType: o.UnitType, UnitID: o.UnitID, Variation: o.Variation}
 	}
-	for i, r := range c.Rules {
+	for _, r := range c.Rules {
 		serve := eval.Serve{Kind: r.Serve.Kind, Variation: r.Serve.Variation}
-		if r.Serve.Kind == flags.ServeRollout {
+		switch r.Serve.Kind {
+		case flags.ServeRollout:
 			serve.UnitType, serve.Percentage, serve.Salt = r.Serve.UnitType, r.Serve.Percentage, r.Serve.Salt
+		case flags.ServeExperiment:
+			e, ok := experiments[r.Serve.Experiment]
+			if !ok || e.Status != flags.ExperimentRunning {
+				continue
+			}
+			serve = experimentServe(e)
 		}
-		out.Rules[i] = eval.Rule{ID: r.ID.String(), Conditions: conditions(r.Conditions), Serve: serve}
+		out.Rules = append(out.Rules, eval.Rule{ID: r.ID.String(), Conditions: conditions(r.Conditions), Serve: serve})
 	}
 	return out
+}
+
+// experimentServe returns what a rule serving the running experiment e
+// carries in a ruleset: the experiment's frozen fields, which SDKs assign
+// units by.
+func experimentServe(e flags.ExperimentRef) eval.Serve {
+	weights := make([]eval.Weight, len(e.Weights))
+	for i, w := range e.Weights {
+		weights[i] = eval.Weight{Variation: w.Variation, Weight: w.Weight}
+	}
+	return eval.Serve{
+		Kind: flags.ServeExperiment, Experiment: e.Key, UnitType: e.UnitType, InclusionSalt: e.InclusionSalt,
+		VariationSalt: e.VariationSalt, TrafficAllocation: e.TrafficAllocation, Weights: weights,
+	}
 }
 
 func conditions(in []flags.Condition) []eval.Condition {

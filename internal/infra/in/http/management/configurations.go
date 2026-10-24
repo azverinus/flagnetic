@@ -174,6 +174,7 @@ func ruleIn(r RuleInput) flags.RuleInput {
 		Description: valueOf(r.Description), Conditions: conditionsIn(valueOr(r.Conditions, nil)),
 		Serve: flags.ServeInput{
 			Kind: r.Serve.Kind, Variation: valueOf(r.Serve.Variation), UnitType: valueOf(r.Serve.UnitType),
+			Experiment: valueOf(r.Serve.Experiment),
 			Percentage: r.Serve.Percentage, Salt: valueOf(r.Serve.Salt),
 		},
 	}
@@ -201,6 +202,9 @@ func configurationOut(ec flags.EnvironmentConfiguration) FlagConfiguration {
 
 func ruleOut(r flags.Rule) Rule {
 	serve := Serve{Kind: r.Serve.Kind, Variation: optional(r.Serve.Variation)}
+	if r.Serve.Kind == flags.ServeExperiment {
+		serve.Experiment = optional(r.Serve.Experiment)
+	}
 	if r.Serve.Kind == flags.ServeRollout {
 		percentage := r.Serve.Percentage
 		serve.UnitType, serve.Percentage, serve.Salt = optional(r.Serve.UnitType), &percentage, optional(r.Serve.Salt)

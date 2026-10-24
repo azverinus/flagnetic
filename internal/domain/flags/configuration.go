@@ -79,11 +79,14 @@ const (
 	ServeExperiment = eval.ServeExperiment
 )
 
-// Serve is what a rule serves: a variation, or a rollout of one variation to
-// a share of one unit type's units, the others continuing to the next rule.
+// Serve is what a rule serves: a variation, a rollout of one variation to a
+// share of one unit type's units, the others continuing to the next rule, or
+// an experiment of the flag.
 type Serve struct {
 	Kind      string
 	Variation string
+	// Experiment is the key of the experiment an experiment serve names.
+	Experiment string
 	// UnitType, Percentage and Salt are a rollout's: the unit type whose
 	// units are bucketed, the share served in basis points, and the salt
 	// mixed into each unit's bucket.
@@ -156,9 +159,9 @@ type RuleInput struct {
 // ServeInput is a serve as a write gives it. Percentage is nil when absent;
 // Salt is "" when absent, since only the server mints one.
 type ServeInput struct {
-	Kind, Variation, UnitType string
-	Percentage                *int
-	Salt                      string
+	Kind, Variation, UnitType, Experiment string
+	Percentage                            *int
+	Salt                                  string
 }
 
 // Referents are what a configuration may name, as the handler loaded them
@@ -171,6 +174,48 @@ type Referents struct {
 	Segments     []string
 	Declarations Declarations
 	Requirements Requirements
+	// Experiments are the project's experiments, whatever their status.
+	Experiments []ExperimentRef
+}
+
+// ExperimentRef is an experiment as a rule may name it, and as a flag's
+// archival and variations are judged against it.
+type ExperimentRef struct {
+	Key string
+	// Flag is the flag the experiment compares variations of.
+	Flag FlagID
+	// Status is draft, running, stopped or archived.
+	Status string
+	// UnitType is the unit type whose units the experiment splits.
+	UnitType string
+	// InclusionSalt and VariationSalt are the experiment's public salts.
+	InclusionSalt, VariationSalt string
+	// TrafficAllocation is the share of units included, in basis points.
+	TrafficAllocation int
+	// Weights are the variations the experiment lists with their shares in
+	// basis points, in the order that fixes the cumulative bucket ranges.
+	Weights []ExperimentWeight
+}
+
+// ExperimentWeight is one variation's share of an experiment's allocated
+// traffic, in basis points.
+type ExperimentWeight struct {
+	Variation string
+	Weight    int
+}
+
+// The statuses of an experiment a rule or a flag is judged by.
+const (
+	ExperimentDraft   = "draft"
+	ExperimentRunning = "running"
+)
+
+func (r Referents) experiment(key string) (ExperimentRef, bool) {
+	i := slices.IndexFunc(r.Experiments, func(e ExperimentRef) bool { return e.Key == key })
+	if i < 0 {
+		return ExperimentRef{}, false
+	}
+	return r.Experiments[i], true
 }
 
 func (r Referents) flag(key string) (Flag, bool) {
@@ -457,7 +502,7 @@ func (ck *check) rules(previous []Rule, in []RuleInput, f Flag, r Referents, m M
 		out = append(out, Rule{
 			ID: ruleID, Description: ck.description(pointer+"/description", ri.Description),
 			Conditions: ck.ruleConditions(pointer+"/conditions", ri.Conditions, r),
-			Serve:      ck.serve(pointer+"/serve", serve, before, f, r.Declarations, m),
+			Serve:      ck.serve(pointer+"/serve", serve, before, f, r, m),
 		})
 	}
 	return out
@@ -510,15 +555,19 @@ func (ck *check) ruleCondition(pointer string, cond Condition, r Referents) {
 // current configuration the rule is, nil for a new one: a rollout keeps the
 // salt it was given for as long as it stays a rollout, so growing its
 // percentage never moves a unit out; any other rollout is given a new one.
-func (ck *check) serve(pointer string, in ServeInput, before *Rule, f Flag, d Declarations, m Mint) Serve {
+func (ck *check) serve(pointer string, in ServeInput, before *Rule, f Flag, r Referents, m Mint) Serve {
+	d := r.Declarations
 	out := Serve{Kind: in.Kind, Variation: in.Variation}
 	switch in.Kind {
 	case ServeVariation:
-		if in.UnitType != "" || in.Percentage != nil || in.Salt != "" {
+		if in.UnitType != "" || in.Percentage != nil || in.Salt != "" || in.Experiment != "" {
 			ck.add(pointer, "invalid_value", "a variation serve names a variation and nothing else", nil)
 		}
 		ck.variationOf(pointer+"/variation", f, in.Variation)
 	case ServeRollout:
+		if in.Experiment != "" {
+			ck.add(pointer+"/experiment", "invalid_value", "a rollout serves no experiment", nil)
+		}
 		if !d.units[in.UnitType] {
 			ck.add(pointer+"/unit_type", "unknown_unit_type", "the project declares no unit type "+strconv.Quote(in.UnitType),
 				map[string]any{"unit_type": in.UnitType})
@@ -532,12 +581,34 @@ func (ck *check) serve(pointer string, in ServeInput, before *Rule, f Flag, d De
 		}
 		out.UnitType, out.Salt = in.UnitType, ck.salt(pointer+"/salt", in.Salt, before, m)
 	case ServeExperiment:
-		ck.add(pointer+"/kind", "experiment_not_available", "a rule cannot serve an experiment yet", nil)
+		out = Serve{Kind: in.Kind, Experiment: in.Experiment}
+		if in.Variation != "" || in.UnitType != "" || in.Percentage != nil || in.Salt != "" {
+			ck.add(pointer, "invalid_value", "an experiment serve names an experiment and nothing else", nil)
+		}
+		ck.experimentOf(pointer+"/experiment", f, in.Experiment, r)
 	default:
 		ck.add(pointer+"/kind", "invalid_value", "the serve kind is not one a rule serves",
-			map[string]any{"kinds": []string{ServeVariation, ServeRollout}})
+			map[string]any{"kinds": []string{ServeVariation, ServeRollout, ServeExperiment}})
 	}
 	return out
+}
+
+// experimentOf checks at pointer that key names an experiment of f that a
+// rule may serve: a draft or a running one. Several rules may serve the
+// same experiment.
+func (ck *check) experimentOf(pointer string, f Flag, key string, r Referents) {
+	e, ok := r.experiment(key)
+	switch {
+	case !ok:
+		ck.add(pointer, "unknown_experiment", "the project has no experiment "+strconv.Quote(key),
+			map[string]any{"experiment": key})
+	case e.Flag != f.ID:
+		ck.add(pointer, "experiment_of_another_flag", "the experiment "+strconv.Quote(key)+" compares variations of another flag",
+			map[string]any{"experiment": key})
+	case e.Status != ExperimentDraft && e.Status != ExperimentRunning:
+		ck.add(pointer, "experiment_not_servable", "the experiment "+strconv.Quote(key)+" is "+e.Status+"; only a draft or running experiment is served",
+			map[string]any{"experiment": key, "status": e.Status})
+	}
 }
 
 // salt returns the salt of a rollout whose rule was before: its salt while

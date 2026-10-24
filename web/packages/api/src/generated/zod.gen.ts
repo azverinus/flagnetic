@@ -787,13 +787,19 @@ export const zOverrideInput = z.object({
  * `unit_type`, in basis points (0 to 10,000), the others continuing to
  * the next rule. A rollout's `salt` is given by the server and changes
  * only through regenerating it, so a write omits it or sends it
- * unchanged. Experiments are not available yet
- * (`experiment_not_available`).
+ * unchanged. `experiment` serves the experiment `experiment` of the
+ * flag, which assigns units to variations by its own weights; a rule
+ * serves a draft or running experiment of its flag
+ * (`unknown_experiment`, `experiment_of_another_flag` and
+ * `experiment_not_servable` otherwise), and several rules may serve
+ * the same one. While the experiment is a draft its rules are left
+ * out of the ruleset SDKs receive.
  *
  */
 export const zServe = z.object({
   kind: z.string(),
   variation: z.string().optional(),
+  experiment: z.string().optional(),
   unit_type: z.string().optional(),
   percentage: z.int().gte(0).lte(10000).optional(),
   salt: z.string().optional(),
@@ -830,6 +836,7 @@ export const zFlagState = z.object({
   on: z.boolean(),
   has_rules: z.boolean(),
   has_rollout: z.boolean(),
+  has_experiment: z.boolean(),
 });
 
 /**
@@ -1633,7 +1640,7 @@ export const zListFlagsQuery = z.object({
   owner: z.uuid().optional(),
   archived: z.boolean().optional().default(false),
   environment: zKey.optional(),
-  state: z.enum(["on", "off", "rules", "rollout"]).optional(),
+  state: z.enum(["on", "off", "rules", "rollout", "experiment"]).optional(),
   differs_between: z.tuple([zKey, zKey]).optional(),
   sort: z.enum(["key", "name", "updated"]).optional().default("key"),
   cursor: z.string().optional(),

@@ -252,7 +252,7 @@ func (h *MaterializeRuleset) Ruleset(ctx context.Context, environment workspace.
 }
 
 // readMaterials reads into m the declarations, segments and flags of
-// project and the flags' configurations in environment, in the snapshot ctx
+// project, the flags' configurations in environment and the experiments, in the snapshot ctx
 // carries.
 func readMaterials(ctx context.Context, declarations Declarations, configured ConfiguredFlags, project workspace.ProjectID,
 	environment workspace.EnvironmentID, m *delivery.Materials,
@@ -270,7 +270,10 @@ func readMaterials(ctx context.Context, declarations Declarations, configured Co
 	if m.Flags, err = configured.ProjectFlags(ctx, project); err != nil {
 		return err
 	}
-	m.Configurations, err = configured.EnvironmentConfigurations(ctx, environment)
+	if m.Configurations, err = configured.EnvironmentConfigurations(ctx, environment); err != nil {
+		return err
+	}
+	m.Experiments, err = configured.ProjectExperiments(ctx, project)
 	return err
 }
 

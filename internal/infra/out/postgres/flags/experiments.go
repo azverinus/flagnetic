@@ -2,6 +2,7 @@ package flags
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -10,7 +11,9 @@ import (
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 // ExperimentFlag returns the facts about project's flag with key that an
@@ -48,4 +51,53 @@ func (s *Store) RolloutSalts(ctx context.Context, project workspace.ProjectID) (
 		return nil, fmt.Errorf("reading rollout salts: %w", err)
 	}
 	return salts, nil
+}
+
+// ProjectExperiments returns every experiment of project, whatever its
+// status, by key in byte order.
+func (s *Store) ProjectExperiments(ctx context.Context, project workspace.ProjectID) ([]flags.ExperimentRef, error) {
+	return s.experimentRefs(ctx, `e.project_id = $1`, project.Bytes())
+}
+
+// FlagExperiments returns the experiments of flag, whatever their status,
+// by key in byte order.
+func (s *Store) FlagExperiments(ctx context.Context, flag flags.FlagID) ([]flags.ExperimentRef, error) {
+	return s.experimentRefs(ctx, `e.flag_id = $1`, flag.Bytes())
+}
+
+// experimentRefs returns the experiments where holds, by key in byte order.
+func (s *Store) experimentRefs(ctx context.Context, where string, arg any) ([]flags.ExperimentRef, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT e.key, e.flag_id, e.status, e.unit_type, e.inclusion_salt, e.variation_salt, e.traffic_allocation, e.variations
+		FROM experiments e
+		WHERE `+where+`
+		ORDER BY e.key COLLATE "C"`, arg)
+	if err != nil {
+		return nil, fmt.Errorf("reading experiments: %w", err)
+	}
+	defer rows.Close()
+	var out []flags.ExperimentRef
+	for rows.Next() {
+		var (
+			e       flags.ExperimentRef
+			flag    [16]byte
+			weights []byte
+			docs    []struct {
+				Variation string `json:"variation"`
+				Weight    int    `json:"weight"`
+			}
+		)
+		if err := rows.Scan(&e.Key, &flag, &e.Status, &e.UnitType, &e.InclusionSalt, &e.VariationSalt, &e.TrafficAllocation, &weights); err != nil {
+			return nil, fmt.Errorf("reading experiments: %w", err)
+		}
+		if err := json.Unmarshal(weights, &docs); err != nil {
+			return nil, fmt.Errorf("decoding the weights of experiment %s: %w", e.Key, err)
+		}
+		e.Flag = id.FromBytes[flags.Flag](flag)
+		for _, d := range docs {
+			e.Weights = append(e.Weights, flags.ExperimentWeight{Variation: d.Variation, Weight: d.Weight})
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }

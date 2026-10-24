@@ -198,6 +198,9 @@ func configurationValues(c flags.Configuration) map[string]any {
 			conditions[j] = conditionValues(cond)
 		}
 		serve := map[string]any{"kind": r.Serve.Kind, "variation": r.Serve.Variation}
+		if r.Serve.Kind == flags.ServeExperiment {
+			serve["experiment"] = r.Serve.Experiment
+		}
 		if r.Serve.Kind == flags.ServeRollout {
 			serve["unit_type"], serve["percentage"], serve["salt"] = r.Serve.UnitType, r.Serve.Percentage, r.Serve.Salt
 		}

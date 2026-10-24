@@ -18,6 +18,9 @@ type ReferentReader interface {
 	// Requirements returns, by flag key, the keys of the flags each flag's
 	// configuration in environment requires, archived flags included.
 	Requirements(ctx context.Context, environment workspace.EnvironmentID) (flags.Requirements, error)
+	// ProjectExperiments returns every experiment of project, whatever its
+	// status.
+	ProjectExperiments(ctx context.Context, project workspace.ProjectID) ([]flags.ExperimentRef, error)
 }
 
 // ConfigurationReplacer stores a flag's configuration replaced whole, and
@@ -108,6 +111,9 @@ func referentsOf(ctx context.Context, store ReferentReader, declarations Declara
 	if r.Declarations, err = declarationsOf(ctx, declarations, project); err != nil {
 		return r, err
 	}
-	r.Requirements, err = store.Requirements(ctx, environment)
+	if r.Requirements, err = store.Requirements(ctx, environment); err != nil {
+		return r, err
+	}
+	r.Experiments, err = store.ProjectExperiments(ctx, project)
 	return r, err
 }

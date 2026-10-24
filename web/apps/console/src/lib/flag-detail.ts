@@ -200,8 +200,12 @@ export function configurationViolationMessage(i18n: I18n, violation: Violation):
       return i18n._(msg`This operator does not apply to the attribute's type.`);
     case "unknown_rule":
       return i18n._(msg`This rule is no longer in the configuration.`);
-    case "experiment_not_available":
-      return i18n._(msg`Experiments are not available yet.`);
+    case "unknown_experiment":
+      return i18n._(msg`The project has no such experiment.`);
+    case "experiment_of_another_flag":
+      return i18n._(msg`This experiment compares variations of another flag.`);
+    case "experiment_not_servable":
+      return i18n._(msg`Only a draft or running experiment can be served.`);
     case "immutable":
       return i18n._(msg`This cannot be changed here.`);
     case "prerequisite_cycle": {

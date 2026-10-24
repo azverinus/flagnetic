@@ -1544,10 +1544,6 @@ msgstr "Expected removal changed from {before} to {after}."
 msgid "Experiment created"
 msgstr "Experiment created"
 
-#: src/lib/flag-detail.ts
-msgid "Experiments are not available yet."
-msgstr "Experiments are not available yet."
-
 #: src/components/token-list.tsx
 #: src/lib/sdk-keys.ts
 msgid "Expired"
@@ -2518,6 +2514,10 @@ msgstr "One with this key already exists."
 #: src/components/member-credentials.tsx
 msgid "Only {name} creates their tokens. Project tokens they created belong to their projects, not to them."
 msgstr "Only {name} creates their tokens. Project tokens they created belong to their projects, not to them."
+
+#: src/lib/flag-detail.ts
+msgid "Only a draft or running experiment can be served."
+msgstr "Only a draft or running experiment can be served."
 
 #: src/lib/problem-messages.ts
 msgid "Only a rule serving a rollout has a salt."
@@ -3701,6 +3701,10 @@ msgstr "The project has no flag with this key. It may have been deleted."
 msgid "The project has no segment with this key. It may have been deleted."
 msgstr "The project has no segment with this key. It may have been deleted."
 
+#: src/lib/flag-detail.ts
+msgid "The project has no such experiment."
+msgstr "The project has no such experiment."
+
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
 msgid "The project has no such flag, or it is archived."
@@ -3877,6 +3881,10 @@ msgstr "This device"
 #: src/components/sdk-keys.tsx
 msgid "This environment has no SDK key yet."
 msgstr "This environment has no SDK key yet."
+
+#: src/lib/flag-detail.ts
+msgid "This experiment compares variations of another flag."
+msgstr "This experiment compares variations of another flag."
 
 #: src/lib/configuration-draft.ts
 msgid "This flag is already a prerequisite."

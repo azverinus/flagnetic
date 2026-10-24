@@ -169,7 +169,7 @@ func TestFlagConfigurationsAreValidated(t *testing.T) {
 		Rules: &[]management.RuleInput{
 			{Conditions: conditions(attr("shoe_size", "eq", `"42"`), attr("app_version", "in", `["1.2.0","two"]`),
 				inSegment("nobody"), requires("absent", "true")), Serve: serves("b")},
-			{Serve: management.Serve{Kind: "experiment"}},
+			{Serve: management.Serve{Kind: "experiment", Experiment: ptr("nothing")}},
 			{Serve: rolloutOf("device", "b", 10001)},
 		},
 		Overrides: &[]management.OverrideInput{{UnitType: "user", UnitId: strings.Repeat("x", 257), Variation: "z"}},
@@ -180,7 +180,7 @@ func TestFlagConfigurationsAreValidated(t *testing.T) {
 		"/overrides/0/unit_id too_long", "/overrides/0/variation unknown_variation",
 		"/rules/0/conditions/0/attribute unknown_attribute", "/rules/0/conditions/1/value invalid_value",
 		"/rules/0/conditions/2/segment unknown_segment", "/rules/0/conditions/3/flag unknown_flag",
-		"/rules/1/serve/kind experiment_not_available",
+		"/rules/1/serve/experiment unknown_experiment",
 		"/rules/2/serve/unit_type unknown_unit_type", "/rules/2/serve/percentage invalid_value",
 	}
 	if got := violationsOf(t, "invalid", res.StatusCode(), res.Body, "invalid_configuration"); !slices.Equal(got, want) {

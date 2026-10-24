@@ -68,8 +68,8 @@ func flagPageOf(params ListFlagsParams) (appflags.FlagPage, error) {
 	}
 	if st := params.State; st != nil {
 		page.State = appflags.StateFilter(*st)
-		if !slices.Contains([]appflags.StateFilter{appflags.StateOn, appflags.StateOff, appflags.StateRules, appflags.StateRollout}, page.State) {
-			return page, flaghttp.InvalidRequest("state must be one of on, off, rules and rollout")
+		if !slices.Contains([]appflags.StateFilter{appflags.StateOn, appflags.StateOff, appflags.StateRules, appflags.StateRollout, appflags.StateExperiment}, page.State) {
+			return page, flaghttp.InvalidRequest("state must be one of on, off, rules, rollout and experiment")
 		}
 		if page.Environment == "" {
 			return page, flaghttp.InvalidRequest("state is judged in the environment named by environment")
@@ -261,7 +261,7 @@ func flagListItemOut(l appflags.ListedFlag) FlagListItem {
 		Variations: d.Variations, ArchivedAt: d.ArchivedAt, CreatedBy: d.CreatedBy, CreatedAt: d.CreatedAt,
 		UpdatedAt: d.UpdatedAt, Version: d.Version,
 		States: each(l.States, func(s appflags.FlagState) FlagState {
-			return FlagState{Environment: s.Environment, On: s.On, HasRules: s.HasRules, HasRollout: s.HasRollout}
+			return FlagState{Environment: s.Environment, On: s.On, HasRules: s.HasRules, HasRollout: s.HasRollout, HasExperiment: s.HasExperiment}
 		}),
 	}
 }

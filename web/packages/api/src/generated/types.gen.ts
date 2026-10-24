@@ -879,7 +879,7 @@ export type AuditEntryList = {
 
 export type Reference = {
   /**
-   * What names it, such as `flag` or `segment`.
+   * What names it, such as `flag`, `segment` or `experiment`.
    */
   kind: string;
   key: string;
@@ -1179,16 +1179,25 @@ export type RuleInput = {
  * `unit_type`, in basis points (0 to 10,000), the others continuing to
  * the next rule. A rollout's `salt` is given by the server and changes
  * only through regenerating it, so a write omits it or sends it
- * unchanged. Experiments are not available yet
- * (`experiment_not_available`).
+ * unchanged. `experiment` serves the experiment `experiment` of the
+ * flag, which assigns units to variations by its own weights; a rule
+ * serves a draft or running experiment of its flag
+ * (`unknown_experiment`, `experiment_of_another_flag` and
+ * `experiment_not_servable` otherwise), and several rules may serve
+ * the same one. While the experiment is a draft its rules are left
+ * out of the ruleset SDKs receive.
  *
  */
 export type Serve = {
   /**
-   * `variation` or `rollout`.
+   * `variation`, `rollout` or `experiment`.
    */
   kind: string;
   variation?: string;
+  /**
+   * The key of the experiment served, for kind `experiment`.
+   */
+  experiment?: string;
   unit_type?: string;
   percentage?: number;
   salt?: string;
@@ -1273,6 +1282,10 @@ export type FlagState = {
    * A rule of the configuration serves a rollout.
    */
   has_rollout: boolean;
+  /**
+   * A rule of the configuration serves an experiment.
+   */
+  has_experiment: boolean;
 };
 
 export type FlagCreate = {
@@ -4197,11 +4210,12 @@ export type ListFlagsData = {
     environment?: Key;
     /**
      * Lists the flags whose configuration in `environment` is on, is
-     * off, has rules, or has a rule serving a rollout; rules count
-     * whether the flag is on or off.
+     * off, has rules, has a rule serving a rollout, or has a rule
+     * serving an experiment; rules count whether the flag is on or
+     * off.
      *
      */
-    state?: "on" | "off" | "rules" | "rollout";
+    state?: "on" | "off" | "rules" | "rollout" | "experiment";
     /**
      * Two environment keys, comma separated: lists the flags whose
      * configurations differ between them in what their rulesets carry

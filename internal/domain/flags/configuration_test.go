@@ -32,10 +32,19 @@ func mustFlag(in flags.FlagInput) flags.Flag {
 	return f
 }
 
+// The project's experiments: one of each status on copy, one on another flag.
+var experimentRefs = []flags.ExperimentRef{
+	{Key: "draft_title", Flag: copyFlag.ID, Status: "draft"},
+	{Key: "running_title", Flag: copyFlag.ID, Status: "running"},
+	{Key: "stopped_title", Flag: copyFlag.ID, Status: "stopped"},
+	{Key: "archived_title", Flag: copyFlag.ID, Status: "archived"},
+	{Key: "gate_test", Flag: gateFlag.ID, Status: "draft"},
+}
+
 func referents(reqs flags.Requirements) flags.Referents {
 	return flags.Referents{
 		Flags: []flags.Flag{copyFlag, gateFlag, otherFlag, oldFlag}, Segments: []string{"beta_testers"},
-		Declarations: declarations, Requirements: reqs,
+		Declarations: declarations, Requirements: reqs, Experiments: experimentRefs,
 	}
 }
 
@@ -166,7 +175,7 @@ func TestRuleServesAreValidated(t *testing.T) {
 		{Serve: rollout("device", "z", 10001)},
 		{Serve: flags.ServeInput{Kind: "rollout", UnitType: "user", Variation: "b"}},
 		{Serve: rollout("user", "b", -1)},
-		{Serve: flags.ServeInput{Kind: "experiment"}},
+		{Serve: flags.ServeInput{Kind: "experiment", Experiment: "nothing"}},
 		{Serve: flags.ServeInput{Kind: "split"}},
 		{Serve: rollout("user", "b", 0)},
 		{Serve: rollout("anonymous", "c", 10000)},
@@ -179,7 +188,7 @@ func TestRuleServesAreValidated(t *testing.T) {
 		"/rules/2/serve/percentage invalid_value",
 		"/rules/3/serve/percentage invalid_value",
 		"/rules/4/serve/percentage invalid_value",
-		"/rules/5/serve/kind experiment_not_available",
+		"/rules/5/serve/experiment unknown_experiment",
 		"/rules/6/serve/kind invalid_value",
 	}
 	if got := configurationViolations(t, err); !slices.Equal(got, want) {
@@ -524,5 +533,76 @@ func TestRemovingAVariationIsRefusedWhileServesOverridesOrOtherFlagsNameIt(t *te
 	}
 	if got := refs(flags.DependentReferences(dependents)); !slices.Equal(got, []string{"gate production", "gate staging", "other staging"}) {
 		t.Errorf("archiving: %v", got)
+	}
+}
+
+func experimentServe(key string) flags.ServeInput {
+	return flags.ServeInput{Kind: "experiment", Experiment: key}
+}
+
+func TestARuleServesADraftOrRunningExperimentOfItsFlag(t *testing.T) {
+	in := base()
+	in.Rules = []flags.RuleInput{
+		{Serve: experimentServe("draft_title")},
+		{Serve: experimentServe("running_title")},
+		{Serve: experimentServe("draft_title")},
+	}
+	got, changed, err := replace(initial(), in, nil)
+	if err != nil || !changed.Ruleset {
+		t.Fatalf("replace = %v, %+v, want accepted, changing the ruleset", err, changed)
+	}
+	for i, want := range []string{"draft_title", "running_title", "draft_title"} {
+		if s := got.Rules[i].Serve; s.Kind != flags.ServeExperiment || s.Experiment != want || s.Variation != "" || s.Salt != "" {
+			t.Errorf("rule %d serves %+v, want the experiment %s alone", i, s, want)
+		}
+	}
+}
+
+func TestARuleServingAnExperimentIsRefusedWhenTheExperimentCannotBeServed(t *testing.T) {
+	in := base()
+	in.Rules = []flags.RuleInput{
+		{Serve: experimentServe("missing")},
+		{Serve: experimentServe("gate_test")},
+		{Serve: experimentServe("stopped_title")},
+		{Serve: experimentServe("archived_title")},
+		{Serve: flags.ServeInput{Kind: "experiment", Experiment: "draft_title", Variation: "a"}},
+		{Serve: flags.ServeInput{Kind: "variation", Variation: "a", Experiment: "draft_title"}},
+	}
+	_, _, err := replace(initial(), in, nil)
+	want := []string{
+		"/rules/0/serve/experiment unknown_experiment",
+		"/rules/1/serve/experiment experiment_of_another_flag",
+		"/rules/2/serve/experiment experiment_not_servable",
+		"/rules/3/serve/experiment experiment_not_servable",
+		"/rules/4/serve invalid_value",
+		"/rules/5/serve invalid_value",
+	}
+	if got := configurationViolations(t, err); !slices.Equal(got, want) {
+		t.Errorf("violations = %v\nwant %v", got, want)
+	}
+}
+
+func TestExperimentsHoldingAFlagAreReferencesToArchiveOrRemoveFromIt(t *testing.T) {
+	experiments := []flags.ExperimentRef{
+		{Key: "draft_title", Status: "draft", Weights: []flags.ExperimentWeight{{Variation: "a", Weight: 5000}, {Variation: "b", Weight: 5000}}},
+		{Key: "stopped_title", Status: "stopped", Weights: []flags.ExperimentWeight{{Variation: "a", Weight: 5000}, {Variation: "c", Weight: 5000}}},
+		{Key: "archived_title", Status: "archived"},
+		{Key: "running_title", Status: "running"},
+	}
+	keys := func(refs []flags.Reference) []string {
+		var out []string
+		for _, r := range refs {
+			out = append(out, r.Kind+" "+r.Key+" "+r.Environment)
+		}
+		return out
+	}
+	if got := keys(flags.ExperimentArchiveReferences(experiments)); !slices.Equal(got, []string{"experiment draft_title ", "experiment running_title "}) {
+		t.Errorf("archive references = %v, want the draft and the running experiment", got)
+	}
+	if got := keys(flags.ExperimentVariationReferences(experiments, []string{"c"})); !slices.Equal(got, []string{"experiment stopped_title "}) {
+		t.Errorf("references of c = %v, want the stopped experiment listing it", got)
+	}
+	if got := flags.ExperimentVariationReferences(experiments, []string{"z"}); len(got) != 0 {
+		t.Errorf("references of z = %v, want none", got)
 	}
 }

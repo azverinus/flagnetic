@@ -216,3 +216,54 @@ func violationsOf(t *testing.T, err error, code string) []string {
 	}
 	return out
 }
+
+// TestMaterializeLeavesOutRulesServingAnExperimentThatIsNotRunning pins that
+// preparing an experiment changes nothing any application is served, and
+// that a running one is embedded with the fields SDKs assign units by.
+func TestMaterializeLeavesOutRulesServingAnExperimentThatIsNotRunning(t *testing.T) {
+	title := newFlag("title", flags.TypeString, "a", `"A"`, "b", `"B"`)
+	configured := flags.InitialConfiguration(title, env, &author, now)
+	configured.On = true
+	rule := func(experiment string) flags.Rule {
+		return flags.Rule{
+			ID: id.New[flags.Rule](ids), Conditions: []flags.Condition{},
+			Serve: flags.Serve{Kind: flags.ServeExperiment, Experiment: experiment},
+		}
+	}
+	configured.Rules = []flags.Rule{rule("preparing"), rule("live"), rule("finished")}
+	weights := []flags.ExperimentWeight{{Variation: "b", Weight: 3000}, {Variation: "a", Weight: 7000}}
+	experiments := []flags.ExperimentRef{
+		{Key: "preparing", Flag: title.ID, Status: "draft", UnitType: "user", Weights: weights},
+		{Key: "live", Flag: title.ID, Status: "running", UnitType: "user", InclusionSalt: "0123456789abcdef",
+			VariationSalt: "fedcba9876543210", TrafficAllocation: 2500, Weights: weights},
+		{Key: "finished", Flag: title.ID, Status: "stopped", UnitType: "user", Weights: weights},
+	}
+	doc, err := delivery.Materialize(delivery.Materials{
+		Environment: "staging", Version: 1, UnitTypes: unitTypes("user"), Flags: []flags.Flag{title},
+		Configurations: []flags.Configuration{configured}, Experiments: experiments,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := eval.Decode(doc); err != nil {
+		t.Fatal(err)
+	}
+	var got eval.Ruleset
+	if err := json.Unmarshal(doc, &got); err != nil {
+		t.Fatal(err)
+	}
+	rules := got.Flags[0].Rules
+	if len(rules) != 1 {
+		t.Fatalf("rules = %+v, want only the running experiment's", rules)
+	}
+	want := eval.Serve{
+		Kind: "experiment", Experiment: "live", UnitType: "user", InclusionSalt: "0123456789abcdef",
+		VariationSalt: "fedcba9876543210", TrafficAllocation: 2500,
+		Weights: []eval.Weight{{Variation: "b", Weight: 3000}, {Variation: "a", Weight: 7000}},
+	}
+	if s := rules[0].Serve; s.Kind != want.Kind || s.Experiment != want.Experiment || s.UnitType != want.UnitType ||
+		s.InclusionSalt != want.InclusionSalt || s.VariationSalt != want.VariationSalt ||
+		s.TrafficAllocation != want.TrafficAllocation || len(s.Weights) != 2 || s.Weights[0] != want.Weights[0] || s.Weights[1] != want.Weights[1] {
+		t.Errorf("serve = %+v, want %+v", s, want)
+	}
+}

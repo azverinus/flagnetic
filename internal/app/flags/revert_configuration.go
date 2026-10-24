@@ -140,6 +140,7 @@ type configurationRecord struct {
 		Serve struct {
 			Kind       string `json:"kind"`
 			Variation  string `json:"variation"`
+			Experiment string `json:"experiment"`
 			UnitType   string `json:"unit_type"`
 			Percentage int    `json:"percentage"`
 			Salt       string `json:"salt"`
