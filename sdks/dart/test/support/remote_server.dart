@@ -63,11 +63,15 @@ final class Remote {
     final started = (await _call('start'))! as Map;
     return _RemoteServer(
       this,
-      started['server']! as int,
+      _int(started['server']),
       Uri.parse(started['url']! as String),
     );
   }
 }
+
+/// A number from the channel, which a page compiled to WebAssembly reads
+/// as a double.
+int _int(Object? number) => (number! as num).toInt();
 
 final class _RemoteServer implements ScriptedServer {
   _RemoteServer(this._remote, this._id, this.url);
@@ -92,14 +96,14 @@ final class _RemoteServer implements ScriptedServer {
             as Map;
     return _RemoteExchange(
       _remote,
-      got['exchange']! as int,
+      _int(got['exchange']),
       method: got['method']! as String,
       path: got['path']! as String,
       query: (got['query']! as Map).cast<String, String>(),
       headers: (got['headers']! as Map).cast<String, String>(),
       rawBody: base64.decode(got['body']! as String),
       arrivedAt: DateTime.fromMicrosecondsSinceEpoch(
-        got['arrived_at_us']! as int,
+        _int(got['arrived_at_us']),
       ),
     );
   }
@@ -119,17 +123,17 @@ final class _RemoteServer implements ScriptedServer {
   });
 
   @override
-  Future<int> countReceived({String? path}) async =>
-      (await _remote._call('count_received', {'server': _id, 'path': path}))!
-          as int;
+  Future<int> countReceived({String? path}) async => _int(
+    await _remote._call('count_received', {'server': _id, 'path': path}),
+  );
 
   @override
-  Future<int> unansweredAt(DateTime time) async =>
-      (await _remote._call('unanswered_at', {
-            'server': _id,
-            'at_us': time.microsecondsSinceEpoch,
-          }))!
-          as int;
+  Future<int> unansweredAt(DateTime time) async => _int(
+    await _remote._call('unanswered_at', {
+      'server': _id,
+      'at_us': time.microsecondsSinceEpoch,
+    }),
+  );
 
   @override
   Future<void> close() => _remote._call('close', {'server': _id});
@@ -204,7 +208,7 @@ final class _RemoteExchange implements ScriptedExchange {
               'headers': headers,
             }))!
             as Map;
-    return _RemoteStream(_remote, opened['stream']! as int);
+    return _RemoteStream(_remote, _int(opened['stream']));
   }
 
   @override

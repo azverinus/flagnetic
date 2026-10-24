@@ -51,6 +51,14 @@ Exposures and aliases are queued in the store, sent in batches and flushed every
 
 On iOS, Android and desktop the client holds the ruleset stream while the app is in the foreground and closes it in the background. When a change is announced it waits a random 0–3 seconds before evaluating, so the apps open at a kill switch do not all ask at once. A kill switch therefore reaches an open app within 5 seconds at the 99th percentile, and a backgrounded app at its next `foreground()`, which refetches unless the last attempt was less than 10 seconds ago. Pass `ClientOptions(sse: false)` to hold no connection: values then stay fresh within the 5 minute poll and at every `foreground()`. On the web the stream is opt-in (`sse: true`).
 
+## On the web
+
+The same package runs in an app compiled for the web, with the browser's `fetch` and no extra dependency. The client follows the page by itself: a hidden or closing page stops polling, closes the stream and hands its queued events to `navigator.sendBeacon`, so the last exposures of a visit still arrive; a page shown again, or one whose network comes back, refetches unless the last attempt was less than 10 seconds ago. A browser cannot set `User-Agent`, so the client names itself in what it posts: `sdk`, `sdk_version` and `platform` (`web` unless `ClientOptions.platform` says otherwise) in the context, and the events envelope's `sdk`. The stream, when enabled, carries the client key as the query parameter `sdk_key`; list your app's origins on the key to keep other sites from using it.
+
+## Anonymous users
+
+`anonymousUnitId(store, unitType)` returns one random ID per installation (per origin on the web) and unit type, kept in the store outside the SDK key's entries: a rotated client key keeps every anonymous user in the experiment arm they were in.
+
 ## Tests
 
 Build a client with `ClientOptions(offline: OfflineSource.document(...))` to serve a values document without a network. `client.offline` sets values, reloads the document and lists the events the client recorded.

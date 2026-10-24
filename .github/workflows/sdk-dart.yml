@@ -1,8 +1,8 @@
 name: sdk-dart
 
 # The Dart SDK: format, static analysis with infos fatal, and the unit and
-# protocol tests on the oldest Dart that Flutter's supported stable ships and
-# on the current stable. Called from ci.yml.
+# protocol tests on the VM and on Chrome, on the oldest Dart that Flutter's
+# supported stable ships and on the current stable. Called from ci.yml.
 on:
   workflow_call:
 
@@ -34,3 +34,10 @@ jobs:
         run: dart analyze --fatal-infos
       - name: Test
         run: dart test
+      # The same package compiled for the web: the browser transport and the
+      # client protocol runner against a mock server on another origin.
+      - name: Test on Chrome
+        run: dart test -p chrome
+      - name: Test on Chrome as WebAssembly
+        if: matrix.sdk == 'stable'
+        run: dart test -p chrome -c dart2wasm

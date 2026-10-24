@@ -414,7 +414,9 @@ final class FlagneticClient {
   /// old, and run the interval again.
   ///
   /// `flagnetic_flutter` calls this from a `WidgetsBindingObserver`; a plain
-  /// Dart application calls it from whatever tells it the same.
+  /// Dart application calls it from whatever tells it the same. In a
+  /// browser the client calls it itself when the page is shown again or its
+  /// network comes back.
   void foreground() {
     try {
       if (_closed) return;
@@ -439,7 +441,9 @@ final class FlagneticClient {
   }
 
   /// The app went to the background: nothing is fetched until [foreground].
-  /// Values keep serving and queued events flush best effort.
+  /// Values keep serving and queued events flush best effort. In a browser
+  /// the client calls it itself when the page is hidden or unloaded, and
+  /// the queue leaves through `navigator.sendBeacon`.
   void background() {
     try {
       if (_closed) return;
