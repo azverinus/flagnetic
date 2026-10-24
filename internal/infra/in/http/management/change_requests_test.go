@@ -549,3 +549,18 @@ func TestChangeRequestsAreListedNewestFirstByFilter(t *testing.T) {
 		assertProblem(t, name, res.StatusCode(), res.Body, http.StatusBadRequest, "invalid_request")
 	}
 }
+
+func TestAChangeRequestGoesWithTheFlagItProposesFor(t *testing.T) {
+	f := startChangeRequests(t)
+	cr := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("Turn it on", proposedOn()))
+	flag := getFlag(t, f.admin, f.project.Key, "checkout_title")
+	archived := archive(t, f.admin, f.project.Key, "checkout_title", flag.Version)
+	if archived.JSON200 == nil {
+		t.Fatalf("archive = %d: %s", archived.StatusCode(), archived.Body)
+	}
+	if res := deleteFlag(t, f.admin, f.project.Key, "checkout_title", archived.JSON200.Version); res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("delete = %d: %s", res.StatusCode(), res.Body)
+	}
+	got := do(f.dev.GetChangeRequestWithResponse(t.Context(), f.project.Key, cr.Id))
+	assertProblem(t, "a change request of a deleted flag", got.StatusCode(), got.Body, http.StatusNotFound, "not_found")
+}
