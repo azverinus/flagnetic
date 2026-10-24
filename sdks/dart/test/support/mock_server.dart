@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flagnetic/flagnetic.dart';
-import 'package:test/test.dart';
+
+import 'scripted.dart';
+
+export 'scripted.dart';
 
 /// The protocol fixtures of the monorepo checkout, relative to this
 /// package's root, where `dart test` runs.
@@ -18,37 +20,66 @@ Object? protocolJson(String path) =>
 List<int> protocolBytes(String path) =>
     File('$protocolDir/$path').readAsBytesSync();
 
-/// A client key as the platform issues them.
-const clientKey = 'fn_cli_TESTKEY0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+/// The protocol fixtures read from the checkout.
+final class CheckoutFixtures implements Fixtures {
+  /// The fixtures under [protocolDir].
+  const CheckoutFixtures();
 
-/// The store keys [clientKey] writes; another key writes its own.
-final clientKeys = StoreKeys(clientKey);
+  @override
+  Object? json(String path) => protocolJson(path);
 
-/// The path of the evaluate endpoint.
-const evaluatePath = '/sdk/v1/evaluate';
+  @override
+  List<int> bytes(String path) => protocolBytes(path);
+}
+
+/// What every answer of a server reached cross-origin carries, as the
+/// platform's CORS answer does: any origin, and the headers an SDK acts on
+/// readable by a script.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Expose-Headers':
+      'ETag, Retry-After, RateLimit-Limit, RateLimit-Remaining, '
+      'RateLimit-Reset',
+};
 
 /// One request the SDK sent, held open until the test answers it.
-final class Exchange {
-  Exchange._(this._request, this.headers, this.rawBody, this.arrivedAt);
+final class Exchange implements ScriptedExchange {
+  Exchange._(
+    this._request,
+    this.headers,
+    this.rawBody,
+    this.arrivedAt, {
+    required bool cors,
+  }) : _cors = cors;
 
   final HttpRequest _request;
+  final bool _cors;
 
   /// Request headers, lower-case names.
+  @override
   final Map<String, String> headers;
 
   /// The body as sent, before decompression.
+  @override
   final List<int> rawBody;
 
   /// When the request arrived.
+  @override
   final DateTime arrivedAt;
 
   /// The request method.
+  @override
   String get method => _request.method;
 
   /// The request path.
+  @override
   String get path => _request.uri.path;
 
+  @override
+  Map<String, String> get query => _request.uri.queryParameters;
+
   /// The body, gunzipped when the request says so, as decoded JSON.
+  @override
   Object? get json => jsonDecode(
     utf8.decode(
       headers['content-encoding'] == 'gzip' ? gzip.decode(rawBody) : rawBody,
@@ -58,6 +89,7 @@ final class Exchange {
   bool _answered = false;
 
   /// Answers with [status], [headers] and a [body] of bytes or a string.
+  @override
   Future<void> respond(
     int status, {
     Object? body,
@@ -65,6 +97,13 @@ final class Exchange {
   }) async {
     _answered = true;
     final response = _request.response..statusCode = status;
+    if (_cors) {
+      corsHeaders.forEach(response.headers.set);
+      // A browser sends a request again, unseen by the page, when a
+      // connection it reused drops without an answer; a fresh connection
+      // per request lets a dropped one fail as scripted.
+      response.persistentConnection = false;
+    }
     headers.forEach(response.headers.set);
     switch (body) {
       case final String s:
@@ -76,6 +115,7 @@ final class Exchange {
   }
 
   /// Answers 200 with a JSON document.
+  @override
   Future<void> respondJson(Object? document) => respond(
     200,
     body: jsonEncode(document),
@@ -90,18 +130,18 @@ final class Exchange {
   /// head before anything is sent. An event-stream parser ignores comments,
   /// exactly as it ignores the platform's `: hb` heartbeats, so a scripted
   /// transcript still arrives as it was written.
+  @override
   Future<OpenStream> respondStream({
-    Map<String, String> headers = const {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'X-Accel-Buffering': 'no',
-    },
+    Map<String, String> headers = eventStreamHeaders,
   }) async {
     _answered = true;
     // The socket is written by hand: a stream the SDK ends can only be told
     // from a quiet one by reading the socket, which `HttpResponse` hides.
     final socket = await _request.response.detachSocket(writeHeaders: false);
     final head = StringBuffer('HTTP/1.1 200 OK\r\nConnection: close\r\n');
+    if (_cors) {
+      corsHeaders.forEach((name, value) => head.write('$name: $value\r\n'));
+    }
     headers.forEach((name, value) => head.write('$name: $value\r\n'));
     head.write('\r\n');
     final open = OpenStream._(socket);
@@ -111,6 +151,7 @@ final class Exchange {
   }
 
   /// Drops the connection without an answer.
+  @override
   Future<void> dropConnection() async {
     _answered = true;
     final socket = await _request.response.detachSocket(writeHeaders: false);
@@ -119,7 +160,7 @@ final class Exchange {
 }
 
 /// A change stream the test holds open and writes to.
-final class OpenStream {
+final class OpenStream implements ScriptedStream {
   OpenStream._(this._socket) {
     _socket.listen(
       (_) {},
@@ -133,12 +174,14 @@ final class OpenStream {
   bool _gone = false;
 
   /// Writes [bytes] and flushes, so the SDK reads them at once.
+  @override
   Future<void> send(String bytes) async {
     _socket.add(utf8.encode(bytes));
     await _socket.flush();
   }
 
   /// Whether the SDK ends the connection within [timeout].
+  @override
   Future<bool> closedBySdk(Duration timeout) async {
     final deadline = DateTime.now().add(timeout);
     while (!_gone && DateTime.now().isBefore(deadline)) {
@@ -148,6 +191,7 @@ final class OpenStream {
   }
 
   /// Ends the stream from the server's side.
+  @override
   Future<void> closeStream() async {
     try {
       await _socket.close();
@@ -159,9 +203,27 @@ final class OpenStream {
 
 /// An in-process HTTP server that queues every request until the test
 /// answers it, so a test observes the SDK between request and response.
-final class MockServer {
-  MockServer._(this._server) {
+final class MockServer implements ScriptedServer {
+  MockServer._(this._server, {required bool cors}) {
     _server.listen((request) async {
+      if (cors && request.method == 'OPTIONS') {
+        // A preflight, answered as the platform answers it and not one of
+        // the SDK's requests.
+        final response = request.response
+          ..statusCode = 204
+          ..persistentConnection = false;
+        corsHeaders.forEach(response.headers.set);
+        response.headers
+          ..set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+          ..set(
+            'Access-Control-Allow-Headers',
+            'Authorization, Content-Type, Content-Encoding, '
+                'Flagnetic-Schema-Version, Last-Event-ID',
+          )
+          ..set('Access-Control-Max-Age', '86400');
+        await response.close();
+        return;
+      }
       final body = await request.fold<List<int>>(
         [],
         (all, chunk) => all..addAll(chunk),
@@ -170,7 +232,13 @@ final class MockServer {
       request.headers.forEach(
         (name, values) => headers[name.toLowerCase()] = values.join(', '),
       );
-      final exchange = Exchange._(request, headers, body, DateTime.now());
+      final exchange = Exchange._(
+        request,
+        headers,
+        body,
+        DateTime.now(),
+        cors: cors,
+      );
       received.add(exchange);
       final waiter = _takeWaiter(exchange.path);
       if (waiter != null) {
@@ -186,9 +254,12 @@ final class MockServer {
     });
   }
 
-  /// Starts a server on the loopback interface.
-  static Future<MockServer> start() async =>
-      MockServer._(await HttpServer.bind(InternetAddress.loopbackIPv4, 0));
+  /// Starts a server on the loopback interface; with [cors], one a page
+  /// of another origin may call, as it may call the platform.
+  static Future<MockServer> start({bool cors = false}) async => MockServer._(
+    await HttpServer.bind(InternetAddress.loopbackIPv4, 0),
+    cors: cors,
+  );
 
   final HttpServer _server;
   final List<Exchange> _pending = [];
@@ -205,6 +276,17 @@ final class MockServer {
   void autoRespond(String path, Future<void> Function(Exchange) handler) =>
       _auto[path] = handler;
 
+  @override
+  Future<void> answerAll(
+    String path,
+    int status, {
+    Map<String, String> headers = const {},
+    List<int>? body,
+  }) async => autoRespond(
+    path,
+    (poll) => poll.respond(status, headers: headers, body: body),
+  );
+
   Completer<Exchange>? _takeWaiter(String path) {
     for (final waiter in _waiters) {
       if (waiter.path == null || waiter.path == path) {
@@ -219,10 +301,12 @@ final class MockServer {
   final List<Exchange> received = [];
 
   /// The base URL SDKs are built with.
+  @override
   Uri get url => Uri.parse('http://127.0.0.1:${_server.port}');
 
   /// The next request not yet taken, to [path] when one is named, waiting
   /// up to [timeout].
+  @override
   Future<Exchange> next({
     String? path,
     Duration timeout = const Duration(seconds: 5),
@@ -256,7 +340,16 @@ final class MockServer {
   int pendingAt(DateTime time) =>
       _pending.where((e) => !e.arrivedAt.isAfter(time)).length;
 
+  @override
+  Future<int> countReceived({String? path}) async => path == null
+      ? received.length
+      : received.where((e) => e.path == path).length;
+
+  @override
+  Future<int> unansweredAt(DateTime time) async => pendingAt(time);
+
   /// Answers whatever is still open and stops.
+  @override
   Future<void> close() async {
     for (final exchange in received) {
       if (!exchange._answered) {
@@ -268,143 +361,6 @@ final class MockServer {
       }
     }
     await _server.close(force: true);
-  }
-}
-
-/// A logger hook that keeps every event.
-final class LogRecorder {
-  /// Every event received, in order.
-  final List<({LogLevel level, String event, Map<String, Object?> fields})>
-  events = [];
-
-  /// The hook to pass as [ClientOptions.logger].
-  void call(LogLevel level, String event, Map<String, Object?> fields) =>
-      events.add((level: level, event: event, fields: fields));
-
-  /// How many events named [event] were received.
-  int count(String event) => events.where((e) => e.event == event).length;
-
-  /// The fields of every event named [event].
-  List<Map<String, Object?>> fieldsOf(String event) => [
-    for (final e in events)
-      if (e.event == event) e.fields,
-  ];
-}
-
-/// Waits until [condition] holds, failing with [reason] after [timeout].
-Future<void> eventually(
-  bool Function() condition, {
-  String reason = 'condition',
-  Duration timeout = const Duration(seconds: 3),
-}) async {
-  final deadline = DateTime.now().add(timeout);
-  while (!condition()) {
-    if (DateTime.now().isAfter(deadline)) fail('timed out waiting: $reason');
-    await Future<void>.delayed(const Duration(milliseconds: 1));
-  }
-}
-
-/// The client's durations divided by 1000, so scenarios that span
-/// minutes run in milliseconds. The request timeout stays real.
-ClientOptions scaledOptions({
-  FlagneticStore? store,
-  Logger? logger,
-  Duration pollInterval = const Duration(milliseconds: 300),
-  Map<String, Object?>? bootstrap,
-  OfflineSource? offline,
-  String? platform,
-  String? appVersion,
-  int storedUnitSets = 4,
-  Duration requestTimeout = const Duration(seconds: 5),
-  Duration closeTimeout = const Duration(seconds: 2),
-  bool? sse = false,
-  Duration rulesetEventJitter = Duration.zero,
-  Random? random,
-  DateTime Function()? clock,
-  Duration minimumRefetchGap = const Duration(milliseconds: 10),
-  Duration streamSilenceTimeout = const Duration(milliseconds: 45),
-  Duration flushInterval = const Duration(hours: 1),
-  Duration retryBackoff = const Duration(milliseconds: 2),
-  Duration retryBackoffCap = const Duration(milliseconds: 300),
-  Duration unauthorizedBackoffCap = const Duration(milliseconds: 900),
-  int eventBatchSize = 100,
-  int eventQueueCapacity = 1000,
-  int exposureMemory = 1000,
-  bool sendExposures = true,
-  bool sendSummaries = true,
-  bool allowOverrides = false,
-}) => ClientOptions(
-  store: store,
-  logger: logger,
-  pollInterval: pollInterval,
-  bootstrap: bootstrap,
-  offline: offline,
-  platform: platform,
-  appVersion: appVersion,
-  storedUnitSets: storedUnitSets,
-  requestTimeout: requestTimeout,
-  closeTimeout: closeTimeout,
-  retryBackoff: retryBackoff,
-  retryBackoffCap: retryBackoffCap,
-  unauthorizedBackoffCap: unauthorizedBackoffCap,
-  flushInterval: flushInterval,
-  eventBatchSize: eventBatchSize,
-  eventQueueCapacity: eventQueueCapacity,
-  exposureMemory: exposureMemory,
-  sendExposures: sendExposures,
-  sendSummaries: sendSummaries,
-  allowOverrides: allowOverrides,
-  minimumPollInterval: const Duration(milliseconds: 30),
-  minimumRefetchGap: minimumRefetchGap,
-  sse: sse,
-  rulesetEventJitter: rulesetEventJitter,
-  random: random,
-  clock: clock,
-  streamBackoff: const Duration(milliseconds: 1),
-  streamBackoffCap: const Duration(milliseconds: 30),
-  streamCloseJitter: const Duration(milliseconds: 2),
-  streamSilenceTimeout: streamSilenceTimeout,
-  streamStableAfter: const Duration(milliseconds: 60),
-);
-
-/// Reads a scenario context.
-FlagneticContext contextOf(Object? json) {
-  final map = json! as Map<String, Object?>;
-  return FlagneticContext(
-    units: (map['units']! as Map<String, Object?>).cast<String, String>(),
-    attributes: map['attributes']! as Map<String, Object?>,
-  );
-}
-
-/// Checks that [client] serves each answer of a protocol fixture: `flag`,
-/// `type`, `default`, and the `value`, `variation` and `reason` expected.
-void expectAnswers(FlagneticClient client, List<Object?> answers) {
-  for (final answer in answers.cast<Map<String, Object?>>()) {
-    final flag = answer['flag']! as String;
-    final def = answer['default'];
-    final detail = client.getDetail(flag, def);
-    expect(
-      [detail.value, detail.variation, detail.reason],
-      [answer['value'], answer['variation'], answer['reason']],
-      reason: 'answer for $flag',
-    );
-    final typed = switch (answer['type']) {
-      'boolean' => client.getBool(flag, def! as bool),
-      'string' => client.getString(flag, def! as String),
-      'number' => client.getNumber(flag, def! as num),
-      _ => client.getJson(flag, def),
-    };
-    expect(typed, answer['value'], reason: 'typed getter for $flag');
-  }
-}
-
-/// True when [client] serves every answer (see [expectAnswers]).
-bool servesAnswers(FlagneticClient client, List<Object?> answers) {
-  try {
-    expectAnswers(client, answers);
-    return true;
-  } on TestFailure {
-    return false;
   }
 }
 
@@ -432,79 +388,3 @@ Future<InMemoryStore> storeHolding(
   await server.close();
   return target;
 }
-
-/// A values document serving `checkout` from a running experiment, in the
-/// shape `POST /sdk/v1/evaluate` answers, plus a `banner` flag
-/// with no experiment at all.
-Map<String, Object?> experimentValues({
-  bool automaticExposure = false,
-  String variation = 'treatment',
-  String reason = 'experiment',
-  bool override = false,
-  int rulesetVersion = 42,
-}) => {
-  'schema_version': 1,
-  'ruleset_version': rulesetVersion,
-  'environment': {'key': 'production', 'protected': false},
-  'flags': {
-    'checkout': {
-      'type': 'boolean',
-      'value': true,
-      'variation': variation,
-      'reason': reason,
-      'rule_id': '01JA',
-      'automatic_exposure': automaticExposure,
-      'override_influenced': override,
-      'experiment': {
-        'key': 'checkout_v2',
-        'variation': variation,
-        'unit_type': 'anonymous',
-        'unit_id': 'd-8f1c',
-        'inclusion_salt': 'a3f9c2e17b4d0e58',
-        'variation_salt': '7e1d4c90b2a6f3d1',
-        'inclusion_bucket': 3537,
-        'variation_bucket': 2898,
-        'override': override,
-      },
-    },
-    'banner': {
-      'type': 'string',
-      'value': 'Try free',
-      'variation': 'short',
-      'reason': 'targeting_match',
-      'automatic_exposure': false,
-    },
-  },
-};
-
-/// The 202 answer of the events endpoint.
-Map<String, Object?> ingestAnswer({
-  int accepted = 1,
-  int duplicates = 0,
-  List<Object?> rejected = const [],
-}) => {
-  'accepted': accepted,
-  'duplicates': duplicates,
-  'dropped_rows': 0,
-  'rejected': rejected,
-};
-
-/// Answers [exchange] with a 202 the endpoint would send.
-Future<void> acceptBatch(
-  Exchange exchange, {
-  List<Object?> rejected = const [],
-}) => exchange.respond(
-  202,
-  body: jsonEncode(ingestAnswer(rejected: rejected)),
-  headers: {'Content-Type': 'application/json'},
-);
-
-/// The events of an ingest envelope.
-List<Map<String, Object?>> eventsOf(Exchange exchange) =>
-    ((exchange.json! as Map<String, Object?>)['events']! as List<Object?>)
-        .cast<Map<String, Object?>>();
-
-/// The `event_id`s of an ingest envelope, in order.
-List<Object?> eventIdsOf(Exchange exchange) => [
-  for (final event in eventsOf(exchange)) event['event_id'],
-];

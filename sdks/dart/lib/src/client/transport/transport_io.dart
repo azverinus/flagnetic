@@ -9,6 +9,16 @@ Transport createTransport() => _IoTransport();
 /// The operating system the app runs on.
 String hostPlatform() => Platform.operatingSystem;
 
+/// No page to follow: the app calls `foreground` and `background`.
+void Function()? watchPage({
+  required void Function() hidden,
+  required void Function() visible,
+  required void Function() online,
+}) => null;
+
+/// `User-Agent` names the platform.
+String? defaultPlatformAttribute() => null;
+
 final class _IoTransport implements Transport {
   final HttpClient _http = HttpClient()..autoUncompress = true;
   final Set<HttpClientRequest> _inFlight = {};
@@ -124,6 +134,9 @@ final class _IoTransport implements Transport {
       _inFlight.remove(request);
     }
   }
+
+  @override
+  bool beacon(Uri url, String body) => false;
 
   @override
   void close() {
