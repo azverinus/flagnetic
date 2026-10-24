@@ -1258,7 +1258,7 @@ export type PatchOperation = {
    */
   path: string;
   /**
-   * The value added or replaced, of any JSON type.
+   * The value added or replaced, of any JSON type, null included.
    */
   value?: unknown;
 };
