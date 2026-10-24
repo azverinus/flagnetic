@@ -541,4 +541,11 @@ func TestChangeRequestsAreListedNewestFirstByFilter(t *testing.T) {
 	assertProblem(t, "a cursor not answered", bad.StatusCode(), bad.Body, http.StatusBadRequest, "invalid_request")
 	over := do(f.dev.ListChangeRequestsWithResponse(t.Context(), f.project.Key, &management.ListChangeRequestsParams{Limit: ptr(201)}))
 	assertProblem(t, "a limit over 200", over.StatusCode(), over.Body, http.StatusBadRequest, "invalid_request")
+	for name, params := range map[string]*management.ListChangeRequestsParams{
+		"an unknown kind":  {Kind: ptr(management.ChangeRequestKind("flag"))},
+		"an unknown state": {State: ptr(management.ChangeRequestState("pending"))},
+	} {
+		res := do(f.dev.ListChangeRequestsWithResponse(t.Context(), f.project.Key, params))
+		assertProblem(t, name, res.StatusCode(), res.Body, http.StatusBadRequest, "invalid_request")
+	}
 }

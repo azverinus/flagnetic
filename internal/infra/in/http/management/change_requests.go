@@ -25,10 +25,18 @@ const (
 func (a *api) ListChangeRequests(ctx context.Context, req ListChangeRequestsRequestObject) (ListChangeRequestsResponseObject, error) {
 	p := req.Params
 	f := appgovernance.ChangeRequestFilter{Project: projectID(ctx), Flag: valueOf(p.Flag), Environment: valueOf(p.Environment)}
+	// An unknown kind or state would match nothing, which reads as no
+	// change request of it rather than as a filter misspelt.
 	if p.Kind != nil {
+		if !p.Kind.Valid() {
+			return nil, flaghttp.InvalidRequest("kind must be one of flag_configuration, definition and experiment")
+		}
 		f.Kind = governance.ChangeRequestKind(*p.Kind)
 	}
 	if p.State != nil {
+		if !p.State.Valid() {
+			return nil, flaghttp.InvalidRequest("state must be one of draft, open, approved, rejected, applied, cancelled and superseded")
+		}
 		f.State = governance.ChangeRequestState(*p.State)
 	}
 	if p.Author != nil {
