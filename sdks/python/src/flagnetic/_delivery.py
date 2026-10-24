@@ -1,7 +1,7 @@
-"""The delivery thread: fetches the ruleset, holds the change stream, polls and backs off.
+"""The delivery thread: fetches the ruleset, holds the ruleset stream, polls and backs off.
 
 One daemon thread does it all, so a client costs one thread however many
-flags it serves. The change stream is read from its socket by the thread
+flags it serves. The ruleset stream is read from its socket by the thread
 itself, between fetches, with ``select`` waiting for whichever comes first:
 bytes on the stream, the next fetch or reconnect due, the heartbeat deadline,
 or a wake-up from ``close``.
@@ -22,14 +22,11 @@ import time
 import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
 
 from . import _events
 from ._sse import ChunkedDecoder, EventStreamParser, Frame, StreamError
-
-if TYPE_CHECKING:
-    pass
 
 API_PATH = "/sdk/v1"
 
@@ -143,9 +140,15 @@ class Host(Protocol):
     def mark_ready(self) -> None: ...
 
 
+# Doublings beyond this reach any limit from any base; capping the exponent keeps a long outage's
+# count of failures from overflowing the float the ceiling is computed in.
+_MAX_DOUBLINGS = 64
+
+
 def backoff_ceiling(failures: int, base: float, limit: float) -> float:
     """The exponential ceiling of the nth consecutive failure: the base doubling up to the limit."""
-    return float(min(base * 2 ** max(failures - 1, 0), limit))
+    doublings = min(max(failures - 1, 0), _MAX_DOUBLINGS)
+    return min(base * 2.0**doublings, limit)
 
 
 def full_jitter(ceiling: float) -> float:
@@ -161,7 +164,7 @@ def user_agent(version: str, platform: str) -> str:
 class _Unbuffered(http.client.HTTPResponse):
     """A response that reads no further than the end of the headers.
 
-    The change stream's body is read from the socket by the delivery thread, so
+    The ruleset stream's body is read from the socket by the delivery thread, so
     nothing of it may sit in a buffer of ``http.client`` where ``select`` cannot see it.
     """
 
@@ -223,11 +226,13 @@ class Delivery:
         self._announced = 0
         self._catch_ups = 0
         self._wake_fetch = False
-        # The version the change stream last asked for.
+        # The version the ruleset stream last asked for.
         self._target = 0
 
-        # The change stream.
+        # The ruleset stream.
         self._fetch_conn: http.client.HTTPConnection | None = None
+        # The stream connection between its request and its response headers.
+        self._opening_conn: http.client.HTTPConnection | None = None
         self._conn: http.client.HTTPConnection | None = None
         self._resp: http.client.HTTPResponse | None = None
         self._stream_sock: socket.socket | None = None
@@ -251,7 +256,11 @@ class Delivery:
         with contextlib.suppress(OSError):
             self._wake_write.send(b"x")
         # A request in flight ends now rather than at its timeout.
-        for sock in (getattr(self._fetch_conn, "sock", None), self._stream_sock):
+        for sock in (
+            getattr(self._fetch_conn, "sock", None),
+            getattr(self._opening_conn, "sock", None),
+            self._stream_sock,
+        ):
             if sock is not None:
                 with contextlib.suppress(OSError):
                     sock.shutdown(socket.SHUT_RDWR)
@@ -379,6 +388,10 @@ class Delivery:
         conn = self._connection(self._secure, stream=False)
         self._fetch_conn = conn
         try:
+            conn.connect()
+            # A close that came while connecting found no socket to shut down.
+            if self._closing.is_set():
+                return _FETCH_CLOSING
             conn.request("GET", self._ruleset_path, headers=headers)
             resp = conn.getresponse()
             status = resp.status
@@ -447,7 +460,7 @@ class Delivery:
             raise EOFError("gzip stream ends early")
         return out
 
-    # -- the change stream ------------------------------------------------
+    # -- the ruleset stream ------------------------------------------------
 
     def _open_stream(self) -> None:
         host = self._host
@@ -464,7 +477,14 @@ class Delivery:
         if last_event_id > 0:
             headers["Last-Event-ID"] = str(last_event_id)
         conn = self._connection(self._secure, stream=True)
+        # Held where close can shut it down, so a server slow to answer never delays a close.
+        self._opening_conn = conn
         try:
+            conn.connect()
+            # A close that came while connecting found no socket to shut down.
+            if self._closing.is_set():
+                conn.close()
+                return
             conn.request("GET", self._stream_path, headers=headers)
             resp = conn.getresponse()
         except TimeoutError as err:
@@ -479,6 +499,8 @@ class Delivery:
             if not self._closing.is_set():
                 self._stream_dropped_before_open(CAUSE_NETWORK, err, 0)
             return
+        finally:
+            self._opening_conn = None
         # The first fetch waits for this attempt, so that the stream is open before it
         # and no change falls between the two.
         self._first_attempt_done = True

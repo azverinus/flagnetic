@@ -83,11 +83,11 @@ class Client:
 
     ``poll_interval``
         Seconds between ruleset fetches (with ``If-None-Match``) while the
-        change stream is connected; default 300, at least 30. While the stream
+        ruleset stream is connected; default 300, at least 30. While the stream
         is down or disabled the safety poll runs every 30 seconds instead, so
         a kill switch is never further away than that.
     ``stream``
-        Whether to hold the change stream; on by default. It carries nothing
+        Whether to hold the ruleset stream; on by default. It carries nothing
         but the new ruleset version, so a kill switch reaches the client
         within two seconds; with it off the safety poll is the only notice,
         which is what a proxy that blocks ``text/event-stream`` leaves.
@@ -530,7 +530,7 @@ class _Host:
             client._set_stage(Stage.LAST_GOOD)
 
     def key_revoked(self, status: int) -> None:
-        """Logs key_revoked once, however many of the fetch loop and the change stream see the refusal."""
+        """Logs key_revoked once, however many of the fetch loop and the ruleset stream see the refusal."""
         client = self._client
         if not client._revoked:
             client._revoked = True

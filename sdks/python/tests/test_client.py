@@ -26,7 +26,7 @@ JSON = {"Content-Type": "application/json", "ETag": '"1"'}
 
 
 def serving(document: bytes, etag: str = '"1"') -> MockServer:
-    """A server that serves ``document`` on the ruleset endpoint and refuses the change stream."""
+    """A server that serves ``document`` on the ruleset endpoint and refuses the ruleset stream."""
 
     def handler(request: Request) -> Response:
         if request.path.endswith("/stream"):
@@ -490,3 +490,55 @@ def test_a_malformed_ruleset_event_drops_the_stream_and_it_reconnects(clients: A
     assert eventually(lambda: [] if len(streams) == 2 else ["no reconnect"]) == []
     assert [f["cause"] for f in logs.named("sse_dropped")] == ["malformed"]
     assert streams[1].headers["last-event-id"] == "1"
+
+
+def test_close_ends_the_thread_while_the_stream_waits_for_its_answer(clients: Any) -> None:
+    release = threading.Event()
+    arrived = threading.Event()
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            arrived.set()
+            release.wait(10)
+            return Response(500)
+        return Response(200, JSON, RULESET)
+
+    client = clients(MockServer(handler), stream=True)
+    assert arrived.wait(5)
+    started = time.monotonic()
+    client.close()
+    assert time.monotonic() - started < 2
+    assert not [t for t in threading.enumerate() if t.name == "flagnetic" and t.is_alive()]
+    release.set()
+
+
+def test_a_long_outage_never_stops_the_thread() -> None:
+    # Thousands of failed connections in a row, as hours of an unreachable server make.
+    logs = Logs()
+    client = flagnetic.Client(SDK_KEY, "http://127.0.0.1:1", logger=logs, _time_divisor=100_000)
+    try:
+        assert eventually(lambda: [] if logs.count("sse_dropped") > 1500 else ["too few"], 30) == []
+        assert logs.count("evaluation_failed") == 0
+        assert [t for t in threading.enumerate() if t.name == "flagnetic" and t.is_alive()]
+    finally:
+        client.close()
+
+
+def test_an_event_too_long_to_be_a_version_drops_the_stream(clients: Any) -> None:
+    logs = Logs()
+    streams: list[Request] = []
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            streams.append(request)
+            return Response(200, {"Content-Type": "text/event-stream"}, stream=True)
+        return Response(200, JSON, RULESET)
+
+    server = MockServer(handler)
+    client = clients(server, stream=True, logger=logs, _time_divisor=100, poll_interval=3600)
+    assert client.ready(5) is flagnetic.Stage.FRESH
+    assert eventually(lambda: [] if streams else ["no stream"]) == []
+    for _ in range(80):
+        server.stream_send(b"data: " + b"x" * 1024 + b"\n")
+    assert eventually(lambda: [] if len(streams) == 2 else ["no reconnect"]) == []
+    assert [f["cause"] for f in logs.named("sse_dropped")] == ["malformed"]

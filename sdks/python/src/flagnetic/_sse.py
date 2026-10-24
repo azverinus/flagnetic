@@ -1,20 +1,20 @@
-"""The change stream's wire format: chunked transfer coding and the event stream."""
+"""The ruleset stream's wire format: chunked transfer coding and the event stream."""
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 
-# One line of the change stream. The only event the stream carries is a
-# version, so a longer line is a broken or hostile server and ends the
-# connection.
+# One line, or the data of one event, of the ruleset stream. The only event the
+# stream carries is a version, so anything longer is a broken or hostile server
+# and ends the connection.
 MAX_LINE_BYTES = 64 << 10
 
 _LINE_END = re.compile(rb"\r\n|\r|\n")
 
 
 class StreamError(Exception):
-    """The bytes of the change stream are not what the stream claims to be."""
+    """The bytes of the ruleset stream are not what the stream claims to be."""
 
 
 class ChunkedDecoder:
@@ -73,7 +73,7 @@ class ChunkedDecoder:
 
 @dataclass(frozen=True, slots=True)
 class Frame:
-    """One block of the change stream: a dispatched event, or a comment such as the heartbeat."""
+    """One block of the ruleset stream: a dispatched event, or a comment such as the heartbeat."""
 
     comment: bool = False
     event: str = ""
@@ -93,6 +93,7 @@ class EventStreamParser:
         self._pending = b""
         self._event = ""
         self._data: list[str] = []
+        self._data_size = 0
         self._id = ""
         # The reconnection time the server last asked for, in seconds; None until it sends one.
         self.retry: float | None = None
@@ -124,6 +125,7 @@ class EventStreamParser:
                 frames.append(Frame(event=self._event, id=self._id, data="\n".join(self._data)))
             self._event = ""
             self._data = []
+            self._data_size = 0
         elif line.startswith(":"):
             # A comment never interrupts the block being accumulated, but it
             # proves the server is there.
@@ -135,6 +137,9 @@ class EventStreamParser:
                 self._event = value
             elif field == "data":
                 self._data.append(value)
+                self._data_size += len(value) + 1
+                if self._data_size > MAX_LINE_BYTES:
+                    raise StreamError("event stream event too long")
             elif field == "id":
                 if "\0" not in value:
                     self._id = value

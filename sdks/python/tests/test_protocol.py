@@ -25,7 +25,7 @@ EXPERIMENTS = read_json("experiment-scenarios.json")
 CONTEXT = flagnetic.Context(**FILES["context"])
 
 # Time is compressed by one factor: the client's waits and the scenario's durations are divided by it.
-# The change stream's scenarios watch for silences of a fraction of a minute, so they need the margins
+# The ruleset stream's scenarios watch for silences of a fraction of a minute, so they need the margins
 # a smaller factor leaves; the revoked key's backoff climbs to 15 minutes and needs a larger one.
 CATCH_UP = (
     "server: a fetch below the event's version is retried after 1, 2 and 4 seconds and never downgrades"
@@ -39,7 +39,7 @@ DIVISORS = {
 }
 DEFAULT_DIVISOR = 50
 
-# The scenarios of the fetch loop and the change stream, whole, and how many steps of each are played.
+# The scenarios of the fetch loop and the ruleset stream, whole, and how many steps of each are played.
 # A scenario ends with a step that sends events, which this client does not do yet: its steps up to
 # there are played.
 DELIVERY: dict[str, int | None] = {

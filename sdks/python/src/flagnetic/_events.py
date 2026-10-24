@@ -18,9 +18,9 @@ RULESET_LOADED = "ruleset_loaded"
 #: network, http_status, unauthorized, parse, schema_unsupported, wrong_scope, version_downgrade),
 #: error, and status for an HTTP status.
 FETCH_FAILED = "fetch_failed"
-#: info: the change stream is open. Fields: last_event_id, the held version the stream resumes from.
+#: info: the ruleset stream is open. Fields: last_event_id, the held version the stream resumes from.
 SSE_CONNECTED = "sse_connected"
-#: info for a server-side close, warning otherwise: the change stream ended. Fields: cause
+#: info for a server-side close, warning otherwise: the ruleset stream ended. Fields: cause
 #: (server_closed, silence, timeout, network, http_status, unauthorized, malformed), error,
 #: reconnect (false where the stream stays down), and status for an HTTP status.
 SSE_DROPPED = "sse_dropped"

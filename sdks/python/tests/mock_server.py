@@ -26,7 +26,7 @@ class Response:
     body: bytes = b""
     #: Drop the connection without answering.
     network_error: bool = False
-    #: Keep the response open as the change stream, which ``stream_send`` and ``stream_close`` drive.
+    #: Keep the response open as the ruleset stream, which ``stream_send`` and ``stream_close`` drive.
     stream: bool = False
 
 
@@ -36,11 +36,15 @@ _CLOSE = object()
 
 
 class MockServer:
-    """Serves every request through ``handler``; the change stream is driven from the test."""
+    """Serves every request through ``handler``; the ruleset stream is driven from the test."""
 
     def __init__(self, handler: Handler) -> None:
         self._handler = handler
         self._streams: queue.Queue[Any] | None = None
+        # Set while a stream is held: its headers are sent after the handler saw its request, so a
+        # test that sends as soon as the request arrived waits for it here.
+        self._stream_open = threading.Event()
+        self._stream_lock = threading.Lock()
         self._stopping = threading.Event()
         outer = self
 
@@ -64,13 +68,15 @@ class MockServer:
         return f"http://{host!s}:{port}"
 
     def stream_send(self, data: bytes) -> None:
-        """Writes ``data`` to the open change stream."""
-        assert self._streams is not None, "no change stream is open"
+        """Writes ``data`` to the open ruleset stream."""
+        assert self._stream_open.wait(5), "no ruleset stream is open"
+        assert self._streams is not None
         self._streams.put(data)
 
     def stream_close(self) -> None:
-        """Ends the open change stream from the server's side."""
-        assert self._streams is not None, "no change stream is open"
+        """Ends the open ruleset stream from the server's side."""
+        assert self._stream_open.wait(5), "no ruleset stream is open"
+        assert self._streams is not None
         self._streams.put(_CLOSE)
 
     def close(self) -> None:
@@ -102,7 +108,9 @@ class MockServer:
 
     def _hold_stream(self, h: BaseHTTPRequestHandler) -> None:
         items: queue.Queue[Any] = queue.Queue()
-        self._streams = items
+        with self._stream_lock:
+            self._streams = items
+            self._stream_open.set()
         h.close_connection = True
         try:
             while not self._stopping.is_set():
@@ -118,3 +126,7 @@ class MockServer:
                 h.wfile.flush()
         except OSError:
             return
+        finally:
+            with self._stream_lock:
+                if self._streams is items:
+                    self._stream_open.clear()
