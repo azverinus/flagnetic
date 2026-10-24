@@ -303,7 +303,8 @@ describe("the experiment form's issues", () => {
       { variations: flagVariations, base },
     );
     expect(Object.fromEntries(issues.fields)).toEqual({
-      traffic_allocation: "While the experiment runs its traffic allocation can only grow, from 50.00 %.",
+      traffic_allocation:
+        "While the experiment runs its traffic allocation can only grow, from 50.00 %.",
     });
     expect(issues.weights).toEqual({ rows: [], total: undefined });
   });

@@ -415,7 +415,9 @@ export function experimentIssues(
       const from = percentText(i18n, base.traffic_allocation);
       fields.set(
         "traffic_allocation",
-        i18n._(msg`While the experiment runs its traffic allocation can only grow, from ${from} %.`),
+        i18n._(
+          msg`While the experiment runs its traffic allocation can only grow, from ${from} %.`,
+        ),
       );
     }
   }
