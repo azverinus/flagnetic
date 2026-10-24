@@ -57,7 +57,7 @@ The same package runs in an app compiled for the web, with the browser's `fetch`
 
 ## Anonymous users
 
-`anonymousUnitId(store, unitType)` returns one random ID per installation (per origin on the web) and unit type, kept in the store outside the SDK key's entries: a rotated client key keeps every anonymous user in the experiment arm they were in.
+`anonymousUnitId(store, unitType)` returns one random ID per device (per origin on the web) and unit type, kept in the store outside the SDK key's entries: a rotated client key keeps every anonymous user in the experiment arm they were in.
 
 ## Tests
 

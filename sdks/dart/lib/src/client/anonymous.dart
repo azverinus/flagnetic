@@ -9,7 +9,7 @@ import 'uuid.dart';
 String anonymousUnitIdKey(String unitType) =>
     '${storeKeyPrefix}anonymous.$unitType';
 
-/// The unit ID this installation uses for the anonymous unit type
+/// The unit ID this device (this origin in a browser) uses for the anonymous unit type
 /// [unitType], generating and persisting a random one the first time.
 ///
 /// The unit type is the application's: a project declares its own unit
