@@ -1,3 +1,6 @@
+// Package events is the domain of the events context: the events SDKs post,
+// how each is judged on its own, and how an exposure is judged against the
+// experiment it names.
 package events
 
 import (
