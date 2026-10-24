@@ -831,7 +831,7 @@
                 "kind": "attribute",
                 "attribute": "n",
                 "op": "eq",
-                "value": 100.0
+                "value": 1e2
               }
             ],
             "serve": {
