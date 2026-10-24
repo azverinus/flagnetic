@@ -169,14 +169,24 @@ func (s *Store) ExperimentByKey(ctx context.Context, project workspace.ProjectID
 	return e, nil
 }
 
-// Experiments returns up to limit experiments of project by key in byte
-// order, those whose key is greater than after when it is not "".
-func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, after string, limit int) ([]experiments.Experiment, error) {
+// Experiments returns up to limit experiments of project matching filter by
+// key in byte order, those whose key is greater than after when it is not "".
+func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, filter appexperiments.ExperimentFilter,
+	after string, limit int) ([]experiments.Experiment, error) {
+	var owner any
+	if filter.Owner != nil {
+		owner = filter.Owner.Bytes()
+	}
 	rows, err := s.db(ctx).Query(ctx, `
 		SELECT `+columns+from+`
 		WHERE e.project_id = $1 AND ($2 = '' OR e.key COLLATE "C" > $2)
+		  AND ($3 = '' OR e.status = $3)
+		  AND ($4 OR $3 = 'archived' OR e.status <> 'archived')
+		  AND ($5 = '' OR f.key = $5)
+		  AND ($6::uuid IS NULL OR e.owner_id = $6)
+		  AND ($7 = '' OR $7 = ANY (e.tags))
 		ORDER BY e.key COLLATE "C"
-		LIMIT $3`, project.Bytes(), after, limit)
+		LIMIT $8`, project.Bytes(), after, string(filter.Status), filter.IncludeArchived, filter.Flag, owner, filter.Tag, limit)
 	if err != nil {
 		return nil, fmt.Errorf("listing experiments: %w", err)
 	}
@@ -190,4 +200,44 @@ func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, af
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+// UpdateExperiment stores the changed definition e, which keeps its key,
+// project and creation.
+func (s *Store) UpdateExperiment(ctx context.Context, e experiments.Experiment) error {
+	docs := make([]weightDoc, len(e.Variations))
+	for i, w := range e.Variations {
+		docs[i] = weightDoc(w)
+	}
+	variations, err := json.Marshal(docs)
+	if err != nil {
+		return err
+	}
+	tag, err := s.db(ctx).Exec(ctx, `
+		UPDATE experiments SET name = $2, hypothesis = $3, owner_id = $4, tags = $5, flag_id = $6, unit_type = $7,
+		    variations = $8, traffic_allocation = $9, inclusion_salt = $10, variation_salt = $11, status = $12,
+		    expected_end_at = $13, started_at = $14, stopped_at = $15, archived_at = $16, updated_at = $17, version = $18
+		WHERE id = $1`,
+		e.ID.Bytes(), e.Name, e.Hypothesis, e.Owner.Bytes(), e.Tags, e.Flag.Bytes(), e.UnitType, variations,
+		e.TrafficAllocation, e.InclusionSalt, e.VariationSalt, string(e.Status), e.ExpectedEndAt, e.StartedAt,
+		e.StoppedAt, e.ArchivedAt, e.UpdatedAt, e.Version)
+	if err != nil {
+		return fmt.Errorf("updating an experiment: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return appexperiments.ErrNotFound
+	}
+	return nil
+}
+
+// DeleteExperiment deletes the experiment.
+func (s *Store) DeleteExperiment(ctx context.Context, experiment experiments.ExperimentID) error {
+	tag, err := s.db(ctx).Exec(ctx, `DELETE FROM experiments WHERE id = $1`, experiment.Bytes())
+	if err != nil {
+		return fmt.Errorf("deleting an experiment: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return appexperiments.ErrNotFound
+	}
+	return nil
 }

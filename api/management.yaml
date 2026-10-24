@@ -2130,11 +2130,40 @@ paths:
       summary: The project's experiments
       description: |
         The project's experiments by key in byte order (capitals before
-        lower case). Page with `cursor` set to the `next_cursor` of the
-        previous page.
+        lower case). Every filter given applies. Archived experiments are
+        left out unless `include_archived` is true or `status` is
+        `archived`. Page with `cursor` set to the `next_cursor` of the
+        previous page, under the same filters.
       x-permission: project.read
       tags: [experiments]
       parameters:
+        - name: status
+          in: query
+          description: Lists the experiments in this status.
+          schema:
+            $ref: "#/components/schemas/ExperimentStatus"
+        - name: flag
+          in: query
+          description: The key of the flag the experiments compare; a flag the project does not have lists nothing.
+          schema:
+            type: string
+        - name: owner
+          in: query
+          description: The member owning the experiment.
+          schema:
+            type: string
+            format: uuid
+        - name: tag
+          in: query
+          description: A tag the experiment carries, matched exactly.
+          schema:
+            type: string
+        - name: include_archived
+          in: query
+          description: Lists archived experiments too.
+          schema:
+            type: boolean
+            default: false
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -2219,6 +2248,163 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateExperiment
+      summary: Change a draft experiment
+      description: |
+        Changes any of the name, hypothesis, owner, tags, flag, unit type,
+        variations, traffic allocation or expected end date of a draft, as a
+        create judges them; the key never changes (`immutable`). Only a draft
+        is changed (`not_draft`). A change to the values the experiment
+        already has changes nothing and records nothing.
+      x-permission: experiment.edit
+      tags: [experiments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentPatch"
+      responses:
+        "200":
+          description: The experiment as changed.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+    delete:
+      operationId: deleteExperiment
+      summary: Delete a draft experiment
+      description: |
+        Deletes the experiment. Only a draft is deleted (`not_draft`): once
+        started, an experiment keeps its history.
+      x-permission: experiment.delete
+      tags: [experiments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "204":
+          description: Deleted.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/experiments/{experiment}/salts:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+    post:
+      operationId: regenerateExperimentSalts
+      summary: Regenerate a draft's salts
+      description: |
+        Draws a new inclusion salt and a new variation salt, apart from every
+        salt of the project's experiments and rollouts. Only a draft has its
+        salts regenerated (`not_draft`): past the draft, units have been
+        assigned from them.
+      x-permission: experiment.edit
+      tags: [experiments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The experiment with its new salts.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/experiments/{experiment}/clone:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+    post:
+      operationId: cloneExperiment
+      summary: Clone an experiment into a new draft
+      description: |
+        Copies an experiment of any status into a new draft under a new key,
+        with new salts and no decision: the rerun of a stopped experiment
+        never reuses its assignments. The name, hypothesis, tags, flag, unit
+        type, weights, traffic allocation and expected end date are copied;
+        the owner is the calling member (the source's, for a project token).
+        The clone is judged as a create is. The source is not changed, so no
+        `If-Match`.
+      x-permission: experiment.edit
+      tags: [experiments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentClone"
+      responses:
+        "201":
+          description: The clone.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/change-requests:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -4971,6 +5157,57 @@ components:
         expected_end_at:
           type: string
           format: date
+    ExperimentPatch:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Refused with `immutable` whatever its value.
+        name:
+          $ref: "#/components/schemas/Name"
+        hypothesis:
+          type: string
+          maxLength: 2000
+        owner:
+          type: string
+          format: uuid
+          description: A new owner must be an active member holding a grant in the project, or an instance admin.
+        tags:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 64
+        flag:
+          type: string
+          description: The key of a flag of the project that is not archived; the variations are judged against it.
+        unit_type:
+          type: string
+          description: The key of a unit type the project declares.
+        variations:
+          type: array
+          minItems: 2
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/ExperimentWeight"
+        traffic_allocation:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        expected_end_at:
+          type: string
+          format: date
+    ExperimentClone:
+      type: object
+      required: [key]
+      properties:
+        key:
+          type: string
+          pattern: "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"
+          description: The clone's key, unique, case sensitively, in the project (`already_exists`).
+        name:
+          $ref: "#/components/schemas/Name"
     FlagDefinition:
       type: object
       required: [id, key, type, name, description, owner, tags, lifetime, expected_removal_at, automatic_exposure,

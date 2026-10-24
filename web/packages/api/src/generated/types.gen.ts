@@ -1031,6 +1031,39 @@ export type ExperimentCreate = {
   expected_end_at?: string;
 };
 
+export type ExperimentPatch = {
+  /**
+   * Refused with `immutable` whatever its value.
+   */
+  key?: string;
+  name?: Name;
+  hypothesis?: string;
+  /**
+   * A new owner must be an active member holding a grant in the project, or an instance admin.
+   */
+  owner?: string;
+  tags?: Array<string>;
+  /**
+   * The key of a flag of the project that is not archived; the variations are judged against it.
+   */
+  flag?: string;
+  /**
+   * The key of a unit type the project declares.
+   */
+  unit_type?: string;
+  variations?: Array<ExperimentWeight>;
+  traffic_allocation?: number;
+  expected_end_at?: string;
+};
+
+export type ExperimentClone = {
+  /**
+   * The clone's key, unique, case sensitively, in the project (`already_exists`).
+   */
+  key: string;
+  name?: Name;
+};
+
 export type FlagDefinition = {
   id: string;
   /**
@@ -5467,6 +5500,26 @@ export type ListExperimentsData = {
   };
   query?: {
     /**
+     * Lists the experiments in this status.
+     */
+    status?: ExperimentStatus;
+    /**
+     * The key of the flag the experiments compare; a flag the project does not have lists nothing.
+     */
+    flag?: string;
+    /**
+     * The member owning the experiment.
+     */
+    owner?: string;
+    /**
+     * A tag the experiment carries, matched exactly.
+     */
+    tag?: string;
+    /**
+     * Lists archived experiments too.
+     */
+    include_archived?: boolean;
+    /**
      * The `next_cursor` of the previous page.
      */
     cursor?: string;
@@ -5574,6 +5627,85 @@ export type CreateExperimentResponses = {
 
 export type CreateExperimentResponse = CreateExperimentResponses[keyof CreateExperimentResponses];
 
+export type DeleteExperimentData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/experiments/{experiment}";
+};
+
+export type DeleteExperimentErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type DeleteExperimentError = DeleteExperimentErrors[keyof DeleteExperimentErrors];
+
+export type DeleteExperimentResponses = {
+  /**
+   * Deleted.
+   */
+  204: void;
+};
+
+export type DeleteExperimentResponse = DeleteExperimentResponses[keyof DeleteExperimentResponses];
+
 export type GetExperimentData = {
   body?: never;
   path: {
@@ -5625,6 +5757,234 @@ export type GetExperimentResponses = {
 };
 
 export type GetExperimentResponse = GetExperimentResponses[keyof GetExperimentResponses];
+
+export type UpdateExperimentData = {
+  body: ExperimentPatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/experiments/{experiment}";
+};
+
+export type UpdateExperimentErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type UpdateExperimentError = UpdateExperimentErrors[keyof UpdateExperimentErrors];
+
+export type UpdateExperimentResponses = {
+  /**
+   * The experiment as changed.
+   */
+  200: Experiment;
+};
+
+export type UpdateExperimentResponse = UpdateExperimentResponses[keyof UpdateExperimentResponses];
+
+export type RegenerateExperimentSaltsData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/experiments/{experiment}/salts";
+};
+
+export type RegenerateExperimentSaltsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type RegenerateExperimentSaltsError =
+  RegenerateExperimentSaltsErrors[keyof RegenerateExperimentSaltsErrors];
+
+export type RegenerateExperimentSaltsResponses = {
+  /**
+   * The experiment with its new salts.
+   */
+  200: Experiment;
+};
+
+export type RegenerateExperimentSaltsResponse =
+  RegenerateExperimentSaltsResponses[keyof RegenerateExperimentSaltsResponses];
+
+export type CloneExperimentData = {
+  body: ExperimentClone;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/experiments/{experiment}/clone";
+};
+
+export type CloneExperimentErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CloneExperimentError = CloneExperimentErrors[keyof CloneExperimentErrors];
+
+export type CloneExperimentResponses = {
+  /**
+   * The clone.
+   */
+  201: Experiment;
+};
+
+export type CloneExperimentResponse = CloneExperimentResponses[keyof CloneExperimentResponses];
 
 export type ListChangeRequestsData = {
   body?: never;

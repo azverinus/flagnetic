@@ -68,36 +68,8 @@ func (h *CreateExperiment) Handle(ctx context.Context, cmd CreateExperimentComma
 		if err := lockProject(ctx, h.d.Projects, cmd.Project); err != nil {
 			return err
 		}
-		owner, err := h.owner(ctx, cmd)
+		e, err := h.create(ctx, cmd, now)
 		if err != nil {
-			return err
-		}
-		flag, err := h.flag(ctx, cmd)
-		if err != nil {
-			return err
-		}
-		units, err := h.d.UnitTypes.UnitTypes(ctx, cmd.Project)
-		if err != nil {
-			return err
-		}
-		salts, err := h.salts(ctx, cmd.Project)
-		if err != nil {
-			return err
-		}
-		declared := make([]string, len(units))
-		for i, u := range units {
-			declared[i] = u.Key
-		}
-		e, err := experiments.New(experiments.Input{
-			ID: id.New[experiments.Experiment](h.d.Recorder.ids), Project: cmd.Project, Key: cmd.Key, Name: cmd.Name,
-			Hypothesis: cmd.Hypothesis, Owner: owner, Tags: cmd.Tags, Flag: flag, FlagKey: cmd.Flag, UnitType: cmd.UnitType,
-			DeclaredUnitTypes: declared, Variations: cmd.Variations, TrafficAllocation: cmd.TrafficAllocation,
-			ExpectedEndAt: cmd.ExpectedEndAt, Salts: salts, CreatedBy: cmd.Caller, Now: now,
-		})
-		if err != nil {
-			return err
-		}
-		if err := h.d.Store.CreateExperiment(ctx, e); err != nil {
 			return err
 		}
 		out = e
@@ -106,6 +78,41 @@ func (h *CreateExperiment) Handle(ctx context.Context, cmd CreateExperimentComma
 		})
 	})
 	return out, err
+}
+
+// create judges cmd against the project and stores the draft it describes,
+// in the unit of work ctx carries, which already holds the project's lock.
+func (h *CreateExperiment) create(ctx context.Context, cmd CreateExperimentCommand, now time.Time) (experiments.Experiment, error) {
+	owner, err := h.owner(ctx, cmd)
+	if err != nil {
+		return experiments.Experiment{}, err
+	}
+	flag, err := h.flag(ctx, cmd)
+	if err != nil {
+		return experiments.Experiment{}, err
+	}
+	units, err := h.d.UnitTypes.UnitTypes(ctx, cmd.Project)
+	if err != nil {
+		return experiments.Experiment{}, err
+	}
+	salts, err := h.salts(ctx, cmd.Project)
+	if err != nil {
+		return experiments.Experiment{}, err
+	}
+	declared := make([]string, len(units))
+	for i, u := range units {
+		declared[i] = u.Key
+	}
+	e, err := experiments.New(experiments.Input{
+		ID: id.New[experiments.Experiment](h.d.Recorder.ids), Project: cmd.Project, Key: cmd.Key, Name: cmd.Name,
+		Hypothesis: cmd.Hypothesis, Owner: owner, Tags: cmd.Tags, Flag: flag, FlagKey: cmd.Flag, UnitType: cmd.UnitType,
+		DeclaredUnitTypes: declared, Variations: cmd.Variations, TrafficAllocation: cmd.TrafficAllocation,
+		ExpectedEndAt: cmd.ExpectedEndAt, Salts: salts, CreatedBy: cmd.Caller, Now: now,
+	})
+	if err != nil {
+		return e, err
+	}
+	return e, h.d.Store.CreateExperiment(ctx, e)
 }
 
 // owner returns the owner cmd names, else its caller, and whether they may

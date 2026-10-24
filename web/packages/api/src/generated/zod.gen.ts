@@ -739,6 +739,24 @@ export const zExperimentCreate = z.object({
   expected_end_at: z.iso.date().optional(),
 });
 
+export const zExperimentPatch = z.object({
+  key: z.string().optional(),
+  name: zName.optional(),
+  hypothesis: z.string().max(2000).optional(),
+  owner: z.uuid().optional(),
+  tags: z.array(z.string().min(1).max(64)).max(50).optional(),
+  flag: z.string().optional(),
+  unit_type: z.string().optional(),
+  variations: z.array(zExperimentWeight).min(2).max(50).optional(),
+  traffic_allocation: z.int().gte(0).lte(10000).optional(),
+  expected_end_at: z.iso.date().optional(),
+});
+
+export const zExperimentClone = z.object({
+  key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
+  name: zName.optional(),
+});
+
 export const zFlagDefinition = z.object({
   id: z.uuid(),
   key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
@@ -1969,6 +1987,11 @@ export const zListExperimentsPath = z.object({
 });
 
 export const zListExperimentsQuery = z.object({
+  status: zExperimentStatus.optional(),
+  flag: z.string().optional(),
+  owner: z.uuid().optional(),
+  tag: z.string().optional(),
+  include_archived: z.boolean().optional().default(false),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });
@@ -1989,6 +2012,20 @@ export const zCreateExperimentPath = z.object({
  */
 export const zCreateExperimentResponse = zExperiment;
 
+export const zDeleteExperimentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zDeleteExperimentPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteExperimentResponse = z.void();
+
 export const zGetExperimentPath = z.object({
   project: z.string(),
   experiment: z.string(),
@@ -1998,6 +2035,48 @@ export const zGetExperimentPath = z.object({
  * The experiment; its `ETag` is its version.
  */
 export const zGetExperimentResponse = zExperiment;
+
+export const zUpdateExperimentBody = zExperimentPatch;
+
+export const zUpdateExperimentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateExperimentPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+/**
+ * The experiment as changed.
+ */
+export const zUpdateExperimentResponse = zExperiment;
+
+export const zRegenerateExperimentSaltsHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zRegenerateExperimentSaltsPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+/**
+ * The experiment with its new salts.
+ */
+export const zRegenerateExperimentSaltsResponse = zExperiment;
+
+export const zCloneExperimentBody = zExperimentClone;
+
+export const zCloneExperimentPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+/**
+ * The clone.
+ */
+export const zCloneExperimentResponse = zExperiment;
 
 export const zListChangeRequestsPath = z.object({
   project: z.string(),

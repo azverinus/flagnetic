@@ -22,7 +22,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `segment.edit` | creating segments and changing them | `flags:write` | |
 | `segment.delete` | deleting segments | `flags:write` | |
 | `sdk_key.manage` | creating, renaming, rotating and revoking an environment's SDK keys and changing their allowed origins | `project:admin` | |
-| `experiment.edit` | creating experiments | `experiments:write` | |
+| `experiment.edit` | creating, changing and cloning experiments, and regenerating a draft's salts | `experiments:write` | |
 | `experiment.delete` | deleting draft experiments | `experiments:write` | |
 | `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening and cancelling one's own, copying any | `flags:write` | |
 
