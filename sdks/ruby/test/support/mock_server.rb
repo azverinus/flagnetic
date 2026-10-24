@@ -9,11 +9,27 @@ require "stringio"
 # request per connection. By default it behaves like the platform: the
 # ruleset endpoint serves the current document with ETag and If-None-Match,
 # the change stream writes `retry`, the current version when Last-Event-ID
-# is below it, and every later version. Tests replace any endpoint with a
+# is below it, and every later version, and the events endpoint answers
+# 202 accepting every event it was sent. Tests replace any endpoint with a
 # script, publish new versions, and drop or close open streams.
 class MockServer
   Request = Struct.new(:verb, :path, :headers, :at, :body, keyword_init: true) do
     def [](name) = headers[name.downcase]
+
+    # decoded_body ungzips body when Content-Encoding says so, as every
+    # POST /sdk/v1/events body is.
+    def decoded_body
+      return body unless self["content-encoding"].to_s.include?("gzip")
+
+      Zlib::GzipReader.new(StringIO.new(body)).read
+    end
+
+    # events is the decoded body's events array, or [] for anything else.
+    def events
+      JSON.parse(decoded_body)["events"] || []
+    rescue JSON::ParserError
+      []
+    end
   end
 
   # Stream is one open change stream connection.
@@ -99,6 +115,12 @@ class MockServer
 
   def fetches = requests("/sdk/v1/ruleset")
   def stream_requests = requests("/sdk/v1/stream")
+  def events_requests = requests("/sdk/v1/events")
+
+  # on_events scripts the events endpoint: the block receives the request
+  # and returns [status, headers, body], or nil for the default behaviour
+  # (202, accepting every event it was sent).
+  def on_events(&block) = @mutex.synchronize { @events_script = block }
 
   def close
     @server.close
@@ -136,6 +158,7 @@ class MockServer
     when "/sdk/v1/ruleset" then respond(socket, *ruleset(request),
                                         gzip: request["accept-encoding"].to_s.include?("gzip"))
     when "/sdk/v1/stream" then stream(socket, request)
+    when "/sdk/v1/events" then respond(socket, *events(request))
     else respond(socket, 404, {}, "")
     end
   rescue IOError, SystemCallError
@@ -161,6 +184,16 @@ class MockServer
     # A request through a proxy names the origin in an absolute target.
     Request.new(verb: method, path: target.sub(%r{\Ahttps?://[^/]+}, "").split("?").first, headers: headers,
                 at: Process.clock_gettime(Process::CLOCK_MONOTONIC), body: body)
+  end
+
+  def events(request)
+    script = @mutex.synchronize { @events_script }
+    scripted = script&.call(request)
+    return scripted if scripted
+
+    body = JSON.generate({ "accepted" => request.events.size, "duplicates" => 0, "dropped_rows" => 0,
+                           "rejected" => [] })
+    [202, { "Content-Type" => "application/json" }, body]
   end
 
   def ruleset(request)

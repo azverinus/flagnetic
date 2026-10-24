@@ -5,7 +5,9 @@ require "json"
 module Flagnetic
   # Worker is a client's background thread. It fetches the ruleset after
   # every (re)connect of the change stream, on every event above the held
-  # version and on the poll interval, and retries with backoff. The stream
+  # version and on the poll interval, and retries with backoff; it flushes
+  # the exposure and alias queue and the evaluation summary window on
+  # their intervals. The stream
   # itself is read by a Stream thread that posts what happens to the
   # worker's inbox, which the worker waits on together with its next
   # deadline. It never raises: a failure is a log event and a later attempt.
@@ -71,16 +73,34 @@ module Flagnetic
       @stream&.close
     end
 
-    # step opens the stream when due, fetches when due, then waits for the
+    # step opens the stream when due, fetches when due, flushes the
+    # exposure and summary queues when either is due, then waits for the
     # stream, a wake-up or the next deadline. The stream is opened before
     # the first fetch, so no change is missed between the two.
     def step
       open_stream if @stream_due && now >= @stream_due
       fetch if !@stop && now >= @next_fetch
+      drive(@client.__send__(:exposures), @timing.exposure_flush) unless @stop
+      drive(@client.__send__(:summaries), @timing.summary_flush) unless @stop
       wait unless @stop
     rescue StandardError => e
       @client.__send__(:log, :error, :worker_failed, cause: "#{e.class}: #{e.message}")
       sleep 1 unless @stop
+    end
+
+    # drive flushes queue once when it is due; a queue that is off is nil
+    # and this is a no-op. It never lets a flush failure stop the loop. The
+    # budget is the interval but at most one request timeout: this thread
+    # also fetches the ruleset and reads the stream's messages, so a flush
+    # retrying through an events outage for a whole minute would hold back
+    # every flag change for that minute. A flush cut short keeps what it
+    # did not deliver and is due again after its backoff.
+    def drive(queue, interval)
+      return unless queue&.due?(now)
+
+      queue.flush_once([interval, @timing.request_timeout].min)
+    rescue StandardError => e
+      @client.__send__(:log, :error, :worker_failed, cause: "#{e.class}: #{e.message}")
     end
 
     def open_stream
@@ -107,6 +127,9 @@ module Flagnetic
     def wait
       deadlines = [@next_fetch]
       deadlines << @stream_due if @stream_due
+      deadlines << @client.__send__(:exposures)&.next_deadline
+      deadlines << @client.__send__(:summaries)&.next_deadline
+      deadlines.compact!
       message = @inbox.pop(timeout: [deadlines.min - now, 0].max)
       handle(message) if message
       handle(@inbox.pop) until @inbox.empty?
