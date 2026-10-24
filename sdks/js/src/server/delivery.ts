@@ -4,7 +4,7 @@
 import { decodeRuleset, type Ruleset } from "../evaluator/evaluate.js";
 import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
-import { retryAfterMs } from "../internal/http.js";
+import { retryAfterMs, trimTrailingSlashes } from "../internal/http.js";
 import { causeOf } from "./logger.js";
 import { SseParser } from "./sse.js";
 import type { LogEvent, LogLevel } from "./types.js";
@@ -151,7 +151,7 @@ export class Delivery {
     private readonly host: DeliveryHost,
   ) {
     this.userAgent = `flagnetic-js/${VERSION} (${config.platform})`;
-    this.base = config.baseUrl.replace(/\/+$/, "");
+    this.base = trimTrailingSlashes(config.baseUrl);
     this.fetchBackoff = new Backoff(config.timing.retryInitial, config.random);
     this.streamBackoff = new Backoff(config.timing.streamRetryInitial, config.random);
     this.clock = config.clock;

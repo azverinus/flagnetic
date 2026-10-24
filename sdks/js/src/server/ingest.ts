@@ -6,7 +6,7 @@
 // receipt.
 import type { Clock } from "../internal/clock.js";
 import { packBatches, type QueuedEvent } from "../internal/events.js";
-import { retryAfterMs } from "../internal/http.js";
+import { retryAfterMs, trimTrailingSlashes } from "../internal/http.js";
 import { causeOf } from "./logger.js";
 import { SCHEMA_VERSION_MAX, SDK_API_PATH, VERSION } from "../version.js";
 
@@ -77,7 +77,7 @@ export class Ingest {
   private readonly identity: { name: string; version: string; platform: string };
 
   constructor(private readonly config: IngestConfig) {
-    this.url = `${config.baseUrl.replace(/\/+$/, "")}${SDK_API_PATH}/events`;
+    this.url = `${trimTrailingSlashes(config.baseUrl)}${SDK_API_PATH}/events`;
     this.userAgent = `${SDK_NAME}/${VERSION} (${config.platform})`;
     this.identity = { name: SDK_NAME, version: VERSION, platform: config.platform };
   }
