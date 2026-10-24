@@ -153,6 +153,9 @@ export class FlagneticClient {
   private lastAttemptAt = Number.NEGATIVE_INFINITY;
   /** The poll or the retry, whichever is due: the next attempt is one timer. */
   private nextAttempt: unknown;
+  private firstWait: unknown;
+  /** Aborts the evaluation in flight; close calls it so a late answer or error touches nothing. */
+  private abortInFlight: (() => void) | undefined;
   private attemptSeq = 0;
   private readonly attemptWaiters: { readonly minSeq: number; readonly resolve: (stage: Stage) => void }[] = [];
   private readonly backoff: Backoff;
@@ -288,7 +291,7 @@ export class FlagneticClient {
       this.stream.open();
       // The stream opens first so that no change falls between the two; the
       // first evaluation waits for it no longer than this.
-      this.clock.setTimeout(() => { if (!this.started) this.refetch("start"); }, this.timing.streamFirstWait);
+      this.firstWait = this.clock.setTimeout(() => { if (!this.started) this.refetch("start"); }, this.timing.streamFirstWait);
       return;
     }
     this.refetch("start");
@@ -387,6 +390,8 @@ export class FlagneticClient {
     if (this.closed) return;
     this.closed = true;
     this.clock.clearTimeout(this.nextAttempt);
+    this.clock.clearTimeout(this.firstWait);
+    this.abortInFlight?.();
     this.unlisten();
     this.stream?.close();
     const flushed = this.flush();
@@ -685,8 +690,11 @@ export class FlagneticClient {
     try {
       ok = await this.attempt(trigger, context);
     } catch (e) {
-      this.log("error", "evaluation_failed", { operation: "fetch", cause: causeOf(e) });
-      this.failed({ source: "network", cause: "internal", detail: causeOf(e) });
+      // Reading the body of a request close aborted throws; that is no failure.
+      if (!this.closed) {
+        this.log("error", "evaluation_failed", { operation: "fetch", cause: causeOf(e) });
+        this.failed({ source: "network", cause: "internal", detail: causeOf(e) });
+      }
     } finally {
       this.inFlight = false;
       this.traceEvent?.("fetch_handled");
@@ -746,6 +754,7 @@ export class FlagneticClient {
     const timer = this.clock.setTimeout(() => {
       controller.abort(new Error(`timed out after ${this.timing.requestTimeout} ms`));
     }, this.timing.requestTimeout);
+    this.abortInFlight = () => { controller.abort(new Error("client closed")); };
     let res: Response;
     let text: string;
     try {
@@ -764,6 +773,8 @@ export class FlagneticClient {
           signal: controller.signal,
         });
       } catch (e) {
+        // A closed client records no failure: it no longer fetches.
+        if (this.closed) return false;
         const reason: unknown = controller.signal.aborted ? (controller.signal.reason as unknown) : e;
         this.failed({ source: "network", cause: "network", trigger, detail: causeOf(reason) });
         return false;
@@ -782,8 +793,13 @@ export class FlagneticClient {
       text = await res.text();
     } finally {
       this.clock.clearTimeout(timer);
+      this.abortInFlight = undefined;
     }
     if (this.closed) return false;
+    // The context changed while this request was in flight: its answer is
+    // for the previous context, and the evaluation of the new one follows,
+    // so it neither serves nor counts as a failure.
+    if (context !== this.context) return false;
     if (!this.accept(text, "network")) return false;
     // The server answers again, so a stream a refusal closed comes back.
     this.logged.delete("revoked");

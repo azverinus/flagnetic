@@ -421,6 +421,48 @@ describe("refetch triggers", () => {
     expect(h.net.waiting("/sdk/v1/evaluate")).toHaveLength(0);
   });
 
+  test("an answer for the context replaced while it was in flight does not serve", async () => {
+    const h = harness();
+    const c = h.client({ store: false, pollInterval: 3_600_000 });
+    await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true) }));
+    const changed: string[][] = [];
+    const stages: string[] = [];
+    c.onChange((keys) => changed.push(keys));
+    c.onStage((s) => stages.push(s));
+
+    // A refetch for the anonymous context is in flight when the user signs in.
+    await h.advance(10_000);
+    h.page.online();
+    const stale = await h.waitFor("/sdk/v1/evaluate");
+    const done = c.setContext({ units: { user: "u-1" } });
+    stale.answer({ status: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify(values(2, { checkout: boolFlag(false) })) });
+    await settle();
+    expect(c.getBool("checkout", false)).toBe(true);
+    expect(c.stage).toBe("last_good");
+    expect(changed).toStrictEqual([]);
+    expect(h.count("fetch_failed")).toBe(0);
+
+    const fresh = await h.waitFor("/sdk/v1/evaluate");
+    expect((JSON.parse(fresh.body ?? "{}") as { context: { units: unknown } }).context.units).toStrictEqual({ user: "u-1" });
+    fresh.answer({ status: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify(values(2, { checkout: boolFlag(false) })) });
+    expect(await done).toBe("fresh");
+    expect(c.getBool("checkout", true)).toBe(false);
+    expect(stages).toStrictEqual(["last_good", "fresh"]);
+    expect(changed).toStrictEqual([["checkout"]]);
+  });
+
+  test("close aborts the evaluation in flight and records no failure", async () => {
+    const h = harness();
+    const c = h.client({ store: false, pollInterval: 3_600_000 });
+    await h.waitFor("/sdk/v1/evaluate");
+    await c.close();
+    await settle();
+    expect(h.net.waiting("/sdk/v1/evaluate")).toHaveLength(0);
+    expect(h.count("fetch_failed")).toBe(0);
+    expect(h.count("evaluation_failed")).toBe(0);
+    expect(c.stage).toBe("built_in");
+  });
+
   test("visibility and the network coming back refetch, no oftener than the minimum gap", async () => {
     const h = harness();
     h.client({ store: false, pollInterval: 3_600_000 });
