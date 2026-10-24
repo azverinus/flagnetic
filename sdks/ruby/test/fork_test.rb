@@ -63,6 +63,6 @@ class ForkTest < Minitest::Test
       c.string("on", default: "")
     end
     @server.publish(document(2, { "on" => "two" }))
-    assert eventually { c.string("on", default: "") == "two" }
+    assert(eventually { c.string("on", default: "") == "two" })
   end
 end
