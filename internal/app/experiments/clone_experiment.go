@@ -42,7 +42,7 @@ func NewCloneExperiment(d CloneExperimentDeps) *CloneExperiment {
 }
 
 // CloneExperimentCommand clones the experiment Source of Project as Key. Name
-// is the clone's, the source's when empty; Caller is the member making the
+// is the clone's, the source's when nil; Caller is the member making the
 // request, nil for a project token.
 type CloneExperimentCommand struct {
 	Project workspace.ProjectID

@@ -20,6 +20,50 @@ func patchExperiment(t *testing.T, c *management.ClientWithResponses, project, k
 	return do(c.UpdateExperimentWithResponse(t.Context(), project, key, &management.UpdateExperimentParams{IfMatch: ifMatch(version)}, body))
 }
 
+// putInStatus moves an experiment to status through the repository, as its
+// transition will: the API offers no transition out of draft yet, and these
+// tests are about what each status allows, not how it is reached.
+func putInStatus(t *testing.T, f experimentFixture, key string, status experiments.Status) {
+	t.Helper()
+	store := pgexperiments.NewStore(testkit.Pool(t))
+	e, err := store.ExperimentByKey(t.Context(), projectIDOf(f.project), key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Status = status
+	if err := store.UpdateExperiment(t.Context(), e); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOnlyADraftIsEditedHasItsSaltsRegeneratedAndIsDeletedButAnyIsCloned(t *testing.T) {
+	f := startExperiments(t)
+	for _, status := range []experiments.Status{experiments.StatusRunning, experiments.StatusStopped, experiments.StatusArchived} {
+		key := string(status)
+		created := createExperiment(t, f.admin, f.project.Key, validExperiment(key))
+		putInStatus(t, f, key, status)
+
+		patch := patchExperiment(t, f.admin, f.project.Key, key, 1, management.ExperimentPatch{Flag: ptr("checkout_title"), Variations: &[]management.ExperimentWeight{{Variation: "a", Weight: 1000}, {Variation: "b", Weight: 9000}}})
+		if patch.StatusCode() != http.StatusConflict {
+			t.Errorf("PATCH of a %s experiment's weights = %d, want 409: %s", status, patch.StatusCode(), patch.Body)
+		}
+		salts := do(f.admin.RegenerateExperimentSaltsWithResponse(t.Context(), f.project.Key, key, &management.RegenerateExperimentSaltsParams{IfMatch: ifMatch(1)}))
+		assertProblem(t, "salts of a "+key+" experiment", salts.StatusCode(), salts.Body, http.StatusConflict, "not_draft")
+		del := do(f.admin.DeleteExperimentWithResponse(t.Context(), f.project.Key, key, &management.DeleteExperimentParams{IfMatch: ifMatch(1)}))
+		assertProblem(t, "delete of a "+key+" experiment", del.StatusCode(), del.Body, http.StatusConflict, "not_draft")
+
+		got := do(f.admin.GetExperimentWithResponse(t.Context(), f.project.Key, key))
+		if got.JSON200 == nil || got.JSON200.Version != 1 || got.JSON200.InclusionSalt != created.InclusionSalt || !slices.Equal(got.JSON200.Variations, created.Variations) {
+			t.Errorf("%s experiment after refused writes = %s", status, got.Body)
+		}
+
+		clone := do(f.admin.CloneExperimentWithResponse(t.Context(), f.project.Key, key, management.ExperimentClone{Key: key + "_again"}))
+		if clone.JSON201 == nil || clone.JSON201.Status != management.ExperimentStatusDraft || clone.JSON201.InclusionSalt == created.InclusionSalt {
+			t.Errorf("clone of a %s experiment = %d %s", status, clone.StatusCode(), clone.Body)
+		}
+	}
+}
+
 func TestPatchingADraftChangesEveryFieldAndRecordsTheExperimentBeforeAndAfter(t *testing.T) {
 	f := startExperiments(t)
 	createFlag(t, f.admin, f.project.Key, management.FlagCreate{Key: "other_flag", Type: management.FlagTypeBoolean, Name: "Other"})
@@ -317,21 +361,7 @@ func TestListingExperimentsFiltersByStatusFlagOwnerTagAndArchived(t *testing.T) 
 	createExperiment(t, f.admin, f.project.Key, management.ExperimentCreate{
 		Key: "c_other", Name: "C", Tags: &[]string{"web"}, Flag: "other_flag", UnitType: "user", Variations: weights("true", 5000, "false", 5000),
 	})
-	// Archiving arrives with a later change; until then an experiment is put
-	// there through the repository, as the transition will.
-	archive := func(key string) {
-		t.Helper()
-		store := pgexperiments.NewStore(testkit.Pool(t))
-		e, err := store.ExperimentByKey(t.Context(), projectIDOf(f.project), key)
-		if err != nil {
-			t.Fatal(err)
-		}
-		e.Status = experiments.StatusArchived
-		if err := store.UpdateExperiment(t.Context(), e); err != nil {
-			t.Fatal(err)
-		}
-	}
-	archive("c_other")
+	putInStatus(t, f, "c_other", experiments.StatusArchived)
 
 	keys := func(what string, params management.ListExperimentsParams) []string {
 		t.Helper()
@@ -368,6 +398,10 @@ func TestListingExperimentsFiltersByStatusFlagOwnerTagAndArchived(t *testing.T) 
 		{"tag with archived", management.ListExperimentsParams{Tag: ptr("web"), IncludeArchived: ptr(true)}, []string{"a_checkout", "c_other"}},
 		{"several filters", management.ListExperimentsParams{Flag: ptr("checkout_title"), Owner: &devID, Tag: ptr("mobile")}, []string{"b_mobile"}},
 		{"a tag matches exactly", management.ListExperimentsParams{Tag: ptr("web ")}, nil},
+		// Page by page, a filter narrows every page, not only the first.
+		{"flag one per page", management.ListExperimentsParams{Flag: ptr("checkout_title"), Limit: ptr(1)}, []string{"a_checkout", "b_mobile"}},
+		{"tag with archived one per page", management.ListExperimentsParams{Tag: ptr("web"), IncludeArchived: ptr(true), Limit: ptr(1)}, []string{"a_checkout", "c_other"}},
+		{"owner one per page", management.ListExperimentsParams{Owner: &adminID, IncludeArchived: ptr(true), Limit: ptr(1)}, []string{"a_checkout", "c_other"}},
 	} {
 		if got := keys(c.what, c.params); !slices.Equal(got, c.want) {
 			t.Errorf("%s: experiments = %v, want %v", c.what, got, c.want)

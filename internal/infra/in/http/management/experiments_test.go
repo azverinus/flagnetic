@@ -245,6 +245,21 @@ func TestEverySaltOfAProjectIsDistinctFromTheRolloutSalts(t *testing.T) {
 			salts[salt] = what + " salt of " + e.Key
 		}
 	}
+
+	// Regenerated and cloned salts are drawn apart from them as well.
+	regenerated := do(f.admin.RegenerateExperimentSaltsWithResponse(t.Context(), f.project.Key, "e0", &management.RegenerateExperimentSaltsParams{IfMatch: ifMatch(1)}))
+	cloned := do(f.admin.CloneExperimentWithResponse(t.Context(), f.project.Key, "e1", management.ExperimentClone{Key: "e1_clone"}))
+	if regenerated.JSON200 == nil || cloned.JSON201 == nil {
+		t.Fatalf("salts = %d %s, clone = %d %s", regenerated.StatusCode(), regenerated.Body, cloned.StatusCode(), cloned.Body)
+	}
+	for _, e := range []management.Experiment{*regenerated.JSON200, *cloned.JSON201} {
+		for what, salt := range map[string]string{"inclusion": e.InclusionSalt, "variation": e.VariationSalt} {
+			if owner, taken := salts[salt]; taken {
+				t.Errorf("new %s salt of %s is %q, already the %s", what, e.Key, salt, owner)
+			}
+			salts[salt] = what + " salt of " + e.Key
+		}
+	}
 }
 
 func TestEveryExperimentWriteRecordsOneAuditEntryWithTheExperimentAfter(t *testing.T) {
