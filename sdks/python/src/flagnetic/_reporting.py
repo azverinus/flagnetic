@@ -566,7 +566,7 @@ class Summaries:
             if sent.status:
                 fields["status"] = sent.status
             self._log(logging.WARNING, _events.EVENTS_FAILED, **fields)
-            if final or now + wait > self._give_up_at:
+            if final or now + wait >= self._give_up_at:
                 self._give_back()
                 return
             self._retry_at = now + wait

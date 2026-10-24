@@ -60,6 +60,38 @@ def test_scenario(name: str) -> None:
 
 DEGRADATION = read_json("degradation/cases.json")
 CASES = [c for c in DEGRADATION["cases"] if c["endpoint"] == "GET /sdk/v1/ruleset"]
+EVENTS_CASES = [c for c in DEGRADATION["cases"] if c["endpoint"] == "POST /sdk/v1/events"]
+
+
+@pytest.mark.parametrize("case", EVENTS_CASES, ids=lambda c: c["name"])
+def test_events_degradation_case(case: dict[str, Any]) -> None:
+    """A batch the server answered is done, whatever it rejected and whatever the rejection is called."""
+    scenario = {
+        "mode": "server",
+        "given": {
+            "options": {
+                "sse": False,
+                "poll_interval_ms": 3_600_000,
+                "flush_interval_ms": 3_600_000,
+                "send_summaries": False,
+            }
+        },
+        "steps": [
+            {
+                "request": {"method": "GET", "path": "/sdk/v1/ruleset"},
+                "respond": {"status": 200, "headers": {"ETag": '"1"'}, "body": "server/ruleset.json"},
+                "expect": {"stage": "fresh"},
+            },
+            {"call": {"op": "alias", "times": 12}},
+            {"call": {"op": "flush"}},
+            {"request": {"method": "POST", "path": "/sdk/v1/events"}, "respond": case["response"]},
+            {"call": {"op": "flush"}},
+            {"no_request": {"path": "/sdk/v1/events", "for_ms": 600_000}},
+        ],
+    }
+    context = flagnetic.Context(**DEGRADATION["context"])
+    errors = play(scenario, context, FILES["answers"], DEFAULT_DIVISOR * 20)
+    assert not errors, "\n".join(errors)
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c["name"])
