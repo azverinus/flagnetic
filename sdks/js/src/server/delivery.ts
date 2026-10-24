@@ -6,7 +6,7 @@ import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
 import { retryAfterMs, trimTrailingSlashes } from "../internal/http.js";
 import { causeOf } from "./logger.js";
-import { SseParser } from "./sse.js";
+import { SseParser } from "../internal/sse.js";
 import type { LogEvent, LogLevel } from "./types.js";
 import { SCHEMA_VERSION_MAX, SCHEMA_VERSION_MIN, SDK_API_PATH, SUPPORTED_SCHEMA_VERSIONS, VERSION } from "../version.js";
 
