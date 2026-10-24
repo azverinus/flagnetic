@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.2.0](https://github.com/azverinus/flagnetic/compare/v0.1.0...v0.2.0) (2026-10-24)
+
+
+### Features
+
+* **console:** list, create and edit experiments ([#91](https://github.com/azverinus/flagnetic/issues/91)) ([e641526](https://github.com/azverinus/flagnetic/commit/e6415263605ea7876406d38c9ec25f4207777bda))
+* **events:** link each alias pair once, keeping the earliest ([#89](https://github.com/azverinus/flagnetic/issues/89)) ([2ed0c63](https://github.com/azverinus/flagnetic/commit/2ed0c639ca32035cb5a29b7989661f111bc8cb85))
+* **events:** roll exposures up into first exposures, daily counts and conflicts ([#98](https://github.com/azverinus/flagnetic/issues/98)) ([57aa570](https://github.com/azverinus/flagnetic/commit/57aa5708575b7784e2466cb17abbbf22b141844d))
+* **events:** store exposures in a new events context ([#78](https://github.com/azverinus/flagnetic/issues/78)) ([8170401](https://github.com/azverinus/flagnetic/commit/81704012fd1bc1d9a15a8d519ba53128619764cd))
+* **experiments:** create, read and list experiments ([#73](https://github.com/azverinus/flagnetic/issues/73)) ([03cda29](https://github.com/azverinus/flagnetic/commit/03cda29876a9a303322b76f60a17ad566b2427ea))
+* **experiments:** edit, delete, clone and filter draft experiments ([#79](https://github.com/azverinus/flagnetic/issues/79)) ([fa8ea5b](https://github.com/azverinus/flagnetic/commit/fa8ea5b9033dab29488f691428223d53522a783c))
+* **experiments:** look up an assignment and check the hash's uniformity ([#90](https://github.com/azverinus/flagnetic/issues/90)) ([34e63a9](https://github.com/azverinus/flagnetic/commit/34e63a948e96ed0c74a49955ad1de89d1c2cd47f))
+* **experiments:** start an experiment and grow a running one's allocation ([#97](https://github.com/azverinus/flagnetic/issues/97)) ([6120581](https://github.com/azverinus/flagnetic/commit/61205813c5573675af76b205000ae48d6dd8d654))
+* **flags:** serve an experiment from a rule ([#81](https://github.com/azverinus/flagnetic/issues/81)) ([851e9e5](https://github.com/azverinus/flagnetic/commit/851e9e5180c2df649c28d91cb504787e40a05c8b))
+* **governance:** propose flag configurations as change requests ([#84](https://github.com/azverinus/flagnetic/issues/84)) ([9f8c236](https://github.com/azverinus/flagnetic/commit/9f8c23611319bf69d8d0af2b4c4fb50e844ef788))
+* **sdk-dart:** add the Dart client mode ([#74](https://github.com/azverinus/flagnetic/issues/74)) ([2e8d8b7](https://github.com/azverinus/flagnetic/commit/2e8d8b7bbf603ec99e4bce5db05c17639add3782))
+* **sdk-dart:** hold the stream in the foreground ([#88](https://github.com/azverinus/flagnetic/issues/88)) ([71e78ae](https://github.com/azverinus/flagnetic/commit/71e78aea3b860003cd3b11cefd31d72c56ebbc20))
+* **sdk-dart:** serve Dart apps compiled for the web ([#93](https://github.com/azverinus/flagnetic/issues/93)) ([71c0c86](https://github.com/azverinus/flagnetic/commit/71c0c863ab72d3b15759611d1800381c0e86f6f1))
+* **sdk-js:** add the browser client ([#95](https://github.com/azverinus/flagnetic/issues/95)) ([247fa98](https://github.com/azverinus/flagnetic/commit/247fa98b8fef26506d451dffcf0b4cd2f16aec9a))
+* **sdk-js:** add the flagnetic package with a conformance-tested evaluator ([#69](https://github.com/azverinus/flagnetic/issues/69)) ([49b5ff9](https://github.com/azverinus/flagnetic/commit/49b5ff9b602bb22f1a73707bd1782d3382f509fa))
+* **sdk-python:** add the flagnetic package with a local evaluator ([#71](https://github.com/azverinus/flagnetic/issues/71)) ([e5c6593](https://github.com/azverinus/flagnetic/commit/e5c65932696d1867b586718b763466686784eabc))
+* **sdk-ruby:** evaluate any ruleset as the reference evaluator does ([#70](https://github.com/azverinus/flagnetic/issues/70)) ([0b0e915](https://github.com/azverinus/flagnetic/commit/0b0e915dc819686fe5449d890a54950049f3ca39))
+* **workspace:** protect environments ([#94](https://github.com/azverinus/flagnetic/issues/94)) ([e69da8e](https://github.com/azverinus/flagnetic/commit/e69da8e67f965a4257945175240f13cfecdd5975))
+
+
+### Bug Fixes
+
+* **experiments:** keep a hypothesis on an experiment past its draft ([#99](https://github.com/azverinus/flagnetic/issues/99)) ([c11cf0c](https://github.com/azverinus/flagnetic/commit/c11cf0ca85bea094ff38d858d3d24a1b152d1731))
+* **platform:** size the problem members map from the extensions only ([#66](https://github.com/azverinus/flagnetic/issues/66)) ([85ba9e1](https://github.com/azverinus/flagnetic/commit/85ba9e16996316833079a92fdf3aed2371df99d4))
+
+
+### Dependencies
+
+* clear the open security advisories and audit the npm lockfiles ([#80](https://github.com/azverinus/flagnetic/issues/80)) ([ba480a5](https://github.com/azverinus/flagnetic/commit/ba480a5e696c7f2283b5a4d7e1b41b327e0da4bb))
+* **console:** bump TanStack Table to 9, Vitest to 5 and the console's other majors ([#87](https://github.com/azverinus/flagnetic/issues/87)) ([ecdafa5](https://github.com/azverinus/flagnetic/commit/ecdafa54081e915489bf3a817f27713e433f1597))
+* **sdk-js:** bump eslint to 10 and vitest to 5 ([#86](https://github.com/azverinus/flagnetic/issues/86)) ([c096cc3](https://github.com/azverinus/flagnetic/commit/c096cc31329e42d25e30ddb2f1378fb2887356e5))
+
 ## 0.1.0 (2026-10-23)
 
 
