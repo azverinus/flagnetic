@@ -26,17 +26,28 @@ func (s *Server) HoldNextIngest(t testing.TB) (written <-chan struct{}, release 
 	xid, letGo := s.hold.HoldNext()
 	w := make(chan struct{})
 	released := make(chan struct{})
-	var mine string
+	// mine and done are guarded by held.mu: the transaction's ID may arrive
+	// after the test let it go, and must then not be left marked as held.
+	var (
+		mine string
+		done bool
+	)
 	go func() {
+		var x string
 		select {
-		case mine = <-xid:
+		case x = <-xid:
 		case <-released:
 			return
 		}
 		held.mu.Lock()
+		if done {
+			held.mu.Unlock()
+			return
+		}
 		if held.xids == nil {
 			held.xids = map[string]bool{}
 		}
+		mine = x
 		held.xids[mine] = true
 		held.mu.Unlock()
 		close(w)
@@ -44,11 +55,14 @@ func (s *Server) HoldNextIngest(t testing.TB) (written <-chan struct{}, release 
 	var once sync.Once
 	release = func() {
 		once.Do(func() {
+			held.mu.Lock()
+			done = true
+			if mine != "" {
+				delete(held.xids, mine)
+			}
+			held.mu.Unlock()
 			close(released)
 			letGo()
-			held.mu.Lock()
-			delete(held.xids, mine)
-			held.mu.Unlock()
 		})
 	}
 	t.Cleanup(release)
