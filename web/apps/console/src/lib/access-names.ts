@@ -30,7 +30,8 @@ export type Permission =
   | "segment.delete"
   | "sdk_key.manage"
   | "experiment.edit"
-  | "experiment.delete";
+  | "experiment.delete"
+  | "change_request.propose";
 
 /** Each permission as what it lets a member do, to complete "the permission to …". */
 const permissionNames: Record<Permission, MessageDescriptor> = {
@@ -50,6 +51,7 @@ const permissionNames: Record<Permission, MessageDescriptor> = {
   "sdk_key.manage": msg`manage SDK keys`,
   "experiment.edit": msg`edit and run experiments`,
   "experiment.delete": msg`delete draft experiments`,
+  "change_request.propose": msg`propose changes as change requests`,
 };
 
 const roleNames: Record<string, MessageDescriptor> = {

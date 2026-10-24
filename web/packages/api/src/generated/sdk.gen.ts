@@ -9,15 +9,24 @@ import type {
   ArchiveFlagData,
   ArchiveFlagErrors,
   ArchiveFlagResponses,
+  CancelChangeRequestData,
+  CancelChangeRequestErrors,
+  CancelChangeRequestResponses,
   ChangeMyPasswordData,
   ChangeMyPasswordErrors,
   ChangeMyPasswordResponses,
+  CopyChangeRequestData,
+  CopyChangeRequestErrors,
+  CopyChangeRequestResponses,
   CopyFlagConfigurationData,
   CopyFlagConfigurationErrors,
   CopyFlagConfigurationResponses,
   CreateAttributeData,
   CreateAttributeErrors,
   CreateAttributeResponses,
+  CreateChangeRequestData,
+  CreateChangeRequestErrors,
+  CreateChangeRequestResponses,
   CreateEnvironmentData,
   CreateEnvironmentErrors,
   CreateEnvironmentResponses,
@@ -90,6 +99,9 @@ import type {
   GetAuthSettingsData,
   GetAuthSettingsErrors,
   GetAuthSettingsResponses,
+  GetChangeRequestData,
+  GetChangeRequestErrors,
+  GetChangeRequestResponses,
   GetEnvironmentData,
   GetEnvironmentErrors,
   GetEnvironmentResponses,
@@ -141,6 +153,9 @@ import type {
   ListAuditEntriesData,
   ListAuditEntriesErrors,
   ListAuditEntriesResponses,
+  ListChangeRequestsData,
+  ListChangeRequestsErrors,
+  ListChangeRequestsResponses,
   ListDiscoveredAttributesData,
   ListDiscoveredAttributesErrors,
   ListDiscoveredAttributesResponses,
@@ -201,6 +216,9 @@ import type {
   ListUnitTypesData,
   ListUnitTypesErrors,
   ListUnitTypesResponses,
+  OpenChangeRequestData,
+  OpenChangeRequestErrors,
+  OpenChangeRequestResponses,
   PutFlagConfigurationData,
   PutFlagConfigurationErrors,
   PutFlagConfigurationResponses,
@@ -210,6 +228,9 @@ import type {
   ReactivateMemberData,
   ReactivateMemberErrors,
   ReactivateMemberResponses,
+  RebaseChangeRequestData,
+  RebaseChangeRequestErrors,
+  RebaseChangeRequestResponses,
   RegenerateRolloutSaltData,
   RegenerateRolloutSaltErrors,
   RegenerateRolloutSaltResponses,
@@ -258,6 +279,9 @@ import type {
   UpdateAuthSettingsData,
   UpdateAuthSettingsErrors,
   UpdateAuthSettingsResponses,
+  UpdateChangeRequestData,
+  UpdateChangeRequestErrors,
+  UpdateChangeRequestResponses,
   UpdateEnvironmentData,
   UpdateEnvironmentErrors,
   UpdateEnvironmentResponses,
@@ -1993,6 +2017,245 @@ export const getExperiment = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/experiments/{experiment}",
+    ...options,
+  });
+
+/**
+ * The project's change requests
+ *
+ * The project's change requests, newest first, narrowed by every
+ * filter given. Page with `cursor` set to the `next_cursor` of the
+ * previous page.
+ *
+ */
+export const listChangeRequests = <ThrowOnError extends boolean = false>(
+  options: Options<ListChangeRequestsData, ThrowOnError>,
+): RequestResult<ListChangeRequestsResponses, ListChangeRequestsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListChangeRequestsResponses,
+    ListChangeRequestsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests",
+    ...options,
+  });
+
+/**
+ * Propose a change
+ *
+ * Proposes a flag's configuration in one environment as a change
+ * request, as a draft or, with `open`, opened for review at once. The
+ * caller, a member or a project token, is its author. It is based on
+ * the configuration as it is now, and `diff` is the RFC 6902 patch from
+ * that configuration to `proposed`. `proposed` is checked as replacing
+ * the configuration would be, with the same refusals under
+ * `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+ * configuration has no rule with, and a `salt` that is not that rule's,
+ * are left out, so the rule is a new one. New rules and rollouts are
+ * given an identifier and a salt, which `proposed` holds. A title of 1
+ * to 200 characters is required and a description has at most 10,000
+ * (`invalid_change_request`).
+ *
+ */
+export const createChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<CreateChangeRequestData, ThrowOnError>,
+): RequestResult<CreateChangeRequestResponses, CreateChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateChangeRequestResponses,
+    CreateChangeRequestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * A change request
+ */
+export const getChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<GetChangeRequestData, ThrowOnError>,
+): RequestResult<GetChangeRequestResponses, GetChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetChangeRequestResponses, GetChangeRequestErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests/{change_request}",
+    ...options,
+  });
+
+/**
+ * Edit a change request
+ *
+ * Changes the title, the description or what is proposed, each left
+ * as it is when absent. Only the author edits (`not_author`), a draft
+ * or an open change request (`invalid_state`). A new `proposed` is
+ * checked as on creation, against the configuration as it is now, and
+ * `diff` is recomputed from the configuration the change request is
+ * based on; a rebase moves that. An edit that changes nothing changes
+ * nothing and records nothing.
+ *
+ */
+export const updateChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateChangeRequestData, ThrowOnError>,
+): RequestResult<UpdateChangeRequestResponses, UpdateChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateChangeRequestResponses,
+    UpdateChangeRequestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests/{change_request}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Open a draft change request for review
+ *
+ * Only the author opens (`not_author`), and only a draft
+ * (`invalid_state`). When the configuration was written since the
+ * change request was based on it, its diff no longer shows what it
+ * would do, and opening is refused (`base_moved`) until it is rebased.
+ *
+ */
+export const openChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<OpenChangeRequestData, ThrowOnError>,
+): RequestResult<OpenChangeRequestResponses, OpenChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    OpenChangeRequestResponses,
+    OpenChangeRequestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests/{change_request}/open",
+    ...options,
+  });
+
+/**
+ * Base a draft change request on the configuration as it is now
+ *
+ * Keeps what is proposed and recomputes `diff` from the configuration
+ * as it is now, which becomes `base_version`. Only the author rebases
+ * (`not_author`), and only a draft (`invalid_state`). Rebasing on the
+ * base it has changes nothing and records nothing.
+ *
+ */
+export const rebaseChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<RebaseChangeRequestData, ThrowOnError>,
+): RequestResult<RebaseChangeRequestResponses, RebaseChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RebaseChangeRequestResponses,
+    RebaseChangeRequestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests/{change_request}/rebase",
+    ...options,
+  });
+
+/**
+ * Cancel a change request
+ *
+ * The author cancels a draft, open or approved change request
+ * (`not_author`, `invalid_state`). A cancelled change request is
+ * final; copying it resumes its work.
+ *
+ */
+export const cancelChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<CancelChangeRequestData, ThrowOnError>,
+): RequestResult<CancelChangeRequestResponses, CancelChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CancelChangeRequestResponses,
+    CancelChangeRequestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests/{change_request}/cancel",
+    ...options,
+  });
+
+/**
+ * Copy a change request into a new draft
+ *
+ * Copies any change request, whatever its state and whoever wrote it,
+ * into a new draft of the caller's with the same title, description
+ * and proposal, based on the configuration as it is now and checked
+ * against it as a new change request is.
+ *
+ */
+export const copyChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<CopyChangeRequestData, ThrowOnError>,
+): RequestResult<CopyChangeRequestResponses, CopyChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CopyChangeRequestResponses,
+    CopyChangeRequestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests/{change_request}/copy",
     ...options,
   });
 

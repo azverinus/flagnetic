@@ -814,6 +814,55 @@ export const zFlagConfigurationRevert = z.object({
     }),
 });
 
+/**
+ * What a change request proposes: `flag_configuration`, a flag's
+ * configuration in one environment. Other kinds are to come; a client
+ * reads `proposed` by the kind.
+ *
+ */
+export const zChangeRequestKind = z.enum(["flag_configuration", "definition", "experiment"]);
+
+/**
+ * `draft` (its author prepares it), `open` (offered for review),
+ * `approved`, `rejected`, `applied`, `cancelled`, `superseded` (what
+ * it was based on moved). The last four are final.
+ *
+ */
+export const zChangeRequestState = z.enum([
+  "draft",
+  "open",
+  "approved",
+  "rejected",
+  "applied",
+  "cancelled",
+  "superseded",
+]);
+
+/**
+ * The member or the project token that proposed the change request.
+ */
+export const zChangeRequestAuthor = z.object({
+  kind: z.enum(["member", "token"]),
+  id: z.uuid(),
+  name: z.string(),
+});
+
+/**
+ * One operation of an RFC 6902 JSON Patch; `value` is absent from a `remove`.
+ */
+export const zPatchOperation = z.object({
+  op: z.enum(["add", "remove", "replace"]),
+  path: z.string(),
+  value: z.unknown().optional(),
+});
+
+export const zProposedOverride = z.object({
+  unit_type: z.string(),
+  unit_id: z.string(),
+  variation: z.string(),
+  note: z.string().nullable(),
+});
+
 export const zFlagConfigurationCopy = z.object({
   from: z.string(),
   include_overrides: z.boolean().optional().default(false),
@@ -947,6 +996,66 @@ export const zFlagConfigurationPut = z.object({
   prerequisites: z.array(zPrerequisite).optional(),
   overrides: z.array(zOverrideInput).max(200).optional(),
   rules: z.array(zRuleInput).max(50).optional(),
+});
+
+/**
+ * A flag configuration as a change request proposes it: what it serves
+ * and the notes and descriptions that stay on the server, without who
+ * wrote it or when.
+ *
+ */
+export const zProposedConfiguration = z.object({
+  on: z.boolean(),
+  off_variation: z.string(),
+  fallthrough: z.string(),
+  prerequisites: z.array(zPrerequisite),
+  overrides: z.array(zProposedOverride),
+  rules: z.array(zRule),
+});
+
+export const zChangeRequest = z.object({
+  id: z.uuid(),
+  kind: zChangeRequestKind,
+  flag: z.string().optional(),
+  environment: z.string().optional(),
+  state: zChangeRequestState,
+  title: z.string(),
+  description: z.string(),
+  base_version: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  proposed: zProposedConfiguration,
+  diff: z.array(zPatchOperation),
+  author: zChangeRequestAuthor,
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
+  version: zVersion,
+});
+
+export const zChangeRequestList = z.object({
+  items: z.array(zChangeRequest),
+  next_cursor: z.string().nullable(),
+});
+
+export const zChangeRequestCreate = z.object({
+  kind: z.enum(["flag_configuration"]),
+  flag: z.string(),
+  environment: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  proposed: zFlagConfigurationPut,
+  open: z.boolean().optional().default(false),
+});
+
+export const zChangeRequestPatch = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  proposed: zFlagConfigurationPut.optional(),
 });
 
 export const zKillResult = z.object({
@@ -1111,6 +1220,11 @@ export const zLimit = z.int().gte(1).lte(200).default(50);
  * The flag's key.
  */
 export const zFlagKey = z.string();
+
+/**
+ * The change request's identifier.
+ */
+export const zChangeRequestId = z.uuid();
 
 /**
  * The experiment's key.
@@ -1884,6 +1998,114 @@ export const zGetExperimentPath = z.object({
  * The experiment; its `ETag` is its version.
  */
 export const zGetExperimentResponse = zExperiment;
+
+export const zListChangeRequestsPath = z.object({
+  project: z.string(),
+});
+
+export const zListChangeRequestsQuery = z.object({
+  flag: z.string().optional(),
+  environment: z.string().optional(),
+  kind: zChangeRequestKind.optional(),
+  state: zChangeRequestState.optional(),
+  author: z.uuid().optional(),
+  cursor: z.string().optional(),
+  limit: z.int().gte(1).lte(200).optional().default(50),
+});
+
+/**
+ * One page of change requests.
+ */
+export const zListChangeRequestsResponse = zChangeRequestList;
+
+export const zCreateChangeRequestBody = zChangeRequestCreate;
+
+export const zCreateChangeRequestPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * Created.
+ */
+export const zCreateChangeRequestResponse = zChangeRequest;
+
+export const zGetChangeRequestPath = z.object({
+  project: z.string(),
+  change_request: z.uuid(),
+});
+
+/**
+ * The change request; its `ETag` is its version.
+ */
+export const zGetChangeRequestResponse = zChangeRequest;
+
+export const zUpdateChangeRequestBody = zChangeRequestPatch;
+
+export const zUpdateChangeRequestHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateChangeRequestPath = z.object({
+  project: z.string(),
+  change_request: z.uuid(),
+});
+
+/**
+ * The change request as it is now.
+ */
+export const zUpdateChangeRequestResponse = zChangeRequest;
+
+export const zOpenChangeRequestHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zOpenChangeRequestPath = z.object({
+  project: z.string(),
+  change_request: z.uuid(),
+});
+
+/**
+ * The change request as it is now.
+ */
+export const zOpenChangeRequestResponse = zChangeRequest;
+
+export const zRebaseChangeRequestHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zRebaseChangeRequestPath = z.object({
+  project: z.string(),
+  change_request: z.uuid(),
+});
+
+/**
+ * The change request as it is now.
+ */
+export const zRebaseChangeRequestResponse = zChangeRequest;
+
+export const zCancelChangeRequestHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zCancelChangeRequestPath = z.object({
+  project: z.string(),
+  change_request: z.uuid(),
+});
+
+/**
+ * The change request as it is now.
+ */
+export const zCancelChangeRequestResponse = zChangeRequest;
+
+export const zCopyChangeRequestPath = z.object({
+  project: z.string(),
+  change_request: z.uuid(),
+});
+
+/**
+ * The copy.
+ */
+export const zCopyChangeRequestResponse = zChangeRequest;
 
 export const zListSegmentsPath = z.object({
   project: z.string(),

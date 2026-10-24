@@ -57,3 +57,40 @@ func (h *DraftConfiguration) Draft(ctx context.Context, project workspace.Projec
 	draft, _, err := saved.Configuration.Replace(f, in, r, mintFrom(h.ids), flags.Write{})
 	return draft, err
 }
+
+// Propose returns in, proposed to replace the configuration of project's
+// flag keyed flag in the environment keyed environment, checked as Draft
+// checks it once what only the saved configuration may hold is left out of
+// it: a rule identifier it has no rule with, and a salt that is not its
+// rule's. A proposal is kept while others write the configuration, so what
+// it names that the saved one does not hold makes a new rule, not a
+// refusal. New rules are given identifiers and new rollouts salts, which
+// the proposal holds until it is applied: held are the rules of the
+// proposal in revises, nil for a new one, whose identifiers and salts in
+// keeps. It returns the flag, the saved configuration with its
+// environment's key, and what replacing it with in would leave.
+func (h *DraftConfiguration) Propose(ctx context.Context, project workspace.ProjectID, flag, environment string,
+	in flags.ConfigurationInput, held []flags.RuleInput,
+) (flags.Flag, flags.EnvironmentConfiguration, flags.Configuration, error) {
+	f, saved, err := configurationOf(ctx, h.store, project, flag, environment)
+	if err != nil {
+		return f, saved, flags.Configuration{}, err
+	}
+	if err = f.CanConfigure(); err != nil {
+		return f, saved, flags.Configuration{}, err
+	}
+	r, err := referentsOf(ctx, h.store, h.declarations, project, saved.Configuration.Environment)
+	if err != nil {
+		return f, saved, flags.Configuration{}, err
+	}
+	proposed, err := saved.Configuration.Propose(f, in, held, r, mintFrom(h.ids))
+	return f, saved, proposed, err
+}
+
+// Current returns project's flag keyed flag and its saved configuration in
+// the environment keyed environment, or not_found for either, as a proposal
+// would be based on it now.
+func (h *DraftConfiguration) Current(ctx context.Context, project workspace.ProjectID, flag, environment string,
+) (flags.Flag, flags.EnvironmentConfiguration, error) {
+	return configurationOf(ctx, h.store, project, flag, environment)
+}

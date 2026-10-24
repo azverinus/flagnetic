@@ -123,6 +123,15 @@ type Handlers struct {
 	CreateExperiment *appexperiments.CreateExperiment
 	GetExperiment    *appexperiments.GetExperiment
 
+	ListChangeRequests  *appgovernance.ListChangeRequests
+	CreateChangeRequest *appgovernance.CreateChangeRequest
+	GetChangeRequest    *appgovernance.GetChangeRequest
+	UpdateChangeRequest *appgovernance.UpdateChangeRequest
+	OpenChangeRequest   *appgovernance.OpenChangeRequest
+	RebaseChangeRequest *appgovernance.RebaseChangeRequest
+	CancelChangeRequest *appgovernance.CancelChangeRequest
+	CopyChangeRequest   *appgovernance.CopyChangeRequest
+
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment
 	CreateSegment     *appflags.CreateSegment

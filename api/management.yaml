@@ -2219,6 +2219,325 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/change-requests:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listChangeRequests
+      summary: The project's change requests
+      description: |
+        The project's change requests, newest first, narrowed by every
+        filter given. Page with `cursor` set to the `next_cursor` of the
+        previous page.
+      x-permission: project.read
+      tags: [change-requests]
+      parameters:
+        - name: flag
+          in: query
+          description: Only those naming the flag with this key.
+          schema:
+            type: string
+        - name: environment
+          in: query
+          description: Only those naming the environment with this key.
+          schema:
+            type: string
+        - name: kind
+          in: query
+          schema:
+            $ref: "#/components/schemas/ChangeRequestKind"
+        - name: state
+          in: query
+          schema:
+            $ref: "#/components/schemas/ChangeRequestState"
+        - name: author
+          in: query
+          description: Only those authored by the member or the project token with this identifier.
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of change requests.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequestList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createChangeRequest
+      summary: Propose a change
+      description: |
+        Proposes a flag's configuration in one environment as a change
+        request, as a draft or, with `open`, opened for review at once. The
+        caller, a member or a project token, is its author. It is based on
+        the configuration as it is now, and `diff` is the RFC 6902 patch from
+        that configuration to `proposed`. `proposed` is checked as replacing
+        the configuration would be, with the same refusals under
+        `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+        configuration has no rule with, and a `salt` that is not that rule's,
+        are left out, so the rule is a new one. New rules and rollouts are
+        given an identifier and a salt, which `proposed` holds. A title of 1
+        to 200 characters is required and a description has at most 10,000
+        (`invalid_change_request`).
+      x-permission: change_request.propose
+      tags: [change-requests]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRequestCreate"
+      responses:
+        "201":
+          description: Created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/change-requests/{change_request}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ChangeRequestID"
+    get:
+      operationId: getChangeRequest
+      summary: A change request
+      x-permission: project.read
+      tags: [change-requests]
+      responses:
+        "200":
+          description: The change request; its `ETag` is its version.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateChangeRequest
+      summary: Edit a change request
+      description: |
+        Changes the title, the description or what is proposed, each left
+        as it is when absent. Only the author edits (`not_author`), a draft
+        or an open change request (`invalid_state`). A new `proposed` is
+        checked as on creation, against the configuration as it is now, and
+        `diff` is recomputed from the configuration the change request is
+        based on; a rebase moves that. An edit that changes nothing changes
+        nothing and records nothing.
+      x-permission: change_request.propose
+      tags: [change-requests]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRequestPatch"
+      responses:
+        "200":
+          description: The change request as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/change-requests/{change_request}/open:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ChangeRequestID"
+    post:
+      operationId: openChangeRequest
+      summary: Open a draft change request for review
+      description: |
+        Only the author opens (`not_author`), and only a draft
+        (`invalid_state`). When the configuration was written since the
+        change request was based on it, its diff no longer shows what it
+        would do, and opening is refused (`base_moved`) until it is rebased.
+      x-permission: change_request.propose
+      tags: [change-requests]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The change request as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/change-requests/{change_request}/rebase:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ChangeRequestID"
+    post:
+      operationId: rebaseChangeRequest
+      summary: Base a draft change request on the configuration as it is now
+      description: |
+        Keeps what is proposed and recomputes `diff` from the configuration
+        as it is now, which becomes `base_version`. Only the author rebases
+        (`not_author`), and only a draft (`invalid_state`). Rebasing on the
+        base it has changes nothing and records nothing.
+      x-permission: change_request.propose
+      tags: [change-requests]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The change request as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/change-requests/{change_request}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ChangeRequestID"
+    post:
+      operationId: cancelChangeRequest
+      summary: Cancel a change request
+      description: |
+        The author cancels a draft, open or approved change request
+        (`not_author`, `invalid_state`). A cancelled change request is
+        final; copying it resumes its work.
+      x-permission: change_request.propose
+      tags: [change-requests]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The change request as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/change-requests/{change_request}/copy:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ChangeRequestID"
+    post:
+      operationId: copyChangeRequest
+      summary: Copy a change request into a new draft
+      description: |
+        Copies any change request, whatever its state and whoever wrote it,
+        into a new draft of the caller's with the same title, description
+        and proposal, based on the configuration as it is now and checked
+        against it as a new change request is.
+      x-permission: change_request.propose
+      tags: [change-requests]
+      responses:
+        "201":
+          description: The copy.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/segments:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -3114,6 +3433,14 @@ components:
       description: The flag's key.
       schema:
         type: string
+    ChangeRequestID:
+      name: change_request
+      in: path
+      required: true
+      description: The change request's identifier.
+      schema:
+        type: string
+        format: uuid
     ExperimentKey:
       name: experiment
       in: path
@@ -4900,6 +5227,176 @@ components:
           format: int64
           minimum: 1
           description: The version of this configuration to write again, from its history in this environment.
+    ChangeRequestKind:
+      type: string
+      description: |
+        What a change request proposes: `flag_configuration`, a flag's
+        configuration in one environment. Other kinds are to come; a client
+        reads `proposed` by the kind.
+      enum: [flag_configuration, definition, experiment]
+    ChangeRequestState:
+      type: string
+      description: |
+        `draft` (its author prepares it), `open` (offered for review),
+        `approved`, `rejected`, `applied`, `cancelled`, `superseded` (what
+        it was based on moved). The last four are final.
+      enum: [draft, open, approved, rejected, applied, cancelled, superseded]
+    ChangeRequestAuthor:
+      type: object
+      description: The member or the project token that proposed the change request.
+      required: [kind, id, name]
+      properties:
+        kind:
+          type: string
+          enum: [member, token]
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: The member's display name or the token's name, as it is now.
+    PatchOperation:
+      type: object
+      description: One operation of an RFC 6902 JSON Patch; `value` is absent from a `remove`.
+      required: [op, path]
+      properties:
+        op:
+          type: string
+          enum: [add, remove, replace]
+        path:
+          type: string
+          description: A JSON Pointer into `proposed`.
+        value:
+          description: The value added or replaced, of any JSON type, null included.
+          nullable: true
+          # Raw, so a null value is written as null and not left out, which
+          # would make the operation another one.
+          x-go-type: json.RawMessage
+    ProposedOverride:
+      type: object
+      required: [unit_type, unit_id, variation, note]
+      properties:
+        unit_type:
+          type: string
+        unit_id:
+          type: string
+        variation:
+          type: string
+        note:
+          type: string
+          nullable: true
+    ProposedConfiguration:
+      type: object
+      description: |
+        A flag configuration as a change request proposes it: what it serves
+        and the notes and descriptions that stay on the server, without who
+        wrote it or when.
+      required: ["on", off_variation, fallthrough, prerequisites, overrides, rules]
+      properties:
+        "on":
+          type: boolean
+        off_variation:
+          type: string
+        fallthrough:
+          type: string
+        prerequisites:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prerequisite"
+        overrides:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProposedOverride"
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/Rule"
+    ChangeRequest:
+      type: object
+      required: [id, kind, state, title, description, base_version, proposed, diff, author, created_at, updated_at, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/ChangeRequestKind"
+        flag:
+          type: string
+          description: The key of the flag proposed for.
+        environment:
+          type: string
+          description: The key of the environment of a `flag_configuration` change request.
+        state:
+          $ref: "#/components/schemas/ChangeRequestState"
+        title:
+          type: string
+        description:
+          type: string
+        base_version:
+          type: integer
+          format: int64
+          description: The version of the configuration the change request is based on.
+        proposed:
+          $ref: "#/components/schemas/ProposedConfiguration"
+        diff:
+          type: array
+          description: The RFC 6902 patch from the configuration the change request is based on to `proposed`.
+          items:
+            $ref: "#/components/schemas/PatchOperation"
+        author:
+          $ref: "#/components/schemas/ChangeRequestAuthor"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          $ref: "#/components/schemas/Version"
+    ChangeRequestList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChangeRequest"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` for the next page; null on the last.
+    ChangeRequestCreate:
+      type: object
+      required: [kind, flag, environment, title, proposed]
+      properties:
+        kind:
+          type: string
+          enum: [flag_configuration]
+        flag:
+          type: string
+          description: The key of the flag.
+        environment:
+          type: string
+          description: The key of the environment.
+        title:
+          type: string
+        description:
+          type: string
+        proposed:
+          $ref: "#/components/schemas/FlagConfigurationPut"
+        open:
+          type: boolean
+          default: false
+          description: Open the change request for review at once instead of drafting it.
+    ChangeRequestPatch:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        proposed:
+          $ref: "#/components/schemas/FlagConfigurationPut"
     FlagConfigurationCopy:
       type: object
       required: [from]

@@ -1219,6 +1219,134 @@ export type FlagConfigurationRevert = {
   version: number;
 };
 
+/**
+ * What a change request proposes: `flag_configuration`, a flag's
+ * configuration in one environment. Other kinds are to come; a client
+ * reads `proposed` by the kind.
+ *
+ */
+export type ChangeRequestKind = "flag_configuration" | "definition" | "experiment";
+
+/**
+ * `draft` (its author prepares it), `open` (offered for review),
+ * `approved`, `rejected`, `applied`, `cancelled`, `superseded` (what
+ * it was based on moved). The last four are final.
+ *
+ */
+export type ChangeRequestState =
+  "draft" | "open" | "approved" | "rejected" | "applied" | "cancelled" | "superseded";
+
+/**
+ * The member or the project token that proposed the change request.
+ */
+export type ChangeRequestAuthor = {
+  kind: "member" | "token";
+  id: string;
+  /**
+   * The member's display name or the token's name, as it is now.
+   */
+  name: string;
+};
+
+/**
+ * One operation of an RFC 6902 JSON Patch; `value` is absent from a `remove`.
+ */
+export type PatchOperation = {
+  op: "add" | "remove" | "replace";
+  /**
+   * A JSON Pointer into `proposed`.
+   */
+  path: string;
+  /**
+   * The value added or replaced, of any JSON type, null included.
+   */
+  value?: unknown;
+};
+
+export type ProposedOverride = {
+  unit_type: string;
+  unit_id: string;
+  variation: string;
+  note: string | null;
+};
+
+/**
+ * A flag configuration as a change request proposes it: what it serves
+ * and the notes and descriptions that stay on the server, without who
+ * wrote it or when.
+ *
+ */
+export type ProposedConfiguration = {
+  on: boolean;
+  off_variation: string;
+  fallthrough: string;
+  prerequisites: Array<Prerequisite>;
+  overrides: Array<ProposedOverride>;
+  rules: Array<Rule>;
+};
+
+export type ChangeRequest = {
+  id: string;
+  kind: ChangeRequestKind;
+  /**
+   * The key of the flag proposed for.
+   */
+  flag?: string;
+  /**
+   * The key of the environment of a `flag_configuration` change request.
+   */
+  environment?: string;
+  state: ChangeRequestState;
+  title: string;
+  description: string;
+  /**
+   * The version of the configuration the change request is based on.
+   */
+  base_version: number;
+  proposed: ProposedConfiguration;
+  /**
+   * The RFC 6902 patch from the configuration the change request is based on to `proposed`.
+   */
+  diff: Array<PatchOperation>;
+  author: ChangeRequestAuthor;
+  created_at: string;
+  updated_at: string;
+  version: Version;
+};
+
+export type ChangeRequestList = {
+  items: Array<ChangeRequest>;
+  /**
+   * Pass as `cursor` for the next page; null on the last.
+   */
+  next_cursor: string | null;
+};
+
+export type ChangeRequestCreate = {
+  kind: "flag_configuration";
+  /**
+   * The key of the flag.
+   */
+  flag: string;
+  /**
+   * The key of the environment.
+   */
+  environment: string;
+  title: string;
+  description?: string;
+  proposed: FlagConfigurationPut;
+  /**
+   * Open the change request for review at once instead of drafting it.
+   */
+  open?: boolean;
+};
+
+export type ChangeRequestPatch = {
+  title?: string;
+  description?: string;
+  proposed?: FlagConfigurationPut;
+};
+
 export type FlagConfigurationCopy = {
   /**
    * The key of the environment whose configuration is copied, another of the project's.
@@ -1571,6 +1699,11 @@ export type Limit = number;
  * The flag's key.
  */
 export type FlagKey = string;
+
+/**
+ * The change request's identifier.
+ */
+export type ChangeRequestId = string;
 
 /**
  * The experiment's key.
@@ -5492,6 +5625,568 @@ export type GetExperimentResponses = {
 };
 
 export type GetExperimentResponse = GetExperimentResponses[keyof GetExperimentResponses];
+
+export type ListChangeRequestsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: {
+    /**
+     * Only those naming the flag with this key.
+     */
+    flag?: string;
+    /**
+     * Only those naming the environment with this key.
+     */
+    environment?: string;
+    kind?: ChangeRequestKind;
+    state?: ChangeRequestState;
+    /**
+     * Only those authored by the member or the project token with this identifier.
+     */
+    author?: string;
+    /**
+     * The `next_cursor` of the previous page.
+     */
+    cursor?: string;
+    /**
+     * How many entries a page holds at most.
+     */
+    limit?: number;
+  };
+  url: "/projects/{project}/change-requests";
+};
+
+export type ListChangeRequestsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListChangeRequestsError = ListChangeRequestsErrors[keyof ListChangeRequestsErrors];
+
+export type ListChangeRequestsResponses = {
+  /**
+   * One page of change requests.
+   */
+  200: ChangeRequestList;
+};
+
+export type ListChangeRequestsResponse =
+  ListChangeRequestsResponses[keyof ListChangeRequestsResponses];
+
+export type CreateChangeRequestData = {
+  body: ChangeRequestCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests";
+};
+
+export type CreateChangeRequestErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateChangeRequestError = CreateChangeRequestErrors[keyof CreateChangeRequestErrors];
+
+export type CreateChangeRequestResponses = {
+  /**
+   * Created.
+   */
+  201: ChangeRequest;
+};
+
+export type CreateChangeRequestResponse =
+  CreateChangeRequestResponses[keyof CreateChangeRequestResponses];
+
+export type GetChangeRequestData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The change request's identifier.
+     */
+    change_request: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests/{change_request}";
+};
+
+export type GetChangeRequestErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetChangeRequestError = GetChangeRequestErrors[keyof GetChangeRequestErrors];
+
+export type GetChangeRequestResponses = {
+  /**
+   * The change request; its `ETag` is its version.
+   */
+  200: ChangeRequest;
+};
+
+export type GetChangeRequestResponse = GetChangeRequestResponses[keyof GetChangeRequestResponses];
+
+export type UpdateChangeRequestData = {
+  body: ChangeRequestPatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The change request's identifier.
+     */
+    change_request: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests/{change_request}";
+};
+
+export type UpdateChangeRequestErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type UpdateChangeRequestError = UpdateChangeRequestErrors[keyof UpdateChangeRequestErrors];
+
+export type UpdateChangeRequestResponses = {
+  /**
+   * The change request as it is now.
+   */
+  200: ChangeRequest;
+};
+
+export type UpdateChangeRequestResponse =
+  UpdateChangeRequestResponses[keyof UpdateChangeRequestResponses];
+
+export type OpenChangeRequestData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The change request's identifier.
+     */
+    change_request: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests/{change_request}/open";
+};
+
+export type OpenChangeRequestErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type OpenChangeRequestError = OpenChangeRequestErrors[keyof OpenChangeRequestErrors];
+
+export type OpenChangeRequestResponses = {
+  /**
+   * The change request as it is now.
+   */
+  200: ChangeRequest;
+};
+
+export type OpenChangeRequestResponse =
+  OpenChangeRequestResponses[keyof OpenChangeRequestResponses];
+
+export type RebaseChangeRequestData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The change request's identifier.
+     */
+    change_request: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests/{change_request}/rebase";
+};
+
+export type RebaseChangeRequestErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type RebaseChangeRequestError = RebaseChangeRequestErrors[keyof RebaseChangeRequestErrors];
+
+export type RebaseChangeRequestResponses = {
+  /**
+   * The change request as it is now.
+   */
+  200: ChangeRequest;
+};
+
+export type RebaseChangeRequestResponse =
+  RebaseChangeRequestResponses[keyof RebaseChangeRequestResponses];
+
+export type CancelChangeRequestData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The change request's identifier.
+     */
+    change_request: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests/{change_request}/cancel";
+};
+
+export type CancelChangeRequestErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type CancelChangeRequestError = CancelChangeRequestErrors[keyof CancelChangeRequestErrors];
+
+export type CancelChangeRequestResponses = {
+  /**
+   * The change request as it is now.
+   */
+  200: ChangeRequest;
+};
+
+export type CancelChangeRequestResponse =
+  CancelChangeRequestResponses[keyof CancelChangeRequestResponses];
+
+export type CopyChangeRequestData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The change request's identifier.
+     */
+    change_request: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests/{change_request}/copy";
+};
+
+export type CopyChangeRequestErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CopyChangeRequestError = CopyChangeRequestErrors[keyof CopyChangeRequestErrors];
+
+export type CopyChangeRequestResponses = {
+  /**
+   * The copy.
+   */
+  201: ChangeRequest;
+};
+
+export type CopyChangeRequestResponse =
+  CopyChangeRequestResponses[keyof CopyChangeRequestResponses];
 
 export type ListSegmentsData = {
   body?: never;
