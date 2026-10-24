@@ -80,7 +80,7 @@ func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeReques
 func propose(ctx context.Context, d ChangeRequestDeps, project workspace.ProjectID, flag, environment string,
 	in flags.ConfigurationInput, p governance.Proposal, open bool, author governance.Author, now time.Time,
 ) (governance.ChangeRequest, error) {
-	f, saved, proposed, err := d.Configurations.Propose(ctx, project, flag, environment, in)
+	f, saved, proposed, err := d.Configurations.Propose(ctx, project, flag, environment, in, nil)
 	if err != nil {
 		return governance.ChangeRequest{}, under(err, "/proposed")
 	}
@@ -129,7 +129,14 @@ func (h *UpdateChangeRequest) Handle(ctx context.Context, cmd UpdateChangeReques
 			}
 			e := governance.Edit{Title: cmd.Title, Description: cmd.Description}
 			if cmd.Proposed != nil {
-				_, _, proposed, err := h.d.Configurations.Propose(ctx, cr.Project, cr.Flag.Key, cr.Environment.Key, *cmd.Proposed)
+				// The rules the change request proposes keep the
+				// identifiers and salts they were given when it was made.
+				held, err := configurationInputOf(cr.Proposed)
+				if err != nil {
+					return cr, false, err
+				}
+				_, _, proposed, err := h.d.Configurations.Propose(ctx, cr.Project, cr.Flag.Key, cr.Environment.Key,
+					*cmd.Proposed, held.Rules)
 				if err != nil {
 					return cr, false, under(err, "/proposed")
 				}

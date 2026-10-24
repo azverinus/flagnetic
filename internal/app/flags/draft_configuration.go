@@ -65,11 +65,12 @@ func (h *DraftConfiguration) Draft(ctx context.Context, project workspace.Projec
 // rule's. A proposal is kept while others write the configuration, so what
 // it names that the saved one does not hold makes a new rule, not a
 // refusal. New rules are given identifiers and new rollouts salts, which
-// the proposal holds until it is applied. It returns the flag, the saved
-// configuration with its environment's key, and what replacing it with in
-// would leave.
+// the proposal holds until it is applied: held are the rules of the
+// proposal in revises, nil for a new one, whose identifiers and salts in
+// keeps. It returns the flag, the saved configuration with its
+// environment's key, and what replacing it with in would leave.
 func (h *DraftConfiguration) Propose(ctx context.Context, project workspace.ProjectID, flag, environment string,
-	in flags.ConfigurationInput,
+	in flags.ConfigurationInput, held []flags.RuleInput,
 ) (flags.Flag, flags.EnvironmentConfiguration, flags.Configuration, error) {
 	f, saved, err := configurationOf(ctx, h.store, project, flag, environment)
 	if err != nil {
@@ -82,7 +83,7 @@ func (h *DraftConfiguration) Propose(ctx context.Context, project workspace.Proj
 	if err != nil {
 		return f, saved, flags.Configuration{}, err
 	}
-	proposed, _, err := saved.Configuration.Replace(f, saved.Configuration.Proposable(in), r, mintFrom(h.ids), flags.Write{})
+	proposed, err := saved.Configuration.Propose(f, in, held, r, mintFrom(h.ids))
 	return f, saved, proposed, err
 }
 

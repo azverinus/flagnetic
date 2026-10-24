@@ -62,9 +62,11 @@ type Configurations interface {
 	// Propose returns project's flag keyed flag, its saved configuration in
 	// the environment keyed environment, and what replacing it with in
 	// would leave, checked as that write would be, with the same refusals,
-	// once the rule identifiers and salts the saved configuration does not
-	// hold are left out of in.
+	// once the rule identifiers and salts neither the saved configuration
+	// nor held hold are left out of in. held are the rules of the proposal
+	// in revises, nil for a new one.
 	Propose(ctx context.Context, project workspace.ProjectID, flag, environment string, in flags.ConfigurationInput,
+		held []flags.RuleInput,
 	) (flags.Flag, flags.EnvironmentConfiguration, flags.Configuration, error)
 	// Current returns project's flag keyed flag and its saved
 	// configuration in the environment keyed environment, or not_found for

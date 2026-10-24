@@ -387,6 +387,39 @@ func TestRuleIdentifiersAndSaltsTheConfigurationDoesNotHoldAreLeftOut(t *testing
 	}
 }
 
+func TestAProposalsNewRulesKeepTheirIdentifiersAndSaltsWhileItIsEdited(t *testing.T) {
+	f := startChangeRequests(t)
+	proposed := proposedOn()
+	proposed.Rules = &[]management.RuleInput{{Serve: rolloutOf("user", "b", 2500)}}
+	cr := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("Roll out", proposed))
+	given := cr.Proposed.Rules[0]
+
+	// Sending back the proposal as it was answered changes nothing.
+	echoed := proposedOn()
+	echoed.Rules = &[]management.RuleInput{{Id: &given.Id, Serve: given.Serve}}
+	same := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr, management.ChangeRequestPatch{Proposed: &echoed})
+	if same.JSON200 == nil || same.JSON200.Version != 1 || !same.JSON200.UpdatedAt.Equal(cr.UpdatedAt) {
+		t.Fatalf("sending the proposal back = %d: %s", same.StatusCode(), same.Body)
+	}
+
+	// Growing the rollout keeps the rule and its salt, so no unit moves out.
+	grown := proposedOn()
+	serve := rolloutOf("user", "b", 5000)
+	grown.Rules = &[]management.RuleInput{{Id: &given.Id, Serve: serve}}
+	res := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr, management.ChangeRequestPatch{Proposed: &grown})
+	if res.JSON200 == nil {
+		t.Fatalf("growing the rollout = %d: %s", res.StatusCode(), res.Body)
+	}
+	rules := res.JSON200.Proposed.Rules
+	if len(rules) != 1 || rules[0].Id != given.Id || valueOr(rules[0].Serve.Salt) != valueOr(given.Serve.Salt) ||
+		rules[0].Serve.Percentage == nil || *rules[0].Serve.Percentage != 5000 {
+		t.Errorf("proposed rules = %+v, want rule %v with salt %q at 5000", rules, given.Id, valueOr(given.Serve.Salt))
+	}
+	if actions := changeRequestActions(t, f.srv, cr); !slices.Equal(actions, []string{"change_request.updated", "change_request.drafted"}) {
+		t.Errorf("audit = %v", actions)
+	}
+}
+
 func TestChangeRequestsAreReadByAnyMemberAndProposedWithChangeRequestPropose(t *testing.T) {
 	f := startChangeRequests(t)
 	cr := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("Turn it on", proposedOn()))
