@@ -67,6 +67,7 @@ void main() {
   for (final name in const [
     'versioning-scenarios.json',
     'experiment-scenarios.json',
+    'foreground-scenarios.json',
   ]) {
     final extra = protocolJson(name)! as Map<String, Object?>;
     all.addAll((extra['scenarios']! as List<Object?>).cast());
@@ -121,6 +122,12 @@ abstract interface class Sdk {
   /// Flushes.
   Future<void> flush();
 
+  /// The app went to the background.
+  void background();
+
+  /// The app came back to the foreground.
+  void foreground();
+
   /// What an offline client recorded.
   List<Map<String, Object?>> get recorded;
 
@@ -168,6 +175,10 @@ final class ClientSdk implements Sdk {
   );
   @override
   Future<void> flush() => client.flush();
+  @override
+  void background() => client.background();
+  @override
+  void foreground() => client.foreground();
   @override
   List<Map<String, Object?>> get recorded => client.offline?.recorded ?? [];
   @override
@@ -340,6 +351,7 @@ Future<void> runScenario(
   final store = storedDoc == null
       ? InMemoryStore()
       : await storeHolding(storedDoc, context);
+  var scenarioNow = DateTime.utc(2026, 1, 1);
   final server = await MockServer.start();
   final logs = LogRecorder();
   final offlineSource = offline == null
@@ -357,7 +369,14 @@ Future<void> runScenario(
         store: store,
         logger: logs.call,
         pollInterval: scaled(options['poll_interval_ms']),
-        sse: options['sse'] == true,
+        sse: options['sse'] as bool?,
+        // The scenarios' 0–3 s wait, divided like every duration.
+        rulesetEventJitter: scaled(3000),
+        // Time as the scenario counts it: it moves only by `advance_ms`, so
+        // the 10 s minimum refetch gap is tested in the protocol's own
+        // seconds.
+        clock: () => scenarioNow,
+        minimumRefetchGap: const Duration(seconds: 10),
         offline: offlineSource,
         flushInterval: flushInterval,
         sendExposures: options['send_exposures'] != false,
@@ -492,7 +511,18 @@ Future<void> runScenario(
       stream = null;
       stepEnd = DateTime.now();
     }
-    if (step['advance_ms'] case final Object ms) {
+    if (step['stream_closed'] case final Map<String, Object?> closed) {
+      final open = stream ?? fail('$label: no stream is open');
+      expect(
+        await open.closedBySdk(scaled(closed['within_ms']) + latency),
+        isTrue,
+        reason: '$label: the SDK closes the stream',
+      );
+      stream = null;
+      stepEnd = DateTime.now();
+    }
+    if (step['advance_ms'] case final int ms) {
+      scenarioNow = scenarioNow.add(Duration(milliseconds: ms));
       await Future<void>.delayed(scaled(ms));
       stepEnd = DateTime.now();
     }
@@ -554,6 +584,10 @@ Detail? makeCall(Sdk sdk, Map<String, Object?> call, String label) {
       sdk.exposure(call['flag']! as String);
     case 'alias':
       sdk.alias();
+    case 'background':
+      sdk.background();
+    case 'foreground':
+      sdk.foreground();
     case 'flush':
       // Not awaited: the batch it posts is answered by a later step, so
       // waiting here would deadlock the runner against its own script.

@@ -3411,7 +3411,7 @@
           },
           "request": {
             "delay_ms": {
-              "max": 2000,
+              "max": 3000,
               "min": 0
             },
             "headers": {

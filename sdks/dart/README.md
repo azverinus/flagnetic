@@ -47,6 +47,10 @@ Values come from, in order: the fresh response, the last good values in the stor
 
 Exposures and aliases are queued in the store, sent in batches and flushed every 5 seconds while the app is in the foreground, so events recorded offline are sent on a later start. Call `foreground()` and `background()` as the app's lifecycle changes.
 
+## Staying fresh
+
+On iOS, Android and desktop the client holds the ruleset stream while the app is in the foreground and closes it in the background. When a change is announced it waits a random 0–3 seconds before evaluating, so the apps open at a kill switch do not all ask at once. A kill switch therefore reaches an open app within 5 seconds at the 99th percentile, and a backgrounded app at its next `foreground()`, which refetches unless the last attempt was less than 10 seconds ago. Pass `ClientOptions(sse: false)` to hold no connection: values then stay fresh within the 5 minute poll and at every `foreground()`. On the web the stream is opt-in (`sse: true`).
+
 ## Tests
 
 Build a client with `ClientOptions(offline: OfflineSource.document(...))` to serve a values document without a network. `client.offline` sets values, reloads the document and lists the events the client recorded.
