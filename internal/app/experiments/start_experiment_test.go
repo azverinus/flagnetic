@@ -2,6 +2,7 @@ package experiments_test
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/azverinus/flagnetic/eval"
@@ -197,7 +197,7 @@ func rulesetOf(t *testing.T, c *management.ClientWithResponses, p management.Pro
 // holds.
 func setUp(t *testing.T, c *management.ClientWithResponses) management.Project {
 	t.Helper()
-	key := "p" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
+	key := "p" + strings.ToLower(rand.Text())[:12]
 	p, err := c.CreateProjectWithResponse(t.Context(), management.ProjectCreate{Key: key, Name: "Project " + key})
 	if err != nil || p.JSON201 == nil {
 		t.Fatalf("create project: %v", err)
