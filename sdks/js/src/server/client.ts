@@ -543,7 +543,6 @@ export class FlagneticServer {
     const r = held.rs.evaluate(key, isObject(context) ? context : {});
     if (r.reason === "error") {
       const code = r.error_code ?? "inconsistent_ruleset";
-      if (code === "inconsistent_ruleset") this.once(`rule:${key}:${String(held.rs.version)}`, "warn", "rule_unsupported", { flag: key, error_code: code });
       return served(this.fallback(def, code));
     }
     if (!fitsFlagType(type, r.value)) return served(this.fallback(def, "inconsistent_ruleset"));
@@ -681,6 +680,24 @@ export class FlagneticServer {
   private swap(rs: Ruleset, receivedAt: Date, source: string): void {
     this.held = { rs, receivedAt };
     this.log("info", "ruleset_loaded", { source, ruleset_version: rs.version, flags: rs.document.flags.length });
+    this.reportUnsupported(rs);
+  }
+
+  // reportUnsupported logs rule_unsupported for every flag of rs holding a
+  // construct the evaluator does not know, once per flag and ruleset
+  // version: the evaluator finds them when it decodes, so a flag nobody
+  // evaluates is reported too, and an SDK that must be upgraded says so
+  // without a line per evaluation.
+  private reportUnsupported(rs: Ruleset): void {
+    const report = rs.unsupportedRules();
+    for (const key of [...report.keys()].sort()) {
+      const constructs = (report.get(key) ?? []).map((u) => `${u.kind} ${u.name}`);
+      this.once(`rule:${key}:${String(rs.version)}`, "error", "rule_unsupported", {
+        flag: key,
+        constructs,
+        ruleset_version: rs.version,
+      });
+    }
   }
 
   private setStage(stage: Stage): void {

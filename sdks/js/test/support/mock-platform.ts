@@ -24,7 +24,9 @@ export type EventsReply =
   | { readonly kind: "accepted"; readonly body?: string }
   | { readonly kind: "status"; readonly status: number; readonly headers?: Record<string, string> }
   | { readonly kind: "network" }
-  | { readonly kind: "hang" };
+  | { readonly kind: "hang" }
+  /** Answers 202 and never finishes the body. */
+  | { readonly kind: "stall" };
 
 /** One ingest batch the mock received, with its envelope decoded. */
 export interface RecordedBatch {
@@ -224,6 +226,11 @@ export class MockPlatform {
           return;
         case "network":
           res.destroy();
+          return;
+        case "stall":
+          res.writeHead(202, { "Content-Type": "application/json" });
+          res.write('{"accepted":');
+          this.hanging.add(res);
           return;
         case "status":
           res.writeHead(reply.status, { "Content-Type": "application/problem+json", ...reply.headers });

@@ -1,5 +1,5 @@
 // Delivery of the ruleset over the SDK API: the fetch with ETag
-// revalidation, the change stream and the safety poll. It decides when to fetch and what a response
+// revalidation, the ruleset stream and the safety poll. It decides when to fetch and what a response
 // means; the client owns the held ruleset and the stage.
 import { decodeRuleset, type Ruleset } from "../evaluator/evaluate.js";
 import { Backoff } from "../internal/backoff.js";
@@ -105,6 +105,9 @@ class AttemptFailed extends Error {
 }
 
 const unauthorized = (status: number): boolean => status === 401 || status === 403;
+
+/** The longest delay a timer holds (2^31 - 1 ms); a longer one fires at once. */
+const MAX_TIMER_DELAY = 2_147_483_647;
 
 export class Delivery {
   private closed = false;
@@ -229,7 +232,9 @@ export class Delivery {
         return;
       }
       const cap = f.status !== undefined && unauthorized(f.status) ? this.config.timing.unauthorizedMax : this.config.timing.retryMax;
-      const delay = Math.max(this.fetchBackoff.next(cap), f.retryAfter ?? 0);
+      // A far-off `Retry-After` is clamped to the longest delay a timer
+      // holds: beyond it the timer overflows and fires at once.
+      const delay = Math.min(Math.max(this.fetchBackoff.next(cap), f.retryAfter ?? 0), MAX_TIMER_DELAY);
       this.host.log("warn", "fetch_failed", {
         cause: f.message,
         ...(f.status !== undefined && { status: f.status }),
@@ -245,9 +250,9 @@ export class Delivery {
     this.fetchBackoff.reset();
     this.revoked = false;
     if (this.fetchRefused) {
-      // The key works again: the stream comes back.
+      // The key works again: the stream comes back, if it was ever wanted.
       this.fetchRefused = false;
-      if (this.streamStopped) {
+      if (this.streamStopped && this.config.sse) {
         this.streamStopped = false;
         void this.openStream();
       }
@@ -422,6 +427,7 @@ export class Delivery {
       this.armSilence(abort);
       const res = await this.config.fetch(`${this.base}${SDK_API_PATH}/stream`, { headers, signal: abort.signal });
       if (unauthorized(res.status)) {
+        this.clock.clearTimeout(this.silenceTimer);
         await res.body?.cancel();
         this.keyRevoked(res.status);
         this.stopStream();

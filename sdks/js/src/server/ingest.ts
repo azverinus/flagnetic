@@ -109,12 +109,22 @@ export class Ingest {
         signal: controller.signal,
       });
     } catch (e) {
-      return { outcome: "retry", cause: `network error: ${causeOf(e)}` };
-    } finally {
       this.config.clock.clearTimeout(timer);
+      return { outcome: "retry", cause: `network error: ${causeOf(e)}` };
     }
 
-    if (res.status === 202) return { outcome: "accepted", status: 202, result: await this.read(res) };
+    // The request timeout covers the answer's body too: a 202 whose body
+    // stalls would otherwise hold the queue's only sender forever.
+    if (res.status === 202) {
+      try {
+        return { outcome: "accepted", status: 202, result: await this.read(res) };
+      } finally {
+        this.config.clock.clearTimeout(timer);
+      }
+    }
+    this.config.clock.clearTimeout(timer);
+    // Any other answer's body is not read; cancelling it frees the connection.
+    await res.body?.cancel().catch(() => undefined);
     const cause = `status ${String(res.status)}`;
     const after = retryAfterMs(res.headers.get("Retry-After"), this.config.now());
     if (res.status === 401 || res.status === 403) return { outcome: "unauthorized", status: res.status, cause };

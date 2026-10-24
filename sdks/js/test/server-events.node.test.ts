@@ -310,6 +310,24 @@ describe("the retry policy", () => {
     expect((p.batches[1]?.at ?? 0) - (p.batches[0]?.at ?? 0)).toBeLessThan(2_000);
   });
 
+  test("an accepted answer whose body stalls ends at the request timeout and the queue keeps sending", async () => {
+    const p = await platform();
+    const h = start(p, { sendSummaries: false });
+    await h.client.ready(2_000);
+    p.eventsReplies.push({ kind: "stall" });
+    h.client.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
+    await h.client.flush();
+    h.client.alias({ fromUnitType: "anonymous", fromUnitId: "d-9a2b", toUnitType: "user", toUnitId: "u-1002" });
+    await h.client.flush();
+
+    await eventually(() => {
+      expect(p.batches.length).toBe(2);
+    });
+    // The stalled batch was accepted: only the new alias goes.
+    expect(p.batches[1]?.eventIds).toHaveLength(1);
+    expect(p.batches[1]?.eventIds).not.toStrictEqual(p.batches[0]?.eventIds);
+  });
+
   test("a network error retries the whole batch", async () => {
     const p = await platform();
     const h = start(p);

@@ -119,7 +119,7 @@ function expectGaps(times: number[], expected: number[]): void {
 }
 
 describe("the ruleset fetch", () => {
-  test("opens the stream before fetching and sends the spec's headers, gzip accepted and If-None-Match on the next fetch", async () => {
+  test("opens the stream before fetching and sends the identity, schema and gzip headers and If-None-Match on the next fetch", async () => {
     const p = await platform(rulesetOf(1, { a: true }));
     p.gzip = true;
     const h = start(p, {}, { pollConnected: 100 });
@@ -226,6 +226,15 @@ describe("the ruleset fetch", () => {
     expect(gapsOf(p.rulesetRequests().map((r) => r.at))[0]).toBeGreaterThanOrEqual(290);
   });
 
+  test("a Retry-After beyond what a timer holds still waits instead of retrying at once", async () => {
+    const p = await platform(rulesetOf(1, {}));
+    p.rulesetReplies.push({ kind: "status", status: 429, headers: { "Retry-After": "99999999" } });
+    start(p, { stream: false }, {}, () => 0);
+    await p.until(() => p.rulesetRequests().length >= 1);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(p.rulesetRequests()).toHaveLength(1);
+  });
+
   test.each([
     ["corrupt JSON", `{"schema_version":1,`, "parse: malformed JSON"],
     ["an empty body", "", "parse: empty body"],
@@ -320,7 +329,7 @@ describe("the ruleset fetch", () => {
   });
 });
 
-describe("the change stream", () => {
+describe("the ruleset stream", () => {
   test("an event reaches onChange with exactly the changed keys within 2 s", async () => {
     const p = await platform(rulesetOf(1, { a: true, b: true }));
     const h = start(p);

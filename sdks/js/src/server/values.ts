@@ -58,7 +58,7 @@ export interface ServedFlagDocument {
  */
 export interface ValuesDocument {
   readonly schema_version: number;
-  /** The version of the ruleset the values were computed from; 0 at stage `built_in`. */
+  /** The version of the ruleset the values were computed from. */
   readonly ruleset_version: number;
   readonly environment?: { readonly key: string; readonly protected: boolean };
   /** By flag key. */

@@ -202,9 +202,10 @@ export class Summaries {
     for (;;) {
       const res = await this.post(group);
       if (res.outcome !== "retry") return res;
-      // Backoff alone decides when the batch goes again, as in the event
-      // queue (conformance/protocol/README.md).
-      // Never sooner than the platform's own `Retry-After` (docs/operations.md).
+      // Never sooner than the platform's own `Retry-After`: a summary covers
+      // a whole interval, so waiting as asked costs nothing, unlike the
+      // exposure queue, which backs off on its own. A wait beyond the
+      // interval ends the attempt below, so a huge header cannot stall it.
       const wait = Math.max(backoff.next(this.config.retryMax), res.retryAfter ?? 0);
       this.log("warn", "events_failed", {
         kind: "evaluation_summary",

@@ -105,7 +105,7 @@ scenarios.scenarios.push(...experiments.scenarios);
 
 const cases = JSON.parse(read("degradation/cases.json")) as {
   context: Context;
-  cases: { name: string; endpoint: string; held: string; response: Respond; outcome: string; answers: Answer[] }[];
+  cases: { name: string; endpoint: string; held: string; response: Respond; outcome: string; answers: Answer[]; logs?: Record<string, number> }[];
 };
 
 // ---------------------------------------------------------------- the runner
@@ -289,6 +289,9 @@ class Runner {
       if (step.expect) this.check(step.expect, result, where);
       stepStart = this.clock.now();
     }
+    // After the last step no request may be left unanswered or unexpected.
+    await this.quiet();
+    expect(this.queue.map((r) => `${r.method} ${r.path}`), "requests after the last step").toStrictEqual([]);
   }
 
   private async request(want: NonNullable<Step["request"]>, respond: Respond, stepStart: number, where: string): Promise<void> {
@@ -577,7 +580,7 @@ describe("protocol degradation cases, the ruleset endpoint", () => {
       {
         request: { method: "GET", path: "/sdk/v1/ruleset", headers: { "If-None-Match": `"${held.version}"` }, delay_ms: { min: 30_000, max: 30_000 } },
         respond: c.response,
-        expect: { stage: accept ? "fresh" : "last_good", stale_since: accept ? "unset" : "set", answers: c.answers },
+        expect: { stage: accept ? "fresh" : "last_good", stale_since: accept ? "unset" : "set", answers: c.answers, ...(c.logs && { logs: c.logs }) },
       },
     ]);
   });

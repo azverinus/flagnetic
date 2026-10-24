@@ -4,7 +4,8 @@
  * Undefined when the header is absent or unreadable.
  */
 export function retryAfterMs(header: string | null, now: number): number | undefined {
-  if (header === null) return undefined;
+  // Number("") is 0: an empty header would read as "retry now".
+  if (header === null || header.trim() === "") return undefined;
   const seconds = Number(header);
   if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
   const at = Date.parse(header);

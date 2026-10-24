@@ -296,15 +296,19 @@ describe("getters", () => {
     expect(c.getDetail(user, "nope", 3).variation).toBeUndefined();
   });
 
-  test("a type mismatch is logged once per key, an unsupported rule once per flag", () => {
+  test("a type mismatch is logged once per key, an unsupported rule once per flag at load, evaluated or not", () => {
     const { logger, events } = captureLogs();
     const d = createServer("", "", { offline: document(), logger });
+    // Reported when the ruleset loads, before anything evaluates the flag.
+    expect(events("rule_unsupported")).toHaveLength(1);
     d.getNumber(user, "copy", 1);
     d.getNumber(user, "copy", 1);
     d.getBool(user, "broken", false);
     d.getBool(user, "broken", false);
     expect(events("type_mismatch").map((l) => l.fields)).toStrictEqual([{ flag: "copy", flag_type: "string", requested_type: "number" }]);
-    expect(events("rule_unsupported").map((l) => l.fields)).toStrictEqual([{ flag: "broken", error_code: "inconsistent_ruleset" }]);
+    expect(events("rule_unsupported").map((l) => l.fields)).toStrictEqual([
+      { flag: "broken", constructs: ["operator resembles"], ruleset_version: 7 },
+    ]);
   });
 
   test("getters are total: garbage contexts, a throwing logger and hostile values never throw", () => {

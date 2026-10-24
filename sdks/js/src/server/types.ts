@@ -53,11 +53,11 @@ export type { LogLevel };
  *
  * - `ruleset_loaded` (info): a ruleset was accepted. Fields: source, ruleset_version, flags.
  * - `fetch_failed` (warn): a ruleset fetch failed. Fields: cause, status?, retry_in_ms (when the next attempt is due).
- * - `sse_connected` (info) and `sse_dropped` (warn): the change stream. Fields of the drop: cause, retry_in_ms.
+ * - `sse_connected` (info) and `sse_dropped` (warn): the ruleset stream. Fields of the drop: cause, retry_in_ms.
  * - `stage_changed` (warn when leaving `fresh`, else info). Fields: from, to.
  * - `key_revoked` (error): 401 or 403, logged once until a fetch succeeds. Fields: status.
  * - `schema_unsupported` (error): a document's schema_version is not one this SDK reads, logged once. Fields: schema_version, supported.
- * - `rule_unsupported` (warn): a flag reached a construct the evaluator cannot apply, logged once per flag and ruleset version. Fields: flag, error_code.
+ * - `rule_unsupported` (error): a flag of a loaded ruleset holds a construct the evaluator does not know and serves the fallback, logged once per flag and ruleset version. Fields: flag, constructs, ruleset_version.
  * - `store_failed` (warn): the store could not be read or written. Fields: operation, cause.
  * - `events_failed` (warn): an ingest batch failed and goes again with the same event IDs. Fields: cause, status?, events, retry_in_ms.
  * - `queue_dropped` (warn): events or summary rows were given up on. Fields: cause, plus what was dropped.
@@ -111,11 +111,11 @@ export interface ServerOptions {
   readonly allowOverrides?: boolean;
   /** Replaces the default logger, `consoleLogger("warn")`. */
   readonly logger?: Logger;
-  /** Milliseconds between safety polls while the change stream is connected: 300 000 by default, 30 000 at least. */
+  /** Milliseconds between safety polls while the ruleset stream is connected: 300 000 by default, 30 000 at least. */
   readonly pollInterval?: number;
   /** Milliseconds between polls while the stream is down or disabled: 30 000 by default and at least. */
   readonly pollIntervalWithoutStream?: number;
-  /** Whether to open the change stream: true by default. Without it the client polls at `pollIntervalWithoutStream`. */
+  /** Whether to open the ruleset stream: true by default. Without it the client polls at `pollIntervalWithoutStream`. */
   readonly stream?: boolean;
   /** Milliseconds a ruleset request may take: 10 000 by default. */
   readonly requestTimeout?: number;
