@@ -115,7 +115,7 @@ tasks:
   # --- JavaScript SDK (sdks/js/, needs Node and pnpm) ---
 
   sdk-js:check:
-    desc: Lint, typecheck, test, time and package the JavaScript SDK (its browser run is pnpm test:browser)
+    desc: Lint, typecheck, test, time, package and size the JavaScript SDK (its browser runs are pnpm test:browser and test:browsers)
     dir: sdks/js
     cmds:
       - pnpm install --frozen-lockfile
@@ -126,6 +126,7 @@ tasks:
       - pnpm test:p99
       - pnpm build
       - pnpm check:package
+      - pnpm check:size
 
   # --- SDK end to end (e2e/, needs Docker) ---
 
