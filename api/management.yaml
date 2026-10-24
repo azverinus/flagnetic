@@ -2546,6 +2546,128 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/experiments/{experiment}/exposures:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+      - $ref: "#/components/parameters/ExposureEnvironment"
+    get:
+      operationId: getExperimentExposures
+      summary: An experiment's exposures in one environment
+      description: |
+        What the exposures of an experiment of any status came to in one
+        environment, from the exposure rollup, which reads the exposures
+        committed every 10 seconds; `as_of` is when it last moved, null
+        before it first did.
+
+        A unit's first exposure is its non-override exposure with the
+        earliest `occurred_at`, ties broken by the smaller `event_id`; an
+        earlier exposure arriving late replaces it. Every other
+        non-override exposure of the unit naming another variation is a
+        conflict. Override exposures are counted as `overridden` and never
+        make, replace or conflict with a first exposure. However exposures
+        arrive, in whatever order and batches, the counts come out the
+        same.
+
+        `variations` lists the experiment's variations in its order, each
+        even without an exposure, then any other variation an override
+        exposure named, by key, which expects no share. `rejections`
+        counts the exposures of the experiment refused in the environment,
+        by reason.
+      x-permission: project.read
+      tags: [experiments]
+      responses:
+        "200":
+          description: The experiment's exposures in the environment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentExposures"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/experiments/{experiment}/exposures/timeline:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+      - $ref: "#/components/parameters/ExposureEnvironment"
+    get:
+      operationId: getExperimentExposureTimeline
+      summary: An experiment's exposures per day in one environment
+      description: |
+        The experiment's exposure counts per UTC day and variation, by day
+        then variation key; a day and variation without an exposure is left
+        out. `exposures` and `overridden` count by the day an exposure was
+        received, `first_exposures` by the day the first exposure occurred,
+        so an earlier exposure arriving late moves a first exposure to its
+        own day.
+      x-permission: project.read
+      tags: [experiments]
+      parameters:
+        - name: from
+          in: query
+          description: The first UTC day, included; the first day with an exposure when absent.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: The last UTC day, included; the last day with an exposure when absent.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: The counts per day.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExposureTimeline"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/experiments/{experiment}/conflicts:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+      - $ref: "#/components/parameters/ExposureEnvironment"
+    get:
+      operationId: getExperimentConflicts
+      summary: A sample of an experiment's conflicting units in one environment
+      description: |
+        Up to 100 units exposed in the environment to another variation
+        than their first exposure's, the most recent conflict first. A
+        unit's conflicting variation is the other variation it was last
+        exposed to by `occurred_at`, ties broken by the larger `event_id`,
+        so the sample does not depend on the order exposures arrived in.
+        The totals are `conflicts` of `GET .../exposures`.
+      x-permission: project.read
+      tags: [experiments]
+      responses:
+        "200":
+          description: The conflicting units.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExposureConflicts"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/change-requests:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -3791,6 +3913,13 @@ components:
         refused `428 precondition_required`, and with any other version than
         the current one `412 version_mismatch`, both judged after the request
         is validated.
+      schema:
+        type: string
+    ExposureEnvironment:
+      name: environment
+      in: query
+      required: true
+      description: The key of the environment whose exposures to read.
       schema:
         type: string
     EnvironmentKey:
@@ -5485,6 +5614,127 @@ components:
             `independent` when `p_value` is at least 0.001; `untestable` when
             there are no degrees of freedom, every unit ID having fallen into
             one bin under one of the salts.
+    ExperimentExposures:
+      type: object
+      required: [variations, conflicts, rejections, as_of]
+      properties:
+        variations:
+          type: array
+          items:
+            $ref: "#/components/schemas/VariationExposures"
+        conflicts:
+          $ref: "#/components/schemas/ConflictTotals"
+        rejections:
+          type: array
+          description: The exposures refused, by reason, those with a count only.
+          items:
+            $ref: "#/components/schemas/ExposureRejections"
+        as_of:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the exposure rollup last moved; null before it first did.
+    ConflictTotals:
+      type: object
+      required: [total, units]
+      properties:
+        total:
+          type: integer
+          format: int64
+          description: The exposures naming another variation than their unit's first exposure.
+        units:
+          type: integer
+          format: int64
+          description: The units with at least one conflict.
+    ExposureRejections:
+      type: object
+      required: [reason, count]
+      properties:
+        reason:
+          type: string
+          description: The rejection code, such as `unknown_variation`.
+        count:
+          type: integer
+          format: int64
+    VariationExposures:
+      type: object
+      required: [variation, exposures, overridden, first_exposures, observed_share, expected_share]
+      properties:
+        variation:
+          type: string
+        exposures:
+          type: integer
+          format: int64
+          description: The non-override exposures naming the variation.
+        overridden:
+          type: integer
+          format: int64
+          description: The override exposures naming the variation.
+        first_exposures:
+          type: integer
+          format: int64
+          description: The units whose first exposure names the variation.
+        observed_share:
+          type: number
+          format: double
+          description: The variation's share of first exposures, 0 without any.
+        expected_share:
+          type: number
+          format: double
+          description: The share the variation's weight asks for, 0 for a variation the experiment does not weigh.
+    ExposureTimeline:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExposureDay"
+    ExposureDay:
+      type: object
+      required: [day, variation, exposures, overridden, first_exposures]
+      properties:
+        day:
+          type: string
+          format: date
+        variation:
+          type: string
+        exposures:
+          type: integer
+          format: int64
+        overridden:
+          type: integer
+          format: int64
+        first_exposures:
+          type: integer
+          format: int64
+    ExposureConflicts:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/ExposureConflict"
+    ExposureConflict:
+      type: object
+      required: [unit_type, unit_id, first_variation, conflicting_variation, conflicting_at]
+      properties:
+        unit_type:
+          type: string
+        unit_id:
+          type: string
+        first_variation:
+          type: string
+          description: The variation of the unit's first exposure.
+        conflicting_variation:
+          type: string
+          description: The other variation the unit was last exposed to.
+        conflicting_at:
+          type: string
+          format: date-time
+          description: When that exposure occurred.
     FlagDefinition:
       type: object
       required: [id, key, type, name, description, owner, tags, lifetime, expected_removal_at, automatic_exposure,

@@ -807,6 +807,119 @@ export const zHashCheck = z.object({
   independence: zHashCheckIndependence.optional(),
 });
 
+export const zConflictTotals = z.object({
+  total: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  units: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zExposureRejections = z.object({
+  reason: z.string(),
+  count: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zVariationExposures = z.object({
+  variation: z.string(),
+  exposures: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  overridden: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  first_exposures: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  observed_share: z.number(),
+  expected_share: z.number(),
+});
+
+export const zExperimentExposures = z.object({
+  variations: z.array(zVariationExposures),
+  conflicts: zConflictTotals,
+  rejections: z.array(zExposureRejections),
+  as_of: z.iso.datetime().nullable(),
+});
+
+export const zExposureDay = z.object({
+  day: z.iso.date(),
+  variation: z.string(),
+  exposures: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  overridden: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  first_exposures: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zExposureTimeline = z.object({
+  items: z.array(zExposureDay),
+});
+
+export const zExposureConflict = z.object({
+  unit_type: z.string(),
+  unit_id: z.string(),
+  first_variation: z.string(),
+  conflicting_variation: z.string(),
+  conflicting_at: z.iso.datetime(),
+});
+
+export const zExposureConflicts = z.object({
+  items: z.array(zExposureConflict).max(100),
+});
+
 export const zFlagDefinition = z.object({
   id: z.uuid(),
   key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
@@ -1313,6 +1426,11 @@ export const zSegmentKey = z.string();
  *
  */
 export const zIfMatch = z.string();
+
+/**
+ * The key of the environment whose exposures to read.
+ */
+export const zExposureEnvironment = z.string();
 
 /**
  * The environment's key.
@@ -2168,6 +2286,50 @@ export const zCheckHashUniformityPath = z.object({
  * The counts per bin and each test's statistic and verdict.
  */
 export const zCheckHashUniformityResponse = zHashCheck;
+
+export const zGetExperimentExposuresPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+export const zGetExperimentExposuresQuery = z.object({
+  environment: z.string(),
+});
+
+/**
+ * The experiment's exposures in the environment.
+ */
+export const zGetExperimentExposuresResponse = zExperimentExposures;
+
+export const zGetExperimentExposureTimelinePath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+export const zGetExperimentExposureTimelineQuery = z.object({
+  environment: z.string(),
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+});
+
+/**
+ * The counts per day.
+ */
+export const zGetExperimentExposureTimelineResponse = zExposureTimeline;
+
+export const zGetExperimentConflictsPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+export const zGetExperimentConflictsQuery = z.object({
+  environment: z.string(),
+});
+
+/**
+ * The conflicting units.
+ */
+export const zGetExperimentConflictsResponse = zExposureConflicts;
 
 export const zListChangeRequestsPath = z.object({
   project: z.string(),

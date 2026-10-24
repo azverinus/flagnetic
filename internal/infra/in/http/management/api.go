@@ -14,6 +14,7 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	appevents "github.com/azverinus/flagnetic/internal/app/events"
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
@@ -129,6 +130,10 @@ type Handlers struct {
 	CloneExperiment           *appexperiments.CloneExperiment
 	GetExperimentAssignment   *appexperiments.GetAssignment
 	CheckHashUniformity       *appexperiments.CheckUniformity
+
+	GetExperimentExposures *appevents.GetExperimentExposures
+	GetExposureTimeline    *appevents.GetExposureTimeline
+	GetConflicts           *appevents.GetConflicts
 
 	ListChangeRequests  *appgovernance.ListChangeRequests
 	CreateChangeRequest *appgovernance.CreateChangeRequest
