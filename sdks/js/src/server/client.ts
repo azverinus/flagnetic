@@ -380,15 +380,19 @@ export class FlagneticServer {
 
   /**
    * Reports the evaluation summary of the window so far and sends the
-   * queued exposures and aliases. Never rejects; an offline client resolves
-   * at once, having recorded them instead.
+   * queued exposures and aliases, waiting at most timeout milliseconds
+   * (5 s by default); what is not yet sent goes on in the background. Never
+   * rejects; an offline client resolves at once, having recorded them
+   * instead.
    */
-  async flush(): Promise<void> {
-    try {
-      await Promise.all([this.summaries?.flush(), this.queue?.flush()]);
-    } catch (e) {
-      this.log("error", "evaluation_failed", { operation: "flush", cause: causeOf(e) });
-    }
+  async flush(timeout: number = this.eventTiming.closeTimeout): Promise<void> {
+    const flushed = Promise.all([this.summaries?.flush(), this.queue?.flush()]).then(
+      () => undefined,
+      (e: unknown) => {
+        this.log("error", "evaluation_failed", { operation: "flush", cause: causeOf(e) });
+      },
+    );
+    await Promise.race([flushed, deadline(timeout)]);
   }
 
   /**

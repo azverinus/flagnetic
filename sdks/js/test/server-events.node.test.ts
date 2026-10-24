@@ -532,6 +532,17 @@ describe("exposures and aliases", () => {
     expect(h.events("exposure_skipped")[0]?.fields.cause).toBe("local_override");
   });
 
+  test("flush resolves at its timeout while the platform does not answer", async () => {
+    const p = await platform();
+    const h = start(p, { sendSummaries: false });
+    await h.client.ready(2_000);
+    p.eventsReplies.push({ kind: "hang" });
+    h.client.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
+    const began = Date.now();
+    await h.client.flush(100);
+    expect(Date.now() - began).toBeLessThan(1_500);
+  });
+
   test("the alias event carries both unit pairs and changes no context", async () => {
     const p = await platform();
     const h = start(p, { sendSummaries: false });
