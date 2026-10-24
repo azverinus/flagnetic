@@ -2,9 +2,9 @@
 
 One daemon thread does it all, so a client costs one thread however many
 flags it serves. The ruleset stream is read from its socket by the thread
-itself, between fetches, with ``select`` waiting for whichever comes first:
-bytes on the stream, the next fetch or reconnect due, the heartbeat deadline,
-or a wake-up from ``close``.
+itself, between fetches and event reports, with ``select`` waiting for
+whichever comes first: bytes on the stream, the next fetch, reconnect or
+report due, the heartbeat deadline, or a wake-up from a flush or ``close``.
 """
 
 from __future__ import annotations
@@ -22,11 +22,14 @@ import time
 import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 from urllib.parse import urlsplit
 
 from . import _events
 from ._sse import ChunkedDecoder, EventStreamParser, Frame, StreamError
+
+if TYPE_CHECKING:
+    from ._reporting import Reporter
 
 API_PATH = "/sdk/v1"
 
@@ -93,12 +96,18 @@ class Waits:
     catch_up: tuple[float, ...]
 
     @classmethod
-    def of(cls, request_timeout: float, poll_interval: float | None, divisor: float = 1.0) -> Waits:
+    def of(
+        cls,
+        request_timeout: float,
+        poll_interval: float | None,
+        divisor: float = 1.0,
+        down_poll_interval: float = DEFAULT_DOWN_POLL_INTERVAL,
+    ) -> Waits:
         poll = DEFAULT_POLL_INTERVAL if poll_interval is None else poll_interval
         return cls(
             request_timeout=request_timeout,
             poll=max(poll / divisor, MIN_POLL_INTERVAL / divisor),
-            down_poll=DEFAULT_DOWN_POLL_INTERVAL / divisor,
+            down_poll=down_poll_interval / divisor,
             retry_base=RETRY_BASE / divisor,
             retry_cap=RETRY_CAP / divisor,
             unauthorized_cap=UNAUTHORIZED_CAP / divisor,
@@ -198,10 +207,12 @@ class Delivery:
         stream: bool,
         agent: str,
         schema_version: int,
+        reporter: Reporter | None = None,
         ssl_context: ssl.SSLContext | None = None,
         sleep_hook: Callable[[], None] | None = None,
     ) -> None:
         self._host = host
+        self._reporter = reporter
         parts = urlsplit(base_url)
         self._secure = parts.scheme == "https"
         self._netloc_host = parts.hostname or ""
@@ -250,11 +261,15 @@ class Delivery:
     def start(self) -> None:
         self._thread.start()
 
-    def stop(self, timeout: float | None) -> None:
-        """Stops the thread and waits for it for at most ``timeout`` seconds."""
-        self._closing.set()
+    def wake(self) -> None:
+        """Makes the thread look at its work again: a flush was asked for, or the queue filled a batch."""
         with contextlib.suppress(OSError):
             self._wake_write.send(b"x")
+
+    def stop(self, timeout: float | None) -> None:
+        """Stops the thread, which reports what is queued once more, waiting at most ``timeout`` seconds."""
+        self._closing.set()
+        self.wake()
         # A request in flight ends now rather than at its timeout.
         for sock in (
             getattr(self._fetch_conn, "sock", None),
@@ -266,6 +281,21 @@ class Delivery:
                     sock.shutdown(socket.SHUT_RDWR)
         if self._thread.is_alive() and threading.current_thread() is not self._thread:
             self._thread.join(timeout)
+
+    def abandon(self) -> None:
+        """Lets go of the thread's sockets in a forked child, where the thread no longer runs.
+
+        They are closed, never shut down: the parent shares them and keeps using them.
+        """
+        for sock in (self._wake_read, self._wake_write, self._stream_sock):
+            if sock is not None:
+                with contextlib.suppress(OSError):
+                    sock.close()
+        for conn in (self._fetch_conn, self._opening_conn, self._conn):
+            sock = getattr(conn, "sock", None)
+            if sock is not None:
+                with contextlib.suppress(OSError):
+                    sock.close()
 
     # -- the loop ---------------------------------------------------------
 
@@ -279,6 +309,9 @@ class Delivery:
         finally:
             self._drop_stream_connection()
             self._host.mark_ready()
+            if self._reporter is not None:
+                self._reporter.run(time.monotonic(), final=True)
+                self._reporter.release()
             with contextlib.suppress(OSError):
                 self._wake_read.close()
                 self._wake_write.close()
@@ -294,6 +327,11 @@ class Delivery:
             if self._next_fetch is not None and (now >= self._next_fetch or self._wake_fetch):
                 self._wake_fetch = False
                 self._fetch_once()
+                continue
+            reporting = self._reporter.deadline() if self._reporter is not None else None
+            if reporting is not None and now >= reporting:
+                assert self._reporter is not None
+                self._reporter.run(now)
                 continue
             self._wait(now)
 
@@ -314,6 +352,9 @@ class Delivery:
             deadlines.append(self._last_data + self._waits.heartbeat)
         elif self._stream_enabled and not self._stream_stopped:
             deadlines.append(self._next_stream)
+        reporting = self._reporter.deadline() if self._reporter is not None else None
+        if reporting is not None:
+            deadlines.append(reporting)
         timeout = max(min(deadlines) - now, 0.0) if deadlines else None
         readable: list[socket.socket] = [self._wake_read]
         sock = self._stream_sock

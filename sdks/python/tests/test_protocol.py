@@ -39,37 +39,10 @@ DIVISORS = {
 }
 DEFAULT_DIVISOR = 50
 
-# The scenarios of the fetch loop and the ruleset stream, whole, and how many steps of each are played.
-# A scenario ends with a step that sends events, which this client does not do yet: its steps up to
-# there are played.
-DELIVERY: dict[str, int | None] = {
-    "server: the fallback chain keeps the held document through every failure": None,
-    "server: a stored last good document serves before the first request": None,
-    "server: a revoked key keeps the last good and retries at a capped backoff": None,
-    "server: a stream event above the held version triggers a fetch": None,
-    "server: a dropped stream reconnects with Last-Event-ID and fetches": None,
-    "server: 45 seconds of silence reconnect the stream": None,
-    CATCH_UP: None,
-    "server: If-None-Match revalidates and 304 keeps the document fresh": None,
-    "server: a schema_version outside the supported range is a failure logged once": 4,
-}
-
-# Scenarios about what a client reports and what a test can set: events, local overrides, offline mode
-# and experiments. A client that does not have them yet cannot play them; a scenario that is neither
-# here nor above fails the test below instead of silently never running.
-NOT_YET = {
-    "server: local overrides are refused in a protected environment",
-    "server: local overrides are refused without the option",
-    "server: a local override serves local_override, emits no exposure and is counted",
-    "server: offline mode makes no request",
-    "server: events are retried on 5xx and 429 with the same IDs and never after a rejection",
-    "server: the evaluation summary counts every evaluation, fallback included",
-    "server: an answer carries the experiment block",
-    "server: an explicit exposure is sent with its envelope",
-    "server: an evaluation alone records no exposure",
-    "server: automatic exposure follows the flag's setting",
-    "server: repeated exposures of one assignment are sent once",
-}
+# Steps that wait for the server's answer to a flush need a fetch loop that is quiet meanwhile: these
+# scenarios poll every half minute, which the factor below keeps apart from the steps.
+DIVISORS["server: events are retried on 5xx and 429 with the same IDs and never after a rejection"] = 10
+DIVISORS["server: offline mode makes no request"] = 100
 
 
 def server_scenarios() -> list[dict[str, Any]]:
@@ -77,17 +50,11 @@ def server_scenarios() -> list[dict[str, Any]]:
     return [s for s in every if s["mode"] == "server"]
 
 
-def test_every_server_scenario_is_played_or_listed() -> None:
-    names = [s["name"] for s in server_scenarios()]
-    assert sorted(names) == sorted(set(DELIVERY) | NOT_YET)
-    assert not set(DELIVERY) & NOT_YET
-
-
-@pytest.mark.parametrize("name", list(DELIVERY))
+@pytest.mark.parametrize("name", [s["name"] for s in server_scenarios()])
 def test_scenario(name: str) -> None:
     scenario = next(s for s in server_scenarios() if s["name"] == name)
     answers = {**FILES["answers"], **EXPERIMENTS["answers"]}
-    errors = play(scenario, CONTEXT, answers, DIVISORS.get(name, DEFAULT_DIVISOR), DELIVERY[name])
+    errors = play(scenario, CONTEXT, answers, DIVISORS.get(name, DEFAULT_DIVISOR))
     assert not errors, "\n".join(errors)
 
 

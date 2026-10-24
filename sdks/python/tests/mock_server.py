@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import queue
 import threading
 import time
@@ -16,6 +17,8 @@ class Request:
     method: str
     path: str
     headers: Mapping[str, str]
+    #: The body, gunzipped when it was sent gzipped.
+    body: bytes = b""
     arrived: float = field(default_factory=time.monotonic)
 
 
@@ -54,6 +57,9 @@ class MockServer:
             def do_GET(self) -> None:
                 outer._serve(self)
 
+            def do_POST(self) -> None:
+                outer._serve(self)
+
             def log_message(self, format: str, *args: Any) -> None:
                 pass
 
@@ -85,7 +91,11 @@ class MockServer:
         self._server.server_close()
 
     def _serve(self, h: BaseHTTPRequestHandler) -> None:
-        request = Request(h.command, h.path, {k.lower(): v for k, v in h.headers.items()})
+        headers = {k.lower(): v for k, v in h.headers.items()}
+        body = h.rfile.read(int(headers.get("content-length", "0")))
+        if headers.get("content-encoding") == "gzip":
+            body = gzip.decompress(body)
+        request = Request(h.command, h.path, headers, body)
         response = self._handler(request)
         if response.network_error:
             h.close_connection = True
