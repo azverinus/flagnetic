@@ -64,6 +64,13 @@ func evaluationOut(r delivery.Result) EvaluationResult {
 	if r.Value != nil {
 		out.Value = &r.Value
 	}
+	if x := r.Experiment; x != nil {
+		out.Experiment = &EvaluatedExperiment{
+			Key: x.Key, Variation: x.Variation, UnitType: x.UnitType, UnitId: x.UnitID, InclusionSalt: x.InclusionSalt,
+			VariationSalt: x.VariationSalt, InclusionBucket: x.InclusionBucket, VariationBucket: x.VariationBucket,
+			Override: x.Override,
+		}
+	}
 	if rule, err := id.Parse[flags.Rule](r.RuleID); err == nil {
 		u := openapi_types.UUID(rule.Bytes())
 		out.RuleId = &u

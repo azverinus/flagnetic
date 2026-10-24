@@ -1333,8 +1333,12 @@ export type RuleInput = {
  * serves a draft or running experiment of its flag
  * (`unknown_experiment`, `experiment_of_another_flag` and
  * `experiment_not_servable` otherwise), and several rules may serve
- * the same one. While the experiment is a draft its rules are left
- * out of the ruleset SDKs receive.
+ * the same one; a rule that served the experiment already keeps
+ * serving it whatever its status, so stopping or archiving it never
+ * blocks an edit of the other rules. While the experiment is a draft,
+ * stopped or archived its rules are left out of the ruleset SDKs
+ * receive; while it runs they carry its unit type, salts, traffic
+ * allocation and weights.
  *
  */
 export type Serve = {
@@ -1744,6 +1748,38 @@ export type Evaluation = {
 };
 
 /**
+ * The running experiment a result comes from, as an SDK's exposure
+ * carries it: present with reason `experiment`, and with reason
+ * `override` when the unit, without the override, would be in a
+ * running experiment. Recomputing either bucket takes the salt and
+ * the unit: `murmur3_32(salt + "." + unit_id) % 10000`.
+ *
+ */
+export type EvaluatedExperiment = {
+  key: string;
+  /**
+   * The served variation; the override's when an override decided the result.
+   */
+  variation: string;
+  unit_type: string;
+  unit_id: string;
+  inclusion_salt: string;
+  variation_salt: string;
+  /**
+   * The unit is included when it is below the traffic allocation.
+   */
+  inclusion_bucket: number;
+  /**
+   * Picks the variation by the weights' cumulative ranges.
+   */
+  variation_bucket: number;
+  /**
+   * Whether an override influenced the result; analysis leaves such exposures out.
+   */
+  override: boolean;
+};
+
+/**
  * What one flag serves the context, and why, as the reference
  * evaluator computes it. `type` and `automatic_exposure` are absent
  * only for `flag_not_found`.
@@ -1757,13 +1793,14 @@ export type EvaluationResult = {
    */
   variation?: string;
   /**
-   * `off`, `override`, `rule`, `rollout`, `fallthrough`, `prerequisite_failed` or `error`.
+   * `off`, `override`, `rule`, `rollout`, `experiment`, `fallthrough`, `prerequisite_failed` or `error`.
    */
   reason: string;
   /**
-   * The rule that served, for reasons `rule` and `rollout`.
+   * The rule that served, for reasons `rule`, `rollout` and `experiment`.
    */
   rule_id?: string;
+  experiment?: EvaluatedExperiment;
   automatic_exposure?: boolean;
   /**
    * The key of the flag-level prerequisite that failed, for reason `prerequisite_failed`.
@@ -6114,6 +6151,89 @@ export type RegenerateExperimentSaltsResponses = {
 
 export type RegenerateExperimentSaltsResponse =
   RegenerateExperimentSaltsResponses[keyof RegenerateExperimentSaltsResponses];
+
+export type StartExperimentData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/experiments/{experiment}/start";
+};
+
+export type StartExperimentErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type StartExperimentError = StartExperimentErrors[keyof StartExperimentErrors];
+
+export type StartExperimentResponses = {
+  /**
+   * The experiment, running.
+   */
+  200: Experiment;
+};
+
+export type StartExperimentResponse = StartExperimentResponses[keyof StartExperimentResponses];
 
 export type CloneExperimentData = {
   body: ExperimentClone;

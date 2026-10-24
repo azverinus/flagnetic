@@ -586,7 +586,7 @@ func (ck *check) serve(pointer string, in ServeInput, before *Rule, f Flag, r Re
 		if in.Variation != "" || in.UnitType != "" || in.Percentage != nil || in.Salt != "" {
 			ck.add(pointer, "invalid_value", "an experiment serve names an experiment and nothing else", nil)
 		}
-		ck.experimentOf(pointer+"/experiment", f, in.Experiment, r)
+		ck.experimentOf(pointer+"/experiment", f, in.Experiment, before, r)
 	default:
 		ck.add(pointer+"/kind", "invalid_value", "the serve kind is not one a rule serves",
 			map[string]any{"kinds": []string{ServeVariation, ServeRollout, ServeExperiment}})
@@ -595,9 +595,12 @@ func (ck *check) serve(pointer string, in ServeInput, before *Rule, f Flag, r Re
 }
 
 // experimentOf checks at pointer that key names an experiment of f that a
-// rule may serve: a draft or a running one. Several rules may serve the
-// same experiment.
-func (ck *check) experimentOf(pointer string, f Flag, key string, r Referents) {
+// rule may serve: a draft or a running one, or any the rule, which was
+// before, served already. A stopped or archived experiment's rule is left
+// out of the ruleset, and keeping it must never block an edit of the other
+// rules of the configuration. Several rules may serve the same experiment.
+func (ck *check) experimentOf(pointer string, f Flag, key string, before *Rule, r Referents) {
+	kept := before != nil && before.Serve.Kind == ServeExperiment && before.Serve.Experiment == key
 	e, ok := r.experiment(key)
 	switch {
 	case !ok:
@@ -606,7 +609,7 @@ func (ck *check) experimentOf(pointer string, f Flag, key string, r Referents) {
 	case e.Flag != f.ID:
 		ck.add(pointer, "experiment_of_another_flag", "the experiment "+strconv.Quote(key)+" compares variations of another flag",
 			map[string]any{"experiment": key})
-	case e.Status != ExperimentDraft && e.Status != ExperimentRunning:
+	case e.Status != ExperimentDraft && e.Status != ExperimentRunning && !kept:
 		ck.add(pointer, "experiment_not_servable", "the experiment "+strconv.Quote(key)+" is "+e.Status+"; only a draft or running experiment is served",
 			map[string]any{"experiment": key, "status": e.Status})
 	}

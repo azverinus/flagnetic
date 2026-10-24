@@ -129,6 +129,7 @@ type Handlers struct {
 	CloneExperiment           *appexperiments.CloneExperiment
 	GetExperimentAssignment   *appexperiments.GetAssignment
 	CheckHashUniformity       *appexperiments.CheckUniformity
+	StartExperiment           *appexperiments.StartExperiment
 
 	ListChangeRequests  *appgovernance.ListChangeRequests
 	CreateChangeRequest *appgovernance.CreateChangeRequest

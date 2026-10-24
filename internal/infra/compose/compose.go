@@ -299,7 +299,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetExperiment: appexperiments.NewGetExperiment(experimentStore),
 		UpdateExperiment: appexperiments.NewUpdateExperiment(appexperiments.UpdateExperimentDeps{
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Owners: owners,
-			Recorder: experimentRec,
+			Holders: flagStore, Rulesets: rulesets, Recorder: experimentRec,
+		}),
+		// A start moves on the rulesets of the environments whose flag
+		// configurations hold the experiment, which the flags context reads.
+		StartExperiment: appexperiments.NewStartExperiment(appexperiments.StartExperimentDeps{
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws,
+			Holders: flagStore, Rulesets: rulesets, Recorder: experimentRec,
 		}),
 		DeleteExperiment: appexperiments.NewDeleteExperiment(appexperiments.DeleteExperimentDeps{
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
