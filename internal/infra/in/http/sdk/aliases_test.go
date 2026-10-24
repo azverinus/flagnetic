@@ -35,18 +35,23 @@ func TestAliasesAreCheckedAgainstTheDeclaredUnitTypes(t *testing.T) {
 		aliasOf(1, protocolTime, "device", "d-1", "user", "u-1"),
 		aliasOf(2, protocolTime, "anonymous", "d-1", "device", "u-1"),
 		aliasOf(3, protocolTime, "anonymous", "d-1", "anonymous", "d-2"),
-		aliasOf(4, protocolTime, "anonymous", "d-1", "user", "u-1"),
+		// The structure is judged before the declared unit types: one
+		// undeclared type on both sides is still the same type twice.
+		aliasOf(4, protocolTime, "ghost", "d-1", "ghost", "d-2"),
+		aliasOf(5, protocolTime, "anonymous", "d-1", "user", "u-1"),
 	))
-	if res.Accepted != 1 || len(res.Rejected) != 3 {
+	if res.Accepted != 1 || len(res.Rejected) != 4 {
 		t.Fatalf("aliases = %+v, want the last accepted and the others refused", res)
 	}
-	for i, want := range []string{"undeclared_unit_type", "undeclared_unit_type", "event_invalid"} {
+	for i, want := range []string{"undeclared_unit_type", "undeclared_unit_type", "event_invalid", "event_invalid"} {
 		if r := res.Rejected[i]; r.Index != i || r.Code != want {
 			t.Errorf("rejection %d = %+v, want index %d refused %s", i, r, i, want)
 		}
 	}
-	if d := res.Rejected[2].Detail; d != "from_unit_type and to_unit_type must differ" {
-		t.Errorf("detail = %q", d)
+	for _, r := range res.Rejected[2:] {
+		if r.Detail != "from_unit_type and to_unit_type must differ" {
+			t.Errorf("detail of rejection %d = %q", r.Index, r.Detail)
+		}
 	}
 	links := aliasLinks(t, p, "production")
 	if len(links) != 1 || links[0].Alias.FromUnitID != "d-1" || links[0].Alias.ToUnitID != "u-1" {

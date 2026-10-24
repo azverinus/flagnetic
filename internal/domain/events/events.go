@@ -457,7 +457,8 @@ type AliasRecord struct {
 }
 
 // AliasLink is the one link of a pair of unit IDs in an environment: the
-// earliest alias of the pair received, kept after its raw event is dropped.
+// alias of the pair that occurred earliest, kept after its raw event is
+// dropped.
 type AliasLink struct {
 	// EventID is the event_id of the alias the link keeps.
 	EventID    delivery.EventID
