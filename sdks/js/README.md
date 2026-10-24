@@ -73,6 +73,40 @@ flagnetic.recorder.exposures();       // exposures and aliases that would have b
 
 A change made in Flagnetic reaches a server client within 2 seconds at p99 while the stream is up, and within the poll interval otherwise.
 
+## Browser client
+
+```ts
+import { createClient } from "flagnetic/client";
+
+const flagnetic = createClient("fn_cli_…", "https://flags.example.com", {
+  context: { units: { anonymous: anonymousId }, attributes: { country: "DE" } },
+});
+
+// Values serve at once: the bootstrap document, else the last good values
+// this browser kept for the key and the context's units, else your defaults.
+await flagnetic.ready(2000); // "fresh", "last_good" or "built_in"; never rejects
+
+if (flagnetic.getBool("new_checkout", false)) {
+  // ...
+}
+
+// After sign-in: resolves once the new context's values arrived, while the
+// previous values keep serving, so there is no flash of defaults.
+await flagnetic.setContext({ units: { anonymous: anonymousId, user: "u-1001" } });
+```
+
+`createClient` refuses a server key (`fn_srv_…`), which must never ship in a bundle. The client asks the server to evaluate for its context and never contains the evaluator, so `flagnetic/client` stays within a gzip size budget checked in CI. It names itself to the server through the context's `sdk`, `sdk_version` and `platform` attributes, since a browser cannot set a `User-Agent`.
+
+The last good values are kept in `localStorage` under the SDK key and the context's units (in memory where `localStorage` cannot be reached, or with `store: false`), so the next page load serves them before any request and two keys in one browser never see each other's values. A `bootstrap` option takes the document `values(context)` of `flagnetic/server` rendered into the page, served as `fresh`; an `offline` option takes a values document and makes no request at all, with `offline.set`, `offline.reload` and `offline.recorded()` for tests.
+
+The client refetches when the tab becomes visible or the network comes back, at most once every 10 seconds, and polls every 300 seconds while the tab is visible. With `sse: true` it also holds the change stream, read over `fetch` so that it can send its key and `Last-Event-ID` in headers and reconnect by itself; it is off by default, since every open tab holds one connection.
+
+Exposures, aliases and evaluation summaries are queued in `localStorage` under the key and sent every 5 seconds while the tab is visible; `flush()` and `close()` send them within 5 seconds. Options: `context`, `bootstrap`, `offline`, `store`, `sse`, `pollInterval`, `requestTimeout`, `flushInterval`, `sendExposures`, `sendSummaries`, `allowOverrides`, `logger`, `platform` and `appVersion`. Getters, `getDetail`, `stage`, `status()`, `onChange`, `onStage`, `overrides`, `exposure(key)` and `alias` work as in server mode, without the context argument.
+
+### Propagation
+
+A change made in Flagnetic reaches a browser client at the latest after the 300-second poll while the tab is visible, at once when the tab becomes visible again or the network returns, and within seconds with the stream on.
+
 ## Evaluator
 
 ```ts
@@ -91,8 +125,9 @@ pnpm install
 pnpm lint && pnpm typecheck
 pnpm test            # the shared conformance suite and unit tests, in Node
 pnpm test:browser    # the same suite in Chromium (pnpm exec playwright install chromium once)
+pnpm test:browsers   # the browser client cross-origin in Chromium, Firefox and WebKit (FLAGNETIC_BROWSERS=webkit for one)
 pnpm test:p99        # 1,000 flags evaluate under 1 ms at p99
-pnpm build && pnpm check:package
+pnpm build && pnpm check:package && pnpm check:size
 ```
 
 The Unicode class tables of the regular expression engine are generated from Go's `regexp/syntax`; after a Go upgrade run `pnpm gen:unicode`, and CI fails when they are stale.

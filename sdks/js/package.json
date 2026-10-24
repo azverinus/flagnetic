@@ -109,10 +109,12 @@
     "test": "vitest run --project node",
     "test:p99": "vitest run --project p99",
     "test:browser": "vitest run --project browser",
+    "test:browsers": "vitest run --project browsers",
     "bench": "vitest bench --run --project \"node (bench)\"",
     "gen:unicode": "go run scripts/gen-unicode-classes.go > src/evaluator/unicode-classes.ts",
     "check:unicode": "scripts/check-unicode-classes.sh",
-    "check:package": "node scripts/check-package.mjs && publint --strict && attw --pack . --profile node16"
+    "check:package": "node scripts/check-package.mjs && publint --strict && attw --pack . --profile node16",
+    "check:size": "node scripts/check-size.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
