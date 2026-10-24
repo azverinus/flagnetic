@@ -155,6 +155,14 @@ func (p project) protocolProject(t *testing.T) map[string]string {
 	configure("new_search", "staging", management.FlagConfigurationPut{On: false, OffVariation: "false", Fallthrough: "true"})
 	configure("theme", "staging", management.FlagConfigurationPut{On: false, OffVariation: "light", Fallthrough: "light"})
 
+	// The experiment the documents' exposures belong to. It is a draft, which
+	// an SDK's ruleset does not show, so the ruleset documents stay as they are.
+	experiment := do(p.admin.CreateExperimentWithResponse(t.Context(), p.key, management.ExperimentCreate{
+		Key: "banner_test", Name: "Banner test", Flag: "banner_text", UnitType: "user",
+		Variations: []management.ExperimentWeight{{Variation: "short", Weight: 5000}, {Variation: "long", Weight: 5000}},
+	}))
+	ok(experiment.StatusCode(), experiment.Body, "create experiment banner_test")
+
 	keys := map[string]string{}
 	_, keys["<server key>"] = p.sdkKey(t, "production", management.SdkKeyKindServer)
 	_, keys["<client key>"] = p.sdkKey(t, "production", management.SdkKeyKindClient)

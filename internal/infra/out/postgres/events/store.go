@@ -1,25 +1,47 @@
-package delivery
+// Package events is the PostgreSQL repository of the events context: the raw
+// events SDKs post and the tables that keep them apart from retries.
+package events
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
+	"github.com/azverinus/flagnetic/internal/domain/events"
+	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
+// Store is the repository of raw events.
+type Store struct {
+	pool *pgxpool.Pool
+	// partitions are the days whose event partitions this process knows
+	// exist, as "2006-01-02", so that it creates a missing one at most once.
+	partitions sync.Map
+}
+
+// NewStore returns the repository on pool.
+func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
+
+func (s *Store) db(ctx context.Context) pgxtx.DB { return pgxtx.Querier(ctx, s.pool) }
+
 // eventTables are the raw event tables, each partitioned by the UTC day of
 // received_at.
-var eventTables = []string{"evaluation_summary_events", "alias_events"}
+var eventTables = []string{"evaluation_summary_events", "alias_events", "exposure_events"}
 
 // dedupTables are the tables recording the event IDs received, by type.
-var dedupTables = map[delivery.EventType]string{
-	delivery.EventEvaluationSummary: "evaluation_summary_dedup",
-	delivery.EventAlias:             "alias_dedup",
+var dedupTables = map[events.EventType]string{
+	events.EventEvaluationSummary: "evaluation_summary_dedup",
+	events.EventAlias:             "alias_dedup",
+	events.EventExposure:          "exposure_dedup",
 }
 
 // DeclaredUnitTypes returns which of keys project declares as unit types.
@@ -58,7 +80,7 @@ func (s *Store) keysIn(ctx context.Context, table string, project workspace.Proj
 // and returns those not recorded before. The IDs are inserted in the order
 // given, which the caller sorts, so concurrent claims of overlapping IDs
 // wait on each other rather than deadlock.
-func (s *Store) ClaimEvents(ctx context.Context, project workspace.ProjectID, typ delivery.EventType, ids []delivery.EventID,
+func (s *Store) ClaimEvents(ctx context.Context, project workspace.ProjectID, typ events.EventType, ids []delivery.EventID,
 	at time.Time,
 ) (map[delivery.EventID]bool, error) {
 	table, ok := dedupTables[typ]
@@ -124,7 +146,7 @@ func (s *Store) SaveSummaries(ctx context.Context, rows []delivery.SummaryRecord
 }
 
 // SaveAliases stores aliases.
-func (s *Store) SaveAliases(ctx context.Context, aliases []delivery.AliasRecord) error {
+func (s *Store) SaveAliases(ctx context.Context, aliases []events.AliasRecord) error {
 	if len(aliases) == 0 {
 		return nil
 	}
@@ -243,16 +265,16 @@ func (s *Store) EvaluationSummaries(ctx context.Context, environment workspace.E
 
 // Aliases returns the stored aliases of environment, in the order they were
 // committed.
-func (s *Store) Aliases(ctx context.Context, environment workspace.EnvironmentID) ([]delivery.AliasRecord, error) {
+func (s *Store) Aliases(ctx context.Context, environment workspace.EnvironmentID) ([]events.AliasRecord, error) {
 	rows, err := s.db(ctx).Query(ctx, `SELECT event_id, sdk_key_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id,
 			sdk_name, sdk_version, coalesce(platform, ''), occurred_at, received_at
 		FROM alias_events WHERE environment_id = $1 ORDER BY xid, seq`, environment.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("reading aliases: %w", err)
 	}
-	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (delivery.AliasRecord, error) {
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (events.AliasRecord, error) {
 		var (
-			a            delivery.AliasRecord
+			a            events.AliasRecord
 			event, keyID [16]byte
 		)
 		scanErr := row.Scan(&event, &keyID, &a.Alias.FromUnitType, &a.Alias.FromUnitID, &a.Alias.ToUnitType, &a.Alias.ToUnitID,
@@ -263,6 +285,167 @@ func (s *Store) Aliases(ctx context.Context, environment workspace.EnvironmentID
 	})
 	if err != nil {
 		return nil, fmt.Errorf("reading aliases: %w", err)
+	}
+	return out, nil
+}
+
+// Experiments returns the experiments of project keyed by keys, of any status,
+// by key, each locked against deletion until the unit of work ends: the count
+// of a refusal references its experiment, and an experiment deleted between
+// the lookup and the count would fail the whole batch.
+func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, keys []string) (map[string]events.ExperimentFacts, error) {
+	out := map[string]events.ExperimentFacts{}
+	if len(keys) == 0 {
+		return out, nil
+	}
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT e.id, e.key, f.key, e.unit_type, e.variations
+		FROM experiments e JOIN flags f ON f.id = e.flag_id
+		WHERE e.project_id = $1 AND e.key = ANY($2)
+		ORDER BY e.id
+		FOR KEY SHARE OF e`, project.Bytes(), keys)
+	if err != nil {
+		return nil, fmt.Errorf("reading experiments for exposures: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			f          events.ExperimentFacts
+			experiment [16]byte
+			key        string
+			variations []byte
+		)
+		if err = rows.Scan(&experiment, &key, &f.FlagKey, &f.UnitType, &variations); err != nil {
+			return nil, fmt.Errorf("reading experiments for exposures: %w", err)
+		}
+		var weights []struct {
+			Variation string `json:"variation"`
+		}
+		if err = json.Unmarshal(variations, &weights); err != nil {
+			return nil, fmt.Errorf("decoding the weights of experiment %q: %w", key, err)
+		}
+		for _, w := range weights {
+			f.Variations = append(f.Variations, w.Variation)
+		}
+		f.ID = id.FromBytes[experiments.Experiment](experiment)
+		out[key] = f
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("reading experiments for exposures: %w", err)
+	}
+	return out, nil
+}
+
+// SaveExposures stores exposures.
+func (s *Store) SaveExposures(ctx context.Context, exposures []events.ExposureRecord) error {
+	if len(exposures) == 0 {
+		return nil
+	}
+	if err := s.EnsureEventPartitions(ctx, exposures[0].ReceivedAt); err != nil {
+		return err
+	}
+	_, err := s.db(ctx).CopyFrom(ctx, pgx.Identifier{"exposure_events"}, []string{
+		"event_id", "project_id", "environment_id", "sdk_key_id", "experiment_id", "experiment_key", "flag_key", "variation_key",
+		"unit_type", "unit_id", "evaluation_reason", "override", "ruleset_version", "sdk_name", "sdk_version", "platform",
+		"app_version", "occurred_at", "received_at",
+	}, pgx.CopyFromSlice(len(exposures), func(i int) ([]any, error) {
+		x := exposures[i]
+		e := x.Exposure
+		return []any{
+			x.EventID.Bytes(), x.Key.Project.Bytes(), x.Key.Environment.Bytes(), x.Key.ID.Bytes(), x.Experiment.Bytes(),
+			e.ExperimentKey, e.FlagKey, e.VariationKey, e.UnitType, e.UnitID, e.Reason, e.Override, e.RulesetVersion,
+			x.SDK.Name, x.SDK.Version, nullable(x.SDK.Platform), nullable(e.AppVersion), e.OccurredAt, x.ReceivedAt,
+		}, nil
+	}))
+	if err != nil {
+		return fmt.Errorf("saving exposures: %w", err)
+	}
+	return nil
+}
+
+// CountRejections adds counts to those of exposures refused in environment, as
+// of at. The counts are given in the order of experiment and reason, which
+// the caller sorts, so concurrent batches counting the same rows wait on each
+// other rather than deadlock.
+func (s *Store) CountRejections(ctx context.Context, environment workspace.EnvironmentID, counts []events.RejectionCount,
+	at time.Time,
+) error {
+	experimentIDs := make([][16]byte, len(counts))
+	reasons := make([]string, len(counts))
+	n := make([]int64, len(counts))
+	for i, c := range counts {
+		experimentIDs[i], reasons[i], n[i] = c.Experiment.Bytes(), string(c.Reason), c.Count
+	}
+	_, err := s.db(ctx).Exec(ctx, `
+		INSERT INTO experiment_rejection_counts (experiment_id, environment_id, reason, count, last_rejected_at)
+		SELECT t.experiment_id, $1, t.reason, t.count, $2
+		FROM unnest($3::uuid[], $4::text[], $5::bigint[]) WITH ORDINALITY AS t (experiment_id, reason, count, n)
+		ORDER BY t.n
+		ON CONFLICT (experiment_id, environment_id, reason) DO UPDATE SET
+			count = experiment_rejection_counts.count + excluded.count,
+			last_rejected_at = excluded.last_rejected_at`,
+		environment.Bytes(), at, experimentIDs, reasons, n)
+	if err != nil {
+		return fmt.Errorf("counting refused exposures: %w", err)
+	}
+	return nil
+}
+
+// RejectionCountsOf returns how many exposures of experiment were refused in
+// environment for each reason, in the order of the reasons.
+func (s *Store) RejectionCountsOf(ctx context.Context, experiment experiments.ExperimentID,
+	environment workspace.EnvironmentID,
+) (map[events.RejectionCode]int64, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT reason, count FROM experiment_rejection_counts
+		WHERE experiment_id = $1 AND environment_id = $2`, experiment.Bytes(), environment.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("reading refused exposures: %w", err)
+	}
+	out := map[events.RejectionCode]int64{}
+	for rows.Next() {
+		var (
+			reason string
+			count  int64
+		)
+		if err = rows.Scan(&reason, &count); err != nil {
+			return nil, fmt.Errorf("reading refused exposures: %w", err)
+		}
+		out[events.RejectionCode(reason)] = count
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("reading refused exposures: %w", err)
+	}
+	return out, nil
+}
+
+// Exposures returns the stored exposures of environment, in the order they
+// were committed: what reports read.
+func (s *Store) Exposures(ctx context.Context, environment workspace.EnvironmentID) ([]events.ExposureRecord, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT event_id, sdk_key_id, experiment_id, experiment_key, flag_key, variation_key,
+			unit_type, unit_id, evaluation_reason, override, ruleset_version, sdk_name, sdk_version, coalesce(platform, ''),
+			coalesce(app_version, ''), occurred_at, received_at
+		FROM exposure_events WHERE environment_id = $1 ORDER BY xid, seq`, environment.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("reading exposures: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (events.ExposureRecord, error) {
+		var (
+			x                        events.ExposureRecord
+			event, keyID, experiment [16]byte
+		)
+		e := &x.Exposure
+		scanErr := row.Scan(&event, &keyID, &experiment, &e.ExperimentKey, &e.FlagKey, &e.VariationKey, &e.UnitType, &e.UnitID,
+			&e.Reason, &e.Override, &e.RulesetVersion, &x.SDK.Name, &x.SDK.Version, &e.Platform, &e.AppVersion, &e.OccurredAt,
+			&x.ReceivedAt)
+		x.EventID = id.FromBytes[delivery.Event](event)
+		x.Key.ID, x.Key.Environment = id.FromBytes[delivery.SDKKey](keyID), environment
+		x.Experiment = id.FromBytes[experiments.Experiment](experiment)
+		x.SDK.Platform = e.Platform
+		e.OccurredAt, x.ReceivedAt = e.OccurredAt.UTC(), x.ReceivedAt.UTC()
+		return x, scanErr
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading exposures: %w", err)
 	}
 	return out, nil
 }

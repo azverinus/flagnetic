@@ -172,7 +172,11 @@ type EventBatch struct {
 	// SchemaVersion The envelope's schema, 1.
 	SchemaVersion int         `json:"schema_version"`
 	Sdk           SDKIdentity `json:"sdk"`
-	SentAt        time.Time   `json:"sent_at"`
+
+	// SentAt When the SDK sent the batch, by its own clock. A difference of
+	// more than one minute from the server's time shifts every time
+	// in the batch.
+	SentAt time.Time `json:"sent_at"`
 }
 
 // EventBatchResult defines model for EventBatchResult.
@@ -712,11 +716,29 @@ type ClientInterface interface {
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window), `undeclared_unit_type`,
-	// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-	// type is not its experiment's) and `unknown_variation` (an exposure
-	// naming a variation its experiment does not have). An `occurred_at`
-	// more than 24 hours ahead is taken as the time the event was
-	// received.
+	// `unknown_experiment` (an exposure naming no experiment of the
+	// project; an experiment of any status exists, since a mobile app
+	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// whose unit type is not its experiment's), `unknown_variation` (an
+	// exposure naming a variation its experiment does not weigh; an
+	// exposure with `override` true may name any variation of the flag)
+	// and, for an exposure naming another flag than its experiment's or an
+	// `evaluation_reason` other than `experiment` or `override`,
+	// `event_invalid`. An exposure is judged in that order and refused
+	// with the first check it fails. The codes are the same for both kinds
+	// of key; a refusal's `detail` is specific for a server key and, for a
+	// client key, names no unit type, flag, variation or status of the
+	// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+	// time the event was received.
+	//
+	// **Device clock skew.** When `sent_at` differs from the time the
+	// server received the batch by more than one minute, every time in it
+	// (`occurred_at` of an alias or an exposure, `interval_start` and
+	// `interval_end` of an evaluation summary) is shifted by the server's
+	// time minus `sent_at` before it is checked against the retention
+	// window and stored, so a device with a wrong clock keeps its events
+	// in the right place. Stamp `sent_at` from the same clock as the
+	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
 	// last batch, exposures included, to `navigator.sendBeacon`, which
@@ -763,11 +785,29 @@ type ClientInterface interface {
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window), `undeclared_unit_type`,
-	// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-	// type is not its experiment's) and `unknown_variation` (an exposure
-	// naming a variation its experiment does not have). An `occurred_at`
-	// more than 24 hours ahead is taken as the time the event was
-	// received.
+	// `unknown_experiment` (an exposure naming no experiment of the
+	// project; an experiment of any status exists, since a mobile app
+	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// whose unit type is not its experiment's), `unknown_variation` (an
+	// exposure naming a variation its experiment does not weigh; an
+	// exposure with `override` true may name any variation of the flag)
+	// and, for an exposure naming another flag than its experiment's or an
+	// `evaluation_reason` other than `experiment` or `override`,
+	// `event_invalid`. An exposure is judged in that order and refused
+	// with the first check it fails. The codes are the same for both kinds
+	// of key; a refusal's `detail` is specific for a server key and, for a
+	// client key, names no unit type, flag, variation or status of the
+	// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+	// time the event was received.
+	//
+	// **Device clock skew.** When `sent_at` differs from the time the
+	// server received the batch by more than one minute, every time in it
+	// (`occurred_at` of an alias or an exposure, `interval_start` and
+	// `interval_end` of an evaluation summary) is shifted by the server's
+	// time minus `sent_at` before it is checked against the retention
+	// window and stored, so a device with a wrong clock keeps its events
+	// in the right place. Stamp `sent_at` from the same clock as the
+	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
 	// last batch, exposures included, to `navigator.sendBeacon`, which
@@ -814,11 +854,29 @@ type ClientInterface interface {
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window), `undeclared_unit_type`,
-	// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-	// type is not its experiment's) and `unknown_variation` (an exposure
-	// naming a variation its experiment does not have). An `occurred_at`
-	// more than 24 hours ahead is taken as the time the event was
-	// received.
+	// `unknown_experiment` (an exposure naming no experiment of the
+	// project; an experiment of any status exists, since a mobile app
+	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// whose unit type is not its experiment's), `unknown_variation` (an
+	// exposure naming a variation its experiment does not weigh; an
+	// exposure with `override` true may name any variation of the flag)
+	// and, for an exposure naming another flag than its experiment's or an
+	// `evaluation_reason` other than `experiment` or `override`,
+	// `event_invalid`. An exposure is judged in that order and refused
+	// with the first check it fails. The codes are the same for both kinds
+	// of key; a refusal's `detail` is specific for a server key and, for a
+	// client key, names no unit type, flag, variation or status of the
+	// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+	// time the event was received.
+	//
+	// **Device clock skew.** When `sent_at` differs from the time the
+	// server received the batch by more than one minute, every time in it
+	// (`occurred_at` of an alias or an exposure, `interval_start` and
+	// `interval_end` of an evaluation summary) is shifted by the server's
+	// time minus `sent_at` before it is checked against the retention
+	// window and stored, so a device with a wrong clock keeps its events
+	// in the right place. Stamp `sent_at` from the same clock as the
+	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
 	// last batch, exposures included, to `navigator.sendBeacon`, which
@@ -985,11 +1043,29 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window), `undeclared_unit_type`,
-// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-// type is not its experiment's) and `unknown_variation` (an exposure
-// naming a variation its experiment does not have). An `occurred_at`
-// more than 24 hours ahead is taken as the time the event was
-// received.
+// `unknown_experiment` (an exposure naming no experiment of the
+// project; an experiment of any status exists, since a mobile app
+// flushes its queue days late), `unit_type_mismatch` (an exposure
+// whose unit type is not its experiment's), `unknown_variation` (an
+// exposure naming a variation its experiment does not weigh; an
+// exposure with `override` true may name any variation of the flag)
+// and, for an exposure naming another flag than its experiment's or an
+// `evaluation_reason` other than `experiment` or `override`,
+// `event_invalid`. An exposure is judged in that order and refused
+// with the first check it fails. The codes are the same for both kinds
+// of key; a refusal's `detail` is specific for a server key and, for a
+// client key, names no unit type, flag, variation or status of the
+// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+// time the event was received.
+//
+// **Device clock skew.** When `sent_at` differs from the time the
+// server received the batch by more than one minute, every time in it
+// (`occurred_at` of an alias or an exposure, `interval_start` and
+// `interval_end` of an evaluation summary) is shifted by the server's
+// time minus `sent_at` before it is checked against the retention
+// window and stored, so a device with a wrong clock keeps its events
+// in the right place. Stamp `sent_at` from the same clock as the
+// events.
 //
 // **From a closing page.** A browser page that is closing hands its
 // last batch, exposures included, to `navigator.sendBeacon`, which
@@ -1046,11 +1122,29 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window), `undeclared_unit_type`,
-// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-// type is not its experiment's) and `unknown_variation` (an exposure
-// naming a variation its experiment does not have). An `occurred_at`
-// more than 24 hours ahead is taken as the time the event was
-// received.
+// `unknown_experiment` (an exposure naming no experiment of the
+// project; an experiment of any status exists, since a mobile app
+// flushes its queue days late), `unit_type_mismatch` (an exposure
+// whose unit type is not its experiment's), `unknown_variation` (an
+// exposure naming a variation its experiment does not weigh; an
+// exposure with `override` true may name any variation of the flag)
+// and, for an exposure naming another flag than its experiment's or an
+// `evaluation_reason` other than `experiment` or `override`,
+// `event_invalid`. An exposure is judged in that order and refused
+// with the first check it fails. The codes are the same for both kinds
+// of key; a refusal's `detail` is specific for a server key and, for a
+// client key, names no unit type, flag, variation or status of the
+// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+// time the event was received.
+//
+// **Device clock skew.** When `sent_at` differs from the time the
+// server received the batch by more than one minute, every time in it
+// (`occurred_at` of an alias or an exposure, `interval_start` and
+// `interval_end` of an evaluation summary) is shifted by the server's
+// time minus `sent_at` before it is checked against the retention
+// window and stored, so a device with a wrong clock keeps its events
+// in the right place. Stamp `sent_at` from the same clock as the
+// events.
 //
 // **From a closing page.** A browser page that is closing hands its
 // last batch, exposures included, to `navigator.sendBeacon`, which
@@ -1107,11 +1201,29 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window), `undeclared_unit_type`,
-// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-// type is not its experiment's) and `unknown_variation` (an exposure
-// naming a variation its experiment does not have). An `occurred_at`
-// more than 24 hours ahead is taken as the time the event was
-// received.
+// `unknown_experiment` (an exposure naming no experiment of the
+// project; an experiment of any status exists, since a mobile app
+// flushes its queue days late), `unit_type_mismatch` (an exposure
+// whose unit type is not its experiment's), `unknown_variation` (an
+// exposure naming a variation its experiment does not weigh; an
+// exposure with `override` true may name any variation of the flag)
+// and, for an exposure naming another flag than its experiment's or an
+// `evaluation_reason` other than `experiment` or `override`,
+// `event_invalid`. An exposure is judged in that order and refused
+// with the first check it fails. The codes are the same for both kinds
+// of key; a refusal's `detail` is specific for a server key and, for a
+// client key, names no unit type, flag, variation or status of the
+// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+// time the event was received.
+//
+// **Device clock skew.** When `sent_at` differs from the time the
+// server received the batch by more than one minute, every time in it
+// (`occurred_at` of an alias or an exposure, `interval_start` and
+// `interval_end` of an evaluation summary) is shifted by the server's
+// time minus `sent_at` before it is checked against the retention
+// window and stored, so a device with a wrong clock keeps its events
+// in the right place. Stamp `sent_at` from the same clock as the
+// events.
 //
 // **From a closing page.** A browser page that is closing hands its
 // last batch, exposures included, to `navigator.sendBeacon`, which
@@ -1623,11 +1735,29 @@ type ClientWithResponsesInterface interface {
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window), `undeclared_unit_type`,
-	// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-	// type is not its experiment's) and `unknown_variation` (an exposure
-	// naming a variation its experiment does not have). An `occurred_at`
-	// more than 24 hours ahead is taken as the time the event was
-	// received.
+	// `unknown_experiment` (an exposure naming no experiment of the
+	// project; an experiment of any status exists, since a mobile app
+	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// whose unit type is not its experiment's), `unknown_variation` (an
+	// exposure naming a variation its experiment does not weigh; an
+	// exposure with `override` true may name any variation of the flag)
+	// and, for an exposure naming another flag than its experiment's or an
+	// `evaluation_reason` other than `experiment` or `override`,
+	// `event_invalid`. An exposure is judged in that order and refused
+	// with the first check it fails. The codes are the same for both kinds
+	// of key; a refusal's `detail` is specific for a server key and, for a
+	// client key, names no unit type, flag, variation or status of the
+	// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+	// time the event was received.
+	//
+	// **Device clock skew.** When `sent_at` differs from the time the
+	// server received the batch by more than one minute, every time in it
+	// (`occurred_at` of an alias or an exposure, `interval_start` and
+	// `interval_end` of an evaluation summary) is shifted by the server's
+	// time minus `sent_at` before it is checked against the retention
+	// window and stored, so a device with a wrong clock keeps its events
+	// in the right place. Stamp `sent_at` from the same clock as the
+	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
 	// last batch, exposures included, to `navigator.sendBeacon`, which
@@ -1674,11 +1804,29 @@ type ClientWithResponsesInterface interface {
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window), `undeclared_unit_type`,
-	// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-	// type is not its experiment's) and `unknown_variation` (an exposure
-	// naming a variation its experiment does not have). An `occurred_at`
-	// more than 24 hours ahead is taken as the time the event was
-	// received.
+	// `unknown_experiment` (an exposure naming no experiment of the
+	// project; an experiment of any status exists, since a mobile app
+	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// whose unit type is not its experiment's), `unknown_variation` (an
+	// exposure naming a variation its experiment does not weigh; an
+	// exposure with `override` true may name any variation of the flag)
+	// and, for an exposure naming another flag than its experiment's or an
+	// `evaluation_reason` other than `experiment` or `override`,
+	// `event_invalid`. An exposure is judged in that order and refused
+	// with the first check it fails. The codes are the same for both kinds
+	// of key; a refusal's `detail` is specific for a server key and, for a
+	// client key, names no unit type, flag, variation or status of the
+	// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+	// time the event was received.
+	//
+	// **Device clock skew.** When `sent_at` differs from the time the
+	// server received the batch by more than one minute, every time in it
+	// (`occurred_at` of an alias or an exposure, `interval_start` and
+	// `interval_end` of an evaluation summary) is shifted by the server's
+	// time minus `sent_at` before it is checked against the retention
+	// window and stored, so a device with a wrong clock keeps its events
+	// in the right place. Stamp `sent_at` from the same clock as the
+	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
 	// last batch, exposures included, to `navigator.sendBeacon`, which
@@ -1725,11 +1873,29 @@ type ClientWithResponsesInterface interface {
 	// holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 	// `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 	// time older than the retention window), `undeclared_unit_type`,
-	// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-	// type is not its experiment's) and `unknown_variation` (an exposure
-	// naming a variation its experiment does not have). An `occurred_at`
-	// more than 24 hours ahead is taken as the time the event was
-	// received.
+	// `unknown_experiment` (an exposure naming no experiment of the
+	// project; an experiment of any status exists, since a mobile app
+	// flushes its queue days late), `unit_type_mismatch` (an exposure
+	// whose unit type is not its experiment's), `unknown_variation` (an
+	// exposure naming a variation its experiment does not weigh; an
+	// exposure with `override` true may name any variation of the flag)
+	// and, for an exposure naming another flag than its experiment's or an
+	// `evaluation_reason` other than `experiment` or `override`,
+	// `event_invalid`. An exposure is judged in that order and refused
+	// with the first check it fails. The codes are the same for both kinds
+	// of key; a refusal's `detail` is specific for a server key and, for a
+	// client key, names no unit type, flag, variation or status of the
+	// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+	// time the event was received.
+	//
+	// **Device clock skew.** When `sent_at` differs from the time the
+	// server received the batch by more than one minute, every time in it
+	// (`occurred_at` of an alias or an exposure, `interval_start` and
+	// `interval_end` of an evaluation summary) is shifted by the server's
+	// time minus `sent_at` before it is checked against the retention
+	// window and stored, so a device with a wrong clock keeps its events
+	// in the right place. Stamp `sent_at` from the same clock as the
+	// events.
 	//
 	// **From a closing page.** A browser page that is closing hands its
 	// last batch, exposures included, to `navigator.sendBeacon`, which
@@ -2376,11 +2542,29 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window), `undeclared_unit_type`,
-// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-// type is not its experiment's) and `unknown_variation` (an exposure
-// naming a variation its experiment does not have). An `occurred_at`
-// more than 24 hours ahead is taken as the time the event was
-// received.
+// `unknown_experiment` (an exposure naming no experiment of the
+// project; an experiment of any status exists, since a mobile app
+// flushes its queue days late), `unit_type_mismatch` (an exposure
+// whose unit type is not its experiment's), `unknown_variation` (an
+// exposure naming a variation its experiment does not weigh; an
+// exposure with `override` true may name any variation of the flag)
+// and, for an exposure naming another flag than its experiment's or an
+// `evaluation_reason` other than `experiment` or `override`,
+// `event_invalid`. An exposure is judged in that order and refused
+// with the first check it fails. The codes are the same for both kinds
+// of key; a refusal's `detail` is specific for a server key and, for a
+// client key, names no unit type, flag, variation or status of the
+// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+// time the event was received.
+//
+// **Device clock skew.** When `sent_at` differs from the time the
+// server received the batch by more than one minute, every time in it
+// (`occurred_at` of an alias or an exposure, `interval_start` and
+// `interval_end` of an evaluation summary) is shifted by the server's
+// time minus `sent_at` before it is checked against the retention
+// window and stored, so a device with a wrong clock keeps its events
+// in the right place. Stamp `sent_at` from the same clock as the
+// events.
 //
 // **From a closing page.** A browser page that is closing hands its
 // last batch, exposures included, to `navigator.sendBeacon`, which
@@ -2433,11 +2617,29 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window), `undeclared_unit_type`,
-// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-// type is not its experiment's) and `unknown_variation` (an exposure
-// naming a variation its experiment does not have). An `occurred_at`
-// more than 24 hours ahead is taken as the time the event was
-// received.
+// `unknown_experiment` (an exposure naming no experiment of the
+// project; an experiment of any status exists, since a mobile app
+// flushes its queue days late), `unit_type_mismatch` (an exposure
+// whose unit type is not its experiment's), `unknown_variation` (an
+// exposure naming a variation its experiment does not weigh; an
+// exposure with `override` true may name any variation of the flag)
+// and, for an exposure naming another flag than its experiment's or an
+// `evaluation_reason` other than `experiment` or `override`,
+// `event_invalid`. An exposure is judged in that order and refused
+// with the first check it fails. The codes are the same for both kinds
+// of key; a refusal's `detail` is specific for a server key and, for a
+// client key, names no unit type, flag, variation or status of the
+// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+// time the event was received.
+//
+// **Device clock skew.** When `sent_at` differs from the time the
+// server received the batch by more than one minute, every time in it
+// (`occurred_at` of an alias or an exposure, `interval_start` and
+// `interval_end` of an evaluation summary) is shifted by the server's
+// time minus `sent_at` before it is checked against the retention
+// window and stored, so a device with a wrong clock keeps its events
+// in the right place. Stamp `sent_at` from the same clock as the
+// events.
 //
 // **From a closing page.** A browser page that is closing hands its
 // last batch, exposures included, to `navigator.sendBeacon`, which
@@ -2490,11 +2692,29 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // holding U+0000, a summary over 1,000 rows), `event_type_unknown`,
 // `event_id_invalid`, `out_of_window` (`occurred_at` or the event ID's
 // time older than the retention window), `undeclared_unit_type`,
-// `unknown_experiment`, `unit_type_mismatch` (an exposure whose unit
-// type is not its experiment's) and `unknown_variation` (an exposure
-// naming a variation its experiment does not have). An `occurred_at`
-// more than 24 hours ahead is taken as the time the event was
-// received.
+// `unknown_experiment` (an exposure naming no experiment of the
+// project; an experiment of any status exists, since a mobile app
+// flushes its queue days late), `unit_type_mismatch` (an exposure
+// whose unit type is not its experiment's), `unknown_variation` (an
+// exposure naming a variation its experiment does not weigh; an
+// exposure with `override` true may name any variation of the flag)
+// and, for an exposure naming another flag than its experiment's or an
+// `evaluation_reason` other than `experiment` or `override`,
+// `event_invalid`. An exposure is judged in that order and refused
+// with the first check it fails. The codes are the same for both kinds
+// of key; a refusal's `detail` is specific for a server key and, for a
+// client key, names no unit type, flag, variation or status of the
+// experiment. An `occurred_at` more than 24 hours ahead is taken as the
+// time the event was received.
+//
+// **Device clock skew.** When `sent_at` differs from the time the
+// server received the batch by more than one minute, every time in it
+// (`occurred_at` of an alias or an exposure, `interval_start` and
+// `interval_end` of an evaluation summary) is shifted by the server's
+// time minus `sent_at` before it is checked against the retention
+// window and stored, so a device with a wrong clock keeps its events
+// in the right place. Stamp `sent_at` from the same clock as the
+// events.
 //
 // **From a closing page.** A browser page that is closing hands its
 // last batch, exposures included, to `navigator.sendBeacon`, which

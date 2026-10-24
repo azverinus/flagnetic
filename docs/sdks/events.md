@@ -43,11 +43,17 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `event_id_invalid` | `event_id` is not a lowercase UUIDv7. |
 | `out_of_window` | The time in `event_id`, or `occurred_at` (`interval_end` for a summary), is older than the retention window. |
 | `undeclared_unit_type` | An alias names a unit type the project does not declare. |
-| `unknown_experiment` | An exposure names no running experiment. No experiment runs yet in this version, so every exposure is refused this way, whatever its members: an exposure is never refused `event_invalid`, `event_id_invalid` or `out_of_window` here. |
+| `unknown_experiment` | An exposure names no experiment of the project. An experiment of any status exists, a draft or a stopped one too, since a mobile app may flush its queue days after the exposure. |
+| `unit_type_mismatch` | An exposure's `unit_type` is not the unit type its experiment assigns. |
+| `unknown_variation` | An exposure names a variation its experiment does not weigh. An exposure with `override` true may name any variation of the flag. |
+
+An exposure is judged against its experiment in this order, and refused with the first check it fails: the experiment exists, the unit type is its own, the variation is one it weighs, then `flag_key` must be the experiment's flag and `evaluation_reason` `experiment` or `override` (both `event_invalid`). The codes are the same for every key; the `detail` of a refusal is specific for a server key and, for a client key, names no unit type, flag, variation or status of the experiment: a key that ships inside an app learns nothing of an experiment from it. Exposures refused for an experiment that exists are counted per experiment, environment and reason, and the counts go with the experiment; an exposure naming an experiment that does not exist is counted nowhere.
 
 A summary row's `reason` is a true reason (`rule`, `rollout`, `fallthrough`, `prerequisite_failed`, `off`, `override`, `experiment`, `error`), the SDK's own `fallback` or `local_override`, or `targeting_match`, which a client SDK counts from the answers it receives. A row naming a flag the project does not have (an archived flag is still one) is dropped and counted in `dropped_rows`; the rest of its summary is stored.
 
 An event's time more than 24 hours ahead of the server clock is taken as the time the event was received.
+
+When `sent_at` differs from the time the server received the batch by more than one minute, the SDK's clock is taken to be wrong, and every time in the batch (`occurred_at` of an alias or an exposure, `interval_start` and `interval_end` of a summary) is shifted by the server's time minus `sent_at` before it is checked against the retention window and stored. A phone whose clock is wrong thereby neither loses its events as `out_of_window` nor moves an exposure in time. The time in `event_id` is not shifted.
 
 ## From a closing page
 

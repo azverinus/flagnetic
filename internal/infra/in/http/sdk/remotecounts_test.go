@@ -10,7 +10,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
-	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
+	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -18,7 +18,7 @@ import (
 // server counted itself, by flag and SDK name.
 func remoteCounts(t *testing.T, p project) map[string]delivery.SummaryRecord {
 	t.Helper()
-	rows, err := pgdelivery.NewStore(testkit.Pool(t)).EvaluationSummaries(t.Context(), p.environmentID(t, "production"))
+	rows, err := pgevents.NewStore(testkit.Pool(t)).EvaluationSummaries(t.Context(), p.environmentID(t, "production"))
 	if err != nil {
 		t.Fatal(err)
 	}

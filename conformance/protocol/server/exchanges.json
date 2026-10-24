@@ -341,9 +341,9 @@
             "type": "exposure",
             "event_id": "01a0b91b-c500-7000-8000-00000000000b",
             "occurred_at": "2026-09-19T10:00:00Z",
-            "experiment_key": "pricing_test",
-            "flag_key": "pricing",
-            "variation_key": "treatment",
+            "experiment_key": "banner_test",
+            "flag_key": "banner_text",
+            "variation_key": "long",
             "unit_type": "anonymous",
             "unit_id": "u-1001",
             "platform": "linux",
@@ -356,9 +356,24 @@
             "type": "exposure",
             "event_id": "01a0b91b-c500-7000-8000-00000000000c",
             "occurred_at": "2026-09-19T10:00:00Z",
-            "experiment_key": "pricing_test",
-            "flag_key": "pricing",
-            "variation_key": "premium",
+            "experiment_key": "banner_test",
+            "flag_key": "banner_text",
+            "variation_key": "medium",
+            "unit_type": "user",
+            "unit_id": "u-1001",
+            "platform": "linux",
+            "app_version": "1.18.0",
+            "evaluation_reason": "experiment",
+            "override": false,
+            "ruleset_version": 1
+          },
+          {
+            "type": "exposure",
+            "event_id": "01a0b91b-c500-7000-8000-000000000010",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "experiment_key": "banner_test",
+            "flag_key": "banner_text",
+            "variation_key": "long",
             "unit_type": "user",
             "unit_id": "u-1001",
             "platform": "linux",
@@ -482,6 +497,100 @@
         "Vary": "Accept-Encoding"
       },
       "body": "server/events-exposure-rejected.json"
+    }
+  },
+  {
+    "name": "exposure of an experiment",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/events",
+      "headers": {
+        "Authorization": "Bearer <server key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "events": [
+          {
+            "type": "exposure",
+            "event_id": "01a0b91b-c500-7000-8000-000000000011",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "experiment_key": "banner_test",
+            "flag_key": "banner_text",
+            "variation_key": "long",
+            "unit_type": "user",
+            "unit_id": "u-1001",
+            "platform": "linux",
+            "app_version": "1.18.0",
+            "evaluation_reason": "experiment",
+            "override": false,
+            "ruleset_version": 1
+          }
+        ],
+        "schema_version": 1,
+        "sdk": {
+          "name": "flagnetic-go",
+          "platform": "linux",
+          "version": "1.0.0"
+        },
+        "sent_at": "2026-09-19T10:00:00Z"
+      }
+    },
+    "response": {
+      "status": 202,
+      "headers": {
+        "Content-Type": "application/json",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "599",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/events-accepted.json"
+    }
+  },
+  {
+    "name": "exposure of the wrong unit type",
+    "request": {
+      "method": "POST",
+      "path": "/sdk/v1/events",
+      "headers": {
+        "Authorization": "Bearer <server key>",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "events": [
+          {
+            "type": "exposure",
+            "event_id": "01a0b91b-c500-7000-8000-000000000012",
+            "occurred_at": "2026-09-19T10:00:00Z",
+            "experiment_key": "banner_test",
+            "flag_key": "banner_text",
+            "variation_key": "long",
+            "unit_type": "anonymous",
+            "unit_id": "u-1001",
+            "platform": "linux",
+            "app_version": "1.18.0",
+            "evaluation_reason": "experiment",
+            "override": false,
+            "ruleset_version": 1
+          }
+        ],
+        "schema_version": 1,
+        "sdk": {
+          "name": "flagnetic-go",
+          "platform": "linux",
+          "version": "1.0.0"
+        },
+        "sent_at": "2026-09-19T10:00:00Z"
+      }
+    },
+    "response": {
+      "status": 202,
+      "headers": {
+        "Content-Type": "application/json",
+        "RateLimit-Limit": "600",
+        "RateLimit-Remaining": "598",
+        "Vary": "Accept-Encoding"
+      },
+      "body": "server/events-exposure-unit-type-rejected.json"
     }
   },
   {

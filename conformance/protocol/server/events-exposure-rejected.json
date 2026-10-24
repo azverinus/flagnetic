@@ -5,7 +5,7 @@
   "rejected": [
     {
       "code": "unknown_experiment",
-      "detail": "no running experiment is keyed \"onboarding_test\"",
+      "detail": "no experiment is keyed \"onboarding_test\"",
       "event_id": "01a0b91b-c500-7000-8000-00000000000d",
       "index": 0
     }

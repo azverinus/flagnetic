@@ -15,6 +15,7 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	appevents "github.com/azverinus/flagnetic/internal/app/events"
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
@@ -30,6 +31,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
+	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	pgexperiments "github.com/azverinus/flagnetic/internal/infra/out/postgres/experiments"
 	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
@@ -113,6 +115,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Every write changing what SDKs receive moves the rulesets it changed
 	// on, through the delivery context.
 	deliveryStore := pgdelivery.NewStore(d.Pool)
+	eventStore := pgevents.NewStore(d.Pool)
 	rulesets := appdelivery.NewBumpRulesets(deliveryStore, d.Clock)
 	// Every replica serves rulesets from memory by version, learning each
 	// version from its notification, and its own writes' versions as they
@@ -312,7 +315,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	rulesetStream := pgdelivery.NewRulesetStream(rulesetCache, edge.Logger())
 	// Every replica counts the remote evaluations it answers and writes the
 	// counts in rounds, and once more when it stops.
-	remoteCounts := appdelivery.NewRemoteEvaluationCounts(deliveryStore, d.Clock)
+	remoteCounts := appdelivery.NewRemoteEvaluationCounts(eventStore, d.Clock)
 	// Every replica gathers the SDKs its requests come from and writes them
 	// in rounds.
 	inventory := appdelivery.NewSDKInventory(tx, deliveryStore, d.Clock)
@@ -321,7 +324,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
 		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
 		Evaluate:     appdelivery.NewEvaluateRemotely(rulesetCache, discoveries, remoteCounts, d.Clock),
-		Ingest:       appdelivery.NewIngestEvents(tx, deliveryStore, d.Clock, o.EventsRetention),
+		Ingest:       appevents.NewIngestEvents(tx, eventStore, d.Clock, o.EventsRetention),
 		Inventory:    inventory,
 	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
@@ -334,7 +337,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.SDKInventory(inventory, edge.Logger(), reg),
 			worker.SDKInventoryRetention(appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention)),
 			worker.EventPartitions(func(ctx context.Context) error {
-				return deliveryStore.CreateEventPartitions(ctx, d.Clock.Now(), o.EventsPartitionsAhead)
+				return eventStore.CreateEventPartitions(ctx, d.Clock.Now(), o.EventsPartitionsAhead)
 			}),
 		},
 		Listeners: []Listener{
