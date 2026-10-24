@@ -33,11 +33,19 @@ type DependentFinder interface {
 	Dependents(ctx context.Context, project workspace.ProjectID, flag string) ([]flags.Dependent, error)
 }
 
+// ExperimentFinder finds the experiments of a flag.
+type ExperimentFinder interface {
+	// FlagExperiments returns the flag's experiments, whatever their
+	// status, by key in byte order.
+	FlagExperiments(ctx context.Context, flag flags.FlagID) ([]flags.ExperimentRef, error)
+}
+
 // DefinitionUpdater stores a flag's changed definition once nothing names
 // what the change removes.
 type DefinitionUpdater interface {
 	FlagUpdater
 	DependentFinder
+	ExperimentFinder
 }
 
 // UpdateFlagDeps are what UpdateFlag runs on.
@@ -70,7 +78,7 @@ type UpdateFlagCommand struct {
 // Handle applies the change and returns the flag as it is after it. The
 // change is validated first, then judged against the version it was based
 // on, then against what still names a variation it removes, in the flag's
-// configurations or other flags' prerequisites; a change to the values the flag already has stores and records nothing. A change to
+// configurations, other flags' prerequisites or an experiment's weights; a change to the values the flag already has stores and records nothing. A change to
 // what a ruleset carries moves every environment's ruleset on.
 func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagView, error) {
 	now := h.d.Recorder.now()
@@ -107,7 +115,13 @@ func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagVie
 			if err != nil {
 				return err
 			}
-			if refs := flags.VariationReferences(before, changed.RemovedVariations, configs, dependents); len(refs) > 0 {
+			experiments, err := h.d.Store.FlagExperiments(ctx, before.ID)
+			if err != nil {
+				return err
+			}
+			refs := flags.VariationReferences(before, changed.RemovedVariations, configs, dependents)
+			refs = append(refs, flags.ExperimentVariationReferences(experiments, changed.RemovedVariations)...)
+			if len(refs) > 0 {
 				return flags.ErrInUse(refs)
 			}
 		}

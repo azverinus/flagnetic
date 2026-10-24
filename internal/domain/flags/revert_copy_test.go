@@ -137,3 +137,33 @@ func withOn(c flags.Configuration, on bool, overrides []flags.Override) flags.Co
 	c.On, c.Overrides = on, overrides
 	return c
 }
+
+// TestARevertOrCopyKeepsTheExperimentARuleServes pins that a rule serving an
+// experiment is written back naming the same experiment, not refused as
+// naming none.
+func TestARevertOrCopyKeepsTheExperimentARuleServes(t *testing.T) {
+	in := base()
+	in.Rules = []flags.RuleInput{{Description: "Titles under test", Serve: experimentServe("draft_title")}}
+	recorded := mustReplace(t, initial(), in)
+	edited := in
+	edited.Rules = []flags.RuleInput{{ID: &recorded.Rules[0].ID, Description: "Titles, again", Serve: experimentServe("draft_title")}}
+	current := mustReplace(t, recorded, edited)
+	later := flags.Write{By: &bob, Now: now.Add(time.Hour)}
+
+	reverted, _, err := current.Revert(copyFlag, recorded, referents(nil), later)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameServed(reverted, recorded) {
+		t.Errorf("reverted rules = %+v, want %+v", reverted.Rules, recorded.Rules)
+	}
+
+	target := flags.InitialConfiguration(copyFlag, id.New[workspace.Environment](ids), &anna, now)
+	copied, _, err := target.Copy(copyFlag, recorded, false, referents(nil), later)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(copied.Rules, recorded.Rules) {
+		t.Errorf("copied rules = %+v, want %+v", copied.Rules, recorded.Rules)
+	}
+}

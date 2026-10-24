@@ -306,15 +306,18 @@ func (e SessionMethod) Valid() bool {
 
 // Defines values for ListFlagsParamsState.
 const (
-	ListFlagsParamsStateOff     ListFlagsParamsState = "off"
-	ListFlagsParamsStateOn      ListFlagsParamsState = "on"
-	ListFlagsParamsStateRollout ListFlagsParamsState = "rollout"
-	ListFlagsParamsStateRules   ListFlagsParamsState = "rules"
+	ListFlagsParamsStateExperiment ListFlagsParamsState = "experiment"
+	ListFlagsParamsStateOff        ListFlagsParamsState = "off"
+	ListFlagsParamsStateOn         ListFlagsParamsState = "on"
+	ListFlagsParamsStateRollout    ListFlagsParamsState = "rollout"
+	ListFlagsParamsStateRules      ListFlagsParamsState = "rules"
 )
 
 // Valid indicates whether the value is a known member of the ListFlagsParamsState enum.
 func (e ListFlagsParamsState) Valid() bool {
 	switch e {
+	case ListFlagsParamsStateExperiment:
+		return true
 	case ListFlagsParamsStateOff:
 		return true
 	case ListFlagsParamsStateOn:
@@ -1073,6 +1076,9 @@ type FlagState struct {
 	// Environment Names the entity in URLs, SDK calls and rules, and never changes.
 	Environment Key `json:"environment"`
 
+	// HasExperiment A rule of the configuration serves an experiment.
+	HasExperiment bool `json:"has_experiment"`
+
 	// HasRollout A rule of the configuration serves a rollout.
 	HasRollout bool `json:"has_rollout"`
 
@@ -1443,7 +1449,7 @@ type Reference struct {
 	Environment *string `json:"environment"`
 	Key         string  `json:"key"`
 
-	// Kind What names it, such as `flag` or `segment`.
+	// Kind What names it, such as `flag`, `segment` or `experiment`.
 	Kind string `json:"kind"`
 }
 
@@ -1480,8 +1486,13 @@ type Rule struct {
 	// `unit_type`, in basis points (0 to 10,000), the others continuing to
 	// the next rule. A rollout's `salt` is given by the server and changes
 	// only through regenerating it, so a write omits it or sends it
-	// unchanged. Experiments are not available yet
-	// (`experiment_not_available`).
+	// unchanged. `experiment` serves the experiment `experiment` of the
+	// flag, which assigns units to variations by its own weights; a rule
+	// serves a draft or running experiment of its flag
+	// (`unknown_experiment`, `experiment_of_another_flag` and
+	// `experiment_not_servable` otherwise), and several rules may serve
+	// the same one. While the experiment is a draft its rules are left
+	// out of the ruleset SDKs receive.
 	Serve Serve `json:"serve"`
 }
 
@@ -1498,8 +1509,13 @@ type RuleInput struct {
 	// `unit_type`, in basis points (0 to 10,000), the others continuing to
 	// the next rule. A rollout's `salt` is given by the server and changes
 	// only through regenerating it, so a write omits it or sends it
-	// unchanged. Experiments are not available yet
-	// (`experiment_not_available`).
+	// unchanged. `experiment` serves the experiment `experiment` of the
+	// flag, which assigns units to variations by its own weights; a rule
+	// serves a draft or running experiment of its flag
+	// (`unknown_experiment`, `experiment_of_another_flag` and
+	// `experiment_not_servable` otherwise), and several rules may serve
+	// the same one. While the experiment is a draft its rules are left
+	// out of the ruleset SDKs receive.
 	Serve Serve `json:"serve"`
 }
 
@@ -1692,10 +1708,18 @@ type SegmentPatch struct {
 // `unit_type`, in basis points (0 to 10,000), the others continuing to
 // the next rule. A rollout's `salt` is given by the server and changes
 // only through regenerating it, so a write omits it or sends it
-// unchanged. Experiments are not available yet
-// (`experiment_not_available`).
+// unchanged. `experiment` serves the experiment `experiment` of the
+// flag, which assigns units to variations by its own weights; a rule
+// serves a draft or running experiment of its flag
+// (`unknown_experiment`, `experiment_of_another_flag` and
+// `experiment_not_servable` otherwise), and several rules may serve
+// the same one. While the experiment is a draft its rules are left
+// out of the ruleset SDKs receive.
 type Serve struct {
-	// Kind `variation` or `rollout`.
+	// Experiment The key of the experiment served, for kind `experiment`.
+	Experiment *string `json:"experiment,omitempty"`
+
+	// Kind `variation`, `rollout` or `experiment`.
 	Kind       string  `json:"kind"`
 	Percentage *int    `json:"percentage,omitempty"`
 	Salt       *string `json:"salt,omitempty"`
@@ -2129,8 +2153,9 @@ type ListFlagsParams struct {
 	Environment *Key `form:"environment,omitempty" json:"environment,omitempty"`
 
 	// State Lists the flags whose configuration in `environment` is on, is
-	// off, has rules, or has a rule serving a rollout; rules count
-	// whether the flag is on or off.
+	// off, has rules, has a rule serving a rollout, or has a rule
+	// serving an experiment; rules count whether the flag is on or
+	// off.
 	State *ListFlagsParamsState `form:"state,omitempty" json:"state,omitempty"`
 
 	// DiffersBetween Two environment keys, comma separated: lists the flags whose
@@ -3374,7 +3399,8 @@ type ClientInterface interface {
 	// automatic exposure, for every environment at once; the key and type
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
-	// `in_use`, listing what serves it. A change to the values the flag
+	// `in_use`, listing what serves it, as is removing one that any
+	// experiment of the flag lists. A change to the values the flag
 	// already has changes nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type.
@@ -3388,7 +3414,8 @@ type ClientInterface interface {
 	// automatic exposure, for every environment at once; the key and type
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
-	// `in_use`, listing what serves it. A change to the values the flag
+	// `in_use`, listing what serves it, as is removing one that any
+	// experiment of the flag lists. A change to the values the flag
 	// already has changes nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type.
@@ -3400,7 +3427,9 @@ type ClientInterface interface {
 	//
 	// Hides the flag from SDKs in every environment, keeping its
 	// definition and configurations until it is restored or deleted.
-	// Archiving an archived flag changes nothing.
+	// Archiving an archived flag changes nothing. A flag that another
+	// flag requires, or that has a draft or running experiment, is
+	// refused with `in_use` listing what names it.
 	//
 	// Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
 	ArchiveFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5617,7 +5646,8 @@ func (c *Client) GetFlag(ctx context.Context, project ProjectKey, flag FlagKey, 
 // automatic exposure, for every environment at once; the key and type
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
-// `in_use`, listing what serves it. A change to the values the flag
+// `in_use`, listing what serves it, as is removing one that any
+// experiment of the flag lists. A change to the values the flag
 // already has changes nothing and records nothing.
 //
 // Takes any type of body and a specified content type.
@@ -5641,7 +5671,8 @@ func (c *Client) UpdateFlagWithBody(ctx context.Context, project ProjectKey, fla
 // automatic exposure, for every environment at once; the key and type
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
-// `in_use`, listing what serves it. A change to the values the flag
+// `in_use`, listing what serves it, as is removing one that any
+// experiment of the flag lists. A change to the values the flag
 // already has changes nothing and records nothing.
 //
 // Takes a body of the `application/json` content type.
@@ -5663,7 +5694,9 @@ func (c *Client) UpdateFlag(ctx context.Context, project ProjectKey, flag FlagKe
 //
 // Hides the flag from SDKs in every environment, keeping its
 // definition and configurations until it is restored or deleted.
-// Archiving an archived flag changes nothing.
+// Archiving an archived flag changes nothing. A flag that another
+// flag requires, or that has a draft or running experiment, is
+// refused with `in_use` listing what names it.
 //
 // Corresponds with POST /projects/{project}/flags/{flag}/archive (the `ArchiveFlag` operationId).
 func (c *Client) ArchiveFlag(ctx context.Context, project ProjectKey, flag FlagKey, params *ArchiveFlagParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12290,7 +12323,8 @@ type ClientWithResponsesInterface interface {
 	// automatic exposure, for every environment at once; the key and type
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
-	// `in_use`, listing what serves it. A change to the values the flag
+	// `in_use`, listing what serves it, as is removing one that any
+	// experiment of the flag lists. A change to the values the flag
 	// already has changes nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -12304,7 +12338,8 @@ type ClientWithResponsesInterface interface {
 	// automatic exposure, for every environment at once; the key and type
 	// never change (`immutable`). Variations are replaced as a list and
 	// matched by key: removing one that a configuration still serves is
-	// `in_use`, listing what serves it. A change to the values the flag
+	// `in_use`, listing what serves it, as is removing one that any
+	// experiment of the flag lists. A change to the values the flag
 	// already has changes nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -12316,7 +12351,9 @@ type ClientWithResponsesInterface interface {
 	//
 	// Hides the flag from SDKs in every environment, keeping its
 	// definition and configurations until it is restored or deleted.
-	// Archiving an archived flag changes nothing.
+	// Archiving an archived flag changes nothing. A flag that another
+	// flag requires, or that has a draft or running experiment, is
+	// refused with `in_use` listing what names it.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -21787,7 +21824,8 @@ func (c *ClientWithResponses) GetFlagWithResponse(ctx context.Context, project P
 // automatic exposure, for every environment at once; the key and type
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
-// `in_use`, listing what serves it. A change to the values the flag
+// `in_use`, listing what serves it, as is removing one that any
+// experiment of the flag lists. A change to the values the flag
 // already has changes nothing and records nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -21807,7 +21845,8 @@ func (c *ClientWithResponses) UpdateFlagWithBodyWithResponse(ctx context.Context
 // automatic exposure, for every environment at once; the key and type
 // never change (`immutable`). Variations are replaced as a list and
 // matched by key: removing one that a configuration still serves is
-// `in_use`, listing what serves it. A change to the values the flag
+// `in_use`, listing what serves it, as is removing one that any
+// experiment of the flag lists. A change to the values the flag
 // already has changes nothing and records nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -21825,7 +21864,9 @@ func (c *ClientWithResponses) UpdateFlagWithResponse(ctx context.Context, projec
 //
 // Hides the flag from SDKs in every environment, keeping its
 // definition and configurations until it is restored or deleted.
-// Archiving an archived flag changes nothing.
+// Archiving an archived flag changes nothing. A flag that another
+// flag requires, or that has a draft or running experiment, is
+// refused with `in_use` listing what names it.
 //
 // Returns a wrapper object for the known response body format(s).
 //

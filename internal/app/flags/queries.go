@@ -52,12 +52,14 @@ const (
 type StateFilter string
 
 // The flag states flags are listed by: on, off, with rules whether on or
-// off, with a rule serving a rollout.
+// off, with a rule serving a rollout, with a rule serving an experiment.
 const (
 	StateOn      StateFilter = "on"
 	StateOff     StateFilter = "off"
 	StateRules   StateFilter = "rules"
 	StateRollout StateFilter = "rollout"
+	// StateExperiment lists the flags with a rule serving an experiment.
+	StateExperiment StateFilter = "experiment"
 )
 
 // FlagCursor is where a page of flags starts: after the flag with these
@@ -105,6 +107,8 @@ type FlagState struct {
 	On          bool
 	HasRules    bool
 	HasRollout  bool
+	// HasExperiment is true when a rule serves an experiment.
+	HasExperiment bool
 }
 
 // ListedFlag is a flag's definition with its flag state in every

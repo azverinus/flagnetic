@@ -18,19 +18,27 @@ type stateDoc struct {
 	On          bool   `json:"on"`
 	HasRules    bool   `json:"has_rules"`
 	HasRollout  bool   `json:"has_rollout"`
+	// HasExperiment is true when one of the configuration's rules serves an
+	// experiment.
+	HasExperiment bool `json:"has_experiment"`
 }
 
 // rolloutRule is the containment a configuration matches when one of its
 // rules serves a rollout.
 const rolloutRule = `'{"rules": [{"serve": {"kind": "rollout"}}]}'`
 
+// experimentRule is the containment a configuration matches when one of its
+// rules serves an experiment.
+const experimentRule = `'{"rules": [{"serve": {"kind": "experiment"}}]}'`
+
 // stateConditions are what a configuration c in the state's environment
 // holds when the flag is in that state.
 var stateConditions = map[appflags.StateFilter]string{
-	appflags.StateOn:      `(c.document->>'on')::boolean`,
-	appflags.StateOff:     `NOT (c.document->>'on')::boolean`,
-	appflags.StateRules:   `jsonb_array_length(c.document->'rules') > 0`,
-	appflags.StateRollout: `c.document @> ` + rolloutRule,
+	appflags.StateOn:         `(c.document->>'on')::boolean`,
+	appflags.StateOff:        `NOT (c.document->>'on')::boolean`,
+	appflags.StateRules:      `jsonb_array_length(c.document->'rules') > 0`,
+	appflags.StateRollout:    `c.document @> ` + rolloutRule,
+	appflags.StateExperiment: `c.document @> ` + experimentRule,
 }
 
 // flagOrders are the ORDER BY of each sort, and the keyset condition of a
@@ -99,7 +107,8 @@ func flagsQuery(q appflags.FlagQuery) (string, []any) {
 		    SELECT jsonb_agg(jsonb_build_object(
 		        'environment', e.key, 'on', c.document->'on',
 		        'has_rules', jsonb_array_length(c.document->'rules') > 0,
-		        'has_rollout', c.document @> ` + rolloutRule + `)
+		        'has_rollout', c.document @> ` + rolloutRule + `,
+		        'has_experiment', c.document @> ` + experimentRule + `)
 		        ORDER BY e.sort_order, e.key COLLATE "C")
 		    FROM flag_configurations c JOIN environments e ON e.id = c.environment_id
 		    WHERE c.flag_id = f.id

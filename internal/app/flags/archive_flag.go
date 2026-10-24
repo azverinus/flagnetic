@@ -24,6 +24,7 @@ type ArchivalDeps struct {
 type FlagArchiver interface {
 	FlagUpdater
 	DependentFinder
+	ExperimentFinder
 }
 
 // ArchiveFlagDeps are what ArchiveFlag runs on.
@@ -55,7 +56,8 @@ type FlagCommand struct {
 // Handle archives the flag and returns it; an archived flag stays as it is
 // and nothing is recorded. A flag another flag requires, in any environment
 // and archived or not, is not archived: the requiring flag would then
-// require a flag no SDK receives.
+// require a flag no SDK receives. Nor is one with a draft or running
+// experiment, which would lose its flag.
 func (h *ArchiveFlag) Handle(ctx context.Context, cmd FlagCommand) (FlagView, error) {
 	d := ArchivalDeps{Tx: h.d.Tx, Projects: h.d.Projects, Store: h.d.Store, Rulesets: h.d.Rulesets, Recorder: h.d.Recorder}
 	return archival(ctx, d, cmd, "flag.archived", flags.Flag.Archive, func(ctx context.Context, f flags.Flag) error {
@@ -63,7 +65,12 @@ func (h *ArchiveFlag) Handle(ctx context.Context, cmd FlagCommand) (FlagView, er
 		if err != nil {
 			return err
 		}
-		if refs := flags.DependentReferences(dependents); len(refs) > 0 {
+		experiments, err := h.d.Store.FlagExperiments(ctx, f.ID)
+		if err != nil {
+			return err
+		}
+		refs := append(flags.DependentReferences(dependents), flags.ExperimentArchiveReferences(experiments)...)
+		if len(refs) > 0 {
 			return flags.ErrInUse(refs)
 		}
 		return nil

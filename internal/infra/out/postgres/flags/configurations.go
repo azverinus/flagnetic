@@ -51,6 +51,7 @@ type ruleDoc struct {
 type serveDoc struct {
 	Kind       string `json:"kind"`
 	Variation  string `json:"variation,omitempty"`
+	Experiment string `json:"experiment,omitempty"`
 	UnitType   string `json:"unit_type,omitempty"`
 	Percentage *int   `json:"percentage,omitempty"`
 	Salt       string `json:"salt,omitempty"`
@@ -73,7 +74,7 @@ func docOf(c flags.Configuration) ([]byte, error) {
 		for j, cond := range r.Conditions {
 			conditions[j] = conditionDoc(cond)
 		}
-		serve := serveDoc{Kind: r.Serve.Kind, Variation: r.Serve.Variation, UnitType: r.Serve.UnitType, Salt: r.Serve.Salt}
+		serve := serveDoc{Kind: r.Serve.Kind, Variation: r.Serve.Variation, Experiment: r.Serve.Experiment, UnitType: r.Serve.UnitType, Salt: r.Serve.Salt}
 		if r.Serve.Kind == flags.ServeRollout {
 			serve.Percentage = &r.Serve.Percentage
 		}
@@ -103,7 +104,7 @@ func fromDoc(doc []byte, c *flags.Configuration) error {
 		for j, cond := range r.Conditions {
 			conditions[j] = flags.Condition(cond)
 		}
-		serve := flags.Serve{Kind: r.Serve.Kind, Variation: r.Serve.Variation, UnitType: r.Serve.UnitType, Salt: r.Serve.Salt}
+		serve := flags.Serve{Kind: r.Serve.Kind, Variation: r.Serve.Variation, Experiment: r.Serve.Experiment, UnitType: r.Serve.UnitType, Salt: r.Serve.Salt}
 		if r.Serve.Percentage != nil {
 			serve.Percentage = *r.Serve.Percentage
 		}

@@ -1497,11 +1497,12 @@ paths:
           in: query
           description: |
             Lists the flags whose configuration in `environment` is on, is
-            off, has rules, or has a rule serving a rollout; rules count
-            whether the flag is on or off.
+            off, has rules, has a rule serving a rollout, or has a rule
+            serving an experiment; rules count whether the flag is on or
+            off.
           schema:
             type: string
-            enum: ["on", "off", rules, rollout]
+            enum: ["on", "off", rules, rollout, experiment]
         - name: differs_between
           in: query
           description: |
@@ -1617,7 +1618,8 @@ paths:
         automatic exposure, for every environment at once; the key and type
         never change (`immutable`). Variations are replaced as a list and
         matched by key: removing one that a configuration still serves is
-        `in_use`, listing what serves it. A change to the values the flag
+        `in_use`, listing what serves it, as is removing one that any
+        experiment of the flag lists. A change to the values the flag
         already has changes nothing and records nothing.
       x-permission: flag.edit
       tags: [flags]
@@ -1693,7 +1695,9 @@ paths:
       description: |
         Hides the flag from SDKs in every environment, keeping its
         definition and configurations until it is restored or deleted.
-        Archiving an archived flag changes nothing.
+        Archiving an archived flag changes nothing. A flag that another
+        flag requires, or that has a draft or running experiment, is
+        refused with `in_use` listing what names it.
       x-permission: flag.archive
       tags: [flags]
       parameters:
@@ -4432,7 +4436,7 @@ components:
       properties:
         kind:
           type: string
-          description: What names it, such as `flag` or `segment`.
+          description: What names it, such as `flag`, `segment` or `experiment`.
         key:
           type: string
         environment:
@@ -4838,15 +4842,23 @@ components:
         `unit_type`, in basis points (0 to 10,000), the others continuing to
         the next rule. A rollout's `salt` is given by the server and changes
         only through regenerating it, so a write omits it or sends it
-        unchanged. Experiments are not available yet
-        (`experiment_not_available`).
+        unchanged. `experiment` serves the experiment `experiment` of the
+        flag, which assigns units to variations by its own weights; a rule
+        serves a draft or running experiment of its flag
+        (`unknown_experiment`, `experiment_of_another_flag` and
+        `experiment_not_servable` otherwise), and several rules may serve
+        the same one. While the experiment is a draft its rules are left
+        out of the ruleset SDKs receive.
       required: [kind]
       properties:
         kind:
           type: string
-          description: "`variation` or `rollout`."
+          description: "`variation`, `rollout` or `experiment`."
         variation:
           type: string
+        experiment:
+          type: string
+          description: The key of the experiment served, for kind `experiment`.
         unit_type:
           type: string
         percentage:
@@ -4951,7 +4963,7 @@ components:
     FlagState:
       type: object
       description: What a flag's configuration in one environment serves at a glance.
-      required: [environment, "on", has_rules, has_rollout]
+      required: [environment, "on", has_rules, has_rollout, has_experiment]
       properties:
         environment:
           $ref: "#/components/schemas/Key"
@@ -4963,6 +4975,9 @@ components:
         has_rollout:
           type: boolean
           description: A rule of the configuration serves a rollout.
+        has_experiment:
+          type: boolean
+          description: A rule of the configuration serves an experiment.
     FlagCreate:
       type: object
       required: [key, type, name]

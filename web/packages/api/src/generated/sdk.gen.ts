@@ -1578,7 +1578,8 @@ export const getFlag = <ThrowOnError extends boolean = false>(
  * automatic exposure, for every environment at once; the key and type
  * never change (`immutable`). Variations are replaced as a list and
  * matched by key: removing one that a configuration still serves is
- * `in_use`, listing what serves it. A change to the values the flag
+ * `in_use`, listing what serves it, as is removing one that any
+ * experiment of the flag lists. A change to the values the flag
  * already has changes nothing and records nothing.
  *
  */
@@ -1607,7 +1608,9 @@ export const updateFlag = <ThrowOnError extends boolean = false>(
  *
  * Hides the flag from SDKs in every environment, keeping its
  * definition and configurations until it is restored or deleted.
- * Archiving an archived flag changes nothing.
+ * Archiving an archived flag changes nothing. A flag that another
+ * flag requires, or that has a draft or running experiment, is
+ * refused with `in_use` listing what names it.
  *
  */
 export const archiveFlag = <ThrowOnError extends boolean = false>(

@@ -217,3 +217,30 @@ func DependentReferences(dependents []Dependent) []Reference {
 	}
 	return refs
 }
+
+// ExperimentVariationReferences returns the experiments in experiments that
+// list one of the variations in removed, whatever their status: an
+// experiment's weights and the exposures counted for them mean nothing
+// without the variation.
+func ExperimentVariationReferences(experiments []ExperimentRef, removed []string) []Reference {
+	var refs []Reference
+	for _, e := range experiments {
+		if slices.ContainsFunc(e.Weights, func(w ExperimentWeight) bool { return slices.Contains(removed, w.Variation) }) {
+			refs = append(refs, Reference{Kind: "experiment", Key: e.Key})
+		}
+	}
+	return refs
+}
+
+// ExperimentArchiveReferences returns the draft and running experiments in
+// experiments: archiving their flag would leave them comparing variations
+// of a flag no SDK receives.
+func ExperimentArchiveReferences(experiments []ExperimentRef) []Reference {
+	var refs []Reference
+	for _, e := range experiments {
+		if e.Status == ExperimentDraft || e.Status == ExperimentRunning {
+			refs = append(refs, Reference{Kind: "experiment", Key: e.Key})
+		}
+	}
+	return refs
+}

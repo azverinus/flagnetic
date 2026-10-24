@@ -23,7 +23,7 @@ A key, type or other field that does not fit is refused `422 invalid_flag`, each
 
 A **variation** is one of the values a flag can serve. Each has a `key` (letters, digits, `_`, `.` and `-`, 1 to 64 characters, unique in the flag), a `value` of the flag's type of at most 64 KiB as compact JSON, a `name` that defaults to the key, and a `description`. A boolean flag always has exactly the variations `true` and `false`, and is created without listing them; every other flag lists at least one.
 
-A `PATCH` replaces the variations as a list, matched by key. Removing a variation that is still served is refused `409 in_use`, with `references` naming each flag and environment that names it: as the off or fallthrough variation, in a rule or rollout, in an override, or as the variation another flag requires as a prerequisite.
+A `PATCH` replaces the variations as a list, matched by key. Removing a variation that is still served is refused `409 in_use`, with `references` naming each flag and environment that names it: as the off or fallthrough variation, in a rule or rollout, in an override, or as the variation another flag requires as a prerequisite. An experiment of the flag that lists the variation, whatever its status, is a reference too (`kind` `experiment`, no environment).
 
 ### A new flag, a new environment
 
@@ -73,7 +73,11 @@ A rule serves:
 - `{"kind": "variation", "variation": "on"}`: one variation to every context it matches.
 - `{"kind": "rollout", "unit_type": "user", "variation": "on", "percentage": 2500}`: a **rollout**, serving the variation to a share of the units of that unit type, in basis points from 0 to 10,000 (2500 is 25%).
 
-Experiments can be created (see [Experiments](experiments.md)) but a rule cannot serve one yet: a rule serving one is refused `experiment_not_available`.
+- `{"kind": "experiment", "experiment": "checkout_title_test"}`: an **experiment** of the flag (see [Experiments](experiments.md)), which assigns units to variations by its own weights, traffic allocation and salts. A rule serves a draft or running experiment of its flag, and several rules, in one environment or in several, may serve the same one; the write is refused `422` with `unknown_experiment` for a key the project has not, `experiment_of_another_flag` for an experiment of a different flag and `experiment_not_servable` for a stopped or archived one, each pointing at the rule's `/serve/experiment`.
+
+While the experiment is a draft, a rule serving it is kept in the configuration but left out of the ruleset SDKs receive, so preparing an experiment never changes what anyone is served. While it is running, the rule carries the experiment's key, unit type, salts, traffic allocation and weights.
+
+A flag with a draft or running experiment cannot be archived: it is refused `409 in_use`, with `references` naming each experiment.
 
 ### Rollouts and salts
 
@@ -127,20 +131,20 @@ To compare, `GET /flags?differs_between=staging,production` lists the flags whos
 
 ## Listing flags
 
-`GET /flags` lists the project's flags, each with its **flag state** in every environment: `{environment, on, has_rules, has_rollout}`, and its `updated_at`.
+`GET /flags` lists the project's flags, each with its **flag state** in every environment: `{environment, on, has_rules, has_rollout, has_experiment}`, and its `updated_at`.
 
 | Parameter                 | Lists                                                                                                     |
 | ------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `q`                       | Flags whose key or name contains the text, whatever its case.                                             |
 | `type`, `tag`, `owner`    | Flags of that type, carrying that tag, owned by that member.                                              |
 | `archived`                | The archived flags instead of the others.                                                                 |
-| `environment` and `state` | Flags whose configuration in that environment is `on`, `off`, has `rules`, or has a `rollout`.            |
+| `environment` and `state` | Flags whose configuration in that environment is `on`, `off`, has `rules`, a `rollout` or an `experiment`. |
 | `differs_between`         | Flags whose configurations differ between two environments (above).                                       |
 | `sort`                    | By `key` (the default) or `name` in byte order, or by `updated`, the last change to the definition first. |
 
 Pages hold `limit` flags; `next_cursor` fetches the next page under the same `sort`.
 
-In the console, **Flags** in the project navigation lists the project's flags with their type, their state in every environment (on or off, whether it has rules, whether a rule serves a rollout), owner, tags and last update, filtered by text, type, tag, owner, archived, state in the chosen environment and **Differs between** two environments, sorted by key, name or last update, the filters, the order and the page kept in the address so a view can be shared. The list opens in the environment the address names, else the one this browser showed last in the project, else the first; a flag opens in that environment's tab. **New flag**, offered to a member holding `flag.edit`, creates a flag of any type: a boolean flag is created with its `true` and `false`, any other starts with two variations to fill in, and the owner is the member creating it unless they choose another member of the project. Creating it opens the flag's page.
+In the console, **Flags** in the project navigation lists the project's flags with their type, their state in every environment (on or off, whether it has rules, whether a rule serves a rollout or an experiment), owner, tags and last update, filtered by text, type, tag, owner, archived, state in the chosen environment and **Differs between** two environments, sorted by key, name or last update, the filters, the order and the page kept in the address so a view can be shared. The list opens in the environment the address names, else the one this browser showed last in the project, else the first; a flag opens in that environment's tab. **New flag**, offered to a member holding `flag.edit`, creates a flag of any type: a boolean flag is created with its `true` and `false`, any other starts with two variations to fill in, and the owner is the member creating it unless they choose another member of the project. Creating it opens the flag's page.
 
 A flag's page has one tab per environment and a History tab. **Edit definition** edits the definition for every environment; archiving, restoring and deleting (an archived flag only, typing its key) sit beside it, and a refusal names what still requires the flag. An environment's tab switches the flag on or off there and adds or removes overrides, each saved at once; while the flag is on, **Kill switch** switches it off after a reason of at least 10 characters, showing who used it last and why. If someone saved the definition while it was open, saving shows who and when with a diff of their change, and offers to reload, losing the edits, or to keep the edits and save them onto the newer version.
 

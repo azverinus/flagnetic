@@ -42,6 +42,9 @@ type ConfiguredFlags interface {
 	// EnvironmentConfigurations returns every flag's configuration in
 	// environment.
 	EnvironmentConfigurations(ctx context.Context, environment workspace.EnvironmentID) ([]flags.Configuration, error)
+	// ProjectExperiments returns every experiment of project, whatever its
+	// status.
+	ProjectExperiments(ctx context.Context, project workspace.ProjectID) ([]flags.ExperimentRef, error)
 }
 
 // Drafts checks an unsaved configuration of one flag, as the flags context

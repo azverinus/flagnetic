@@ -211,8 +211,8 @@ func TestEvaluateUsesADraftWithoutSavingIt(t *testing.T) {
 		Rules: &[]management.RuleInput{{Conditions: conditions(attr("shoe_size", "eq", `"9"`)), Serve: serves("a")}}},
 		"/draft/configuration/rules/0/conditions/0/attribute unknown_attribute")
 	refused("an experiment", management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a",
-		Rules: &[]management.RuleInput{{Serve: management.Serve{Kind: "experiment"}}}},
-		"/draft/configuration/rules/0/serve/kind experiment_not_available")
+		Rules: &[]management.RuleInput{{Serve: management.Serve{Kind: "experiment", Experiment: ptr("nothing")}}}},
+		"/draft/configuration/rules/0/serve/experiment unknown_experiment")
 	refused("a cycle", management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a",
 		Prerequisites: &[]management.Prerequisite{{Flag: "dependent", Variation: "a"}}},
 		"/draft/configuration/prerequisites/0/flag prerequisite_cycle")
