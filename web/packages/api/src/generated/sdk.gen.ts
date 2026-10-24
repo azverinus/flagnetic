@@ -15,6 +15,9 @@ import type {
   ChangeMyPasswordData,
   ChangeMyPasswordErrors,
   ChangeMyPasswordResponses,
+  CloneExperimentData,
+  CloneExperimentErrors,
+  CloneExperimentResponses,
   CopyChangeRequestData,
   CopyChangeRequestErrors,
   CopyChangeRequestResponses,
@@ -69,6 +72,9 @@ import type {
   DeleteEnvironmentData,
   DeleteEnvironmentErrors,
   DeleteEnvironmentResponses,
+  DeleteExperimentData,
+  DeleteExperimentErrors,
+  DeleteExperimentResponses,
   DeleteFlagData,
   DeleteFlagErrors,
   DeleteFlagResponses,
@@ -231,6 +237,9 @@ import type {
   RebaseChangeRequestData,
   RebaseChangeRequestErrors,
   RebaseChangeRequestResponses,
+  RegenerateExperimentSaltsData,
+  RegenerateExperimentSaltsErrors,
+  RegenerateExperimentSaltsResponses,
   RegenerateRolloutSaltData,
   RegenerateRolloutSaltErrors,
   RegenerateRolloutSaltResponses,
@@ -285,6 +294,9 @@ import type {
   UpdateEnvironmentData,
   UpdateEnvironmentErrors,
   UpdateEnvironmentResponses,
+  UpdateExperimentData,
+  UpdateExperimentErrors,
+  UpdateExperimentResponses,
   UpdateFlagData,
   UpdateFlagErrors,
   UpdateFlagResponses,
@@ -1945,8 +1957,10 @@ export const regenerateRolloutSalt = <ThrowOnError extends boolean = false>(
  * The project's experiments
  *
  * The project's experiments by key in byte order (capitals before
- * lower case). Page with `cursor` set to the `next_cursor` of the
- * previous page.
+ * lower case). Every filter given applies. Archived experiments are
+ * left out unless `include_archived` is true or `status` is
+ * `archived`. Page with `cursor` set to the `next_cursor` of the
+ * previous page, under the same filters.
  *
  */
 export const listExperiments = <ThrowOnError extends boolean = false>(
@@ -2000,6 +2014,33 @@ export const createExperiment = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Delete a draft experiment
+ *
+ * Deletes the experiment. Only a draft is deleted (`not_draft`): once
+ * started, an experiment keeps its history.
+ *
+ */
+export const deleteExperiment = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteExperimentData, ThrowOnError>,
+): RequestResult<DeleteExperimentResponses, DeleteExperimentErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteExperimentResponses,
+    DeleteExperimentErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}",
+    ...options,
+  });
+
+/**
  * An experiment
  *
  * The experiment with both its salts, so anyone can recompute a unit's buckets.
@@ -2018,6 +2059,103 @@ export const getExperiment = <ThrowOnError extends boolean = false>(
     ],
     url: "/projects/{project}/experiments/{experiment}",
     ...options,
+  });
+
+/**
+ * Change a draft experiment
+ *
+ * Changes any of the name, hypothesis, owner, tags, flag, unit type,
+ * variations, traffic allocation or expected end date of a draft, as a
+ * create judges them; the key never changes (`immutable`). Only a draft
+ * is changed (`not_draft`). A change to the values the experiment
+ * already has changes nothing and records nothing.
+ *
+ */
+export const updateExperiment = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateExperimentData, ThrowOnError>,
+): RequestResult<UpdateExperimentResponses, UpdateExperimentErrors, ThrowOnError> =>
+  (options.client ?? client).patch<UpdateExperimentResponses, UpdateExperimentErrors, ThrowOnError>(
+    {
+      security: [
+        { scheme: "bearer", type: "http" },
+        {
+          in: "cookie",
+          name: "flagnetic_session",
+          type: "apiKey",
+        },
+      ],
+      url: "/projects/{project}/experiments/{experiment}",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    },
+  );
+
+/**
+ * Regenerate a draft's salts
+ *
+ * Draws a new inclusion salt and a new variation salt, apart from every
+ * salt of the project's experiments and rollouts. Only a draft has its
+ * salts regenerated (`not_draft`): past the draft, units have been
+ * assigned from them.
+ *
+ */
+export const regenerateExperimentSalts = <ThrowOnError extends boolean = false>(
+  options: Options<RegenerateExperimentSaltsData, ThrowOnError>,
+): RequestResult<
+  RegenerateExperimentSaltsResponses,
+  RegenerateExperimentSaltsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RegenerateExperimentSaltsResponses,
+    RegenerateExperimentSaltsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/salts",
+    ...options,
+  });
+
+/**
+ * Clone an experiment into a new draft
+ *
+ * Copies an experiment of any status into a new draft under a new key,
+ * with new salts and no decision: the rerun of a stopped experiment
+ * never reuses its assignments. The name, hypothesis, tags, flag, unit
+ * type, weights, traffic allocation and expected end date are copied;
+ * the owner is the calling member (the source's, for a project token).
+ * The clone is judged as a create is. The source is not changed, so no
+ * `If-Match`.
+ *
+ */
+export const cloneExperiment = <ThrowOnError extends boolean = false>(
+  options: Options<CloneExperimentData, ThrowOnError>,
+): RequestResult<CloneExperimentResponses, CloneExperimentErrors, ThrowOnError> =>
+  (options.client ?? client).post<CloneExperimentResponses, CloneExperimentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/clone",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**

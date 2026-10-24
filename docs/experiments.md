@@ -21,7 +21,23 @@ An experiment compares two or more variations of one [flag](flags.md) on units o
 
 A request breaking several rules is refused `422 invalid_experiment` with one violation per field to fix, each naming its JSON Pointer, such as `/variations/1/variation` `unknown_variation`.
 
-The answer is the experiment at `status` `draft` and `version` 1, which is also its `ETag`. `GET /projects/{project}/experiments/{experiment}` reads it again, and `GET /projects/{project}/experiments` lists the project's experiments by key in byte order (capitals before lower case), paged with `limit` (1 to 200, 50 by default) and `cursor`, the `next_cursor` of the previous page.
+The answer is the experiment at `status` `draft` and `version` 1, which is also its `ETag`. `GET /projects/{project}/experiments/{experiment}` reads it again.
+
+## Listing experiments
+
+`GET /projects/{project}/experiments` lists the project's experiments by key in byte order (capitals before lower case), paged with `limit` (1 to 200, 50 by default) and `cursor`, the `next_cursor` of the previous page. Filters, all of which apply when given: `status` (`draft`, `running`, `stopped` or `archived`), `flag` (a flag's key), `owner` (a member's identifier) and `tag` (matched exactly). Archived experiments are left out unless `include_archived` is `true` or `status` is `archived`. Keep the same filters while paging.
+
+## Changing a draft
+
+Every write to an existing experiment names the version it is based on in `If-Match` (the `ETag` of the last answer, such as `"3"`): without it the write is refused `428 precondition_required`, and with an older one `412 version_mismatch`, which names the current version.
+
+A draft is edited in full with `PATCH /projects/{project}/experiments/{experiment}` (`experiment.edit`): name, hypothesis, owner, tags, flag, unit type, variations, traffic allocation and expected end date, each judged as a create judges it. Fields left out stay as they are; the key never changes (`422 invalid_experiment`, `immutable` on `/key`). A change to the values the experiment already has changes nothing: the version stays and nothing is recorded. Changing the flag or the variations judges the variations against the flag as it will be.
+
+`POST /projects/{project}/experiments/{experiment}/salts` (`experiment.edit`) draws a new inclusion salt and variation salt, again apart from every salt of the project's experiments and rollouts. `DELETE /projects/{project}/experiments/{experiment}` (`experiment.delete`, maintainers and owners) deletes the experiment. Editing, regenerating salts and deleting are for drafts only: any other status is refused `409 not_draft`.
+
+## Cloning
+
+`POST /projects/{project}/experiments/{experiment}/clone` (`experiment.edit`) copies an experiment of any status into a new draft. The body names the clone's `key` and, optionally, its `name` (the source's otherwise). The hypothesis, tags, flag, unit type, weights, traffic allocation and expected end date are copied; the salts are new, so a rerun never reuses an assignment; there is no decision. The owner is the calling member, or the source's owner for a project token. The clone is judged as a create is, so a source whose flag has been archived cannot be cloned. The source is not changed, so cloning takes no `If-Match`.
 
 ## Salts
 
@@ -29,4 +45,4 @@ Every experiment gets two salts when it is created: the `inclusion_salt` decides
 
 ## Audit
 
-Creating an experiment records `experiment.created` with the experiment after it (see [The audit log](access.md#the-audit-log)).
+Every write records one entry (see [The audit log](access.md#the-audit-log)): `experiment.created` and `experiment.cloned` with the experiment after it (a clone also names the experiment it was copied from), `experiment.updated` and `experiment.salts_regenerated` with the experiment before and after, and `experiment.deleted` with the experiment before.

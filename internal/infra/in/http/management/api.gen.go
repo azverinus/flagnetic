@@ -1014,6 +1014,13 @@ type Experiment struct {
 	Version Version `json:"version"`
 }
 
+// ExperimentClone defines model for ExperimentClone.
+type ExperimentClone struct {
+	// Key The clone's key, unique, case sensitively, in the project (`already_exists`).
+	Key  string `json:"key"`
+	Name *Name  `json:"name,omitempty"`
+}
+
 // ExperimentCreate defines model for ExperimentCreate.
 type ExperimentCreate struct {
 	ExpectedEndAt *openapi_types.Date `json:"expected_end_at,omitempty"`
@@ -1044,6 +1051,28 @@ type ExperimentList struct {
 
 	// NextCursor Pass as `cursor` for the next page; null on the last.
 	NextCursor *string `json:"next_cursor"`
+}
+
+// ExperimentPatch defines model for ExperimentPatch.
+type ExperimentPatch struct {
+	ExpectedEndAt *openapi_types.Date `json:"expected_end_at,omitempty"`
+
+	// Flag The key of a flag of the project that is not archived; the variations are judged against it.
+	Flag       *string `json:"flag,omitempty"`
+	Hypothesis *string `json:"hypothesis,omitempty"`
+
+	// Key Refused with `immutable` whatever its value.
+	Key  *string `json:"key,omitempty"`
+	Name *Name   `json:"name,omitempty"`
+
+	// Owner A new owner must be an active member holding a grant in the project, or an instance admin.
+	Owner             *openapi_types.UUID `json:"owner,omitempty"`
+	Tags              *[]string           `json:"tags,omitempty"`
+	TrafficAllocation *int                `json:"traffic_allocation,omitempty"`
+
+	// UnitType The key of a unit type the project declares.
+	UnitType   *string             `json:"unit_type,omitempty"`
+	Variations *[]ExperimentWeight `json:"variations,omitempty"`
 }
 
 // ExperimentStatus defines model for ExperimentStatus.
@@ -2429,11 +2458,56 @@ type UpdateEnvironmentParams struct {
 
 // ListExperimentsParams defines parameters for ListExperiments.
 type ListExperimentsParams struct {
+	// Status Lists the experiments in this status.
+	Status *ExperimentStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Flag The key of the flag the experiments compare; a flag the project does not have lists nothing.
+	Flag *string `form:"flag,omitempty" json:"flag,omitempty"`
+
+	// Owner The member owning the experiment.
+	Owner *openapi_types.UUID `form:"owner,omitempty" json:"owner,omitempty"`
+
+	// Tag A tag the experiment carries, matched exactly.
+	Tag *string `form:"tag,omitempty" json:"tag,omitempty"`
+
+	// IncludeArchived Lists archived experiments too.
+	IncludeArchived *bool `form:"include_archived,omitempty" json:"include_archived,omitempty"`
+
 	// Cursor The `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
 	// Limit How many entries a page holds at most.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// DeleteExperimentParams defines parameters for DeleteExperiment.
+type DeleteExperimentParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// UpdateExperimentParams defines parameters for UpdateExperiment.
+type UpdateExperimentParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// RegenerateExperimentSaltsParams defines parameters for RegenerateExperimentSalts.
+type RegenerateExperimentSaltsParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // ListFlagsParams defines parameters for ListFlags.
@@ -2673,6 +2747,12 @@ type RotateSdkKeyJSONRequestBody = SdkKeyRotation
 
 // CreateExperimentJSONRequestBody defines body for CreateExperiment for application/json ContentType.
 type CreateExperimentJSONRequestBody = ExperimentCreate
+
+// UpdateExperimentJSONRequestBody defines body for UpdateExperiment for application/json ContentType.
+type UpdateExperimentJSONRequestBody = ExperimentPatch
+
+// CloneExperimentJSONRequestBody defines body for CloneExperiment for application/json ContentType.
+type CloneExperimentJSONRequestBody = ExperimentClone
 
 // CreateFlagJSONRequestBody defines body for CreateFlag for application/json ContentType.
 type CreateFlagJSONRequestBody = FlagCreate
@@ -3725,8 +3805,10 @@ type ClientInterface interface {
 	// ListExperiments The project's experiments
 	//
 	// The project's experiments by key in byte order (capitals before
-	// lower case). Page with `cursor` set to the `next_cursor` of the
-	// previous page.
+	// lower case). Every filter given applies. Archived experiments are
+	// left out unless `include_archived` is true or `status` is
+	// `archived`. Page with `cursor` set to the `next_cursor` of the
+	// previous page, under the same filters.
 	//
 	// Corresponds with GET /projects/{project}/experiments (the `ListExperiments` operationId).
 	ListExperiments(ctx context.Context, project ProjectKey, params *ListExperimentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3765,12 +3847,86 @@ type ClientInterface interface {
 	// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
 	CreateExperiment(ctx context.Context, project ProjectKey, body CreateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteExperiment Delete a draft experiment
+	//
+	// Deletes the experiment. Only a draft is deleted (`not_draft`): once
+	// started, an experiment keeps its history.
+	//
+	// Corresponds with DELETE /projects/{project}/experiments/{experiment} (the `DeleteExperiment` operationId).
+	DeleteExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *DeleteExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetExperiment An experiment
 	//
 	// The experiment with both its salts, so anyone can recompute a unit's buckets.
 	//
 	// Corresponds with GET /projects/{project}/experiments/{experiment} (the `GetExperiment` operationId).
 	GetExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateExperimentWithBody Change a draft experiment
+	//
+	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
+	// variations, traffic allocation or expected end date of a draft, as a
+	// create judges them; the key never changes (`immutable`). Only a draft
+	// is changed (`not_draft`). A change to the values the experiment
+	// already has changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
+	UpdateExperimentWithBody(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateExperiment Change a draft experiment
+	//
+	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
+	// variations, traffic allocation or expected end date of a draft, as a
+	// create judges them; the key never changes (`immutable`). Only a draft
+	// is changed (`not_draft`). A change to the values the experiment
+	// already has changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
+	UpdateExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CloneExperimentWithBody Clone an experiment into a new draft
+	//
+	// Copies an experiment of any status into a new draft under a new key,
+	// with new salts and no decision: the rerun of a stopped experiment
+	// never reuses its assignments. The name, hypothesis, tags, flag, unit
+	// type, weights, traffic allocation and expected end date are copied;
+	// the owner is the calling member (the source's, for a project token).
+	// The clone is judged as a create is. The source is not changed, so no
+	// `If-Match`.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
+	CloneExperimentWithBody(ctx context.Context, project ProjectKey, experiment ExperimentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CloneExperiment Clone an experiment into a new draft
+	//
+	// Copies an experiment of any status into a new draft under a new key,
+	// with new salts and no decision: the rerun of a stopped experiment
+	// never reuses its assignments. The name, hypothesis, tags, flag, unit
+	// type, weights, traffic allocation and expected end date are copied;
+	// the owner is the calling member (the source's, for a project token).
+	// The clone is judged as a create is. The source is not changed, so no
+	// `If-Match`.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
+	CloneExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, body CloneExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RegenerateExperimentSalts Regenerate a draft's salts
+	//
+	// Draws a new inclusion salt and a new variation salt, apart from every
+	// salt of the project's experiments and rollouts. Only a draft has its
+	// salts regenerated (`not_draft`): past the draft, units have been
+	// assigned from them.
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/salts (the `RegenerateExperimentSalts` operationId).
+	RegenerateExperimentSalts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListFlags The project's flags
 	//
@@ -6105,8 +6261,10 @@ func (c *Client) RotateSdkKey(ctx context.Context, project ProjectKey, environme
 // ListExperiments The project's experiments
 //
 // The project's experiments by key in byte order (capitals before
-// lower case). Page with `cursor` set to the `next_cursor` of the
-// previous page.
+// lower case). Every filter given applies. Archived experiments are
+// left out unless `include_archived` is true or `status` is
+// `archived`. Page with `cursor` set to the `next_cursor` of the
+// previous page, under the same filters.
 //
 // Corresponds with GET /projects/{project}/experiments (the `ListExperiments` operationId).
 func (c *Client) ListExperiments(ctx context.Context, project ProjectKey, params *ListExperimentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6175,6 +6333,24 @@ func (c *Client) CreateExperiment(ctx context.Context, project ProjectKey, body 
 	return c.Client.Do(req)
 }
 
+// DeleteExperiment Delete a draft experiment
+//
+// Deletes the experiment. Only a draft is deleted (`not_draft`): once
+// started, an experiment keeps its history.
+//
+// Corresponds with DELETE /projects/{project}/experiments/{experiment} (the `DeleteExperiment` operationId).
+func (c *Client) DeleteExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *DeleteExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteExperimentRequest(c.Server, project, experiment, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetExperiment An experiment
 //
 // The experiment with both its salts, so anyone can recompute a unit's buckets.
@@ -6182,6 +6358,122 @@ func (c *Client) CreateExperiment(ctx context.Context, project ProjectKey, body 
 // Corresponds with GET /projects/{project}/experiments/{experiment} (the `GetExperiment` operationId).
 func (c *Client) GetExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetExperimentRequest(c.Server, project, experiment)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateExperimentWithBody Change a draft experiment
+//
+// Changes any of the name, hypothesis, owner, tags, flag, unit type,
+// variations, traffic allocation or expected end date of a draft, as a
+// create judges them; the key never changes (`immutable`). Only a draft
+// is changed (`not_draft`). A change to the values the experiment
+// already has changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
+func (c *Client) UpdateExperimentWithBody(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateExperimentRequestWithBody(c.Server, project, experiment, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateExperiment Change a draft experiment
+//
+// Changes any of the name, hypothesis, owner, tags, flag, unit type,
+// variations, traffic allocation or expected end date of a draft, as a
+// create judges them; the key never changes (`immutable`). Only a draft
+// is changed (`not_draft`). A change to the values the experiment
+// already has changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
+func (c *Client) UpdateExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateExperimentRequest(c.Server, project, experiment, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CloneExperimentWithBody Clone an experiment into a new draft
+//
+// Copies an experiment of any status into a new draft under a new key,
+// with new salts and no decision: the rerun of a stopped experiment
+// never reuses its assignments. The name, hypothesis, tags, flag, unit
+// type, weights, traffic allocation and expected end date are copied;
+// the owner is the calling member (the source's, for a project token).
+// The clone is judged as a create is. The source is not changed, so no
+// `If-Match`.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
+func (c *Client) CloneExperimentWithBody(ctx context.Context, project ProjectKey, experiment ExperimentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCloneExperimentRequestWithBody(c.Server, project, experiment, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CloneExperiment Clone an experiment into a new draft
+//
+// Copies an experiment of any status into a new draft under a new key,
+// with new salts and no decision: the rerun of a stopped experiment
+// never reuses its assignments. The name, hypothesis, tags, flag, unit
+// type, weights, traffic allocation and expected end date are copied;
+// the owner is the calling member (the source's, for a project token).
+// The clone is judged as a create is. The source is not changed, so no
+// `If-Match`.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
+func (c *Client) CloneExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, body CloneExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCloneExperimentRequest(c.Server, project, experiment, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RegenerateExperimentSalts Regenerate a draft's salts
+//
+// Draws a new inclusion salt and a new variation salt, apart from every
+// salt of the project's experiments and rollouts. Only a draft has its
+// salts regenerated (`not_draft`): past the draft, units have been
+// assigned from them.
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/salts (the `RegenerateExperimentSalts` operationId).
+func (c *Client) RegenerateExperimentSalts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRegenerateExperimentSaltsRequest(c.Server, project, experiment, params)
 	if err != nil {
 		return nil, err
 	}
@@ -10376,6 +10668,66 @@ func NewListExperimentsRequest(server string, project ProjectKey, params *ListEx
 		// per the OpenAPI spec (e.g. "color=blue,black,brown").
 		var rawQueryFragments []string
 
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Flag != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "flag", *params.Flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Owner != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "owner", *params.Owner, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Tag != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "tag", *params.Tag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.IncludeArchived != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_archived", *params.IncludeArchived, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Cursor != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
@@ -10461,6 +10813,62 @@ func NewCreateExperimentRequestWithBody(server string, project ProjectKey, conte
 	return req, nil
 }
 
+// NewDeleteExperimentRequest constructs an http.Request for the DeleteExperiment method
+func NewDeleteExperimentRequest(server string, project ProjectKey, experiment ExperimentKey, params *DeleteExperimentParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewGetExperimentRequest constructs an http.Request for the GetExperiment method
 func NewGetExperimentRequest(server string, project ProjectKey, experiment ExperimentKey) (*http.Request, error) {
 	var err error
@@ -10497,6 +10905,185 @@ func NewGetExperimentRequest(server string, project ProjectKey, experiment Exper
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateExperimentRequest calls the generic UpdateExperiment builder with application/json body
+func NewUpdateExperimentRequest(server string, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateExperimentRequestWithBody(server, project, experiment, params, "application/json", bodyReader)
+}
+
+// NewUpdateExperimentRequestWithBody constructs an http.Request for the UpdateExperiment method, with any body, and a specified content type
+func NewUpdateExperimentRequestWithBody(server string, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewCloneExperimentRequest calls the generic CloneExperiment builder with application/json body
+func NewCloneExperimentRequest(server string, project ProjectKey, experiment ExperimentKey, body CloneExperimentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCloneExperimentRequestWithBody(server, project, experiment, "application/json", bodyReader)
+}
+
+// NewCloneExperimentRequestWithBody constructs an http.Request for the CloneExperiment method, with any body, and a specified content type
+func NewCloneExperimentRequestWithBody(server string, project ProjectKey, experiment ExperimentKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/clone", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRegenerateExperimentSaltsRequest constructs an http.Request for the RegenerateExperimentSalts method
+func NewRegenerateExperimentSaltsRequest(server string, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/salts", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -13496,8 +14083,10 @@ type ClientWithResponsesInterface interface {
 	// ListExperimentsWithResponse The project's experiments
 	//
 	// The project's experiments by key in byte order (capitals before
-	// lower case). Page with `cursor` set to the `next_cursor` of the
-	// previous page.
+	// lower case). Every filter given applies. Archived experiments are
+	// left out unless `include_archived` is true or `status` is
+	// `archived`. Page with `cursor` set to the `next_cursor` of the
+	// previous page, under the same filters.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -13538,6 +14127,16 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /projects/{project}/experiments (the `CreateExperiment` operationId).
 	CreateExperimentWithResponse(ctx context.Context, project ProjectKey, body CreateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateExperimentResponse, error)
 
+	// DeleteExperimentWithResponse Delete a draft experiment
+	//
+	// Deletes the experiment. Only a draft is deleted (`not_draft`): once
+	// started, an experiment keeps its history.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /projects/{project}/experiments/{experiment} (the `DeleteExperiment` operationId).
+	DeleteExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *DeleteExperimentParams, reqEditors ...RequestEditorFn) (*DeleteExperimentResponse, error)
+
 	// GetExperimentWithResponse An experiment
 	//
 	// The experiment with both its salts, so anyone can recompute a unit's buckets.
@@ -13546,6 +14145,74 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/experiments/{experiment} (the `GetExperiment` operationId).
 	GetExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, reqEditors ...RequestEditorFn) (*GetExperimentResponse, error)
+
+	// UpdateExperimentWithBodyWithResponse Change a draft experiment
+	//
+	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
+	// variations, traffic allocation or expected end date of a draft, as a
+	// create judges them; the key never changes (`immutable`). Only a draft
+	// is changed (`not_draft`). A change to the values the experiment
+	// already has changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
+	UpdateExperimentWithBodyWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateExperimentResponse, error)
+
+	// UpdateExperimentWithResponse Change a draft experiment
+	//
+	// Changes any of the name, hypothesis, owner, tags, flag, unit type,
+	// variations, traffic allocation or expected end date of a draft, as a
+	// create judges them; the key never changes (`immutable`). Only a draft
+	// is changed (`not_draft`). A change to the values the experiment
+	// already has changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
+	UpdateExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateExperimentResponse, error)
+
+	// CloneExperimentWithBodyWithResponse Clone an experiment into a new draft
+	//
+	// Copies an experiment of any status into a new draft under a new key,
+	// with new salts and no decision: the rerun of a stopped experiment
+	// never reuses its assignments. The name, hypothesis, tags, flag, unit
+	// type, weights, traffic allocation and expected end date are copied;
+	// the owner is the calling member (the source's, for a project token).
+	// The clone is judged as a create is. The source is not changed, so no
+	// `If-Match`.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
+	CloneExperimentWithBodyWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CloneExperimentResponse, error)
+
+	// CloneExperimentWithResponse Clone an experiment into a new draft
+	//
+	// Copies an experiment of any status into a new draft under a new key,
+	// with new salts and no decision: the rerun of a stopped experiment
+	// never reuses its assignments. The name, hypothesis, tags, flag, unit
+	// type, weights, traffic allocation and expected end date are copied;
+	// the owner is the calling member (the source's, for a project token).
+	// The clone is judged as a create is. The source is not changed, so no
+	// `If-Match`.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
+	CloneExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, body CloneExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*CloneExperimentResponse, error)
+
+	// RegenerateExperimentSaltsWithResponse Regenerate a draft's salts
+	//
+	// Draws a new inclusion salt and a new variation salt, apart from every
+	// salt of the project's experiments and rollouts. Only a draft has its
+	// salts regenerated (`not_draft`): past the draft, units have been
+	// assigned from them.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/salts (the `RegenerateExperimentSalts` operationId).
+	RegenerateExperimentSaltsWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams, reqEditors ...RequestEditorFn) (*RegenerateExperimentSaltsResponse, error)
 
 	// ListFlagsWithResponse The project's flags
 	//
@@ -19305,6 +19972,96 @@ func (r CreateExperimentResponse) ContentType() string {
 	return ""
 }
 
+// DeleteExperimentResponse401Headers the declared response headers of an HTTP 401 response for DeleteExperiment
+type DeleteExperimentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteExperimentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteExperimentResponse401Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r DeleteExperimentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteExperimentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteExperimentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteExperimentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteExperimentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r DeleteExperimentResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r DeleteExperimentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteExperimentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteExperimentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteExperimentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteExperimentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetExperimentResponse200Headers the declared response headers of an HTTP 200 response for GetExperiment
 type GetExperimentResponse200Headers struct {
 	ETag *string
@@ -19375,6 +20132,318 @@ func (r GetExperimentResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetExperimentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateExperimentResponse200Headers the declared response headers of an HTTP 200 response for UpdateExperiment
+type UpdateExperimentResponse200Headers struct {
+	ETag *string
+}
+
+// UpdateExperimentResponse401Headers the declared response headers of an HTTP 401 response for UpdateExperiment
+type UpdateExperimentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateExperimentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Experiment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateExperimentResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateExperimentResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateExperimentResponse) GetJSON200() *Experiment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateExperimentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateExperimentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateExperimentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateExperimentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateExperimentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateExperimentResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateExperimentResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateExperimentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateExperimentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateExperimentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateExperimentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateExperimentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CloneExperimentResponse201Headers the declared response headers of an HTTP 201 response for CloneExperiment
+type CloneExperimentResponse201Headers struct {
+	ETag *string
+}
+
+// CloneExperimentResponse401Headers the declared response headers of an HTTP 401 response for CloneExperiment
+type CloneExperimentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CloneExperimentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Experiment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CloneExperimentResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CloneExperimentResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CloneExperimentResponse) GetJSON201() *Experiment {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CloneExperimentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CloneExperimentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CloneExperimentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CloneExperimentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CloneExperimentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CloneExperimentResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CloneExperimentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CloneExperimentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CloneExperimentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CloneExperimentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RegenerateExperimentSaltsResponse200Headers the declared response headers of an HTTP 200 response for RegenerateExperimentSalts
+type RegenerateExperimentSaltsResponse200Headers struct {
+	ETag *string
+}
+
+// RegenerateExperimentSaltsResponse401Headers the declared response headers of an HTTP 401 response for RegenerateExperimentSalts
+type RegenerateExperimentSaltsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RegenerateExperimentSaltsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Experiment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RegenerateExperimentSaltsResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RegenerateExperimentSaltsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RegenerateExperimentSaltsResponse) GetJSON200() *Experiment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r RegenerateExperimentSaltsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RegenerateExperimentSaltsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RegenerateExperimentSaltsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RegenerateExperimentSaltsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RegenerateExperimentSaltsResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r RegenerateExperimentSaltsResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r RegenerateExperimentSaltsResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r RegenerateExperimentSaltsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RegenerateExperimentSaltsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RegenerateExperimentSaltsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RegenerateExperimentSaltsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -23879,8 +24948,10 @@ func (c *ClientWithResponses) RotateSdkKeyWithResponse(ctx context.Context, proj
 // ListExperimentsWithResponse The project's experiments
 //
 // The project's experiments by key in byte order (capitals before
-// lower case). Page with `cursor` set to the `next_cursor` of the
-// previous page.
+// lower case). Every filter given applies. Archived experiments are
+// left out unless `include_archived` is true or `status` is
+// `archived`. Page with `cursor` set to the `next_cursor` of the
+// previous page, under the same filters.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -23939,6 +25010,22 @@ func (c *ClientWithResponses) CreateExperimentWithResponse(ctx context.Context, 
 	return ParseCreateExperimentResponse(rsp)
 }
 
+// DeleteExperimentWithResponse Delete a draft experiment
+//
+// Deletes the experiment. Only a draft is deleted (`not_draft`): once
+// started, an experiment keeps its history.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /projects/{project}/experiments/{experiment} (the `DeleteExperiment` operationId).
+func (c *ClientWithResponses) DeleteExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *DeleteExperimentParams, reqEditors ...RequestEditorFn) (*DeleteExperimentResponse, error) {
+	rsp, err := c.DeleteExperiment(ctx, project, experiment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteExperimentResponse(rsp)
+}
+
 // GetExperimentWithResponse An experiment
 //
 // The experiment with both its salts, so anyone can recompute a unit's buckets.
@@ -23952,6 +25039,104 @@ func (c *ClientWithResponses) GetExperimentWithResponse(ctx context.Context, pro
 		return nil, err
 	}
 	return ParseGetExperimentResponse(rsp)
+}
+
+// UpdateExperimentWithBodyWithResponse Change a draft experiment
+//
+// Changes any of the name, hypothesis, owner, tags, flag, unit type,
+// variations, traffic allocation or expected end date of a draft, as a
+// create judges them; the key never changes (`immutable`). Only a draft
+// is changed (`not_draft`). A change to the values the experiment
+// already has changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
+func (c *ClientWithResponses) UpdateExperimentWithBodyWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateExperimentResponse, error) {
+	rsp, err := c.UpdateExperimentWithBody(ctx, project, experiment, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateExperimentResponse(rsp)
+}
+
+// UpdateExperimentWithResponse Change a draft experiment
+//
+// Changes any of the name, hypothesis, owner, tags, flag, unit type,
+// variations, traffic allocation or expected end date of a draft, as a
+// create judges them; the key never changes (`immutable`). Only a draft
+// is changed (`not_draft`). A change to the values the experiment
+// already has changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
+func (c *ClientWithResponses) UpdateExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateExperimentResponse, error) {
+	rsp, err := c.UpdateExperiment(ctx, project, experiment, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateExperimentResponse(rsp)
+}
+
+// CloneExperimentWithBodyWithResponse Clone an experiment into a new draft
+//
+// Copies an experiment of any status into a new draft under a new key,
+// with new salts and no decision: the rerun of a stopped experiment
+// never reuses its assignments. The name, hypothesis, tags, flag, unit
+// type, weights, traffic allocation and expected end date are copied;
+// the owner is the calling member (the source's, for a project token).
+// The clone is judged as a create is. The source is not changed, so no
+// `If-Match`.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
+func (c *ClientWithResponses) CloneExperimentWithBodyWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CloneExperimentResponse, error) {
+	rsp, err := c.CloneExperimentWithBody(ctx, project, experiment, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCloneExperimentResponse(rsp)
+}
+
+// CloneExperimentWithResponse Clone an experiment into a new draft
+//
+// Copies an experiment of any status into a new draft under a new key,
+// with new salts and no decision: the rerun of a stopped experiment
+// never reuses its assignments. The name, hypothesis, tags, flag, unit
+// type, weights, traffic allocation and expected end date are copied;
+// the owner is the calling member (the source's, for a project token).
+// The clone is judged as a create is. The source is not changed, so no
+// `If-Match`.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
+func (c *ClientWithResponses) CloneExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, body CloneExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*CloneExperimentResponse, error) {
+	rsp, err := c.CloneExperiment(ctx, project, experiment, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCloneExperimentResponse(rsp)
+}
+
+// RegenerateExperimentSaltsWithResponse Regenerate a draft's salts
+//
+// Draws a new inclusion salt and a new variation salt, apart from every
+// salt of the project's experiments and rollouts. Only a draft has its
+// salts regenerated (`not_draft`): past the draft, units have been
+// assigned from them.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/salts (the `RegenerateExperimentSalts` operationId).
+func (c *ClientWithResponses) RegenerateExperimentSaltsWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams, reqEditors ...RequestEditorFn) (*RegenerateExperimentSaltsResponse, error) {
+	rsp, err := c.RegenerateExperimentSalts(ctx, project, experiment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRegenerateExperimentSaltsResponse(rsp)
 }
 
 // ListFlagsWithResponse The project's flags
@@ -29534,6 +30719,90 @@ func ParseCreateExperimentResponse(rsp *http.Response) (*CreateExperimentRespons
 	return response, nil
 }
 
+// ParseDeleteExperimentResponse parses an HTTP response from a DeleteExperimentWithResponse call
+func ParseDeleteExperimentResponse(rsp *http.Response) (*DeleteExperimentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteExperimentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteExperimentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetExperimentResponse parses an HTTP response from a GetExperimentWithResponse call
 func ParseGetExperimentResponse(rsp *http.Response) (*GetExperimentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -29591,6 +30860,300 @@ func ParseGetExperimentResponse(rsp *http.Response) (*GetExperimentResponse, err
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetExperimentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateExperimentResponse parses an HTTP response from a UpdateExperimentWithResponse call
+func ParseUpdateExperimentResponse(rsp *http.Response) (*UpdateExperimentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateExperimentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Experiment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateExperimentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers UpdateExperimentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCloneExperimentResponse parses an HTTP response from a CloneExperimentWithResponse call
+func ParseCloneExperimentResponse(rsp *http.Response) (*CloneExperimentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CloneExperimentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Experiment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CloneExperimentResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CloneExperimentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRegenerateExperimentSaltsResponse parses an HTTP response from a RegenerateExperimentSaltsWithResponse call
+func ParseRegenerateExperimentSaltsResponse(rsp *http.Response) (*RegenerateExperimentSaltsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RegenerateExperimentSaltsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Experiment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RegenerateExperimentSaltsResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RegenerateExperimentSaltsResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -32526,9 +34089,21 @@ type ServerInterface interface {
 	// CreateExperiment Create an experiment
 	// (POST /projects/{project}/experiments)
 	CreateExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// DeleteExperiment Delete a draft experiment
+	// (DELETE /projects/{project}/experiments/{experiment})
+	DeleteExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params DeleteExperimentParams)
 	// GetExperiment An experiment
 	// (GET /projects/{project}/experiments/{experiment})
 	GetExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey)
+	// UpdateExperiment Change a draft experiment
+	// (PATCH /projects/{project}/experiments/{experiment})
+	UpdateExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params UpdateExperimentParams)
+	// CloneExperiment Clone an experiment into a new draft
+	// (POST /projects/{project}/experiments/{experiment}/clone)
+	CloneExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey)
+	// RegenerateExperimentSalts Regenerate a draft's salts
+	// (POST /projects/{project}/experiments/{experiment}/salts)
+	RegenerateExperimentSalts(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params RegenerateExperimentSaltsParams)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListFlagsParams)
@@ -35035,6 +36610,71 @@ func (siw *ServerInterfaceWrapper) ListExperiments(w http.ResponseWriter, r *htt
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListExperimentsParams
 
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "flag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "flag", r.URL.Query(), &params.Flag, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "flag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "owner" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "owner", r.URL.Query(), &params.Owner, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "owner"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "owner", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "tag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tag", r.URL.Query(), &params.Tag, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tag", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "include_archived" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "include_archived", r.URL.Query(), &params.IncludeArchived, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "include_archived"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_archived", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "cursor" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -35098,6 +36738,65 @@ func (siw *ServerInterfaceWrapper) CreateExperiment(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteExperiment operation middleware
+func (siw *ServerInterfaceWrapper) DeleteExperiment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteExperimentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteExperiment(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetExperiment operation middleware
 func (siw *ServerInterfaceWrapper) GetExperiment(w http.ResponseWriter, r *http.Request) {
 
@@ -35124,6 +36823,159 @@ func (siw *ServerInterfaceWrapper) GetExperiment(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetExperiment(w, r, project, experiment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateExperiment operation middleware
+func (siw *ServerInterfaceWrapper) UpdateExperiment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateExperimentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateExperiment(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CloneExperiment operation middleware
+func (siw *ServerInterfaceWrapper) CloneExperiment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CloneExperiment(w, r, project, experiment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RegenerateExperimentSalts operation middleware
+func (siw *ServerInterfaceWrapper) RegenerateExperimentSalts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RegenerateExperimentSaltsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RegenerateExperimentSalts(w, r, project, experiment, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -36963,7 +38815,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt", wrapper.RegenerateRolloutSalt)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.ListExperiments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.CreateExperiment)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.DeleteExperiment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.GetExperiment)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.UpdateExperiment)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/salts", wrapper.RegenerateExperimentSalts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/clone", wrapper.CloneExperiment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.ListChangeRequests)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.CreateChangeRequest)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}", wrapper.GetChangeRequest)
@@ -43220,6 +45076,139 @@ func (response CreateExperiment422ApplicationProblemPlusJSONResponse) VisitCreat
 	return err
 }
 
+type DeleteExperimentRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     DeleteExperimentParams
+}
+
+type DeleteExperimentResponseObject interface {
+	VisitDeleteExperimentResponse(w http.ResponseWriter) error
+}
+
+type DeleteExperiment204Response struct {
+}
+
+func (response DeleteExperiment204Response) VisitDeleteExperimentResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteExperiment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteExperiment400ApplicationProblemPlusJSONResponse) VisitDeleteExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteExperiment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteExperiment401ApplicationProblemPlusJSONResponse) VisitDeleteExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteExperiment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteExperiment403ApplicationProblemPlusJSONResponse) VisitDeleteExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteExperiment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteExperiment404ApplicationProblemPlusJSONResponse) VisitDeleteExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteExperiment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteExperiment409ApplicationProblemPlusJSONResponse) VisitDeleteExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteExperiment412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteExperiment412ApplicationProblemPlusJSONResponse) VisitDeleteExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteExperiment428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteExperiment428ApplicationProblemPlusJSONResponse) VisitDeleteExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetExperimentRequestObject struct {
 	Project    ProjectKey    `json:"project"`
 	Experiment ExperimentKey `json:"experiment"`
@@ -43300,6 +45289,454 @@ func (response GetExperiment404ApplicationProblemPlusJSONResponse) VisitGetExper
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExperimentRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     UpdateExperimentParams
+	Body       *UpdateExperimentJSONRequestBody
+}
+
+type UpdateExperimentResponseObject interface {
+	VisitUpdateExperimentResponse(w http.ResponseWriter) error
+}
+
+type UpdateExperiment200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateExperiment200JSONResponse struct {
+	Body    Experiment
+	Headers UpdateExperiment200ResponseHeaders
+}
+
+func (response UpdateExperiment200JSONResponse) VisitUpdateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExperiment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateExperiment400ApplicationProblemPlusJSONResponse) VisitUpdateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExperiment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateExperiment401ApplicationProblemPlusJSONResponse) VisitUpdateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExperiment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateExperiment403ApplicationProblemPlusJSONResponse) VisitUpdateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExperiment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateExperiment404ApplicationProblemPlusJSONResponse) VisitUpdateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExperiment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateExperiment409ApplicationProblemPlusJSONResponse) VisitUpdateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExperiment412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateExperiment412ApplicationProblemPlusJSONResponse) VisitUpdateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExperiment422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateExperiment422ApplicationProblemPlusJSONResponse) VisitUpdateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateExperiment428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateExperiment428ApplicationProblemPlusJSONResponse) VisitUpdateExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloneExperimentRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Body       *CloneExperimentJSONRequestBody
+}
+
+type CloneExperimentResponseObject interface {
+	VisitCloneExperimentResponse(w http.ResponseWriter) error
+}
+
+type CloneExperiment201ResponseHeaders struct {
+	ETag *string
+}
+
+type CloneExperiment201JSONResponse struct {
+	Body    Experiment
+	Headers CloneExperiment201ResponseHeaders
+}
+
+func (response CloneExperiment201JSONResponse) VisitCloneExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloneExperiment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CloneExperiment400ApplicationProblemPlusJSONResponse) VisitCloneExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloneExperiment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CloneExperiment401ApplicationProblemPlusJSONResponse) VisitCloneExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloneExperiment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CloneExperiment403ApplicationProblemPlusJSONResponse) VisitCloneExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloneExperiment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CloneExperiment404ApplicationProblemPlusJSONResponse) VisitCloneExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloneExperiment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CloneExperiment409ApplicationProblemPlusJSONResponse) VisitCloneExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CloneExperiment422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CloneExperiment422ApplicationProblemPlusJSONResponse) VisitCloneExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateExperimentSaltsRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     RegenerateExperimentSaltsParams
+}
+
+type RegenerateExperimentSaltsResponseObject interface {
+	VisitRegenerateExperimentSaltsResponse(w http.ResponseWriter) error
+}
+
+type RegenerateExperimentSalts200ResponseHeaders struct {
+	ETag *string
+}
+
+type RegenerateExperimentSalts200JSONResponse struct {
+	Body    Experiment
+	Headers RegenerateExperimentSalts200ResponseHeaders
+}
+
+func (response RegenerateExperimentSalts200JSONResponse) VisitRegenerateExperimentSaltsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateExperimentSalts400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateExperimentSalts400ApplicationProblemPlusJSONResponse) VisitRegenerateExperimentSaltsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateExperimentSalts401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateExperimentSalts401ApplicationProblemPlusJSONResponse) VisitRegenerateExperimentSaltsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateExperimentSalts403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateExperimentSalts403ApplicationProblemPlusJSONResponse) VisitRegenerateExperimentSaltsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateExperimentSalts404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateExperimentSalts404ApplicationProblemPlusJSONResponse) VisitRegenerateExperimentSaltsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateExperimentSalts409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateExperimentSalts409ApplicationProblemPlusJSONResponse) VisitRegenerateExperimentSaltsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateExperimentSalts412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateExperimentSalts412ApplicationProblemPlusJSONResponse) VisitRegenerateExperimentSaltsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RegenerateExperimentSalts428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response RegenerateExperimentSalts428ApplicationProblemPlusJSONResponse) VisitRegenerateExperimentSaltsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -47316,9 +49753,21 @@ type StrictServerInterface interface {
 	// CreateExperiment Create an experiment
 	// (POST /projects/{project}/experiments)
 	CreateExperiment(ctx context.Context, request CreateExperimentRequestObject) (CreateExperimentResponseObject, error)
+	// DeleteExperiment Delete a draft experiment
+	// (DELETE /projects/{project}/experiments/{experiment})
+	DeleteExperiment(ctx context.Context, request DeleteExperimentRequestObject) (DeleteExperimentResponseObject, error)
 	// GetExperiment An experiment
 	// (GET /projects/{project}/experiments/{experiment})
 	GetExperiment(ctx context.Context, request GetExperimentRequestObject) (GetExperimentResponseObject, error)
+	// UpdateExperiment Change a draft experiment
+	// (PATCH /projects/{project}/experiments/{experiment})
+	UpdateExperiment(ctx context.Context, request UpdateExperimentRequestObject) (UpdateExperimentResponseObject, error)
+	// CloneExperiment Clone an experiment into a new draft
+	// (POST /projects/{project}/experiments/{experiment}/clone)
+	CloneExperiment(ctx context.Context, request CloneExperimentRequestObject) (CloneExperimentResponseObject, error)
+	// RegenerateExperimentSalts Regenerate a draft's salts
+	// (POST /projects/{project}/experiments/{experiment}/salts)
+	RegenerateExperimentSalts(ctx context.Context, request RegenerateExperimentSaltsRequestObject) (RegenerateExperimentSaltsResponseObject, error)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(ctx context.Context, request ListFlagsRequestObject) (ListFlagsResponseObject, error)
@@ -49323,6 +51772,34 @@ func (sh *strictHandler) CreateExperiment(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// DeleteExperiment operation middleware
+func (sh *strictHandler) DeleteExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params DeleteExperimentParams) {
+	var request DeleteExperimentRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteExperiment(ctx, request.(DeleteExperimentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteExperiment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteExperimentResponseObject); ok {
+		if err := validResponse.VisitDeleteExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetExperiment operation middleware
 func (sh *strictHandler) GetExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey) {
 	var request GetExperimentRequestObject
@@ -49343,6 +51820,103 @@ func (sh *strictHandler) GetExperiment(w http.ResponseWriter, r *http.Request, p
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetExperimentResponseObject); ok {
 		if err := validResponse.VisitGetExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateExperiment operation middleware
+func (sh *strictHandler) UpdateExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params UpdateExperimentParams) {
+	var request UpdateExperimentRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	var body UpdateExperimentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateExperiment(ctx, request.(UpdateExperimentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateExperiment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateExperimentResponseObject); ok {
+		if err := validResponse.VisitUpdateExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CloneExperiment operation middleware
+func (sh *strictHandler) CloneExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey) {
+	var request CloneExperimentRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+
+	var body CloneExperimentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CloneExperiment(ctx, request.(CloneExperimentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CloneExperiment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CloneExperimentResponseObject); ok {
+		if err := validResponse.VisitCloneExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RegenerateExperimentSalts operation middleware
+func (sh *strictHandler) RegenerateExperimentSalts(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params RegenerateExperimentSaltsParams) {
+	var request RegenerateExperimentSaltsRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RegenerateExperimentSalts(ctx, request.(RegenerateExperimentSaltsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RegenerateExperimentSalts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RegenerateExperimentSaltsResponseObject); ok {
+		if err := validResponse.VisitRegenerateExperimentSaltsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

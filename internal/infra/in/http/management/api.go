@@ -119,9 +119,13 @@ type Handlers struct {
 	RotateSDKKey *appdelivery.RotateSDKKey
 	RevokeSDKKey *appdelivery.RevokeSDKKey
 
-	ListExperiments  *appexperiments.ListExperiments
-	CreateExperiment *appexperiments.CreateExperiment
-	GetExperiment    *appexperiments.GetExperiment
+	ListExperiments           *appexperiments.ListExperiments
+	CreateExperiment          *appexperiments.CreateExperiment
+	GetExperiment             *appexperiments.GetExperiment
+	UpdateExperiment          *appexperiments.UpdateExperiment
+	DeleteExperiment          *appexperiments.DeleteExperiment
+	RegenerateExperimentSalts *appexperiments.RegenerateSalts
+	CloneExperiment           *appexperiments.CloneExperiment
 
 	ListChangeRequests  *appgovernance.ListChangeRequests
 	CreateChangeRequest *appgovernance.CreateChangeRequest

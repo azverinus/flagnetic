@@ -112,6 +112,12 @@ func matrix(t *testing.T) []matrixRow {
 			}))
 			return res.StatusCode(), res.Body
 		}},
+		{"experiment.delete", "deleteExperiment", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
+			// No experiment has the key, so a caller holding the permission
+			// is answered not_found, and one lacking it forbidden first.
+			res := do(c.DeleteExperimentWithResponse(t.Context(), p.Key, "absent", &management.DeleteExperimentParams{IfMatch: ptr("1")}))
+			return res.StatusCode(), res.Body
+		}},
 		{"change_request.propose", "createChangeRequest", func(t *testing.T, c *management.ClientWithResponses, p management.Project) (int, []byte) {
 			// No flag has the key, so a caller holding the permission is
 			// answered not_found, and one lacking it forbidden first.

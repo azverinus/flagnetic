@@ -296,6 +296,20 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Owners: owners, Recorder: experimentRec,
 		}),
 		GetExperiment: appexperiments.NewGetExperiment(experimentStore),
+		UpdateExperiment: appexperiments.NewUpdateExperiment(appexperiments.UpdateExperimentDeps{
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Owners: owners,
+			Recorder: experimentRec,
+		}),
+		DeleteExperiment: appexperiments.NewDeleteExperiment(appexperiments.DeleteExperimentDeps{
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
+		}),
+		RegenerateExperimentSalts: appexperiments.NewRegenerateSalts(appexperiments.RegenerateSaltsDeps{
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Rollouts: flagStore, Recorder: experimentRec,
+		}),
+		CloneExperiment: appexperiments.NewCloneExperiment(appexperiments.CloneExperimentDeps{
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Rollouts: flagStore,
+			Owners: owners, Recorder: experimentRec,
+		}),
 
 		ListChangeRequests:  appgovernance.NewListChangeRequests(changeRequestStore),
 		CreateChangeRequest: appgovernance.NewCreateChangeRequest(changeRequests),
