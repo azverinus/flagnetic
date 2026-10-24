@@ -1180,6 +1180,95 @@ export type HashCheckIndependence = {
   verdict: "independent" | "dependent" | "untestable";
 };
 
+export type ExperimentExposures = {
+  variations: Array<VariationExposures>;
+  conflicts: ConflictTotals;
+  /**
+   * The exposures refused, by reason, those with a count only.
+   */
+  rejections: Array<ExposureRejections>;
+  /**
+   * When the exposure rollup last moved; null before it first did.
+   */
+  as_of: string | null;
+};
+
+export type ConflictTotals = {
+  /**
+   * The exposures naming another variation than their unit's first exposure.
+   */
+  total: number;
+  /**
+   * The units with at least one conflict.
+   */
+  units: number;
+};
+
+export type ExposureRejections = {
+  /**
+   * The rejection code, such as `unknown_variation`.
+   */
+  reason: string;
+  count: number;
+};
+
+export type VariationExposures = {
+  variation: string;
+  /**
+   * The non-override exposures naming the variation.
+   */
+  exposures: number;
+  /**
+   * The override exposures naming the variation.
+   */
+  overridden: number;
+  /**
+   * The units whose first exposure names the variation.
+   */
+  first_exposures: number;
+  /**
+   * The variation's share of first exposures, 0 without any.
+   */
+  observed_share: number;
+  /**
+   * The share the variation's weight asks for, 0 for a variation the experiment does not weigh.
+   */
+  expected_share: number;
+};
+
+export type ExposureTimeline = {
+  items: Array<ExposureDay>;
+};
+
+export type ExposureDay = {
+  day: string;
+  variation: string;
+  exposures: number;
+  overridden: number;
+  first_exposures: number;
+};
+
+export type ExposureConflicts = {
+  items: Array<ExposureConflict>;
+};
+
+export type ExposureConflict = {
+  unit_type: string;
+  unit_id: string;
+  /**
+   * The variation of the unit's first exposure.
+   */
+  first_variation: string;
+  /**
+   * The other variation the unit was last exposed to.
+   */
+  conflicting_variation: string;
+  /**
+   * When that exposure occurred.
+   */
+  conflicting_at: string;
+};
+
 export type FlagDefinition = {
   id: string;
   /**
@@ -1910,6 +1999,11 @@ export type SegmentKey = string;
  *
  */
 export type IfMatch = string;
+
+/**
+ * The key of the environment whose exposures to read.
+ */
+export type ExposureEnvironment = string;
 
 /**
  * The environment's key.
@@ -6418,6 +6512,203 @@ export type CheckHashUniformityResponses = {
 
 export type CheckHashUniformityResponse =
   CheckHashUniformityResponses[keyof CheckHashUniformityResponses];
+
+export type GetExperimentExposuresData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query: {
+    /**
+     * The key of the environment whose exposures to read.
+     */
+    environment: string;
+  };
+  url: "/projects/{project}/experiments/{experiment}/exposures";
+};
+
+export type GetExperimentExposuresErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetExperimentExposuresError =
+  GetExperimentExposuresErrors[keyof GetExperimentExposuresErrors];
+
+export type GetExperimentExposuresResponses = {
+  /**
+   * The experiment's exposures in the environment.
+   */
+  200: ExperimentExposures;
+};
+
+export type GetExperimentExposuresResponse =
+  GetExperimentExposuresResponses[keyof GetExperimentExposuresResponses];
+
+export type GetExperimentExposureTimelineData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query: {
+    /**
+     * The key of the environment whose exposures to read.
+     */
+    environment: string;
+    /**
+     * The first UTC day, included; the first day with an exposure when absent.
+     */
+    from?: string;
+    /**
+     * The last UTC day, included; the last day with an exposure when absent.
+     */
+    to?: string;
+  };
+  url: "/projects/{project}/experiments/{experiment}/exposures/timeline";
+};
+
+export type GetExperimentExposureTimelineErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetExperimentExposureTimelineError =
+  GetExperimentExposureTimelineErrors[keyof GetExperimentExposureTimelineErrors];
+
+export type GetExperimentExposureTimelineResponses = {
+  /**
+   * The counts per day.
+   */
+  200: ExposureTimeline;
+};
+
+export type GetExperimentExposureTimelineResponse =
+  GetExperimentExposureTimelineResponses[keyof GetExperimentExposureTimelineResponses];
+
+export type GetExperimentConflictsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query: {
+    /**
+     * The key of the environment whose exposures to read.
+     */
+    environment: string;
+  };
+  url: "/projects/{project}/experiments/{experiment}/conflicts";
+};
+
+export type GetExperimentConflictsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetExperimentConflictsError =
+  GetExperimentConflictsErrors[keyof GetExperimentConflictsErrors];
+
+export type GetExperimentConflictsResponses = {
+  /**
+   * The conflicting units.
+   */
+  200: ExposureConflicts;
+};
+
+export type GetExperimentConflictsResponse =
+  GetExperimentConflictsResponses[keyof GetExperimentConflictsResponses];
 
 export type ListChangeRequestsData = {
   body?: never;

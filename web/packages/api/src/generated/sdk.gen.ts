@@ -120,8 +120,17 @@ import type {
   GetExperimentAssignmentData,
   GetExperimentAssignmentErrors,
   GetExperimentAssignmentResponses,
+  GetExperimentConflictsData,
+  GetExperimentConflictsErrors,
+  GetExperimentConflictsResponses,
   GetExperimentData,
   GetExperimentErrors,
+  GetExperimentExposuresData,
+  GetExperimentExposuresErrors,
+  GetExperimentExposuresResponses,
+  GetExperimentExposureTimelineData,
+  GetExperimentExposureTimelineErrors,
+  GetExperimentExposureTimelineResponses,
   GetExperimentResponses,
   GetFlagConfigurationData,
   GetFlagConfigurationErrors,
@@ -2321,6 +2330,116 @@ export const checkHashUniformity = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * An experiment's exposures in one environment
+ *
+ * What the exposures of an experiment of any status came to in one
+ * environment, from the exposure rollup, which reads the exposures
+ * committed every 10 seconds; `as_of` is when it last moved, null
+ * before it first did.
+ *
+ * A unit's first exposure is its non-override exposure with the
+ * earliest `occurred_at`, ties broken by the smaller `event_id`; an
+ * earlier exposure arriving late replaces it. Every other
+ * non-override exposure of the unit naming another variation is a
+ * conflict. Override exposures are counted as `overridden` and never
+ * make, replace or conflict with a first exposure. However exposures
+ * arrive, in whatever order and batches, the counts come out the
+ * same.
+ *
+ * `variations` lists the experiment's variations in its order, each
+ * even without an exposure, then any other variation an override
+ * exposure named, by key, which expects no share. `rejections`
+ * counts the exposures of the experiment refused in the environment,
+ * by reason.
+ *
+ */
+export const getExperimentExposures = <ThrowOnError extends boolean = false>(
+  options: Options<GetExperimentExposuresData, ThrowOnError>,
+): RequestResult<GetExperimentExposuresResponses, GetExperimentExposuresErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetExperimentExposuresResponses,
+    GetExperimentExposuresErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/exposures",
+    ...options,
+  });
+
+/**
+ * An experiment's exposures per day in one environment
+ *
+ * The experiment's exposure counts per UTC day and variation, by day
+ * then variation key; a day and variation without an exposure is left
+ * out. `exposures` and `overridden` count by the day an exposure was
+ * received, `first_exposures` by the day the first exposure occurred,
+ * so an earlier exposure arriving late moves a first exposure to its
+ * own day.
+ *
+ */
+export const getExperimentExposureTimeline = <ThrowOnError extends boolean = false>(
+  options: Options<GetExperimentExposureTimelineData, ThrowOnError>,
+): RequestResult<
+  GetExperimentExposureTimelineResponses,
+  GetExperimentExposureTimelineErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetExperimentExposureTimelineResponses,
+    GetExperimentExposureTimelineErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/exposures/timeline",
+    ...options,
+  });
+
+/**
+ * A sample of an experiment's conflicting units in one environment
+ *
+ * Up to 100 units exposed in the environment to another variation
+ * than their first exposure's, the most recent conflict first. A
+ * unit's conflicting variation is the other variation it was last
+ * exposed to by `occurred_at`, ties broken by the larger `event_id`,
+ * so the sample does not depend on the order exposures arrived in.
+ * The totals are `conflicts` of `GET .../exposures`.
+ *
+ */
+export const getExperimentConflicts = <ThrowOnError extends boolean = false>(
+  options: Options<GetExperimentConflictsData, ThrowOnError>,
+): RequestResult<GetExperimentConflictsResponses, GetExperimentConflictsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetExperimentConflictsResponses,
+    GetExperimentConflictsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/conflicts",
+    ...options,
   });
 
 /**

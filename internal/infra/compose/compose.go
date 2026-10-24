@@ -20,6 +20,7 @@ import (
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
+	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
@@ -66,6 +67,9 @@ type Options struct {
 	// RulesetLoadFault lets a test stall the replica's ruleset
 	// materializations; nil in production.
 	RulesetLoadFault *pgdelivery.RulesetLoadFault
+	// IngestHold lets a test keep a batch's transaction open; nil in
+	// production.
+	IngestHold *pgevents.IngestHold
 	// RateLimits are the limits of the SDK API.
 	RateLimits config.RateLimits
 	// EventsRetention is how long raw events are kept.
@@ -320,6 +324,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetExperimentAssignment: appexperiments.NewGetAssignment(experimentStore),
 		CheckHashUniformity:     appexperiments.NewCheckUniformity(),
 
+		GetExperimentExposures: appevents.NewGetExperimentExposures(tx, eventStore),
+		GetExposureTimeline:    appevents.NewGetExposureTimeline(tx, eventStore),
+		GetConflicts:           appevents.NewGetConflicts(tx, eventStore),
+
 		ListChangeRequests:  appgovernance.NewListChangeRequests(changeRequestStore),
 		CreateChangeRequest: appgovernance.NewCreateChangeRequest(changeRequests),
 		GetChangeRequest:    appgovernance.NewGetChangeRequest(changeRequestStore),
@@ -358,12 +366,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Every replica gathers the SDKs its requests come from and writes them
 	// in rounds.
 	inventory := appdelivery.NewSDKInventory(tx, deliveryStore, d.Clock)
+	var ingestTx appevents.Transactor = tx
+	if o.IngestHold != nil {
+		ingestTx = o.IngestHold.Wrap(tx, d.Pool)
+	}
 	sdk.Mount(edge, sdk.Handlers{
 		Authenticate: appdelivery.NewAuthenticateSDKKey(sdkKeyCache, sdkKeyUses, d.Clock),
 		ServeRuleset: appdelivery.NewServeRuleset(rulesetCache),
 		WatchRuleset: appdelivery.NewWatchRuleset(rulesetStream, rulesetCache.Unmeasured()),
 		Evaluate:     appdelivery.NewEvaluateRemotely(rulesetCache, discoveries, remoteCounts, d.Clock),
-		Ingest:       appevents.NewIngestEvents(tx, eventStore, d.Clock, o.EventsRetention),
+		Ingest:       appevents.NewIngestEvents(ingestTx, eventStore, d.Clock, o.EventsRetention),
 		Inventory:    inventory,
 	}, sdk.Options{Clock: d.Clock, RateLimits: o.RateLimits, Registerer: reg})
 	return Background{
@@ -375,6 +387,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.RemoteEvaluationCounts(remoteCounts, edge.Logger()),
 			worker.SDKInventory(inventory, edge.Logger(), reg),
 			worker.SDKInventoryRetention(appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention)),
+			worker.RollupStream(worker.ExposureRollupName, events.StreamExposures,
+				appevents.NewRollUpExposures(tx, eventStore, d.Clock), worker.NewRollupMetrics(reg)),
 			worker.EventPartitions(func(ctx context.Context) error {
 				return eventStore.CreateEventPartitions(ctx, d.Clock.Now(), o.EventsPartitionsAhead)
 			}),

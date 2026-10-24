@@ -101,6 +101,16 @@ It reads one unit ID per line from the file, or from standard input without one 
 
 The form takes the key, name, hypothesis, flag, unit type, weights, traffic allocation, expected end date, owner and tags. Choosing a flag fills the weights with its variations split evenly; weights and the traffic allocation are typed as percentages with at most two decimals, and the total is shown as they are typed. The form saves only what could start: weights summing to exactly 100.00 %, a hypothesis and an expected end date, though the API accepts a draft without the last two. Fields the experiment's status no longer lets change are shown disabled with the reason. On an experiment's page, **Save** sends what changed under the version the page was opened at; if someone saved the experiment meanwhile, saving shows who and when with a diff of their change, and offers to reload, losing the edits, or to keep the edits and save them onto the newer version.
 
+## Exposures
+
+SDKs report an exposure each time a unit is assigned a variation of an experiment (see [Events](sdks/events.md)). Every 10 seconds the server rolls the exposures it stored up into what three reads answer, in one environment each (`project.read`):
+
+- `GET /projects/{project}/experiments/{experiment}/exposures?environment=` lists, per variation, the `exposures`, the `overridden` exposures and the `first_exposures`, the variation's share of first exposures and the share its weight asks for; the experiment's variations come first, in its order, then any other variation an override exposure named. It also counts the `conflicts` (exposures, and units having one) and the exposures refused, by reason, and says in `as_of` when the rollup last moved.
+- `GET …/exposures/timeline?environment=&from=&to=` gives the same counts per UTC day and variation, `from` and `to` being days, both included and both optional.
+- `GET …/conflicts?environment=` lists up to 100 units exposed to another variation than their first exposure's, the most recent conflict first.
+
+A unit's first exposure is its exposure with the earliest `occurred_at`, ties broken by the smaller `event_id`, so an exposure arriving late from a phone that was offline replaces it when it occurred earlier. Each other exposure of the unit naming another variation is a conflict, and a unit's conflicting variation is the other one it was last exposed to by `occurred_at`. Override exposures are counted as overridden and never make, replace or conflict with a first exposure: an override decides the variation whatever the assignment. Exposures and overridden exposures count on the day they were received, first exposures on the day they occurred, so a replacement moves a first exposure to its own day. Whatever order the exposures arrive in, and however SDKs batch them, the counts come out the same.
+
 ## Audit
 
 Every write records one entry (see [The audit log](access.md#the-audit-log)): `experiment.created` and `experiment.cloned` with the experiment after it (a clone also names the experiment it was copied from), `experiment.updated`, `experiment.salts_regenerated`, `experiment.started` and `experiment.traffic_allocation_changed` (a change of a running experiment's allocation, whatever else the same `PATCH` changed) with the experiment before and after, and `experiment.deleted` with the experiment before.

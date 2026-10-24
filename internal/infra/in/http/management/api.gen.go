@@ -820,6 +820,15 @@ type Condition struct {
 	Variation *string     `json:"variation,omitempty"`
 }
 
+// ConflictTotals defines model for ConflictTotals.
+type ConflictTotals struct {
+	// Total The exposures naming another variation than their unit's first exposure.
+	Total int64 `json:"total"`
+
+	// Units The units with at least one conflict.
+	Units int64 `json:"units"`
+}
+
 // CreatedApiToken A personal access token just created, with its value.
 type CreatedApiToken struct {
 	// Token A personal access token, by its hint; its value is shown only when it is created.
@@ -1153,6 +1162,17 @@ type ExperimentCreate struct {
 	Variations []ExperimentWeight `json:"variations"`
 }
 
+// ExperimentExposures defines model for ExperimentExposures.
+type ExperimentExposures struct {
+	// AsOf When the exposure rollup last moved; null before it first did.
+	AsOf      *time.Time     `json:"as_of"`
+	Conflicts ConflictTotals `json:"conflicts"`
+
+	// Rejections The exposures refused, by reason, those with a count only.
+	Rejections []ExposureRejections `json:"rejections"`
+	Variations []VariationExposures `json:"variations"`
+}
+
 // ExperimentList defines model for ExperimentList.
 type ExperimentList struct {
 	Items []Experiment `json:"items"`
@@ -1195,6 +1215,47 @@ type ExperimentWeight struct {
 
 	// Weight In basis points (0.01 %); the weights of an experiment sum to 10,000.
 	Weight int `json:"weight"`
+}
+
+// ExposureConflict defines model for ExposureConflict.
+type ExposureConflict struct {
+	// ConflictingAt When that exposure occurred.
+	ConflictingAt time.Time `json:"conflicting_at"`
+
+	// ConflictingVariation The other variation the unit was last exposed to.
+	ConflictingVariation string `json:"conflicting_variation"`
+
+	// FirstVariation The variation of the unit's first exposure.
+	FirstVariation string `json:"first_variation"`
+	UnitId         string `json:"unit_id"`
+	UnitType       string `json:"unit_type"`
+}
+
+// ExposureConflicts defines model for ExposureConflicts.
+type ExposureConflicts struct {
+	Items []ExposureConflict `json:"items"`
+}
+
+// ExposureDay defines model for ExposureDay.
+type ExposureDay struct {
+	Day            openapi_types.Date `json:"day"`
+	Exposures      int64              `json:"exposures"`
+	FirstExposures int64              `json:"first_exposures"`
+	Overridden     int64              `json:"overridden"`
+	Variation      string             `json:"variation"`
+}
+
+// ExposureRejections defines model for ExposureRejections.
+type ExposureRejections struct {
+	Count int64 `json:"count"`
+
+	// Reason The rejection code, such as `unknown_variation`.
+	Reason string `json:"reason"`
+}
+
+// ExposureTimeline defines model for ExposureTimeline.
+type ExposureTimeline struct {
+	Items []ExposureDay `json:"items"`
 }
 
 // Flag A flag's definition with its configuration in every environment, by the environments' order.
@@ -2290,6 +2351,25 @@ type Variation struct {
 	Value VariationValue `json:"value"`
 }
 
+// VariationExposures defines model for VariationExposures.
+type VariationExposures struct {
+	// ExpectedShare The share the variation's weight asks for, 0 for a variation the experiment does not weigh.
+	ExpectedShare float64 `json:"expected_share"`
+
+	// Exposures The non-override exposures naming the variation.
+	Exposures int64 `json:"exposures"`
+
+	// FirstExposures The units whose first exposure names the variation.
+	FirstExposures int64 `json:"first_exposures"`
+
+	// ObservedShare The variation's share of first exposures, 0 without any.
+	ObservedShare float64 `json:"observed_share"`
+
+	// Overridden The override exposures naming the variation.
+	Overridden int64  `json:"overridden"`
+	Variation  string `json:"variation"`
+}
+
 // VariationInput defines model for VariationInput.
 type VariationInput struct {
 	Description *Description `json:"description,omitempty"`
@@ -2367,6 +2447,9 @@ type EnvironmentKey = string
 
 // ExperimentKey defines model for ExperimentKey.
 type ExperimentKey = string
+
+// ExposureEnvironment defines model for ExposureEnvironment.
+type ExposureEnvironment = string
 
 // FlagKey defines model for FlagKey.
 type FlagKey = string
@@ -2700,6 +2783,30 @@ type UpdateExperimentParams struct {
 type GetExperimentAssignmentParams struct {
 	// UnitId A unit ID of the experiment's unit type, 1 to 256 bytes.
 	UnitId string `form:"unit_id" json:"unit_id"`
+}
+
+// GetExperimentConflictsParams defines parameters for GetExperimentConflicts.
+type GetExperimentConflictsParams struct {
+	// Environment The key of the environment whose exposures to read.
+	Environment ExposureEnvironment `form:"environment" json:"environment"`
+}
+
+// GetExperimentExposuresParams defines parameters for GetExperimentExposures.
+type GetExperimentExposuresParams struct {
+	// Environment The key of the environment whose exposures to read.
+	Environment ExposureEnvironment `form:"environment" json:"environment"`
+}
+
+// GetExperimentExposureTimelineParams defines parameters for GetExperimentExposureTimeline.
+type GetExperimentExposureTimelineParams struct {
+	// From The first UTC day, included; the first day with an exposure when absent.
+	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
+
+	// To The last UTC day, included; the last day with an exposure when absent.
+	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
+
+	// Environment The key of the environment whose exposures to read.
+	Environment ExposureEnvironment `form:"environment" json:"environment"`
 }
 
 // RegenerateExperimentSaltsParams defines parameters for RegenerateExperimentSalts.
@@ -4176,6 +4283,55 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
 	CloneExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, body CloneExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetExperimentConflicts A sample of an experiment's conflicting units in one environment
+	//
+	// Up to 100 units exposed in the environment to another variation
+	// than their first exposure's, the most recent conflict first. A
+	// unit's conflicting variation is the other variation it was last
+	// exposed to by `occurred_at`, ties broken by the larger `event_id`,
+	// so the sample does not depend on the order exposures arrived in.
+	// The totals are `conflicts` of `GET .../exposures`.
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/conflicts (the `GetExperimentConflicts` operationId).
+	GetExperimentConflicts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentConflictsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetExperimentExposures An experiment's exposures in one environment
+	//
+	// What the exposures of an experiment of any status came to in one
+	// environment, from the exposure rollup, which reads the exposures
+	// committed every 10 seconds; `as_of` is when it last moved, null
+	// before it first did.
+	//
+	// A unit's first exposure is its non-override exposure with the
+	// earliest `occurred_at`, ties broken by the smaller `event_id`; an
+	// earlier exposure arriving late replaces it. Every other
+	// non-override exposure of the unit naming another variation is a
+	// conflict. Override exposures are counted as `overridden` and never
+	// make, replace or conflict with a first exposure. However exposures
+	// arrive, in whatever order and batches, the counts come out the
+	// same.
+	//
+	// `variations` lists the experiment's variations in its order, each
+	// even without an exposure, then any other variation an override
+	// exposure named, by key, which expects no share. `rejections`
+	// counts the exposures of the experiment refused in the environment,
+	// by reason.
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/exposures (the `GetExperimentExposures` operationId).
+	GetExperimentExposures(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposuresParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetExperimentExposureTimeline An experiment's exposures per day in one environment
+	//
+	// The experiment's exposure counts per UTC day and variation, by day
+	// then variation key; a day and variation without an exposure is left
+	// out. `exposures` and `overridden` count by the day an exposure was
+	// received, `first_exposures` by the day the first exposure occurred,
+	// so an earlier exposure arriving late moves a first exposure to its
+	// own day.
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/exposures/timeline (the `GetExperimentExposureTimeline` operationId).
+	GetExperimentExposureTimeline(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposureTimelineParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RegenerateExperimentSalts Regenerate a draft's salts
 	//
@@ -6862,6 +7018,85 @@ func (c *Client) CloneExperimentWithBody(ctx context.Context, project ProjectKey
 // Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
 func (c *Client) CloneExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, body CloneExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCloneExperimentRequest(c.Server, project, experiment, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetExperimentConflicts A sample of an experiment's conflicting units in one environment
+//
+// Up to 100 units exposed in the environment to another variation
+// than their first exposure's, the most recent conflict first. A
+// unit's conflicting variation is the other variation it was last
+// exposed to by `occurred_at`, ties broken by the larger `event_id`,
+// so the sample does not depend on the order exposures arrived in.
+// The totals are `conflicts` of `GET .../exposures`.
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/conflicts (the `GetExperimentConflicts` operationId).
+func (c *Client) GetExperimentConflicts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentConflictsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExperimentConflictsRequest(c.Server, project, experiment, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetExperimentExposures An experiment's exposures in one environment
+//
+// What the exposures of an experiment of any status came to in one
+// environment, from the exposure rollup, which reads the exposures
+// committed every 10 seconds; `as_of` is when it last moved, null
+// before it first did.
+//
+// A unit's first exposure is its non-override exposure with the
+// earliest `occurred_at`, ties broken by the smaller `event_id`; an
+// earlier exposure arriving late replaces it. Every other
+// non-override exposure of the unit naming another variation is a
+// conflict. Override exposures are counted as `overridden` and never
+// make, replace or conflict with a first exposure. However exposures
+// arrive, in whatever order and batches, the counts come out the
+// same.
+//
+// `variations` lists the experiment's variations in its order, each
+// even without an exposure, then any other variation an override
+// exposure named, by key, which expects no share. `rejections`
+// counts the exposures of the experiment refused in the environment,
+// by reason.
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/exposures (the `GetExperimentExposures` operationId).
+func (c *Client) GetExperimentExposures(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposuresParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExperimentExposuresRequest(c.Server, project, experiment, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetExperimentExposureTimeline An experiment's exposures per day in one environment
+//
+// The experiment's exposure counts per UTC day and variation, by day
+// then variation key; a day and variation without an exposure is left
+// out. `exposures` and `overridden` count by the day an exposure was
+// received, `first_exposures` by the day the first exposure occurred,
+// so an earlier exposure arriving late moves a first exposure to its
+// own day.
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/exposures/timeline (the `GetExperimentExposureTimeline` operationId).
+func (c *Client) GetExperimentExposureTimeline(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposureTimelineParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExperimentExposureTimelineRequest(c.Server, project, experiment, params)
 	if err != nil {
 		return nil, err
 	}
@@ -11682,6 +11917,222 @@ func NewCloneExperimentRequestWithBody(server string, project ProjectKey, experi
 	return req, nil
 }
 
+// NewGetExperimentConflictsRequest constructs an http.Request for the GetExperimentConflicts method
+func NewGetExperimentConflictsRequest(server string, project ProjectKey, experiment ExperimentKey, params *GetExperimentConflictsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/conflicts", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetExperimentExposuresRequest constructs an http.Request for the GetExperimentExposures method
+func NewGetExperimentExposuresRequest(server string, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposuresParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/exposures", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetExperimentExposureTimelineRequest constructs an http.Request for the GetExperimentExposureTimeline method
+func NewGetExperimentExposureTimelineRequest(server string, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposureTimelineParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/exposures/timeline", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.From != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", *params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.To != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", *params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewRegenerateExperimentSaltsRequest constructs an http.Request for the RegenerateExperimentSalts method
 func NewRegenerateExperimentSaltsRequest(server string, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams) (*http.Request, error) {
 	var err error
@@ -14998,6 +15449,61 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/experiments/{experiment}/clone (the `CloneExperiment` operationId).
 	CloneExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, body CloneExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*CloneExperimentResponse, error)
+
+	// GetExperimentConflictsWithResponse A sample of an experiment's conflicting units in one environment
+	//
+	// Up to 100 units exposed in the environment to another variation
+	// than their first exposure's, the most recent conflict first. A
+	// unit's conflicting variation is the other variation it was last
+	// exposed to by `occurred_at`, ties broken by the larger `event_id`,
+	// so the sample does not depend on the order exposures arrived in.
+	// The totals are `conflicts` of `GET .../exposures`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/conflicts (the `GetExperimentConflicts` operationId).
+	GetExperimentConflictsWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentConflictsParams, reqEditors ...RequestEditorFn) (*GetExperimentConflictsResponse, error)
+
+	// GetExperimentExposuresWithResponse An experiment's exposures in one environment
+	//
+	// What the exposures of an experiment of any status came to in one
+	// environment, from the exposure rollup, which reads the exposures
+	// committed every 10 seconds; `as_of` is when it last moved, null
+	// before it first did.
+	//
+	// A unit's first exposure is its non-override exposure with the
+	// earliest `occurred_at`, ties broken by the smaller `event_id`; an
+	// earlier exposure arriving late replaces it. Every other
+	// non-override exposure of the unit naming another variation is a
+	// conflict. Override exposures are counted as `overridden` and never
+	// make, replace or conflict with a first exposure. However exposures
+	// arrive, in whatever order and batches, the counts come out the
+	// same.
+	//
+	// `variations` lists the experiment's variations in its order, each
+	// even without an exposure, then any other variation an override
+	// exposure named, by key, which expects no share. `rejections`
+	// counts the exposures of the experiment refused in the environment,
+	// by reason.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/exposures (the `GetExperimentExposures` operationId).
+	GetExperimentExposuresWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposuresParams, reqEditors ...RequestEditorFn) (*GetExperimentExposuresResponse, error)
+
+	// GetExperimentExposureTimelineWithResponse An experiment's exposures per day in one environment
+	//
+	// The experiment's exposure counts per UTC day and variation, by day
+	// then variation key; a day and variation without an exposure is left
+	// out. `exposures` and `overridden` count by the day an exposure was
+	// received, `first_exposures` by the day the first exposure occurred,
+	// so an earlier exposure arriving late moves a first exposure to its
+	// own day.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/exposures/timeline (the `GetExperimentExposureTimeline` operationId).
+	GetExperimentExposureTimelineWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposureTimelineParams, reqEditors ...RequestEditorFn) (*GetExperimentExposureTimelineResponse, error)
 
 	// RegenerateExperimentSaltsWithResponse Regenerate a draft's salts
 	//
@@ -21396,6 +21902,234 @@ func (r CloneExperimentResponse) ContentType() string {
 	return ""
 }
 
+// GetExperimentConflictsResponse401Headers the declared response headers of an HTTP 401 response for GetExperimentConflicts
+type GetExperimentConflictsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetExperimentConflictsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExposureConflicts
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetExperimentConflictsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetExperimentConflictsResponse) GetJSON200() *ExposureConflicts {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetExperimentConflictsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetExperimentConflictsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetExperimentConflictsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetExperimentConflictsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetExperimentConflictsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExperimentConflictsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExperimentConflictsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetExperimentConflictsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetExperimentExposuresResponse401Headers the declared response headers of an HTTP 401 response for GetExperimentExposures
+type GetExperimentExposuresResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetExperimentExposuresResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExperimentExposures
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetExperimentExposuresResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetExperimentExposuresResponse) GetJSON200() *ExperimentExposures {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetExperimentExposuresResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetExperimentExposuresResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetExperimentExposuresResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetExperimentExposuresResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetExperimentExposuresResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExperimentExposuresResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExperimentExposuresResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetExperimentExposuresResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetExperimentExposureTimelineResponse401Headers the declared response headers of an HTTP 401 response for GetExperimentExposureTimeline
+type GetExperimentExposureTimelineResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetExperimentExposureTimelineResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExposureTimeline
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetExperimentExposureTimelineResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetExperimentExposureTimelineResponse) GetJSON200() *ExposureTimeline {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetExperimentExposureTimelineResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetExperimentExposureTimelineResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetExperimentExposureTimelineResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetExperimentExposureTimelineResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetExperimentExposureTimelineResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExperimentExposureTimelineResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExperimentExposureTimelineResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetExperimentExposureTimelineResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // RegenerateExperimentSaltsResponse200Headers the declared response headers of an HTTP 200 response for RegenerateExperimentSalts
 type RegenerateExperimentSaltsResponse200Headers struct {
 	ETag *string
@@ -26426,6 +27160,79 @@ func (c *ClientWithResponses) CloneExperimentWithResponse(ctx context.Context, p
 		return nil, err
 	}
 	return ParseCloneExperimentResponse(rsp)
+}
+
+// GetExperimentConflictsWithResponse A sample of an experiment's conflicting units in one environment
+//
+// Up to 100 units exposed in the environment to another variation
+// than their first exposure's, the most recent conflict first. A
+// unit's conflicting variation is the other variation it was last
+// exposed to by `occurred_at`, ties broken by the larger `event_id`,
+// so the sample does not depend on the order exposures arrived in.
+// The totals are `conflicts` of `GET .../exposures`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/conflicts (the `GetExperimentConflicts` operationId).
+func (c *ClientWithResponses) GetExperimentConflictsWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentConflictsParams, reqEditors ...RequestEditorFn) (*GetExperimentConflictsResponse, error) {
+	rsp, err := c.GetExperimentConflicts(ctx, project, experiment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExperimentConflictsResponse(rsp)
+}
+
+// GetExperimentExposuresWithResponse An experiment's exposures in one environment
+//
+// What the exposures of an experiment of any status came to in one
+// environment, from the exposure rollup, which reads the exposures
+// committed every 10 seconds; `as_of` is when it last moved, null
+// before it first did.
+//
+// A unit's first exposure is its non-override exposure with the
+// earliest `occurred_at`, ties broken by the smaller `event_id`; an
+// earlier exposure arriving late replaces it. Every other
+// non-override exposure of the unit naming another variation is a
+// conflict. Override exposures are counted as `overridden` and never
+// make, replace or conflict with a first exposure. However exposures
+// arrive, in whatever order and batches, the counts come out the
+// same.
+//
+// `variations` lists the experiment's variations in its order, each
+// even without an exposure, then any other variation an override
+// exposure named, by key, which expects no share. `rejections`
+// counts the exposures of the experiment refused in the environment,
+// by reason.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/exposures (the `GetExperimentExposures` operationId).
+func (c *ClientWithResponses) GetExperimentExposuresWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposuresParams, reqEditors ...RequestEditorFn) (*GetExperimentExposuresResponse, error) {
+	rsp, err := c.GetExperimentExposures(ctx, project, experiment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExperimentExposuresResponse(rsp)
+}
+
+// GetExperimentExposureTimelineWithResponse An experiment's exposures per day in one environment
+//
+// The experiment's exposure counts per UTC day and variation, by day
+// then variation key; a day and variation without an exposure is left
+// out. `exposures` and `overridden` count by the day an exposure was
+// received, `first_exposures` by the day the first exposure occurred,
+// so an earlier exposure arriving late moves a first exposure to its
+// own day.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/exposures/timeline (the `GetExperimentExposureTimeline` operationId).
+func (c *ClientWithResponses) GetExperimentExposureTimelineWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposureTimelineParams, reqEditors ...RequestEditorFn) (*GetExperimentExposureTimelineResponse, error) {
+	rsp, err := c.GetExperimentExposureTimeline(ctx, project, experiment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExperimentExposureTimelineResponse(rsp)
 }
 
 // RegenerateExperimentSaltsWithResponse Regenerate a draft's salts
@@ -32632,6 +33439,207 @@ func ParseCloneExperimentResponse(rsp *http.Response) (*CloneExperimentResponse,
 	return response, nil
 }
 
+// ParseGetExperimentConflictsResponse parses an HTTP response from a GetExperimentConflictsWithResponse call
+func ParseGetExperimentConflictsResponse(rsp *http.Response) (*GetExperimentConflictsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExperimentConflictsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExposureConflicts
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetExperimentConflictsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetExperimentExposuresResponse parses an HTTP response from a GetExperimentExposuresWithResponse call
+func ParseGetExperimentExposuresResponse(rsp *http.Response) (*GetExperimentExposuresResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExperimentExposuresResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExperimentExposures
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetExperimentExposuresResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetExperimentExposureTimelineResponse parses an HTTP response from a GetExperimentExposureTimelineWithResponse call
+func ParseGetExperimentExposureTimelineResponse(rsp *http.Response) (*GetExperimentExposureTimelineResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExperimentExposureTimelineResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExposureTimeline
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetExperimentExposureTimelineResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseRegenerateExperimentSaltsResponse parses an HTTP response from a RegenerateExperimentSaltsWithResponse call
 func ParseRegenerateExperimentSaltsResponse(rsp *http.Response) (*RegenerateExperimentSaltsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -35849,6 +36857,15 @@ type ServerInterface interface {
 	// CloneExperiment Clone an experiment into a new draft
 	// (POST /projects/{project}/experiments/{experiment}/clone)
 	CloneExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey)
+	// GetExperimentConflicts A sample of an experiment's conflicting units in one environment
+	// (GET /projects/{project}/experiments/{experiment}/conflicts)
+	GetExperimentConflicts(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentConflictsParams)
+	// GetExperimentExposures An experiment's exposures in one environment
+	// (GET /projects/{project}/experiments/{experiment}/exposures)
+	GetExperimentExposures(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentExposuresParams)
+	// GetExperimentExposureTimeline An experiment's exposures per day in one environment
+	// (GET /projects/{project}/experiments/{experiment}/exposures/timeline)
+	GetExperimentExposureTimeline(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentExposureTimelineParams)
 	// RegenerateExperimentSalts Regenerate a draft's salts
 	// (POST /projects/{project}/experiments/{experiment}/salts)
 	RegenerateExperimentSalts(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params RegenerateExperimentSaltsParams)
@@ -38790,6 +39807,185 @@ func (siw *ServerInterfaceWrapper) CloneExperiment(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// GetExperimentConflicts operation middleware
+func (siw *ServerInterfaceWrapper) GetExperimentConflicts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetExperimentConflictsParams
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetExperimentConflicts(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetExperimentExposures operation middleware
+func (siw *ServerInterfaceWrapper) GetExperimentExposures(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetExperimentExposuresParams
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetExperimentExposures(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetExperimentExposureTimeline operation middleware
+func (siw *ServerInterfaceWrapper) GetExperimentExposureTimeline(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetExperimentExposureTimelineParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetExperimentExposureTimeline(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // RegenerateExperimentSalts operation middleware
 func (siw *ServerInterfaceWrapper) RegenerateExperimentSalts(w http.ResponseWriter, r *http.Request) {
 
@@ -40773,6 +41969,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/clone", wrapper.CloneExperiment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/assignment", wrapper.GetExperimentAssignment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/hash-check", wrapper.CheckHashUniformity)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/exposures", wrapper.GetExperimentExposures)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/exposures/timeline", wrapper.GetExperimentExposureTimeline)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/conflicts", wrapper.GetExperimentConflicts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.ListChangeRequests)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.CreateChangeRequest)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}", wrapper.GetChangeRequest)
@@ -47770,6 +48969,279 @@ func (response CloneExperiment422ApplicationProblemPlusJSONResponse) VisitCloneE
 	return err
 }
 
+type GetExperimentConflictsRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     GetExperimentConflictsParams
+}
+
+type GetExperimentConflictsResponseObject interface {
+	VisitGetExperimentConflictsResponse(w http.ResponseWriter) error
+}
+
+type GetExperimentConflicts200JSONResponse ExposureConflicts
+
+func (response GetExperimentConflicts200JSONResponse) VisitGetExperimentConflictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentConflicts400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentConflicts400ApplicationProblemPlusJSONResponse) VisitGetExperimentConflictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentConflicts401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentConflicts401ApplicationProblemPlusJSONResponse) VisitGetExperimentConflictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentConflicts403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentConflicts403ApplicationProblemPlusJSONResponse) VisitGetExperimentConflictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentConflicts404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentConflicts404ApplicationProblemPlusJSONResponse) VisitGetExperimentConflictsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposuresRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     GetExperimentExposuresParams
+}
+
+type GetExperimentExposuresResponseObject interface {
+	VisitGetExperimentExposuresResponse(w http.ResponseWriter) error
+}
+
+type GetExperimentExposures200JSONResponse ExperimentExposures
+
+func (response GetExperimentExposures200JSONResponse) VisitGetExperimentExposuresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposures400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentExposures400ApplicationProblemPlusJSONResponse) VisitGetExperimentExposuresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposures401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentExposures401ApplicationProblemPlusJSONResponse) VisitGetExperimentExposuresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposures403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentExposures403ApplicationProblemPlusJSONResponse) VisitGetExperimentExposuresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposures404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentExposures404ApplicationProblemPlusJSONResponse) VisitGetExperimentExposuresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposureTimelineRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     GetExperimentExposureTimelineParams
+}
+
+type GetExperimentExposureTimelineResponseObject interface {
+	VisitGetExperimentExposureTimelineResponse(w http.ResponseWriter) error
+}
+
+type GetExperimentExposureTimeline200JSONResponse ExposureTimeline
+
+func (response GetExperimentExposureTimeline200JSONResponse) VisitGetExperimentExposureTimelineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposureTimeline400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentExposureTimeline400ApplicationProblemPlusJSONResponse) VisitGetExperimentExposureTimelineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposureTimeline401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentExposureTimeline401ApplicationProblemPlusJSONResponse) VisitGetExperimentExposureTimelineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposureTimeline403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentExposureTimeline403ApplicationProblemPlusJSONResponse) VisitGetExperimentExposureTimelineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetExperimentExposureTimeline404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetExperimentExposureTimeline404ApplicationProblemPlusJSONResponse) VisitGetExperimentExposureTimelineResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type RegenerateExperimentSaltsRequestObject struct {
 	Project    ProjectKey    `json:"project"`
 	Experiment ExperimentKey `json:"experiment"`
@@ -52220,6 +53692,15 @@ type StrictServerInterface interface {
 	// CloneExperiment Clone an experiment into a new draft
 	// (POST /projects/{project}/experiments/{experiment}/clone)
 	CloneExperiment(ctx context.Context, request CloneExperimentRequestObject) (CloneExperimentResponseObject, error)
+	// GetExperimentConflicts A sample of an experiment's conflicting units in one environment
+	// (GET /projects/{project}/experiments/{experiment}/conflicts)
+	GetExperimentConflicts(ctx context.Context, request GetExperimentConflictsRequestObject) (GetExperimentConflictsResponseObject, error)
+	// GetExperimentExposures An experiment's exposures in one environment
+	// (GET /projects/{project}/experiments/{experiment}/exposures)
+	GetExperimentExposures(ctx context.Context, request GetExperimentExposuresRequestObject) (GetExperimentExposuresResponseObject, error)
+	// GetExperimentExposureTimeline An experiment's exposures per day in one environment
+	// (GET /projects/{project}/experiments/{experiment}/exposures/timeline)
+	GetExperimentExposureTimeline(ctx context.Context, request GetExperimentExposureTimelineRequestObject) (GetExperimentExposureTimelineResponseObject, error)
 	// RegenerateExperimentSalts Regenerate a draft's salts
 	// (POST /projects/{project}/experiments/{experiment}/salts)
 	RegenerateExperimentSalts(ctx context.Context, request RegenerateExperimentSaltsRequestObject) (RegenerateExperimentSaltsResponseObject, error)
@@ -54413,6 +55894,90 @@ func (sh *strictHandler) CloneExperiment(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CloneExperimentResponseObject); ok {
 		if err := validResponse.VisitCloneExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetExperimentConflicts operation middleware
+func (sh *strictHandler) GetExperimentConflicts(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentConflictsParams) {
+	var request GetExperimentConflictsRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetExperimentConflicts(ctx, request.(GetExperimentConflictsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetExperimentConflicts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetExperimentConflictsResponseObject); ok {
+		if err := validResponse.VisitGetExperimentConflictsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetExperimentExposures operation middleware
+func (sh *strictHandler) GetExperimentExposures(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentExposuresParams) {
+	var request GetExperimentExposuresRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetExperimentExposures(ctx, request.(GetExperimentExposuresRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetExperimentExposures")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetExperimentExposuresResponseObject); ok {
+		if err := validResponse.VisitGetExperimentExposuresResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetExperimentExposureTimeline operation middleware
+func (sh *strictHandler) GetExperimentExposureTimeline(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentExposureTimelineParams) {
+	var request GetExperimentExposureTimelineRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetExperimentExposureTimeline(ctx, request.(GetExperimentExposureTimelineRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetExperimentExposureTimeline")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetExperimentExposureTimelineResponseObject); ok {
+		if err := validResponse.VisitGetExperimentExposureTimelineResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
