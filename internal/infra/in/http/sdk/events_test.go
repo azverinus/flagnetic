@@ -15,7 +15,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
-	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
+	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -155,8 +155,7 @@ func TestAMixedBatchIsJudgedPerEvent(t *testing.T) {
 	exchanges := protocolExchanges(t)
 	batchResult(t, srv, value, exchanges["events"].Request.Body)
 	// The mixed exchange of the protocol documents, without the exposures of
-	// an experiment that exists, which no experiment can be before
-	// experiments do: every other rejection is this server's answer today.
+	// an experiment that exists: the server's protocol run answers those.
 	var body map[string]any
 	if err := json.Unmarshal(exchanges["events with a duplicate and rejections"].Request.Body, &body); err != nil {
 		t.Fatal(err)
@@ -167,49 +166,9 @@ func TestAMixedBatchIsJudgedPerEvent(t *testing.T) {
 
 	var want sdk.EventBatchResult
 	readJSON(t, filepath.Join(protocolDir, "server", "events-mixed.json"), &want)
-	want.Rejected = want.Rejected[:6]
+	want.Accepted, want.Rejected = 2, want.Rejected[:6]
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("mixed batch =\n%+v\nwant\n%+v", got, want)
-	}
-}
-
-func TestEveryExposureIsRefusedUnknownExperimentWhateverItsForm(t *testing.T) {
-	srv, _, value := eventsServer(t)
-	exposure := func(changes map[string]any) map[string]any {
-		e := map[string]any{
-			"type": "exposure", "event_id": eventID(protocolTime, 1), "occurred_at": protocolTime.Format(time.RFC3339),
-			"experiment_key": "onboarding_test", "flag_key": "onboarding", "variation_key": "guided", "unit_type": "user",
-			"unit_id": "u-1001", "evaluation_reason": "experiment", "override": false, "ruleset_version": 1,
-		}
-		for k, v := range changes {
-			if v == nil {
-				delete(e, k)
-				continue
-			}
-			e[k] = v
-		}
-		return e
-	}
-	sentIDs := []string{
-		eventID(protocolTime, 1), eventID(protocolTime, 2), "not-a-uuid",
-		eventID(protocolTime.Add(-60*24*time.Hour), 3), eventID(protocolTime, 4), eventID(protocolTime, 5),
-	}
-	got := batchResult(t, srv, value, batch(
-		exposure(nil),
-		exposure(map[string]any{"event_id": sentIDs[1], "flag_key": nil, "override": "no", "ruleset_version": -1}),
-		exposure(map[string]any{"event_id": sentIDs[2]}),
-		exposure(map[string]any{"event_id": sentIDs[3]}),
-		exposure(map[string]any{"event_id": sentIDs[4], "occurred_at": protocolTime.Add(-60 * 24 * time.Hour).Format(time.RFC3339)}),
-		exposure(map[string]any{"event_id": sentIDs[5], "unit_id": strings.Repeat("u", 300)}),
-	))
-	if got.Accepted != 0 || got.Duplicates != 0 || len(got.Rejected) != len(sentIDs) {
-		t.Fatalf("batch = %+v, want every exposure rejected", got)
-	}
-	for i, r := range got.Rejected {
-		if r.Index != i || r.Code != "unknown_experiment" || r.Detail != `no running experiment is keyed "onboarding_test"` ||
-			r.EventId == nil || *r.EventId != sentIDs[i] {
-			t.Errorf("rejection %d = %+v, want unknown_experiment echoing %s", i, r, sentIDs[i])
-		}
 	}
 }
 
@@ -229,7 +188,7 @@ func TestAcceptedSummariesAndAliasesAreStoredOnce(t *testing.T) {
 		t.Errorf("the same batch again = %+v, want 2 duplicates", again)
 	}
 
-	store := pgdelivery.NewStore(testkit.Pool(t))
+	store := pgevents.NewStore(testkit.Pool(t))
 	production := p.environmentID(t, "production")
 	summaries, err := store.EvaluationSummaries(t.Context(), production)
 	if err != nil {
@@ -316,7 +275,7 @@ func TestConcurrentRetriesOnTwoReplicasStoreEachEventOnce(t *testing.T) {
 	if accepted != 50 {
 		t.Errorf("accepted across replicas = %d, want each of 50 events once", accepted)
 	}
-	aliases, err := pgdelivery.NewStore(testkit.Pool(t)).Aliases(t.Context(), p.environmentID(t, "production"))
+	aliases, err := pgevents.NewStore(testkit.Pool(t)).Aliases(t.Context(), p.environmentID(t, "production"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,7 +396,7 @@ func TestThePartitionWorkerKeepsPartitionsAheadOfTheClock(t *testing.T) {
 	if res := batchResult(t, srv, value, batch(aliasEvent(eventID(c.Now(), 1)))); res.Accepted != 1 {
 		t.Errorf("an event 3 days after the round = %+v", res)
 	}
-	aliases, err := pgdelivery.NewStore(testkit.Pool(t)).Aliases(t.Context(), p.environmentID(t, "production"))
+	aliases, err := pgevents.NewStore(testkit.Pool(t)).Aliases(t.Context(), p.environmentID(t, "production"))
 	if err != nil || len(aliases) != 1 {
 		t.Errorf("aliases = %+v, %v", aliases, err)
 	}
@@ -471,7 +430,7 @@ func TestCreatingAPartitionGivesUpRatherThanStallInserts(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := time.Now()
-	err = pgdelivery.NewStore(pool).CreateEventPartitions(t.Context(), protocolTime.AddDate(1, 0, 0), 0)
+	err = pgevents.NewStore(pool).CreateEventPartitions(t.Context(), protocolTime.AddDate(1, 0, 0), 0)
 	if err == nil {
 		t.Fatal("a partition was attached while a reader held its parent")
 	}

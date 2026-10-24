@@ -1,5 +1,5 @@
 {
-  "accepted": 2,
+  "accepted": 3,
   "dropped_rows": 1,
   "duplicates": 1,
   "rejected": [
@@ -35,19 +35,19 @@
     },
     {
       "code": "unknown_experiment",
-      "detail": "no running experiment is keyed \"onboarding_test\"",
+      "detail": "no experiment is keyed \"onboarding_test\"",
       "event_id": "01a0b91b-c500-7000-8000-00000000000a",
       "index": 8
     },
     {
       "code": "unit_type_mismatch",
-      "detail": "experiment \"pricing_test\" assigns units of type \"user\", not \"anonymous\"",
+      "detail": "the unit type is not the experiment's",
       "event_id": "01a0b91b-c500-7000-8000-00000000000b",
       "index": 9
     },
     {
       "code": "unknown_variation",
-      "detail": "experiment \"pricing_test\" has no variation \"premium\"",
+      "detail": "the variation is not one of the experiment's",
       "event_id": "01a0b91b-c500-7000-8000-00000000000c",
       "index": 10
     }

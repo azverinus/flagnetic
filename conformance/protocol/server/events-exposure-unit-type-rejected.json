@@ -1,0 +1,13 @@
+{
+  "accepted": 0,
+  "dropped_rows": 0,
+  "duplicates": 0,
+  "rejected": [
+    {
+      "code": "unit_type_mismatch",
+      "detail": "experiment \"banner_test\" assigns units of type \"user\", not \"anonymous\"",
+      "event_id": "01a0b91b-c500-7000-8000-000000000012",
+      "index": 0
+    }
+  ]
+}

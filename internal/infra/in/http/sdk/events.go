@@ -13,8 +13,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	appevents "github.com/azverinus/flagnetic/internal/app/events"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
+	"github.com/azverinus/flagnetic/internal/domain/events"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -43,7 +44,7 @@ func newEventMetrics(reg prometheus.Registerer) eventMetrics {
 	return m
 }
 
-func (m eventMetrics) observe(res appdelivery.BatchResult) {
+func (m eventMetrics) observe(res appevents.BatchResult) {
 	for kind, n := range res.Accepted {
 		m.ingested.WithLabelValues(string(kind)).Add(float64(n))
 	}
@@ -75,21 +76,21 @@ const errNotABatch = "the body is not a batch of events; errors names every memb
 // that is not one JSON object, an envelope that breaks its shape, or more
 // events than a batch holds. The events themselves are judged one by one
 // later, so one malformed event never costs the others.
-func decodeBatch(body io.Reader) (appdelivery.EventBatch, error) {
+func decodeBatch(body io.Reader) (appevents.EventBatch, error) {
 	data, err := io.ReadAll(body)
 	if err != nil {
-		return appdelivery.EventBatch{}, err
+		return appevents.EventBatch{}, err
 	}
 	var env envelope
 	dec := json.NewDecoder(bytes.NewReader(data))
 	if err = dec.Decode(&env); err != nil {
-		return appdelivery.EventBatch{}, flaghttp.InvalidRequest("the body is not a batch of events: " + err.Error())
+		return appevents.EventBatch{}, flaghttp.InvalidRequest("the body is not a batch of events: " + err.Error())
 	}
 	if _, err = dec.Token(); !errors.Is(err, io.EOF) {
-		return appdelivery.EventBatch{}, flaghttp.InvalidRequest("the body holds more than one JSON value")
+		return appevents.EventBatch{}, flaghttp.InvalidRequest("the body holds more than one JSON value")
 	}
 	var (
-		b          appdelivery.EventBatch
+		b          appevents.EventBatch
 		violations []apperrors.Violation
 	)
 	add := func(pointer, code, detail string, params map[string]any) {
@@ -99,9 +100,9 @@ func decodeBatch(body io.Reader) (appdelivery.EventBatch, error) {
 		add("/events", "required", "events is missing", nil)
 	} else if err := json.Unmarshal(env.Events, &b.Events); err != nil {
 		add("/events", "invalid_type", "events must be a list of events", nil)
-	} else if len(b.Events) > delivery.MaxBatchEvents {
-		return appdelivery.EventBatch{}, flaghttp.RequestTooLarge("a batch holds at most " +
-			strconv.Itoa(delivery.MaxBatchEvents) + " events, this one " + strconv.Itoa(len(b.Events)))
+	} else if len(b.Events) > events.MaxBatchEvents {
+		return appevents.EventBatch{}, flaghttp.RequestTooLarge("a batch holds at most " +
+			strconv.Itoa(events.MaxBatchEvents) + " events, this one " + strconv.Itoa(len(b.Events)))
 	}
 	var version int
 	switch {
@@ -130,12 +131,14 @@ func decodeBatch(body io.Reader) (appdelivery.EventBatch, error) {
 	case json.Unmarshal(env.SentAt, &sentAt) != nil:
 		add("/sent_at", "invalid_type", "sent_at must be an RFC 3339 time", nil)
 	default:
-		if _, err := time.Parse(time.RFC3339Nano, sentAt); err != nil {
+		t, err := time.Parse(time.RFC3339Nano, sentAt)
+		if err != nil {
 			add("/sent_at", "invalid_type", "sent_at must be an RFC 3339 time", nil)
 		}
+		b.SentAt = t
 	}
 	if len(violations) > 0 {
-		return appdelivery.EventBatch{}, flaghttp.MalformedRequest(errNotABatch, violations...)
+		return appevents.EventBatch{}, flaghttp.MalformedRequest(errNotABatch, violations...)
 	}
 	return b, nil
 }

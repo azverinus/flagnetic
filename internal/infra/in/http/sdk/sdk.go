@@ -11,7 +11,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
+	appevents "github.com/azverinus/flagnetic/internal/app/events"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
+	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -27,7 +29,7 @@ type Handlers struct {
 	ServeRuleset *appdelivery.ServeRuleset
 	WatchRuleset *appdelivery.WatchRuleset
 	Evaluate     *appdelivery.EvaluateRemotely
-	Ingest       *appdelivery.IngestEvents
+	Ingest       *appevents.IngestEvents
 	// Inventory gathers the SDKs each request comes from.
 	Inventory *appdelivery.SDKInventory
 }
@@ -78,7 +80,7 @@ var operations = map[string]operation{
 	},
 	"POST " + BaseURL + "/events": {
 		endpoint: endpointEvents, kinds: []delivery.SDKKeyKind{delivery.SDKKeyServer, delivery.SDKKeyClient},
-		queryKey: true, oneKey: true, maxBodyBytes: delivery.MaxBatchBytes,
+		queryKey: true, oneKey: true, maxBodyBytes: events.MaxBatchBytes,
 	},
 }
 
