@@ -247,11 +247,11 @@ func TestEvaluatingAStartedExperiment(t *testing.T) {
 		x.InclusionBucket != eval.Bucket(e.InclusionSalt, included) || x.VariationBucket != variationBucket {
 		t.Errorf("the experiment block = %+v", x)
 	}
-	if r := evaluateUnit(t, f.admin, f.project.Key, "user", excluded); r.Reason != "rule" || valueOr(r.Variation) != "c" || r.Experiment != nil {
-		t.Errorf("a unit outside the allocation: %+v", r)
+	if out := evaluateUnit(t, f.admin, f.project.Key, "user", excluded); out.Reason != "rule" || valueOr(out.Variation) != "c" || out.Experiment != nil {
+		t.Errorf("a unit outside the allocation: %+v", out)
 	}
-	if r := evaluateUnit(t, f.admin, f.project.Key, "anonymous", included); r.Reason != "rule" || r.Experiment != nil {
-		t.Errorf("a context without the experiment's unit type: %+v", r)
+	if other := evaluateUnit(t, f.admin, f.project.Key, "anonymous", included); other.Reason != "rule" || other.Experiment != nil {
+		t.Errorf("a context without the experiment's unit type: %+v", other)
 	}
 
 	// An override wins and carries the assignment it shadows.
@@ -267,8 +267,8 @@ func TestEvaluatingAStartedExperiment(t *testing.T) {
 	if res := do(f.admin.KillFlagWithResponse(t.Context(), f.project.Key, "checkout_title", "staging", management.Kill{})); res.JSON200 == nil {
 		t.Fatalf("kill = %d %s", res.StatusCode(), res.Body)
 	}
-	if r := evaluateUnit(t, f.admin, f.project.Key, "user", included); r.Reason != "off" || r.Experiment != nil {
-		t.Errorf("after the kill switch: %+v", r)
+	if killed := evaluateUnit(t, f.admin, f.project.Key, "user", included); killed.Reason != "off" || killed.Experiment != nil {
+		t.Errorf("after the kill switch: %+v", killed)
 	}
 }
 

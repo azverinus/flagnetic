@@ -88,8 +88,8 @@ func TestAStartInACallersUnitOfWorkCommitsAndRollsBackWithIt(t *testing.T) {
 	}
 
 	err = tx.Within(t.Context(), func(ctx context.Context) error {
-		_, err := start.Handle(ctx, cmd)
-		return err
+		_, startErr := start.Handle(ctx, cmd)
+		return startErr
 	})
 	if err != nil {
 		t.Fatal(err)

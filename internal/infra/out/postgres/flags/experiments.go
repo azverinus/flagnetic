@@ -119,8 +119,8 @@ func (s *Store) HoldingEnvironments(ctx context.Context, project workspace.Proje
 	}
 	envs, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (workspace.EnvironmentID, error) {
 		var env [16]byte
-		err := row.Scan(&env)
-		return id.FromBytes[workspace.Environment](env), err
+		scanErr := row.Scan(&env)
+		return id.FromBytes[workspace.Environment](env), scanErr
 	})
 	if err != nil {
 		return nil, fmt.Errorf("reading the environments holding an experiment: %w", err)
