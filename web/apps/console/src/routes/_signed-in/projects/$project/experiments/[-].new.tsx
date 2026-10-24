@@ -150,7 +150,8 @@ function CreateExperiment({ project }: { project: string }) {
       onSubmit={(event) => {
         event.preventDefault();
         setChecked(true);
-        if (issues.any) return;
+        // A key the server found taken would only be refused again.
+        if (issues.any || taken) return;
         create.mutate(values);
       }}
       onCancel={() => void navigate({ to: "/projects/$project/experiments", params: { project } })}

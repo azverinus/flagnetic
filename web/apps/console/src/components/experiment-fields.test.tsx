@@ -77,10 +77,11 @@ describe("the experiment form's fields by status", () => {
     expect(screen.getByLabelText("Expected end")).toBeEnabled();
   });
 
-  it("lock the allocation too once stopped", () => {
+  it("lock the traffic allocation and the expected end too once stopped", () => {
     renderAt("stopped");
     expect(screen.getByRole("status")).toHaveTextContent("The experiment is stopped");
     expect(screen.getByLabelText("Traffic allocation (%)")).toBeDisabled();
+    expect(screen.getByLabelText("Expected end")).toBeDisabled();
     expect(screen.getByLabelText("Hypothesis")).toBeEnabled();
   });
 

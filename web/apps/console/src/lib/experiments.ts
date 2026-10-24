@@ -157,7 +157,7 @@ const everyField: readonly ExperimentField[] = [
 /**
  * The fields an experiment's status no longer lets change: a draft
  * changes freely; a running experiment keeps what its comparison rests on,
- * its allocation only growing; a stopped one keeps all but its
+ * its traffic allocation only growing; a stopped one keeps all but its
  * description; an archived one keeps everything.
  */
 export function lockedFields(status: ExperimentStatus): ReadonlySet<ExperimentField> {
@@ -167,7 +167,7 @@ export function lockedFields(status: ExperimentStatus): ReadonlySet<ExperimentFi
     case "running":
       return new Set(["flag", "unit_type", "variations"]);
     case "stopped":
-      return new Set(["flag", "unit_type", "variations", "traffic_allocation"]);
+      return new Set(["flag", "unit_type", "variations", "traffic_allocation", "expected_end_at"]);
     case "archived":
       return new Set(everyField);
   }
@@ -184,7 +184,7 @@ export function lockReason(i18n: I18n, status: ExperimentStatus): string | undef
       );
     case "stopped":
       return i18n._(
-        msg`The experiment is stopped: only its name, hypothesis, owner, tags and expected end date still change.`,
+        msg`The experiment is stopped: only its name, hypothesis, owner and tags still change.`,
       );
     case "archived":
       return i18n._(msg`The experiment is archived: nothing about it changes any more.`);
@@ -359,7 +359,7 @@ export type ExperimentIssues = {
  * and everything a start needs, so a saved draft can always start. A
  * field the experiment's status locks is not judged, since it is not
  * sent; an experiment already saved (`base`) has a key that never changes,
- * and while it runs its allocation can only grow.
+ * and while it runs its traffic allocation can only grow.
  */
 export function experimentIssues(
   i18n: I18n,
@@ -415,7 +415,7 @@ export function experimentIssues(
       const from = percentText(i18n, base.traffic_allocation);
       fields.set(
         "traffic_allocation",
-        i18n._(msg`While the experiment runs its allocation can only grow, from ${from} %.`),
+        i18n._(msg`While the experiment runs its traffic allocation can only grow, from ${from} %.`),
       );
     }
   }

@@ -117,6 +117,7 @@ describe("the fields an experiment's status leaves open", () => {
 
   it("leave the description alone once stopped", () => {
     expect([...lockedFields("stopped")].sort()).toEqual([
+      "expected_end_at",
       "flag",
       "traffic_allocation",
       "unit_type",
@@ -302,7 +303,7 @@ describe("the experiment form's issues", () => {
       { variations: flagVariations, base },
     );
     expect(Object.fromEntries(issues.fields)).toEqual({
-      traffic_allocation: "While the experiment runs its allocation can only grow, from 50.00 %.",
+      traffic_allocation: "While the experiment runs its traffic allocation can only grow, from 50.00 %.",
     });
     expect(issues.weights).toEqual({ rows: [], total: undefined });
   });

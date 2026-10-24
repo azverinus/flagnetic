@@ -3798,10 +3798,6 @@ msgstr "Эксперимент в архиве: в нём больше ниче�
 msgid "The experiment is created as a draft: nothing changes for users until a rule serves it and it starts."
 msgstr "Эксперимент создаётся черновиком: для пользователей ничего не меняется, пока его не отдаёт правило и он не запущен."
 
-#: src/lib/problem-messages.ts
-msgid "The experiment is running: its flag, unit type and weights no longer change."
-msgstr "Эксперимент запущен: его флаг, тип единицы и веса больше не меняются."
-
 #: src/lib/experiments.ts
 msgid "The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid, and its traffic allocation can only grow, so no included unit ever leaves."
 msgstr "Эксперимент запущен: флаг, тип единицы и веса остаются как при запуске, чтобы сравнение оставалось честным, а охват можно только увеличивать, чтобы ни одна попавшая в него единица не выбыла."
@@ -3811,8 +3807,12 @@ msgid "The experiment is saved."
 msgstr "Эксперимент сохранён."
 
 #: src/lib/experiments.ts
-msgid "The experiment is stopped: only its name, hypothesis, owner, tags and expected end date still change."
-msgstr "Эксперимент остановлен: менять можно только название, гипотезу, владельца, теги и ожидаемое окончание."
+msgid "The experiment is stopped: only its name, hypothesis, owner and tags still change."
+msgstr "Эксперимент остановлен: менять можно только название, гипотезу, владельца и теги."
+
+#: src/lib/problem-messages.ts
+msgid "The experiment's status no longer lets these fields change: its flag, unit type and weights stay as they started."
+msgstr "Статус эксперимента больше не позволяет менять эти поля: его флаг, тип единицы и веса остаются такими, какими были при запуске."
 
 #: src/components/auth-settings-form.tsx
 msgid "The fewest characters a password chosen from now on has, from 12 to 128. Passwords set before keep working."
@@ -4665,7 +4665,7 @@ msgid "Which flags use the segment could not be read; the rules of any that do e
 msgstr "Не удалось узнать, какие флаги используют сегмент; правила тех, что используют, после сохранения вычисляются по его новому содержимому."
 
 #: src/lib/experiments.ts
-msgid "While the experiment runs its allocation can only grow, from {from} %."
+msgid "While the experiment runs its traffic allocation can only grow, from {from} %."
 msgstr "Пока эксперимент запущен, охват можно только увеличивать, от {from} %."
 
 #: src/components/experiment-fields.tsx

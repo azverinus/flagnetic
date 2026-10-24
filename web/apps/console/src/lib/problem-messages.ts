@@ -103,7 +103,7 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`Only a draft experiment can be changed this way.`);
     case "frozen":
       return i18n._(
-        msg`The experiment is running: its flag, unit type and weights no longer change.`,
+        msg`The experiment's status no longer lets these fields change: its flag, unit type and weights stay as they started.`,
       );
     case "traffic_allocation_decrease":
       return i18n._(msg`A running experiment's traffic allocation can only grow.`);
