@@ -326,28 +326,24 @@ func TestExposuresOfExperimentsThatDoNotExistAddNoCount(t *testing.T) {
 	}
 }
 
-func TestTheCountsOfRefusedExposuresGoWithTheExperiment(t *testing.T) {
+func TestTheCountsOfRefusedExposuresStayWhileTheFlagCannotBeArchivedFromItsExperiment(t *testing.T) {
 	f := startExposures(t)
 	batchResult(t, f.srv, f.client, batch(exposureEvent(1, map[string]any{"unit_type": "anonymous"})))
 	if counts := f.refused(t, "production"); counts["unit_type_mismatch"] != 1 {
 		t.Fatalf("counts = %v, want one unit_type_mismatch", counts)
 	}
-	// Deleting the flag deletes the experiments on it.
+	// A flag with a draft experiment is not archived, so the experiment and
+	// its counts are never left behind a flag no SDK receives.
 	archived := do(f.p.admin.ArchiveFlagWithResponse(t.Context(), f.p.key, "checkout", &management.ArchiveFlagParams{IfMatch: ptr(`"1"`)}))
-	if archived.StatusCode() != http.StatusOK {
-		t.Fatalf("archive = %d: %s", archived.StatusCode(), archived.Body)
+	if archived.StatusCode() != http.StatusConflict || !strings.Contains(string(archived.Body), `"in_use"`) {
+		t.Fatalf("archive = %d: %s, want 409 in_use", archived.StatusCode(), archived.Body)
 	}
-	deleted := do(f.p.admin.DeleteFlagWithResponse(t.Context(), f.p.key, "checkout",
-		&management.DeleteFlagParams{IfMatch: ptr(archived.HTTPResponse.Header.Get("ETag"))}))
-	if deleted.StatusCode() != http.StatusNoContent {
-		t.Fatalf("delete = %d: %s", deleted.StatusCode(), deleted.Body)
-	}
-	if counts := f.refused(t, "production"); len(counts) != 0 {
-		t.Errorf("counts after the experiment is gone = %v, want none", counts)
+	if counts := f.refused(t, "production"); counts["unit_type_mismatch"] != 1 {
+		t.Errorf("counts after the refused archive = %v, want them kept", counts)
 	}
 	got := batchResult(t, f.srv, f.client, batch(exposureEvent(2, nil)))
-	if len(got.Rejected) != 1 || got.Rejected[0].Code != "unknown_experiment" {
-		t.Errorf("exposure after = %+v, want unknown_experiment", got)
+	if got.Accepted != 1 || len(got.Rejected) != 0 {
+		t.Errorf("exposure after = %+v, want it accepted", got)
 	}
 }
 
