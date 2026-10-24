@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { createSegment, listProjectAuditEntries } from "@flagnetic/api";
+import { createExperiment, createSegment, listProjectAuditEntries } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { seriousViolations, useTheme } from "../support/axe";
@@ -33,6 +33,9 @@ const sweepFlag = "sweep_flag";
 
 /** The key of the segment the sweep creates in its project. */
 const sweepSegment = "sweep_segment";
+
+/** The key of the experiment the sweep creates on its flag. */
+const sweepExperiment = "sweep_experiment";
 
 /** The key of the environment every project starts with, whose page the sweep opens. */
 const sweepEnvironment = "staging";
@@ -86,6 +89,8 @@ const signedIn: Route[] = [
   ...[
     "flags",
     "flags/-/new",
+    "experiments",
+    "experiments/-/new",
     "segments",
     "segments/-/new",
     "environments",
@@ -119,6 +124,11 @@ const signedIn: Route[] = [
     name: "project attributes: discovered",
     route: "/projects/$project/attributes",
     path: (s) => `/projects/${s.project}/attributes?tab=discovered`,
+  },
+  {
+    name: "project experiment",
+    route: "/projects/$project/experiments/$experiment",
+    path: (s) => `/projects/${s.project}/experiments/${sweepExperiment}`,
   },
   {
     name: "project segment",
@@ -169,6 +179,25 @@ async function seed(): Promise<Seeded> {
         key: sweepSegment,
         name: "Sweep segment",
         conditions: [{ kind: "attribute", attribute: "country", op: "in", value: ["NL", "DE"] }],
+      },
+    }),
+  );
+  must(
+    `creating ${sweepExperiment}`,
+    await createExperiment({
+      client: managementClient(),
+      path: { project },
+      body: {
+        key: sweepExperiment,
+        name: "Sweep experiment",
+        hypothesis: "The treatment converts better.",
+        flag: sweepFlag,
+        unit_type: "user",
+        variations: [
+          { variation: "control", weight: 5000 },
+          { variation: "treatment", weight: 5000 },
+        ],
+        expected_end_at: "2027-01-31",
       },
     }),
   );

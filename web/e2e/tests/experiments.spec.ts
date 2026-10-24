@@ -1,14 +1,16 @@
 import {
   createExperiment,
+  createGrant,
   type ExperimentCreate,
   getExperiment,
+  listMembers,
   updateExperiment,
 } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
 import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
-import { admin, seededProject, viewer } from "../support/instance";
+import { admin, viewer } from "../support/instance";
 
 /** Signs in and opens a project's experiments. */
 async function openExperiments(page: Page, project: string, who: Credentials = admin) {
@@ -192,11 +194,25 @@ test.describe("experiments", () => {
   });
 
   test("tells a viewer which roles may create and edit experiments", async ({ page }) => {
-    const flag = `viewer_exp_flag_${Date.now().toString(36)}`;
-    const key = `viewer_exp_${Date.now().toString(36)}`;
-    await seedFlag(seededProject.key, stringFlag(flag));
-    await seedExperiment(seededProject.key, experimentOn(flag, key));
-    await openExperiments(page, seededProject.key, viewer);
+    // A project of the test's own, so its writes stay out of the seeded
+    // project's recent activity, which other specs read.
+    const project = await seedProject("exp-viewer");
+    const client = managementClient();
+    const members = must(
+      "finding the viewer",
+      await listMembers({ client, query: { q: viewer.email } }),
+    );
+    const member = members.items.find((candidate) => candidate.email === viewer.email);
+    if (!member) throw new Error(`${viewer.email} is no member`);
+    must(
+      "granting viewer",
+      await createGrant({ client, path: { project }, body: { member: member.id, role: "viewer" } }),
+    );
+    const flag = "checkout_cta";
+    const key = "cta_copy";
+    await seedFlag(project, stringFlag(flag));
+    await seedExperiment(project, experimentOn(flag, key));
+    await openExperiments(page, project, viewer);
 
     await expect(page.getByRole("link", { name: "New experiment" }).first()).toHaveAttribute(
       "aria-disabled",
