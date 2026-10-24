@@ -45,7 +45,7 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `undeclared_unit_type` | An alias names a unit type the project does not declare. |
 | `unknown_experiment` | An exposure names no experiment of the project. An experiment of any status exists, a draft or a stopped one too, since a mobile app may flush its queue days after the exposure. |
 | `unit_type_mismatch` | An exposure's `unit_type` is not the unit type its experiment assigns. |
-| `unknown_variation` | An exposure names a variation its experiment does not weigh. An exposure with `override` true may name any variation of the flag. |
+| `unknown_variation` | An exposure names a variation its experiment does not weigh. An exposure with `override` true is not checked against the weights, since an override decides the variation whatever they are. |
 
 An exposure is judged against its experiment in this order, and refused with the first check it fails: the experiment exists, the unit type is its own, the variation is one it weighs, then `flag_key` must be the experiment's flag and `evaluation_reason` `experiment` or `override` (both `event_invalid`). The codes are the same for every key; the `detail` of a refusal is specific for a server key and, for a client key, names no unit type, flag, variation or status of the experiment: a key that ships inside an app learns nothing of an experiment from it. Exposures refused for an experiment that exists are counted per experiment, environment and reason, and the counts go with the experiment; an exposure naming an experiment that does not exist is counted nowhere.
 

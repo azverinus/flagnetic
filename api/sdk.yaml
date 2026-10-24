@@ -322,7 +322,8 @@ paths:
         flushes its queue days late), `unit_type_mismatch` (an exposure
         whose unit type is not its experiment's), `unknown_variation` (an
         exposure naming a variation its experiment does not weigh; an
-        exposure with `override` true may name any variation of the flag)
+        exposure with `override` true is not checked against the weights, since
+        an override decides the variation whatever they are)
         and, for an exposure naming another flag than its experiment's or an
         `evaluation_reason` other than `experiment` or `override`,
         `event_invalid`. An exposure is judged in that order and refused

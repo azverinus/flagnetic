@@ -23,7 +23,7 @@ type ExperimentFacts struct {
 // exists, and returns why it is refused, or nil when it agrees. The checks
 // run in a fixed order, so every SDK is told the same of the same exposure:
 // the experiment exists, the unit type is its own, the variation is one it
-// weighs (an override exposure may name any variation of the flag, since an
+// weighs (an override exposure is not checked against the weights, since an
 // override decides the variation whatever the weights), then the flag and the
 // evaluation reason.
 //

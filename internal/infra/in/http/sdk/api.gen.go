@@ -721,7 +721,8 @@ type ClientInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true may name any variation of the flag)
+	// exposure with `override` true is not checked against the weights, since
+	// an override decides the variation whatever they are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -790,7 +791,8 @@ type ClientInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true may name any variation of the flag)
+	// exposure with `override` true is not checked against the weights, since
+	// an override decides the variation whatever they are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -859,7 +861,8 @@ type ClientInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true may name any variation of the flag)
+	// exposure with `override` true is not checked against the weights, since
+	// an override decides the variation whatever they are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -1048,7 +1051,8 @@ func (c *Client) Evaluate(ctx context.Context, params *EvaluateParams, body Eval
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true may name any variation of the flag)
+// exposure with `override` true is not checked against the weights, since
+// an override decides the variation whatever they are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -1127,7 +1131,8 @@ func (c *Client) PostEventsWithBody(ctx context.Context, params *PostEventsParam
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true may name any variation of the flag)
+// exposure with `override` true is not checked against the weights, since
+// an override decides the variation whatever they are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -1206,7 +1211,8 @@ func (c *Client) PostEvents(ctx context.Context, params *PostEventsParams, body 
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true may name any variation of the flag)
+// exposure with `override` true is not checked against the weights, since
+// an override decides the variation whatever they are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -1740,7 +1746,8 @@ type ClientWithResponsesInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true may name any variation of the flag)
+	// exposure with `override` true is not checked against the weights, since
+	// an override decides the variation whatever they are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -1809,7 +1816,8 @@ type ClientWithResponsesInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true may name any variation of the flag)
+	// exposure with `override` true is not checked against the weights, since
+	// an override decides the variation whatever they are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -1878,7 +1886,8 @@ type ClientWithResponsesInterface interface {
 	// flushes its queue days late), `unit_type_mismatch` (an exposure
 	// whose unit type is not its experiment's), `unknown_variation` (an
 	// exposure naming a variation its experiment does not weigh; an
-	// exposure with `override` true may name any variation of the flag)
+	// exposure with `override` true is not checked against the weights, since
+	// an override decides the variation whatever they are)
 	// and, for an exposure naming another flag than its experiment's or an
 	// `evaluation_reason` other than `experiment` or `override`,
 	// `event_invalid`. An exposure is judged in that order and refused
@@ -2547,7 +2556,8 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, params *
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true may name any variation of the flag)
+// exposure with `override` true is not checked against the weights, since
+// an override decides the variation whatever they are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -2622,7 +2632,8 @@ func (c *ClientWithResponses) PostEventsWithBodyWithResponse(ctx context.Context
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true may name any variation of the flag)
+// exposure with `override` true is not checked against the weights, since
+// an override decides the variation whatever they are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
@@ -2697,7 +2708,8 @@ func (c *ClientWithResponses) PostEventsWithResponse(ctx context.Context, params
 // flushes its queue days late), `unit_type_mismatch` (an exposure
 // whose unit type is not its experiment's), `unknown_variation` (an
 // exposure naming a variation its experiment does not weigh; an
-// exposure with `override` true may name any variation of the flag)
+// exposure with `override` true is not checked against the weights, since
+// an override decides the variation whatever they are)
 // and, for an exposure naming another flag than its experiment's or an
 // `evaluation_reason` other than `experiment` or `override`,
 // `event_invalid`. An exposure is judged in that order and refused
