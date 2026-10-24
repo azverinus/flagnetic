@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 // The repository root: the conformance suite lives in conformance/ beside the SDKs.
@@ -10,10 +11,10 @@ const channel = process.env.FLAGNETIC_BROWSER_CHANNEL;
 
 const chromium = {
   enabled: true,
-  provider: "playwright" as const,
+  provider: playwright(channel ? { launchOptions: { channel } } : {}),
   headless: true,
   screenshotFailures: false,
-  instances: [{ browser: "chromium", ...(channel ? { launch: { channel } } : {}) }],
+  instances: [{ browser: "chromium" as const }],
 };
 
 export default defineConfig({
