@@ -152,7 +152,7 @@ describe("a page on another origin", () => {
 
   test("holds the stream over fetch when asked to and refetches on a change", async () => {
     await commands.crossOriginServe(key, values(1, false));
-    const c = client({ sse: true });
+    const c = client({ stream: true });
     expect(await c.ready(5_000)).toBe("fresh");
     const [stream] = await requests("/sdk/v1/stream", "GET");
     expect(stream?.query, "the key never travels in the URL").toBe("");

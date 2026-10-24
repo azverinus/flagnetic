@@ -180,7 +180,7 @@ class Runner {
     const options: ClientOptions = {
       context: this.context,
       store: this.store,
-      sse: o.sse === true,
+      stream: o.sse === true,
       pollInterval: o.poll_interval_ms as number,
       flushInterval: o.flush_interval_ms as number,
       sendSummaries: o.send_summaries === true,

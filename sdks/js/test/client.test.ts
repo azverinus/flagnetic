@@ -403,6 +403,23 @@ describe("refetch triggers", () => {
     expect(store.getItem(keys.lastGood(context.units ?? {}))).not.toBeNull();
   });
 
+  test("the new context's first answer is taken whatever its version, a later lower one is not", async () => {
+    const h = harness();
+    const c = h.client({ store: false, pollInterval: 30_000 });
+    await h.serve("/sdk/v1/evaluate", values(5, { checkout: boolFlag(false) }));
+
+    // A replica a little behind answers the new context.
+    const done = c.setContext({ units: { user: "u-1001" } });
+    await h.serve("/sdk/v1/evaluate", values(4, { checkout: boolFlag(true) }));
+    expect(await done).toBe("fresh");
+    expect(c.getBool("checkout", false)).toBe(true);
+
+    // For the same context, a version below the held one is refused again.
+    await h.serve("/sdk/v1/evaluate", values(3, { checkout: boolFlag(false) }));
+    expect(c.stage).toBe("last_good");
+    expect(c.getBool("checkout", false)).toBe(true);
+  });
+
   test("triggers coalesce into the request in flight and start exactly one more", async () => {
     const h = harness();
     const c = h.client({ store: false, pollInterval: 3_600_000 });
@@ -513,7 +530,7 @@ describe("the change stream", () => {
 
   test("the stream carries the client key in a header the CORS preflight allows, never in the URL", async () => {
     const h = harness();
-    h.client({ store: false, sse: true });
+    h.client({ store: false, stream: true });
     const req = await h.waitFor("/sdk/v1/stream");
     expect(req.url.search).toBe("");
     expect(req.headers).toStrictEqual({ authorization: `Bearer ${key}`, accept: "text/event-stream" });
@@ -521,7 +538,7 @@ describe("the change stream", () => {
 
   test("a ruleset event above the held version triggers exactly one evaluation", async () => {
     const h = harness();
-    const c = h.client({ store: false, sse: true, pollInterval: 3_600_000 });
+    const c = h.client({ store: false, stream: true, pollInterval: 3_600_000 });
     (await h.waitFor("/sdk/v1/stream")).answer({ stream: true, body: "retry: 3000\n\n" });
     await h.serve("/sdk/v1/evaluate", values(1, { checkout: boolFlag(true) }));
     expect(h.count("sse_connected")).toBe(1);
@@ -539,7 +556,7 @@ describe("the change stream", () => {
 
   test("a stream the server closes is reconnected within 2 s with Last-Event-ID, and the client evaluates again", async () => {
     const h = harness();
-    h.client({ store: false, sse: true, pollInterval: 3_600_000 });
+    h.client({ store: false, stream: true, pollInterval: 3_600_000 });
     (await h.waitFor("/sdk/v1/stream")).answer({ stream: true, body: 'retry: 3000\n\nevent: ruleset\nid: 1\ndata: {"version":1}\n\n' });
     await h.serve("/sdk/v1/evaluate", values(1, {}));
 
@@ -557,7 +574,7 @@ describe("the change stream", () => {
 
   test("a refused key closes the stream, logs key_revoked once, and the stream returns when the key works", async () => {
     const h = harness();
-    h.client({ store: false, sse: true, pollInterval: 3_600_000 });
+    h.client({ store: false, stream: true, pollInterval: 3_600_000 });
     (await h.waitFor("/sdk/v1/stream")).answer({ stream: true, body: "retry: 3000\n\n" });
     await settle();
     expect(h.net.openStreams).toBe(1);
@@ -581,7 +598,7 @@ describe("the change stream", () => {
 describe("the change stream, refused", () => {
   test("a stream answering 401 stays closed, logs key_revoked once, and opens again after an evaluation succeeds", async () => {
     const h = harness();
-    h.client({ store: false, sse: true, pollInterval: 30_000 });
+    h.client({ store: false, stream: true, pollInterval: 30_000 });
     (await h.waitFor("/sdk/v1/stream")).answer({ status: 401, headers: { "Content-Type": "application/problem+json" }, body: "{}" });
     await settle();
     expect(h.count("key_revoked")).toBe(1);

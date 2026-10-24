@@ -161,6 +161,13 @@ export class FlagneticClient {
   private readonly backoff: Backoff;
   private unauthorized = false;
   private announced = 0;
+  /**
+   * The context whose values were last accepted. Values of another context
+   * set no floor for the version: a replica a little behind may answer the
+   * new context with a lower ruleset version, and that answer is still the
+   * only one there is for it.
+   */
+  private acceptedContext: Context | undefined;
 
   private readyWaiters: (() => void)[] = [];
   private isReady = false;
@@ -253,6 +260,8 @@ export class FlagneticClient {
     // Values serve from here on: bootstrap wins, else the store.
     if (options.bootstrap !== undefined) this.accept(options.bootstrap, "bootstrap");
     if (!this.values) this.loadStored();
+    // Bootstrap and stored values answer the context the client starts with.
+    if (this.values) this.acceptedContext = this.context;
 
     this.unlisten = this.page.listen({
       visible: () => { this.onVisible(); },
@@ -262,7 +271,7 @@ export class FlagneticClient {
     this.ingest.setVisible(this.visible);
     this.ingest.start();
 
-    if (options.sse === true) {
+    if (options.stream === true) {
       this.stream = new ChangeStream(
         {
           url: `${this.baseUrl}${SDK_API_PATH}/stream`,
@@ -800,7 +809,8 @@ export class FlagneticClient {
     // for the previous context, and the evaluation of the new one follows,
     // so it neither serves nor counts as a failure.
     if (context !== this.context) return false;
-    if (!this.accept(text, "network")) return false;
+    if (!this.accept(text, "network", context !== this.acceptedContext)) return false;
+    this.acceptedContext = context;
     // The server answers again, so a stream a refusal closed comes back.
     this.logged.delete("revoked");
     if (this.stream && !this.stream.running) this.stream.open();

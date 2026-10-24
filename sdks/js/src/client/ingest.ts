@@ -25,7 +25,11 @@ export interface IngestConfig {
   readonly appVersion?: string;
   /** The most events the queue holds before dropping its oldest. */
   readonly capacity: number;
-  /** The store key of this connection's queue; no other connection reads or writes it. */
+  /**
+   * The store key of this SDK key's queue. Tabs of one origin with the same
+   * key share it, and each writes back its own queue, so another tab's
+   * unsent events can be overwritten.
+   */
   readonly queueKey: string;
   /** The most events one batch carries. */
   readonly batchSize: number;

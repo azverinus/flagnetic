@@ -187,7 +187,7 @@ export interface ClientOptions {
    * Whether to hold the change stream, which brings a change within seconds
    * at the cost of one connection per tab: false by default.
    */
-  readonly sse?: boolean;
+  readonly stream?: boolean;
   /** Milliseconds between refetches while the tab is visible: 300 000 by default, 30 000 at least. */
   readonly pollInterval?: number;
   /** Milliseconds a remote evaluation or an events request may take: 5 000 by default. */
