@@ -24,6 +24,18 @@ class ClientTest < Minitest::Test
     assert c.bool(:on, default: false, context: { units: { user: "u-1" } })
   end
 
+  def test_int_serves_a_whole_number_as_an_integer
+    c = offline({ "limit" => 5, "float_limit" => 5.0, "ratio" => 2.5, "copy" => "hi" })
+    assert_equal 5, c.int("limit", default: 0)
+    limit = c.int("float_limit", default: 0)
+    assert_equal 5, limit
+    assert_kind_of Integer, limit
+    assert_equal 7, c.int("ratio", default: 7), "a number that is not whole serves the default"
+    assert_equal 7, c.int("copy", default: 7)
+    assert_equal 7, c.int("absent", default: 7)
+    assert_equal 2, logged(:type_mismatch).size
+  end
+
   def test_the_detail_of_a_served_value
     doc = JSON.parse(File.read(File.expand_path("../../../conformance/fixtures/overrides/influence.json", __dir__)))
     fixture_case = doc["cases"].find { |k| k["expect"]["override_influenced"] && k["expect"]["experiment"] }
@@ -262,5 +274,54 @@ class ClientTest < Minitest::Test
     doc = "{"
     assert_raises(Flagnetic::OfflineError) { c.reload }
     assert c.bool("on", default: false)
+  end
+
+  def test_an_offline_source_that_raises_never_fails_construction
+    calls = 0
+    source = lambda do
+      calls += 1
+      raise "source down" if calls == 1
+
+      JSON.generate(document(1, { "on" => true }))
+    end
+    c = Flagnetic::Client.new(offline: source, logger: method(:record))
+    assert_equal :built_in, c.stage
+    assert_match(/source down/, logged(:fetch_failed).first[1][:cause])
+
+    c.reload
+    assert c.bool("on", default: false)
+    calls = 0
+    error = assert_raises(Flagnetic::OfflineError) { c.reload }
+    assert_equal "offline ruleset: RuntimeError: source down", error.message
+    assert c.bool("on", default: false)
+  end
+
+  def test_a_ruleset_nested_deeper_than_the_json_default_is_accepted
+    deep = 150.times.reduce(1) { |inner, _| [inner] }
+    c = offline({ "config" => deep })
+    assert_equal :fresh, c.stage
+    assert_equal deep, c.json("config", default: nil)
+  end
+
+  def test_inspect_never_shows_the_sdk_key
+    c = client(stream: false)
+    refute_includes c.inspect, "a" * 40
+  end
+
+  def test_close_from_a_listener_stops_the_client
+    @server.publish(document(1, { "on" => true }))
+    c = client
+    closed = Queue.new
+    c.on_stage do |stage|
+      next unless stage == :fresh
+
+      c.close(timeout: 1)
+      closed << true
+    end
+    assert pop(closed, 3)
+    assert_empty logged(:listener_failed)
+    requests = @server.requests.size
+    sleep 0.3
+    assert_equal requests, @server.requests.size
   end
 end

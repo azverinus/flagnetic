@@ -24,12 +24,17 @@ module Flagnetic
     end
 
     # stop ends the thread within timeout seconds, killing it when it is
-    # stuck in a fetch, and closes the stream.
+    # stuck in a fetch, and closes the stream. Called from the thread itself
+    # (a listener closing the client), it only asks the loop to end: the
+    # thread cannot wait for itself.
     def stop(timeout)
       @stop = true
       wake
+      return if Thread.current == @thread
+
+      # A killed thread still runs its ensure, which closes the stream; it
+      # is not waited for, so close returns within timeout.
       @thread.kill unless @thread.join([timeout, 0].max)
-      @thread.join(1)
       nil
     end
 

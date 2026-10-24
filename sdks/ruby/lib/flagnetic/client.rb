@@ -93,6 +93,16 @@ module Flagnetic
     # it) for context, or default.
     def number(key, default:, context: nil) = serve(key, "number", default, context).value
 
+    # int serves a number flag as an Integer for context, or default. A
+    # served number that is not whole serves default with error
+    # type_mismatch rather than a truncated value.
+    def int(key, default:, context: nil)
+      detail = serve(key, "number", default, context)
+      return detail.value if detail.reason == :fallback
+
+      whole(detail.value) || mismatch(nil, key.to_s, "number", "int", default).value
+    end
+
     # json serves a JSON flag's value, parsed and frozen, for context, or
     # default.
     def json(key, default:, context: nil) = serve(key, "json", default, context).value
@@ -230,7 +240,7 @@ module Flagnetic
     end
 
     def start_offline(document, path)
-      document = JSON.generate(document) if document.is_a?(Hash)
+      document = JSON.generate(document, max_nesting: false) if document.is_a?(Hash)
       @offline_source =
         if path then -> { File.binread(path) }
         elsif document.respond_to?(:call) then document
@@ -325,6 +335,14 @@ module Flagnetic
         log(:warn, :type_mismatch, flag: key, flag_type: flag_type, requested_type: requested)
       end
       fallback(loaded, default, :type_mismatch)
+    end
+
+    # whole is a served number as an Integer, or nil when it is not whole.
+    def whole(value)
+      return value if value.is_a?(Integer)
+      return unless value.is_a?(Float) && value.finite? && value.to_r.denominator == 1
+
+      value.to_i
     end
 
     def value_of?(type, value)

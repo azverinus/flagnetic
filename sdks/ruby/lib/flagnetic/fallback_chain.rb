@@ -23,8 +23,12 @@ module Flagnetic
       end
 
       swap(ruleset, received_at: Time.now, stage: :fresh, source: "offline")
-    rescue SystemCallError, IOError, TypeError => e
-      raise OfflineError, "offline ruleset: #{e.message}"
+    rescue OfflineError
+      raise
+    rescue StandardError => e
+      # The source may be the application's own callable: whatever it
+      # raises is a failed document, never an error escaping Client.new.
+      raise OfflineError, "offline ruleset: #{e.class}: #{e.message}"
     end
 
     # load_store serves a persisted ruleset as last_good before any network
@@ -48,7 +52,9 @@ module Flagnetic
     # reason it is refused: it must parse, carry a supported schema_version
     # and be of the server scope.
     def decode(json)
-      doc = JSON.parse(json)
+      # The nesting limit is the evaluator's own, so a document it reads is
+      # never refused here first.
+      doc = JSON.parse(json, max_nesting: 10_000)
       return "parse: the document is not a JSON object" unless doc.is_a?(Hash)
 
       schema = doc["schema_version"]
@@ -124,18 +130,21 @@ module Flagnetic
     # exception raised) to the fallback chain and returns :ok, :failed or
     # :revoked. Called by the background thread.
     def handle_fetch(response)
-      outcome =
-        if response.is_a?(Exception) then fetch_failed("#{response.class}: #{response.message}")
-        else
-          case response.status
-          when 200 then accept(response.body)
-          when 304 then not_modified
-          when 401, 403 then key_revoked(response.status, "fetch")
-          else fetch_failed("HTTP #{response.status}")
-          end
-        end
+      return fetch_failed("#{response.class}: #{response.message}") if response.is_a?(Exception)
+
+      case response.status
+      when 200 then accept(response.body)
+      when 304 then not_modified
+      when 401, 403 then key_revoked(response.status, "fetch")
+      else fetch_failed("HTTP #{response.status}")
+      end
+    rescue StandardError => e
+      # An unexpected failure applying the outcome is a failed fetch, so the
+      # stage and the retry schedule move as for any other.
+      fetch_failed("#{e.class}: #{e.message}")
+    ensure
+      # ready waits for the first outcome, whatever it was.
       mark_ready
-      outcome
     end
 
     def accept(json)

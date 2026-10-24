@@ -14,6 +14,7 @@ client.ready(timeout: 5) # => :fresh, :last_good or :built_in
 
 context = { units: { user: "u-1001" }, attributes: { plan: "pro" } }
 client.bool("new_checkout", default: false, context: context)
+client.int("max_items", default: 10, context: context) # a number flag, whole numbers only
 detail = client.detail("new_checkout", default: false, context: context)
 detail.value  # => true
 detail.reason # => :rule
@@ -47,6 +48,27 @@ client = Flagnetic::Client.new(key, base_url: url, allow_overrides: true)
 client.local_overrides.set("new_checkout", true) # raises LocalOverridesNotAllowed without allow_overrides
 client.local_overrides.remove("new_checkout")
 ```
+
+Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on the text:
+
+| Event | Level | Fields |
+|---|---|---|
+| `ruleset_loaded` | info | `source` (`fetch`, `store`, `offline`), `ruleset_version`, `flags` |
+| `fetch_failed` | warn (error offline) | `cause`, `stage` (`source` offline) |
+| `sse_connected` | info | |
+| `sse_dropped` | info after a server close, warn otherwise | `cause` |
+| `stage_changed` | info to `fresh`, warn otherwise | `from`, `to` |
+| `key_revoked` | error, once per source until it recovers | `status`, `source` (`fetch`, `stream`) |
+| `schema_unsupported` | error, once | `schema_version`, `supported` |
+| `rule_unsupported` | error, once per flag and ruleset version | `flag`, `constructs`, `ruleset_version` |
+| `override_set` | warn | `flag` |
+| `override_refused` | warn | `flag`, `reason` (`not_allowed`, `protected`), `environment` |
+| `local_overrides_allowed` | warn | |
+| `type_mismatch` | warn, once per flag | `flag`, `flag_type`, `requested_type` |
+| `evaluation_failed` | error | `flag`, `cause` |
+| `listener_failed` | error | `cause` |
+| `store_failed` | error | `path`, `cause` |
+| `worker_failed` | error | `cause` |
 
 A ruleset from a newer server may hold constructs this SDK does not know. The client logs `rule_unsupported` once per flag and ruleset version, and the flag serves its default with the error code `inconsistent_ruleset`.
 

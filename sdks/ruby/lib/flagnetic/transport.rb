@@ -65,6 +65,10 @@ module Flagnetic
       http
     end
 
+    # inspect leaves the server key out, so a client printed in a console
+    # or attached to an error report does not disclose it.
+    def inspect = "#<#{self.class} #{@ruleset_uri.host}:#{@ruleset_uri.port}>"
+
     private
 
     def headers
