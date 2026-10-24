@@ -66,8 +66,8 @@ func TestAnEnvironmentIsProtectedAndUnprotected(t *testing.T) {
 	if !changed || !protected.Protected || protected.Version != 2 || !protected.UpdatedAt.Equal(later) || protected.Name != "QA" {
 		t.Errorf("protected = %+v, %v", protected, changed)
 	}
-	if same, changed := protected.Protect(true, later.Add(time.Hour)); changed || same != protected {
-		t.Errorf("protecting again = %+v, %v, want no change", same, changed)
+	if same, again := protected.Protect(true, later.Add(time.Hour)); again || same != protected {
+		t.Errorf("protecting again = %+v, %v, want no change", same, again)
 	}
 	unprotected, changed := protected.Protect(false, later)
 	if !changed || unprotected.Protected || unprotected.Version != 3 {
