@@ -10,6 +10,13 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 )
 
+// Stream names a rollup: a reader of one raw event table moving a cursor of
+// its own.
+type Stream string
+
+// StreamExposures rolls exposures up into first exposures and daily counts.
+const StreamExposures Stream = "exposures"
+
 // Cursor is a place in a raw event table, which is read in the order of the
 // inserting transaction's ID, then of each row's sequence number. The zero
 // Cursor is before every row.
@@ -259,4 +266,23 @@ func VariationExposuresOf(weights []experiments.Weight, counts map[string]Exposu
 		out = append(out, entry(v, 0))
 	}
 	return out
+}
+
+// ExposureTimelineDay is an experiment's exposure counts of one variation on
+// one UTC day.
+type ExposureTimelineDay struct {
+	Day       time.Time
+	Variation string
+	ExposureDayCounts
+}
+
+// Conflict is a unit exposed to another variation than its first exposure's:
+// the first exposure's variation, and the other variation it was last
+// exposed to, by occurrence, and when.
+type Conflict struct {
+	UnitType             string
+	UnitID               string
+	FirstVariation       string
+	ConflictingVariation string
+	ConflictingAt        time.Time
 }

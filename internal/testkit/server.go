@@ -21,6 +21,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
+	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -39,6 +40,8 @@ type Server struct {
 	runner     *worker.Runner
 	listeners  *postgres.Listeners
 	background func()
+	pool       *pgxpool.Pool
+	hold       *pgevents.IngestHold
 }
 
 // CloseBackground ends the work the replica's use cases started on their
@@ -225,9 +228,10 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	if c == nil {
 		c = clock.System{}
 	}
+	hold := pgevents.NewIngestHold()
 	background := compose.Management(h, compose.NewDeps(o.pool, c), reg, compose.Options{
 		Keyring: secret.NewKeyring(secret.New(SecretKey)), PasswordHashConcurrency: defaultHashConcurrency, Options: o.web,
-		RulesetLoadFault: o.fault, RateLimits: limits,
+		RulesetLoadFault: o.fault, IngestHold: hold, RateLimits: limits,
 		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
@@ -258,7 +262,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 	}
 	return &Server{
 		URL: srv.URL, Logs: logs, edge: h, metrics: metrics.Handler(reg), runner: runner, listeners: listeners,
-		background: background.Close,
+		background: background.Close, pool: o.pool, hold: hold,
 	}
 }
 
