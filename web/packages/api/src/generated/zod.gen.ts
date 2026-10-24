@@ -757,6 +757,51 @@ export const zExperimentClone = z.object({
   name: zName.optional(),
 });
 
+export const zExperimentAssignment = z.object({
+  experiment: z.string(),
+  unit_type: z.string(),
+  unit_id: z.string(),
+  inclusion_salt: z.string(),
+  variation_salt: z.string(),
+  inclusion_bucket: z.int().gte(0).lte(9999),
+  variation_bucket: z.int().gte(0).lte(9999),
+  traffic_allocation: z.int().gte(0).lte(10000),
+  included: z.boolean(),
+  variation: z.string().nullable(),
+  sql: z.string(),
+});
+
+export const zHashCheckRequest = z.object({
+  unit_ids: z.array(z.string()),
+  salt: z.string().optional(),
+  second_salt: z.string().optional(),
+  bins: z.int().optional().default(100),
+});
+
+/**
+ * The test of independence, present only with `second_salt`.
+ */
+export const zHashCheckIndependence = z.object({
+  chi_square: z.number(),
+  df: z.int(),
+  p_value: z.number(),
+  verdict: z.enum(["independent", "dependent", "untestable"]),
+});
+
+export const zHashCheck = z.object({
+  salt: z.string(),
+  second_salt: z.string().optional(),
+  bins: z.int(),
+  counts: z.array(z.int()),
+  min: z.int(),
+  max: z.int(),
+  chi_square: z.number(),
+  df: z.int(),
+  p_value: z.number(),
+  verdict: z.enum(["uniform", "not_uniform"]),
+  independence: zHashCheckIndependence.optional(),
+});
+
 export const zFlagDefinition = z.object({
   id: z.uuid(),
   key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
@@ -2077,6 +2122,31 @@ export const zCloneExperimentPath = z.object({
  * The clone.
  */
 export const zCloneExperimentResponse = zExperiment;
+
+export const zGetExperimentAssignmentPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+export const zGetExperimentAssignmentQuery = z.object({
+  unit_id: z.string(),
+});
+
+/**
+ * The unit's buckets, inclusion and variation, and the query recomputing them.
+ */
+export const zGetExperimentAssignmentResponse = zExperimentAssignment;
+
+export const zCheckHashUniformityBody = zHashCheckRequest;
+
+export const zCheckHashUniformityPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The counts per bin and each test's statistic and verdict.
+ */
+export const zCheckHashUniformityResponse = zHashCheck;
 
 export const zListChangeRequestsPath = z.object({
   project: z.string(),

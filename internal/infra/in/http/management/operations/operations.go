@@ -37,6 +37,10 @@ type Entry struct {
 	// PasswordBodyLimit bytes, so a huge one is refused before anything,
 	// let alone a hash, is spent on it.
 	ChecksPassword bool
+	// MaxBodyBytes (x-max-body-bytes), when not 0, is the operation's own
+	// body limit, for the few that take bodies larger than the server's
+	// limit allows, such as a long list of unit IDs.
+	MaxBodyBytes int64
 }
 
 // PasswordBodyLimit caps the bodies of the operations that check a
@@ -67,6 +71,7 @@ func Read(doc []byte) (map[string]Entry, error) {
 				SessionRequired bool   `yaml:"x-session-required"`
 				OpensSession    bool   `yaml:"x-opens-session"`
 				ChecksPassword  bool   `yaml:"x-checks-password"`
+				MaxBodyBytes    int64  `yaml:"x-max-body-bytes"`
 			}
 			if err := node.Decode(&o); err != nil {
 				errs = append(errs, fmt.Errorf("%s %s: %w", method, path, err))
@@ -92,7 +97,7 @@ func Read(doc []byte) (map[string]Entry, error) {
 					Name: o.OperationID, Requirement: requirement, SessionRequired: o.SessionRequired,
 					Read: read, Scope: access.ScopeOf(requirement, read), OpenToProjectTokens: where == whoAmI,
 				},
-				OpensSession: o.OpensSession, ChecksPassword: o.ChecksPassword,
+				OpensSession: o.OpensSession, ChecksPassword: o.ChecksPassword, MaxBodyBytes: o.MaxBodyBytes,
 			}
 		}
 	}
@@ -122,8 +127,8 @@ var Table = map[string]Entry{
 	slices.Sort(patterns)
 	for _, p := range patterns {
 		o := ops[p]
-		fmt.Fprintf(&b, "\t%q: {Operation: access.Operation{Name: %q, Requirement: %q, SessionRequired: %t, Read: %t, Scope: %q, OpenToProjectTokens: %t}, OpensSession: %t, ChecksPassword: %t},\n",
-			p, o.Name, string(o.Requirement), o.SessionRequired, o.Read, string(o.Scope), o.OpenToProjectTokens, o.OpensSession, o.ChecksPassword)
+		fmt.Fprintf(&b, "\t%q: {Operation: access.Operation{Name: %q, Requirement: %q, SessionRequired: %t, Read: %t, Scope: %q, OpenToProjectTokens: %t}, OpensSession: %t, ChecksPassword: %t, MaxBodyBytes: %d},\n",
+			p, o.Name, string(o.Requirement), o.SessionRequired, o.Read, string(o.Scope), o.OpenToProjectTokens, o.OpensSession, o.ChecksPassword, o.MaxBodyBytes)
 	}
 	b.WriteString("}\n")
 	return format.Source(b.Bytes())

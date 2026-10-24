@@ -142,3 +142,18 @@ func TestEveryWriteToMeAndEveryTokenCreationNeedsASession(t *testing.T) {
 		}
 	}
 }
+
+func TestAnOperationsOwnBodyLimitIsRead(t *testing.T) {
+	doc := "paths:\n  /projects/{project}/hash-check:\n    post:\n      operationId: checkHashUniformity\n      x-permission: project.read\n      x-max-body-bytes: 67108864\n" +
+		"  /projects:\n    post:\n      operationId: createProject\n      x-permission: instance_admin\n"
+	ops, err := Read([]byte(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ops["POST /projects/{project}/hash-check"].MaxBodyBytes; got != 64<<20 {
+		t.Errorf("hash-check's body limit = %d, want 64 MiB", got)
+	}
+	if got := ops["POST /projects"].MaxBodyBytes; got != 0 {
+		t.Errorf("a body limit nobody declared = %d, want 0", got)
+	}
+}

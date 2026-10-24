@@ -18,6 +18,7 @@ Any number of replicas can run against one database; every replica serves every 
 | `flagnetic serve` | Runs a replica. |
 | `flagnetic migrate` | Applies pending migrations and exits. Safe to run again, and safe to run from several places at once. |
 | `flagnetic admin bootstrap` | Creates the first instance admin and their API token; see [The first instance admin](#the-first-instance-admin). |
+| `flagnetic hash-check` | Runs the [uniformity check](experiments.md#the-uniformity-check) offline on a list of unit IDs; needs neither a database nor a configuration. |
 | `flagnetic healthcheck` | Asks the replica on the configured listen address whether it is ready; exits 0 when it is, 1 otherwise. |
 | `flagnetic version` | Prints the version. |
 
@@ -137,7 +138,7 @@ The public listener bounds what one client can hold:
 | `FLAGNETIC_HTTP_READ_HEADER_TIMEOUT` | `10s` | Time to send the request headers. |
 | `FLAGNETIC_HTTP_BODY_READ_TIMEOUT` | `30s` | Time to send the request body; a body still arriving is answered 408. Long-lived streams are excepted. |
 | `FLAGNETIC_HTTP_IDLE_TIMEOUT` | `120s` | Time a keep-alive connection may stay idle. |
-| `FLAGNETIC_HTTP_MAX_BODY_BYTES` | `1048576` | Size of a request body; a larger one is answered 413. The few routes that take larger bodies declare their own limit. |
+| `FLAGNETIC_HTTP_MAX_BODY_BYTES` | `1048576` | Size of a request body; a larger one is answered 413. The few routes that take larger bodies declare their own limit, such as the uniformity check's 64 MiB. |
 
 There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) and must allow it a read timeout above its 15-second heartbeat; see [TLS and a reverse proxy](install.md#tls-and-a-reverse-proxy).
 

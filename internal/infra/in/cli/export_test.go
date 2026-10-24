@@ -5,6 +5,7 @@ package cli
 // deployment cannot be put in on demand.
 var (
 	WithMigrations       = withMigrations
+	WithStdin            = withStdin
 	WithServerVersionNum = withServerVersionNum
 	WithRoute            = withRoute
 	WithWorker           = withWorker

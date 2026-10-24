@@ -43,6 +43,34 @@ A draft is edited in full with `PATCH /projects/{project}/experiments/{experimen
 
 Every experiment gets two salts when it is created: the `inclusion_salt` decides whether a unit is included in the traffic allocation, the `variation_salt` decides which variation an included unit gets. Each is 16 lower-case hexadecimal characters, and the server draws them so that no other experiment or [rollout](flags.md) of the project uses either one: two experiments, or an experiment and a rollout, therefore assign units independently of each other. Both are public: the experiment shows them so an analyst can recompute any unit's buckets.
 
+## Assignment
+
+`GET /projects/{project}/experiments/{experiment}/assignment?unit_id=…` (`project.read`) answers how the experiment treats one unit, from its own fields in whatever status it is: both salts, both buckets, the traffic allocation, whether the unit is `included` and, if so, its `variation`. A bucket is `murmur3_32("{salt}.{unit_id}") mod 10000`. A unit is included when its inclusion bucket is below the traffic allocation; an included unit gets the variation whose range of cumulative weights, in the experiment's order, holds its variation bucket. The variation bucket is answered for a unit left out too: it is the bucket the unit would be assigned by should the allocation grow to include it. The answer's `sql` is a ClickHouse query recomputing all of it, ready to run:
+
+```sql
+SELECT
+    unit_id,
+    murmurHash3_32(concat('a3f9c2e17b4d0e58', '.', unit_id)) % 10000 AS inclusion_bucket,
+    murmurHash3_32(concat('7e1d4c90b2a6f3d1', '.', unit_id)) % 10000 AS variation_bucket,
+    inclusion_bucket < 6000 AS included,
+    if(included, multiIf(variation_bucket < 3000, 'control', variation_bucket < 10000, 'treatment', NULL), NULL) AS variation
+FROM (SELECT 'user-42' AS unit_id)
+```
+
+Replace the subquery with a table holding a `unit_id` column to recompute every unit's assignment in the warehouse. The lookup reads no event and records nothing. A `unit_id` that is missing, empty or over 256 bytes is answered 400.
+
+## The uniformity check
+
+Before the first experiment, check that the bucketing hash spreads your own unit IDs evenly. `POST /projects/{project}/hash-check` (`project.read`) takes 1,000 to 200,000 `unit_ids` (each 1 to 256 bytes; duplicates count as often as they occur), an optional `salt` (a random one in an experiment salt's form otherwise), an optional `second_salt` and `bins` (2 to 10,000, default 100). It groups the 10,000 buckets into `bins` bins of consecutive buckets (bucket `b` falls into bin `b × bins / 10000`), and compares each bin's count with what a uniform hash expects of its width by Pearson's chi-square test with `bins − 1` degrees of freedom: the answer gives the counts, their `min` and `max`, `chi_square`, `df`, `p_value` and a `verdict`, `uniform` when the p-value is at least 0.001 and `not_uniform` otherwise. With a `second_salt` it also tests that both salts' buckets are independent, as an experiment's inclusion and variation buckets must be: Pearson's test of independence on the table of both salts' bins, over its non-empty rows and columns, whose `verdict` is `independent`, `dependent`, or `untestable` when every unit ID fell into one bin under one of the salts. A request the check cannot run on is answered 422 `invalid_uniformity_check`, naming each field. The check records nothing.
+
+The same check runs offline, so unit IDs never have to leave your machine:
+
+```bash
+flagnetic hash-check --second-salt 7e1d4c90b2a6f3d1 user-ids.txt
+```
+
+It reads one unit ID per line from the file, or from standard input without one or with `-`, takes `--salt`, `--second-salt` and `--bins` as the API takes them, needs neither a database nor a configuration, and prints the API's answer as JSON. A list it cannot check exits 1, naming each line or flag at fault on standard error.
+
 ## Audit
 
 Every write records one entry (see [The audit log](access.md#the-audit-log)): `experiment.created` and `experiment.cloned` with the experiment after it (a clone also names the experiment it was copied from), `experiment.updated` and `experiment.salts_regenerated` with the experiment before and after, and `experiment.deleted` with the experiment before.

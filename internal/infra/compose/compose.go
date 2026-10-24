@@ -310,6 +310,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Rollouts: flagStore,
 			Owners: owners, Recorder: experimentRec,
 		}),
+		GetExperimentAssignment: appexperiments.NewGetAssignment(experimentStore),
+		CheckHashUniformity:     appexperiments.NewCheckUniformity(),
 
 		ListChangeRequests:  appgovernance.NewListChangeRequests(changeRequestStore),
 		CreateChangeRequest: appgovernance.NewCreateChangeRequest(changeRequests),

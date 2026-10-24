@@ -2405,6 +2405,101 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/experiments/{experiment}/assignment:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+    get:
+      operationId: getExperimentAssignment
+      summary: How the experiment treats one unit
+      description: |
+        Which variation the experiment assigns one unit ID, from the
+        experiment's own fields in whatever status it is, and the ClickHouse
+        query that recomputes it in a warehouse. Both buckets are
+        `murmur3_32("{salt}.{unit_id}") mod 10000`: the unit is included when
+        its inclusion bucket is below the traffic allocation, and an
+        included unit gets the variation whose range of cumulative weights,
+        in the experiment's order, holds its variation bucket. It reads no
+        event and records nothing. A missing, empty or over-256-byte
+        `unit_id` is 400.
+      x-permission: project.read
+      tags: [experiments]
+      parameters:
+        - name: unit_id
+          in: query
+          required: true
+          description: A unit ID of the experiment's unit type, 1 to 256 bytes.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The unit's buckets, inclusion and variation, and the query recomputing them.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentAssignment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/hash-check:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    post:
+      operationId: checkHashUniformity
+      summary: Check the hash's uniformity on real unit IDs
+      description: |
+        Buckets every unit ID with `murmur3_32("{salt}.{unit_id}") mod
+        10000`, groups the 10000 buckets into `bins` bins of consecutive
+        buckets (bucket `b` falls into bin `b × bins / 10000`, so bins differ
+        in width by at most one bucket), and compares each bin's count with
+        what a uniform hash expects of its width, `N × width / 10000`, by
+        Pearson's chi-square test with `bins − 1` degrees of freedom: it is
+        `uniform` when `p_value` is at least 0.001. Duplicate IDs count as
+        often as they occur. With `second_salt` it also tests that both
+        salts' buckets are independent, as an experiment's inclusion and
+        variation buckets must be: Pearson's test of independence on the
+        `bins × bins` table of both bins, over its non-empty rows and
+        columns. The same check runs offline as `flagnetic hash-check`, so
+        unit IDs never have to leave a machine. It records nothing.
+
+        Refused with 422 `invalid_uniformity_check`: fewer than 1000 or more
+        than 200000 unit IDs (`/unit_ids`, `out_of_range`), a unit ID empty
+        or over 256 bytes (`/unit_ids/{i}`, `invalid_value`, the first 100
+        only), `bins` outside 2 to 10000 (`/bins`, `out_of_range`), or a salt
+        empty or over 256 bytes (`/salt`, `/second_salt`, `invalid_value`).
+        Its body may take up to 64 MiB, enough for 200000 IDs of 256 bytes,
+        whatever the server's limit for other bodies.
+      x-permission: project.read
+      x-max-body-bytes: 67108864
+      tags: [experiments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HashCheckRequest"
+      responses:
+        "200":
+          description: The counts per bin and each test's statistic and verdict.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HashCheck"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
   /projects/{project}/change-requests:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -5208,6 +5303,129 @@ components:
           description: The clone's key, unique, case sensitively, in the project (`already_exists`).
         name:
           $ref: "#/components/schemas/Name"
+    ExperimentAssignment:
+      type: object
+      required: [experiment, unit_type, unit_id, inclusion_salt, variation_salt, inclusion_bucket, variation_bucket,
+        traffic_allocation, included, variation, sql]
+      properties:
+        experiment:
+          type: string
+          description: The experiment's key.
+        unit_type:
+          type: string
+        unit_id:
+          type: string
+        inclusion_salt:
+          type: string
+        variation_salt:
+          type: string
+        inclusion_bucket:
+          type: integer
+          minimum: 0
+          maximum: 9999
+          description: "`murmur3_32(\"{inclusion_salt}.{unit_id}\") mod 10000`."
+        variation_bucket:
+          type: integer
+          minimum: 0
+          maximum: 9999
+          description: |
+            `murmur3_32("{variation_salt}.{unit_id}") mod 10000`. Given for a
+            unit left out too: the bucket it would be assigned by should the
+            allocation grow to include it.
+        traffic_allocation:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        included:
+          type: boolean
+          description: Whether the inclusion bucket is below the traffic allocation.
+        variation:
+          type: string
+          nullable: true
+          description: The variation the unit is assigned; null when it is not included.
+        sql:
+          type: string
+          description: |
+            A ClickHouse query recomputing both buckets, `included` and
+            `variation` for the unit. Its subquery `(SELECT '<unit_id>' AS
+            unit_id)` stands for any table with a `unit_id` column.
+    HashCheckRequest:
+      type: object
+      required: [unit_ids]
+      properties:
+        unit_ids:
+          type: array
+          description: 1000 to 200000 unit IDs, each 1 to 256 bytes, as often as each occurs.
+          items:
+            type: string
+        salt:
+          type: string
+          description: The salt to hash with, 1 to 256 bytes; a random one in an experiment salt's form when omitted.
+        second_salt:
+          type: string
+          description: A second salt, 1 to 256 bytes, to test both salts' buckets for independence.
+        bins:
+          type: integer
+          default: 100
+          description: How many bins the 10000 buckets are grouped into, 2 to 10000.
+    HashCheck:
+      type: object
+      required: [salt, bins, counts, min, max, chi_square, df, p_value, verdict]
+      properties:
+        salt:
+          type: string
+          description: The salt hashed with, the one given or the random one drawn.
+        second_salt:
+          type: string
+        bins:
+          type: integer
+        counts:
+          type: array
+          description: How many unit IDs fell into each bin, in bin order.
+          items:
+            type: integer
+        min:
+          type: integer
+          description: The smallest count of a bin.
+        max:
+          type: integer
+          description: The largest count of a bin.
+        chi_square:
+          type: number
+          format: double
+        df:
+          type: integer
+          description: The degrees of freedom, `bins − 1`.
+        p_value:
+          type: number
+          format: double
+        verdict:
+          type: string
+          enum: [uniform, not_uniform]
+          description: "`uniform` when `p_value` is at least 0.001."
+        independence:
+          $ref: "#/components/schemas/HashCheckIndependence"
+    HashCheckIndependence:
+      type: object
+      description: The test of independence, present only with `second_salt`.
+      required: [chi_square, df, p_value, verdict]
+      properties:
+        chi_square:
+          type: number
+          format: double
+        df:
+          type: integer
+          description: (non-empty rows − 1) × (non-empty columns − 1).
+        p_value:
+          type: number
+          format: double
+        verdict:
+          type: string
+          enum: [independent, dependent, untestable]
+          description: |
+            `independent` when `p_value` is at least 0.001; `untestable` when
+            there are no degrees of freedom, every unit ID having fallen into
+            one bin under one of the salts.
     FlagDefinition:
       type: object
       required: [id, key, type, name, description, owner, tags, lifetime, expected_removal_at, automatic_exposure,

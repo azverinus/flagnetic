@@ -11,6 +11,7 @@ import (
 
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 )
 
@@ -196,4 +197,43 @@ func experimentOut(e experiments.Experiment) Experiment {
 		out.CreatedBy = &m
 	}
 	return out
+}
+
+// GetExperimentAssignment answers how an experiment treats one unit.
+func (a *api) GetExperimentAssignment(ctx context.Context, req GetExperimentAssignmentRequestObject) (GetExperimentAssignmentResponseObject, error) {
+	unitID := req.Params.UnitId
+	if unitID == "" || len(unitID) > flags.MaxUnitIDBytes {
+		return nil, flaghttp.InvalidRequest(fmt.Sprintf("unit_id must be 1 to %d bytes", flags.MaxUnitIDBytes))
+	}
+	as, err := a.h.GetExperimentAssignment.Handle(ctx, projectID(ctx), req.Experiment, unitID)
+	if err != nil {
+		return nil, err
+	}
+	return GetExperimentAssignment200JSONResponse{
+		Experiment: req.Experiment, UnitType: as.UnitType, UnitId: as.UnitID,
+		InclusionSalt: as.InclusionSalt, VariationSalt: as.VariationSalt,
+		InclusionBucket: as.InclusionBucket, VariationBucket: as.VariationBucket,
+		TrafficAllocation: as.TrafficAllocation, Included: as.Included, Variation: as.Variation, Sql: as.SQL,
+	}, nil
+}
+
+// CheckHashUniformity runs the uniformity check on the unit IDs sent.
+func (a *api) CheckHashUniformity(_ context.Context, req CheckHashUniformityRequestObject) (CheckHashUniformityResponseObject, error) {
+	b := req.Body
+	u, err := a.h.CheckHashUniformity.Handle(appexperiments.UniformityCommand{
+		UnitIDs: b.UnitIds, Salt: b.Salt, SecondSalt: b.SecondSalt, Bins: b.Bins,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := CheckHashUniformity200JSONResponse{
+		Salt: u.Salt, SecondSalt: u.SecondSalt, Bins: u.Bins, Counts: u.Counts, Min: u.Min, Max: u.Max,
+		ChiSquare: u.ChiSquare, Df: u.DF, PValue: u.PValue, Verdict: HashCheckVerdict(u.Verdict),
+	}
+	if i := u.Independence; i != nil {
+		out.Independence = &HashCheckIndependence{
+			ChiSquare: i.ChiSquare, Df: i.DF, PValue: i.PValue, Verdict: HashCheckIndependenceVerdict(i.Verdict),
+		}
+	}
+	return out, nil
 }

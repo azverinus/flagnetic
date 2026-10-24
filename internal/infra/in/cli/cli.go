@@ -32,6 +32,8 @@ Commands:
   migrate       Apply pending database migrations and exit
   healthcheck   Exit 0 when the local server is ready, 1 otherwise
   admin         Administer the instance from the command line (admin help)
+  hash-check    Check the bucketing hash's uniformity on unit IDs, offline
+                (hash-check -h)
   version       Print the version and exit
   help          Print this help
 
@@ -54,6 +56,8 @@ type options struct {
 	serverVersionNum func(context.Context, *pgxpool.Pool) (int, error)
 	routes           []route
 	workers          []worker.Worker
+	// stdin is what a command reads its input from.
+	stdin io.Reader
 	// canary is whether serve checks the secret key against the canary,
 	// which the server's own migrations make a table for.
 	canary bool
@@ -78,6 +82,10 @@ func withRoute(pattern string, h http.Handler) Option {
 	return func(o *options) { o.routes = append(o.routes, route{pattern, h}) }
 }
 
+func withStdin(r io.Reader) Option {
+	return func(o *options) { o.stdin = r }
+}
+
 func withWorker(w worker.Worker) Option {
 	return func(o *options) { o.workers = append(o.workers, w) }
 }
@@ -90,6 +98,7 @@ func Main(args []string, lookupEnv func(string) (string, bool), stdout, stderr i
 		migrations:       postgres.Migrations(),
 		serverVersionNum: postgres.ServerVersionNum,
 		canary:           true,
+		stdin:            os.Stdin,
 	}
 	for _, opt := range opts {
 		opt(&o)
@@ -152,6 +161,8 @@ func Main(args []string, lookupEnv func(string) (string, bool), stdout, stderr i
 			exited <- withConfig(func(cfg config.Config, log *slog.Logger) int {
 				return admin(stop, cl, cfg, log, o)
 			})
+		case "hash-check":
+			exited <- hashCheck(args[1:], o.stdin, stdout, stderr)
 		case "healthcheck":
 			code := withConfig(func(cfg config.Config, log *slog.Logger) int {
 				return healthcheck(stop, cfg, log)

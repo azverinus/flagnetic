@@ -126,6 +126,8 @@ type Handlers struct {
 	DeleteExperiment          *appexperiments.DeleteExperiment
 	RegenerateExperimentSalts *appexperiments.RegenerateSalts
 	CloneExperiment           *appexperiments.CloneExperiment
+	GetExperimentAssignment   *appexperiments.GetAssignment
+	CheckHashUniformity       *appexperiments.CheckUniformity
 
 	ListChangeRequests  *appgovernance.ListChangeRequests
 	CreateChangeRequest *appgovernance.CreateChangeRequest
@@ -233,6 +235,9 @@ func (rt router) HandleFunc(pattern string, h func(http.ResponseWriter, *http.Re
 	var opts []flaghttp.RouteOption
 	if op.ChecksPassword {
 		opts = append(opts, flaghttp.MaxBodyBytes(operations.PasswordBodyLimit))
+	}
+	if op.MaxBodyBytes > 0 {
+		opts = append(opts, flaghttp.MaxBodyBytes(op.MaxBodyBytes))
 	}
 	// A path parameter called secret holds one, such as an invitation's.
 	if strings.Contains(path, "{secret}") {

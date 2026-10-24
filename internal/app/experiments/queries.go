@@ -74,3 +74,20 @@ func (h *ListExperiments) Handle(ctx context.Context, project workspace.ProjectI
 	next := list[page.Limit-1].Key
 	return list, &next, nil
 }
+
+// GetAssignment answers how an experiment treats one unit.
+type GetAssignment struct{ store Reader }
+
+// NewGetAssignment returns the handler.
+func NewGetAssignment(store Reader) *GetAssignment { return &GetAssignment{store: store} }
+
+// Handle returns unitID's assignment in project's experiment with key, from
+// the experiment's own fields whatever its status, or not_found. It reads no
+// event and records nothing.
+func (h *GetAssignment) Handle(ctx context.Context, project workspace.ProjectID, key, unitID string) (experiments.Assignment, error) {
+	e, err := h.store.ExperimentByKey(ctx, project, key)
+	if err != nil {
+		return experiments.Assignment{}, experimentNotFound(err)
+	}
+	return e.Assign(unitID), nil
+}

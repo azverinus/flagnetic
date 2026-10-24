@@ -1064,6 +1064,114 @@ export type ExperimentClone = {
   name?: Name;
 };
 
+export type ExperimentAssignment = {
+  /**
+   * The experiment's key.
+   */
+  experiment: string;
+  unit_type: string;
+  unit_id: string;
+  inclusion_salt: string;
+  variation_salt: string;
+  /**
+   * `murmur3_32("{inclusion_salt}.{unit_id}") mod 10000`.
+   */
+  inclusion_bucket: number;
+  /**
+   * `murmur3_32("{variation_salt}.{unit_id}") mod 10000`. Given for a
+   * unit left out too: the bucket it would be assigned by should the
+   * allocation grow to include it.
+   *
+   */
+  variation_bucket: number;
+  traffic_allocation: number;
+  /**
+   * Whether the inclusion bucket is below the traffic allocation.
+   */
+  included: boolean;
+  /**
+   * The variation the unit is assigned; null when it is not included.
+   */
+  variation: string | null;
+  /**
+   * A ClickHouse query recomputing both buckets, `included` and
+   * `variation` for the unit. Its subquery `(SELECT '<unit_id>' AS
+   * unit_id)` stands for any table with a `unit_id` column.
+   *
+   */
+  sql: string;
+};
+
+export type HashCheckRequest = {
+  /**
+   * 1000 to 200000 unit IDs, each 1 to 256 bytes, as often as each occurs.
+   */
+  unit_ids: Array<string>;
+  /**
+   * The salt to hash with, 1 to 256 bytes; a random one in an experiment salt's form when omitted.
+   */
+  salt?: string;
+  /**
+   * A second salt, 1 to 256 bytes, to test both salts' buckets for independence.
+   */
+  second_salt?: string;
+  /**
+   * How many bins the 10000 buckets are grouped into, 2 to 10000.
+   */
+  bins?: number;
+};
+
+export type HashCheck = {
+  /**
+   * The salt hashed with, the one given or the random one drawn.
+   */
+  salt: string;
+  second_salt?: string;
+  bins: number;
+  /**
+   * How many unit IDs fell into each bin, in bin order.
+   */
+  counts: Array<number>;
+  /**
+   * The smallest count of a bin.
+   */
+  min: number;
+  /**
+   * The largest count of a bin.
+   */
+  max: number;
+  chi_square: number;
+  /**
+   * The degrees of freedom, `bins − 1`.
+   */
+  df: number;
+  p_value: number;
+  /**
+   * `uniform` when `p_value` is at least 0.001.
+   */
+  verdict: "uniform" | "not_uniform";
+  independence?: HashCheckIndependence;
+};
+
+/**
+ * The test of independence, present only with `second_salt`.
+ */
+export type HashCheckIndependence = {
+  chi_square: number;
+  /**
+   * (non-empty rows − 1) × (non-empty columns − 1).
+   */
+  df: number;
+  p_value: number;
+  /**
+   * `independent` when `p_value` is at least 0.001; `untestable` when
+   * there are no degrees of freedom, every unit ID having fallen into
+   * one bin under one of the salts.
+   *
+   */
+  verdict: "independent" | "dependent" | "untestable";
+};
+
 export type FlagDefinition = {
   id: string;
   /**
@@ -5985,6 +6093,126 @@ export type CloneExperimentResponses = {
 };
 
 export type CloneExperimentResponse = CloneExperimentResponses[keyof CloneExperimentResponses];
+
+export type GetExperimentAssignmentData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query: {
+    /**
+     * A unit ID of the experiment's unit type, 1 to 256 bytes.
+     */
+    unit_id: string;
+  };
+  url: "/projects/{project}/experiments/{experiment}/assignment";
+};
+
+export type GetExperimentAssignmentErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetExperimentAssignmentError =
+  GetExperimentAssignmentErrors[keyof GetExperimentAssignmentErrors];
+
+export type GetExperimentAssignmentResponses = {
+  /**
+   * The unit's buckets, inclusion and variation, and the query recomputing them.
+   */
+  200: ExperimentAssignment;
+};
+
+export type GetExperimentAssignmentResponse =
+  GetExperimentAssignmentResponses[keyof GetExperimentAssignmentResponses];
+
+export type CheckHashUniformityData = {
+  body: HashCheckRequest;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/hash-check";
+};
+
+export type CheckHashUniformityErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CheckHashUniformityError = CheckHashUniformityErrors[keyof CheckHashUniformityErrors];
+
+export type CheckHashUniformityResponses = {
+  /**
+   * The counts per bin and each test's statistic and verdict.
+   */
+  200: HashCheck;
+};
+
+export type CheckHashUniformityResponse =
+  CheckHashUniformityResponses[keyof CheckHashUniformityResponses];
 
 export type ListChangeRequestsData = {
   body?: never;
