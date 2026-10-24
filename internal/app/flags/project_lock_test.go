@@ -9,6 +9,7 @@ import (
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -34,7 +35,7 @@ func TestWritesOfAProjectGoneBeforeItsLockAreNotFound(t *testing.T) {
 	c := clock.System{}
 	ids := id.NewSource(c)
 	tx, ws, store := postgres.NewTransactor(pool), pgworkspace.NewStore(pool), pgflags.NewStore(pool)
-	rec := appflags.NewRecorder(pggovernance.NewAuditLog(pool), c, ids)
+	rec := appflags.NewRecorder(appgovernance.NewRecord(pggovernance.NewAuditLog(pool)), c, ids)
 	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool), c)
 	owners := appaccess.NewOwnership(pgaccess.NewStore(pool))
 	archival := appflags.ArchivalDeps{Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec}

@@ -38,7 +38,7 @@ func TestTheAuditGuardFindsASecretInAnyFieldOfAnEntry(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err = pggovernance.NewAuditLog(pool).Record(t.Context(), e); err != nil {
+			if err = pggovernance.NewAuditLog(pool).Append(t.Context(), e); err != nil {
 				t.Fatal(err)
 			}
 			err = testkit.FindSecretsInAudit(t.Context(), pool, []string{"another secret value", planted})
@@ -62,7 +62,7 @@ func TestTheAuditGuardAcceptsAnEntryNamingATokenByItsHint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := pggovernance.NewAuditLog(pool).Record(t.Context(), e); err != nil {
+	if err := pggovernance.NewAuditLog(pool).Append(t.Context(), e); err != nil {
 		t.Fatal(err)
 	}
 	if err := testkit.FindSecretsInAudit(t.Context(), pool, []string{planted}); err != nil {

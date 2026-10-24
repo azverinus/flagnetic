@@ -105,9 +105,11 @@ type Listener struct {
 // metrics on reg, and returns the background work their use cases need.
 func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Options) Background {
 	tx, auditLog := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
-	rec := appworkspace.NewRecorder(auditLog, d.Clock, d.IDs)
+	// Every context records its audit entries through the governance context.
+	audit := appgovernance.NewRecord(auditLog)
+	rec := appworkspace.NewRecorder(audit, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
-	flagStore, flagRec := pgflags.NewStore(d.Pool), appflags.NewRecorder(auditLog, d.Clock, d.IDs)
+	flagStore, flagRec := pgflags.NewStore(d.Pool), appflags.NewRecorder(audit, d.Clock, d.IDs)
 	// Every write changing what SDKs receive moves the rulesets it changed
 	// on, through the delivery context.
 	deliveryStore := pgdelivery.NewStore(d.Pool)
@@ -123,12 +125,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	})
 	deliveryStore.OnCommitted(rulesetCache.Committed)
 	sdkKeys := appdelivery.SDKKeyDeps{
-		Tx: tx, Store: deliveryStore, Audit: auditLog, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
+		Tx: tx, Store: deliveryStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 	}
 	configuration := appflags.ConfigurationDeps{Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec}
 	owners := appaccess.NewOwnership(accessStore)
 	experimentStore := pgexperiments.NewStore(d.Pool)
-	experimentRec := appexperiments.NewRecorder(auditLog, d.Clock, d.IDs)
+	experimentRec := appexperiments.NewRecorder(audit, d.Clock, d.IDs)
 	// Deleting a unit type or attribute asks the flags context what still
 	// names it.
 	declarationGuard := appflags.NewDeclarationGuard(flagStore)
@@ -154,41 +156,41 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
 		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
 		SignIn: appaccess.NewSignIn(appaccess.SignInDeps{
-			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
+			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
 		}),
-		SignOut:            appaccess.NewSignOut(tx, accessStore, auditLog, d.Clock, d.IDs),
+		SignOut:            appaccess.NewSignOut(tx, accessStore, audit, d.Clock, d.IDs),
 		ListSessions:       appaccess.NewListSessions(accessStore, settings, d.Clock),
-		RevokeSessions:     appaccess.NewRevokeSessions(tx, accessStore, settings, auditLog, d.Clock, d.IDs),
+		RevokeSessions:     appaccess.NewRevokeSessions(tx, accessStore, settings, audit, d.Clock, d.IDs),
 		GetAuthSettings:    appaccess.NewGetAuthSettings(settings),
-		UpdateAuthSettings: appaccess.NewUpdateAuthSettings(tx, accessStore, settings, auditLog, d.Clock, d.IDs),
+		UpdateAuthSettings: appaccess.NewUpdateAuthSettings(tx, accessStore, settings, audit, d.Clock, d.IDs),
 		ListMembers:        appaccess.NewListMembers(accessStore),
 		GetMember:          appaccess.NewGetMember(accessStore),
-		UpdateMember:       appaccess.NewUpdateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
-		UpdateMe:           appaccess.NewUpdateMe(tx, accessStore, auditLog, d.Clock, d.IDs, config.ConsoleLocales),
+		UpdateMember:       appaccess.NewUpdateMember(tx, accessStore, audit, d.Clock, d.IDs),
+		UpdateMe:           appaccess.NewUpdateMe(tx, accessStore, audit, d.Clock, d.IDs, config.ConsoleLocales),
 		ChangeMyPassword: appaccess.NewChangeMyPassword(appaccess.ChangeMyPasswordDeps{
-			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
+			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 		}),
-		DeactivateMember:  appaccess.NewDeactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs),
-		ReactivateMember:  appaccess.NewReactivateMember(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
-		InviteMember:      appaccess.NewInviteMember(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
-		ReissueInvitation: appaccess.NewReissueInvitation(tx, accessStore, auditLog, d.Clock, d.IDs, rand.Reader),
+		DeactivateMember:  appaccess.NewDeactivateMember(tx, accessStore, audit, d.Clock, d.IDs),
+		ReactivateMember:  appaccess.NewReactivateMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		InviteMember:      appaccess.NewInviteMember(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
+		ReissueInvitation: appaccess.NewReissueInvitation(tx, accessStore, audit, d.Clock, d.IDs, rand.Reader),
 		GetInvitation:     appaccess.NewGetInvitation(accessStore, d.Clock),
 		AcceptInvitation: appaccess.NewAcceptInvitation(appaccess.AcceptInvitationDeps{
-			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: auditLog, Clock: d.Clock, IDs: d.IDs,
+			Tx: tx, Store: accessStore, Settings: settings, Hasher: hasher, Audit: audit, Clock: d.Clock, IDs: d.IDs,
 			Random: rand.Reader, Key: sessionKey,
 		}),
 		ListPersonalTokens:  appaccess.NewListPersonalTokens(accessStore),
-		CreatePersonalToken: appaccess.NewCreatePersonalToken(tx, accessStore, settings, auditLog, d.Clock, d.IDs, rand.Reader),
-		RevokePersonalToken: appaccess.NewRevokePersonalToken(tx, accessStore, auditLog, d.Clock, d.IDs),
+		CreatePersonalToken: appaccess.NewCreatePersonalToken(tx, accessStore, settings, audit, d.Clock, d.IDs, rand.Reader),
+		RevokePersonalToken: appaccess.NewRevokePersonalToken(tx, accessStore, audit, d.Clock, d.IDs),
 		ListProjectMembers:  appaccess.NewListProjectMembers(accessStore),
 		CountProjectMembers: appaccess.NewCountProjectMembers(accessStore),
 		ListGrants:          appaccess.NewListGrants(accessStore),
-		CreateGrant:         appaccess.NewCreateGrant(tx, accessStore, auditLog, d.Clock, d.IDs),
-		DeleteGrant:         appaccess.NewDeleteGrant(tx, accessStore, auditLog, d.Clock, d.IDs),
+		CreateGrant:         appaccess.NewCreateGrant(tx, accessStore, audit, d.Clock, d.IDs),
+		DeleteGrant:         appaccess.NewDeleteGrant(tx, accessStore, audit, d.Clock, d.IDs),
 		ListProjectTokens:   appaccess.NewListProjectTokens(accessStore),
-		CreateProjectToken:  appaccess.NewCreateProjectToken(tx, accessStore, settings, auditLog, d.Clock, d.IDs, rand.Reader),
-		RevokeProjectToken:  appaccess.NewRevokeProjectToken(tx, accessStore, auditLog, d.Clock, d.IDs),
+		CreateProjectToken:  appaccess.NewCreateProjectToken(tx, accessStore, settings, audit, d.Clock, d.IDs, rand.Reader),
+		RevokeProjectToken:  appaccess.NewRevokeProjectToken(tx, accessStore, audit, d.Clock, d.IDs),
 		ProjectPermissions:  appaccess.NewProjectPermissions(accessStore),
 		WorkingProjects:     appaccess.NewWorkingProjects(accessStore),
 
@@ -364,7 +366,7 @@ func Hasher() *password.Hasher { return password.NewHasher(password.DefaultParam
 // Bootstrap returns the use case creating the first instance admin.
 func Bootstrap(d Deps) *appaccess.Bootstrap {
 	return appaccess.NewBootstrap(postgres.NewTransactor(d.Pool), pgaccess.NewStore(d.Pool),
-		Hasher(), pggovernance.NewAuditLog(d.Pool),
+		Hasher(), record(d),
 		d.Clock, d.IDs, rand.Reader)
 }
 
@@ -372,14 +374,14 @@ func Bootstrap(d Deps) *appaccess.Bootstrap {
 // command line.
 func CreateInstanceAdmin(d Deps) *appaccess.CreateInstanceAdmin {
 	return appaccess.NewCreateInstanceAdmin(postgres.NewTransactor(d.Pool), pgaccess.NewStore(d.Pool), Hasher(),
-		pggovernance.NewAuditLog(d.Pool), d.Clock, d.IDs, rand.Reader)
+		record(d), d.Clock, d.IDs, rand.Reader)
 }
 
 // PromoteMember returns the use case making a member an instance admin from
 // the command line.
 func PromoteMember(d Deps) *appaccess.PromoteMember {
 	return appaccess.NewPromoteMember(postgres.NewTransactor(d.Pool), pgaccess.NewStore(d.Pool),
-		pggovernance.NewAuditLog(d.Pool), d.Clock, d.IDs)
+		record(d), d.Clock, d.IDs)
 }
 
 // InstanceAdminExists returns the query telling whether the instance has an
@@ -399,4 +401,10 @@ func Console(edge *flaghttp.Server, defaultLocale string) (bool, error) {
 	}
 	edge.Console(h)
 	return built, nil
+}
+
+// record returns the audit port of a use case run from the command line,
+// recording through the governance context like every other.
+func record(d Deps) *appgovernance.Record {
+	return appgovernance.NewRecord(pggovernance.NewAuditLog(d.Pool))
 }

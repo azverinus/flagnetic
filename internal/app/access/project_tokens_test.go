@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -46,7 +47,7 @@ func newProjectTokens(t *testing.T) projectTokens {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx, store, audit := postgres.NewTransactor(pool), pgaccess.NewStore(pool), pggovernance.NewAuditLog(pool)
+	tx, store, audit := postgres.NewTransactor(pool), pgaccess.NewStore(pool), appgovernance.NewRecord(pggovernance.NewAuditLog(pool))
 	return projectTokens{
 		create:  appaccess.NewCreateProjectToken(tx, store, pgaccess.NewAuthSettingsCache(pool), audit, c, ids, rand.Reader),
 		revoke:  appaccess.NewRevokeProjectToken(tx, store, audit, c, ids),

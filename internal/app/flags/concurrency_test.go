@@ -9,6 +9,7 @@ import (
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
@@ -51,10 +52,10 @@ func newApp(t *testing.T) *app {
 	c := clock.System{}
 	ids := id.NewSource(c)
 	tx, ws, store := postgres.NewTransactor(pool), pgworkspace.NewStore(pool), pgflags.NewStore(pool)
-	rec := appflags.NewRecorder(pggovernance.NewAuditLog(pool), c, ids)
+	rec := appflags.NewRecorder(appgovernance.NewRecord(pggovernance.NewAuditLog(pool)), c, ids)
 	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool), c)
 	owners := appaccess.NewOwnership(pgaccess.NewStore(pool))
-	wsRec := appworkspace.NewRecorder(pggovernance.NewAuditLog(pool), c, ids)
+	wsRec := appworkspace.NewRecorder(appgovernance.NewRecord(pggovernance.NewAuditLog(pool)), c, ids)
 	return &app{
 		t: t, ids: ids, ws: ws, store: store, admin: testkit.NewMember(t, pool, testkit.AsInstanceAdmin()).ID,
 		req: governance.Request{Actor: governance.CLIActor("test")},
