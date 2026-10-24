@@ -183,3 +183,76 @@ def test_nothing_evaluated_and_nothing_queued_is_nothing_sent(ingest: Any) -> No
     client.flush()
     client.close()
     assert server.batches == []
+
+
+def test_close_posts_a_failing_summary_once(ingest: Any) -> None:
+    # A Retry-After within the interval keeps the report waiting to go again.
+    server, client = ingest(lambda _n: Response(503, {"Retry-After": "60"}), send_exposures=False)
+    client.get_bool(CONTEXT, "checkout", False)
+    client.flush()
+    # Evaluated while the report waits: rows of a newer window.
+    client.get_bool(CONTEXT, "checkout", False)
+    client.close()
+    first, second = server.events("evaluation_summary")
+    assert first["event_id"] == second["event_id"], "close posts the report in progress, not the newer rows"
+
+
+def test_close_cuts_an_events_batch_in_flight_and_sends_it_again(ingest: Any) -> None:
+    released = threading.Event()
+
+    def first_hangs(n: int) -> Response:
+        if n == 1:
+            released.wait(10)
+        return Response(202, {"Content-Type": "application/json"}, ACCEPTED)
+
+    server, client = ingest(first_hangs, send_summaries=False, request_timeout=30)
+    try:
+        client.alias("anonymous", "d-8f1c", "user", "u-1001")
+        client.flush(timeout=0)
+        assert eventually(lambda: [] if server.events("alias") else ["not posted"], timeout=2) == []
+        start = time.monotonic()
+        client.close(timeout=5)
+        assert time.monotonic() - start < 2, "close waited for the request in flight"
+        first, second = server.events("alias")
+        assert first["event_id"] == second["event_id"]
+    finally:
+        released.set()
+
+
+def test_flush_from_a_listener_sends_at_once() -> None:
+    lock = threading.Lock()
+    served: dict[str, Any] = {"document": RULESET, "etag": '"1"'}
+    aliases: list[str] = []
+
+    def handler(request: Request) -> Response:
+        with lock:
+            if request.path.endswith("/events"):
+                aliases.extend(e["from_unit_id"] for e in json.loads(request.body)["events"])
+                return Response(202, {"Content-Type": "application/json"}, ACCEPTED)
+            document, etag = served["document"], served["etag"]
+        return Response(200, {"Content-Type": "application/json", "ETag": etag}, document)
+
+    server = MockServer(handler)
+    client = flagnetic.Client(
+        SDK_KEY, server.url, stream=False, send_summaries=False, flush_interval=3600, _time_divisor=100
+    )
+    took: list[float] = []
+
+    def listener(_keys: list[str]) -> None:
+        start = time.monotonic()
+        client.flush(timeout=5)
+        took.append(time.monotonic() - start)
+
+    try:
+        assert client.ready() == flagnetic.Stage.FRESH
+        client.on_change(listener)
+        client.alias("anonymous", "d-8f1c", "user", "u-1001")
+        with lock:
+            served.update(document=read("server/ruleset-after-kill-switch.json"), etag='"2"')
+        assert eventually(lambda: [] if took else ["listener never ran"], timeout=7) == []
+        assert took[0] < 2, "flush waited for the thread it runs on"
+        with lock:
+            assert aliases == ["d-8f1c"]
+    finally:
+        client.close(timeout=1)
+        server.close()

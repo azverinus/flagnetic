@@ -383,12 +383,6 @@ class EventQueue:
                 duplicates=sent.duplicates,
             )
 
-    def clear(self) -> None:
-        """Forgets what is queued: a forked child leaves its parent's events to the parent."""
-        with self._lock:
-            self._queue = []
-            self._full = False
-
 
 @dataclass(slots=True)
 class _Window:
@@ -454,8 +448,15 @@ class Summaries:
         return self._retry_at if self._pending else self._next_report
 
     def run(self, now: float, *, flush: bool = False, final: bool = False) -> None:
-        if self._pending and (now >= self._retry_at or final):
-            self._attempt(now, final=final)
+        # At close, a report in progress the server did not take ends it: posting the newer rows
+        # after it would only wait out another failure.
+        if (
+            self._pending
+            and (now >= self._retry_at or final)
+            and not self._attempt(now, final=final)
+            and final
+        ):
+            return
         if not (now >= self._next_report or flush or final):
             return
         self._next_report = now + self._timing.summary_interval
@@ -469,15 +470,6 @@ class Summaries:
             return
         self._start_report(window, now)
         self._attempt(now, final=final)
-
-    def clear(self) -> None:
-        """Forgets the counts: a forked child leaves its parent's evaluations to the parent."""
-        with self._lock:
-            self._counts = {}
-            self._start = datetime.now(UTC)
-        self._kept = None
-        self._report = None
-        self._pending = []
 
     def _take(self) -> _Window | None:
         """Closes the current window, merging in the one a failed report kept unless it is too old."""
@@ -531,8 +523,8 @@ class Summaries:
         self._failures = 0
         self._give_up_at = now + self._timing.summary_interval
 
-    def _attempt(self, now: float, *, final: bool) -> None:
-        """Sends the report's batches in order until one fails."""
+    def _attempt(self, now: float, *, final: bool) -> bool:
+        """Sends the report's batches in order until one fails; whether all of them went."""
         while self._pending:
             batch = self._ingest.pack(self._pending)[0]
             sent = self._ingest.post(batch)
@@ -549,7 +541,7 @@ class Summaries:
                     backoff_ceiling(self._refusals, self._timing.retry_base, self._timing.unauthorized_cap)
                 )
                 self._give_back()
-                return
+                return False
             self._failures += 1
             # Never sooner than the server's Retry-After: a summary covers a whole interval, so
             # waiting as asked costs nothing; a wait beyond the interval gives the attempt up.
@@ -568,10 +560,11 @@ class Summaries:
             self._log(logging.WARNING, _events.EVENTS_FAILED, **fields)
             if final or now + wait >= self._give_up_at:
                 self._give_back()
-                return
+                return False
             self._retry_at = now + wait
-            return
+            return False
         self._report = None
+        return True
 
     def _give_back(self) -> None:
         """Puts the rows of every undelivered event back into the next window, over the same interval."""
@@ -653,8 +646,3 @@ class Reporter:
             flushes, self._flushes = self._flushes, []
         for done in flushes:
             done.set()
-
-    def clear(self) -> None:
-        for part in (self.queue, self.summaries):
-            if part is not None:
-                part.clear()

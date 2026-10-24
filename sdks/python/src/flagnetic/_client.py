@@ -38,7 +38,7 @@ from ._detail import Detail, Experiment, Stage, Status
 from ._eval import SCHEMA_VERSION, Context, Ruleset, RulesetError, decode, evaluate, parse
 from ._events import Logger, standard_logger
 from ._ingest import Ingest, event_id
-from ._overrides import LocalOverrides, Override
+from ._overrides import LocalOverride, LocalOverrides
 from ._reporting import (
     EventQueue,
     Exposure,
@@ -338,6 +338,7 @@ class Client:
             agent=agent,
             schema_version=SCHEMA_VERSION,
             reporter=reporter,
+            ingest=ingest if reporter is not None else None,
         )
         self._delivery = delivery
         delivery.start()
@@ -481,7 +482,7 @@ class Client:
         )
 
     def _local(
-        self, loaded: _Loaded | None, key: str, local: Override, requested: str, default: Any
+        self, loaded: _Loaded | None, key: str, local: LocalOverride, requested: str, default: Any
     ) -> Detail:
         """Serves a local override, which follows the getter's type rules like a flag's value does."""
         flag_type = _NUMBER if requested == _INT64 else requested
@@ -683,6 +684,10 @@ class Client:
         if reporter is None or delivery is None or self._closed:
             return
         done = reporter.request_flush()
+        if delivery.on_thread():
+            # A listener runs on the delivery thread, which would never get to a flush it waited for.
+            reporter.run(time.monotonic())
+            return
         delivery.wake()
         done.wait(timeout)
 

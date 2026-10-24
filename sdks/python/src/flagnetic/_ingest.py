@@ -194,6 +194,18 @@ class Ingest:
             with contextlib.suppress(OSError):
                 sock.shutdown(socket.SHUT_RDWR)
 
+    def abandon(self) -> None:
+        """Lets go of a request's socket in a forked child.
+
+        It is closed, never shut down: the parent shares it and keeps using it.
+        """
+        with self._lock:
+            sock = getattr(self._conn, "sock", None)
+            self._conn = None
+        if sock is not None:
+            with contextlib.suppress(OSError):
+                sock.close()
+
     def _envelope(self, events: Sequence[Event]) -> bytes:
         return json.dumps(
             {

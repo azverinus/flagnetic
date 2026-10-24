@@ -29,7 +29,7 @@ class LocalOverrideRefused(Exception):
         super().__init__(f"flagnetic: the local override of {key!r} is refused in a protected environment")
 
 
-class Override(NamedTuple):
+class LocalOverride(NamedTuple):
     type: str
     value: Any
 
@@ -74,7 +74,7 @@ class LocalOverrides:
         self._changed = changed
         self._lock = threading.Lock()
         # Replaced, never changed in place, so a getter reads it without the lock.
-        self.by_key: dict[str, Override] = {}
+        self.by_key: dict[str, LocalOverride] = {}
 
     def set(self, key: str, value: Any) -> None:
         """Serves ``value`` for the flag ``key`` in place of what the ruleset serves.
@@ -105,7 +105,7 @@ class LocalOverrides:
         if flag_type == "json":
             value = copy.deepcopy(value)
         with self._lock:
-            self.by_key = {**self.by_key, key: Override(flag_type, value)}
+            self.by_key = {**self.by_key, key: LocalOverride(flag_type, value)}
         self._log(logging.WARNING, _events.OVERRIDE_SET, flag=key)
         self._changed([key])
 

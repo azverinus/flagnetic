@@ -37,9 +37,9 @@ on automatic exposure for the flag.
 
 ```python
 price = client.get_string(context, "pricing", "Built-in price")
-client.exposure(context, "pricing")                   # reports the assignment just served
+client.exposure(context, "pricing")  # reports the assignment just served
 client.alias("anonymous", "d-8f1c", "user", "u-1001")  # after sign-up
-client.flush(timeout=5)                                # close() flushes too
+client.flush(timeout=5)  # close() flushes too
 ```
 
 ## Pre-forking servers and asyncio
@@ -63,9 +63,9 @@ await client.aclose()
 from flagnetic import testing
 
 client = testing.from_values({"new-checkout": True})  # or from_document(...), from_file(path)
-client.set("new-checkout", False)                     # change listeners fire
-client.reload()                                       # back to what it was built from
-client.recorder.exposures()                           # what it would have reported
+client.set("new-checkout", False)  # change listeners fire
+client.reload()  # back to what it was built from
+client.recorder.exposures()  # what it would have reported
 ```
 
 `Client(..., allow_overrides=True)` enables `client.local_overrides.set(key, value)`, served with reason

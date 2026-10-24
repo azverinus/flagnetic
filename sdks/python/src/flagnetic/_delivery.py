@@ -29,6 +29,7 @@ from . import _events
 from ._sse import ChunkedDecoder, EventStreamParser, Frame, StreamError
 
 if TYPE_CHECKING:
+    from ._ingest import Ingest
     from ._reporting import Reporter
 
 API_PATH = "/sdk/v1"
@@ -208,11 +209,14 @@ class Delivery:
         agent: str,
         schema_version: int,
         reporter: Reporter | None = None,
+        ingest: Ingest | None = None,
         ssl_context: ssl.SSLContext | None = None,
         sleep_hook: Callable[[], None] | None = None,
     ) -> None:
         self._host = host
         self._reporter = reporter
+        # The reporter's connection to the events endpoint, cut at close like the ruleset's.
+        self._ingest = ingest
         parts = urlsplit(base_url)
         self._secure = parts.scheme == "https"
         self._netloc_host = parts.hostname or ""
@@ -279,6 +283,10 @@ class Delivery:
             if sock is not None:
                 with contextlib.suppress(OSError):
                     sock.shutdown(socket.SHUT_RDWR)
+        # An events batch in flight fails now and goes again, with the same event IDs, in the last
+        # report, rather than holding the thread until its timeout while close waits.
+        if self._ingest is not None:
+            self._ingest.abort()
         if self._thread.is_alive() and threading.current_thread() is not self._thread:
             self._thread.join(timeout)
 
@@ -296,6 +304,12 @@ class Delivery:
             if sock is not None:
                 with contextlib.suppress(OSError):
                     sock.close()
+        if self._ingest is not None:
+            self._ingest.abandon()
+
+    def on_thread(self) -> bool:
+        """Whether the caller is the delivery thread itself, as a listener is."""
+        return threading.current_thread() is self._thread
 
     # -- the loop ---------------------------------------------------------
 
