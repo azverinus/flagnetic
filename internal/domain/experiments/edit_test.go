@@ -87,13 +87,16 @@ func TestAnEditIsRefusedWithEveryFieldToFix(t *testing.T) {
 	}
 }
 
-func TestOnlyADraftIsEditedDeletedOrGivenNewSalts(t *testing.T) {
+func TestOnlyADraftIsDeletedOrGivenNewSaltsAndNoneIsEditedPastRunning(t *testing.T) {
 	for _, s := range []experiments.Status{experiments.StatusRunning, experiments.StatusStopped, experiments.StatusArchived} {
 		e := draft(t)
 		e.Status = s
-		_, _, edit := e.Change(experiments.Change{Name: ptr("New")}, later)
 		_, salts := e.RegenerateSalts(experiments.Salts{Inclusion: "0123456789abcdef", Variation: "fedcba9876543210"}, later)
-		for what, err := range map[string]error{"edit": edit, "delete": e.CanDelete(), "salts": salts} {
+		refusals := map[string]error{"delete": e.CanDelete(), "salts": salts}
+		if s != experiments.StatusRunning {
+			_, _, refusals["edit"] = e.Change(experiments.Change{Name: ptr("New")}, later)
+		}
+		for what, err := range refusals {
 			if got, ok := apperrors.From(err); !ok || got.Kind != apperrors.KindConflict || got.Code != "not_draft" {
 				t.Errorf("%s of a %s experiment = %v, want conflict not_draft", what, s, err)
 			}

@@ -37,9 +37,18 @@ type Change struct {
 // Change returns the experiment with ch applied at now, its version
 // incremented, and whether anything changed: an edit to the values the
 // experiment already has changes nothing. A request breaking several rules is
-// invalid_experiment with every field to fix; only a draft is edited
-// (not_draft), judged once the fields are.
+// invalid_experiment with every field to fix. A draft is edited in full; a
+// running experiment refuses a change to its split first (frozen), and its
+// traffic allocation only grows (traffic_allocation_decrease, judged once the
+// fields are); past running nothing is edited (not_draft), judged once the
+// fields are.
 func (e Experiment) Change(ch Change, now time.Time) (Experiment, bool, error) {
+	if e.Status == StatusRunning {
+		var err error
+		if ch, err = e.frozen(ch); err != nil {
+			return e, false, err
+		}
+	}
 	c := newCheck()
 	if ch.Key != nil {
 		c.add("/key", "immutable", "an experiment's key never changes; create a new one instead", nil)
@@ -91,7 +100,13 @@ func (e Experiment) Change(ch Change, now time.Time) (Experiment, bool, error) {
 	if err := c.err(); err != nil {
 		return e, false, err
 	}
-	if e.Status != StatusDraft {
+	switch e.Status {
+	case StatusDraft:
+	case StatusRunning:
+		if out.TrafficAllocation < e.TrafficAllocation {
+			return e, false, errAllocationDecrease
+		}
+	default:
 		return e, false, errNotDraft
 	}
 	if out.sameDefinition(e) {
