@@ -289,6 +289,72 @@ func (s *Store) Aliases(ctx context.Context, environment workspace.EnvironmentID
 	return out, nil
 }
 
+// LinkAliases links the pair of each alias in its environment, keeping per
+// pair the alias that occurred earliest. Pairs are written in their order,
+// so batches linking the same pairs at once wait on each other rather than
+// deadlock; a pair named twice in aliases is written once, since one
+// statement cannot update a row twice.
+func (s *Store) LinkAliases(ctx context.Context, aliases []events.AliasRecord) error {
+	if len(aliases) == 0 {
+		return nil
+	}
+	n := len(aliases)
+	var (
+		environments, eventIDs             = make([][16]byte, n), make([][16]byte, n)
+		fromTypes, fromIDs, toTypes, toIDs = make([]string, n), make([]string, n), make([]string, n), make([]string, n)
+		occurredAt, receivedAt             = make([]time.Time, n), make([]time.Time, n)
+	)
+	for i, a := range aliases {
+		environments[i], eventIDs[i] = a.Key.Environment.Bytes(), a.EventID.Bytes()
+		fromTypes[i], fromIDs[i], toTypes[i], toIDs[i] = a.Alias.FromUnitType, a.Alias.FromUnitID, a.Alias.ToUnitType, a.Alias.ToUnitID
+		occurredAt[i], receivedAt[i] = a.Alias.OccurredAt, a.ReceivedAt
+	}
+	_, err := s.db(ctx).Exec(ctx, `
+		INSERT INTO alias_links (environment_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id, event_id,
+			occurred_at, received_at)
+		SELECT DISTINCT ON (t.environment_id, t.from_unit_type, t.from_unit_id, t.to_unit_type, t.to_unit_id)
+			t.environment_id, t.from_unit_type, t.from_unit_id, t.to_unit_type, t.to_unit_id, t.event_id, t.occurred_at,
+			t.received_at
+		FROM unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[], $6::uuid[], $7::timestamptz[],
+			$8::timestamptz[]) AS t (environment_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id, event_id,
+			occurred_at, received_at)
+		ORDER BY t.environment_id, t.from_unit_type, t.from_unit_id, t.to_unit_type, t.to_unit_id, t.occurred_at, t.event_id
+		ON CONFLICT (environment_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id) DO UPDATE SET
+			event_id = excluded.event_id, occurred_at = excluded.occurred_at, received_at = excluded.received_at
+		WHERE excluded.occurred_at < alias_links.occurred_at`,
+		environments, fromTypes, fromIDs, toTypes, toIDs, eventIDs, occurredAt, receivedAt)
+	if err != nil {
+		return fmt.Errorf("linking aliases: %w", err)
+	}
+	return nil
+}
+
+// AliasLinks returns the alias links of environment, in the order of their
+// pairs.
+func (s *Store) AliasLinks(ctx context.Context, environment workspace.EnvironmentID) ([]events.AliasLink, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT event_id, from_unit_type, from_unit_id, to_unit_type, to_unit_id, occurred_at,
+			received_at
+		FROM alias_links WHERE environment_id = $1
+		ORDER BY from_unit_type, from_unit_id, to_unit_type, to_unit_id`, environment.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("reading alias links: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (events.AliasLink, error) {
+		var (
+			l     events.AliasLink
+			event [16]byte
+		)
+		scanErr := row.Scan(&event, &l.Alias.FromUnitType, &l.Alias.FromUnitID, &l.Alias.ToUnitType, &l.Alias.ToUnitID,
+			&l.Alias.OccurredAt, &l.ReceivedAt)
+		l.EventID = id.FromBytes[delivery.Event](event)
+		return l, scanErr
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading alias links: %w", err)
+	}
+	return out, nil
+}
+
 // Experiments returns the experiments of project keyed by keys, of any status,
 // by key, each locked against deletion until the unit of work ends: the count
 // of a refusal references its experiment, and an experiment deleted between

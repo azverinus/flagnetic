@@ -986,7 +986,11 @@ components:
           format: int64
     AliasEvent:
       type: object
-      description: Links the unit ID in use before sign-up to the one after.
+      description: >-
+        Links the unit ID in use before sign-up to the one after. Both unit
+        types must be declared by the project (`undeclared_unit_type`) and
+        differ from each other (`event_invalid`). An accepted alias links its
+        pair once per environment, keeping the alias that occurred earliest.
       required: [type, event_id, occurred_at, from_unit_type, from_unit_id, to_unit_type, to_unit_id]
       properties:
         type:

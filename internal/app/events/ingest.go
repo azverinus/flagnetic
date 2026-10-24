@@ -48,6 +48,9 @@ type EventStore interface {
 		at time.Time) (map[delivery.EventID]bool, error)
 	SaveSummaries(ctx context.Context, rows []delivery.SummaryRecord) error
 	SaveAliases(ctx context.Context, aliases []events.AliasRecord) error
+	// LinkAliases links the pair of each alias in its environment, once per
+	// pair, keeping the alias that occurred earliest.
+	LinkAliases(ctx context.Context, aliases []events.AliasRecord) error
 	SaveExposures(ctx context.Context, exposures []events.ExposureRecord) error
 	// CountRejections adds counts to those of exposures refused in
 	// environment, as of at.
@@ -288,6 +291,11 @@ func (h *IngestEvents) write(ctx context.Context, key delivery.SDKKey, sdk deliv
 	}
 	if len(aliases) > 0 {
 		if err := h.store.SaveAliases(ctx, aliases); err != nil {
+			return BatchResult{}, err
+		}
+		// The link outlives the raw alias, which retention drops: it is what
+		// joins an anonymous ID to the ID known after sign-up for good.
+		if err := h.store.LinkAliases(ctx, aliases); err != nil {
 			return BatchResult{}, err
 		}
 	}
