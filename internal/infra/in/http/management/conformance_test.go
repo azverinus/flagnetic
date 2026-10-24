@@ -7,8 +7,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/azverinus/flagnetic/eval"
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
@@ -23,12 +27,12 @@ const conformanceDir = "../../../../../conformance/fixtures"
 var fixturesNotRulesets = []string{"murmur3", "regex"}
 
 // refusedByTheAPI are the fixture flags and segments the management API
-// refuses to write: experiment serves, which a configuration cannot hold
-// yet, and documents broken on purpose to pin how an evaluator copes with
-// what no valid write produces (dangling references, unknown constructs,
-// cycles, unparsable values). The cases of a flag reaching one of them are
-// not run. Every refusal must be listed here and every entry refused, so a
-// new fixture is never skipped silently.
+// refuses to write: documents broken on purpose to pin how an evaluator
+// copes with what no valid write produces (dangling references, unknown
+// constructs, cycles, unparsable values, experiment serves no experiment
+// could be). The cases of a flag reaching one of them are not run. Every
+// refusal must be listed here and every entry refused, so a new fixture is
+// never skipped silently.
 var refusedByTheAPI = []string{
 	// Values no write accepts: a date and semantic versions that do not
 	// parse.
@@ -54,19 +58,9 @@ var refusedByTheAPI = []string{
 	"errors/codes operator_not_for_type",
 	"errors/codes undeclared_attribute",
 	"errors/codes wrong_value_type",
-	// Experiment serves.
-	"experiments/allocation-growth alloc_10000",
-	"experiments/allocation-growth alloc_2000",
-	"experiments/allocation-growth alloc_5000",
-	"experiments/automatic-exposure auto_off",
-	"experiments/automatic-exposure auto_on",
-	"experiments/boundaries alloc_0",
-	"experiments/boundaries alloc_10000",
-	"experiments/boundaries alloc_7000",
-	"experiments/boundaries conditions_fail",
-	"experiments/boundaries keyed_on_user",
-	"experiments/boundaries two_experiments",
-	"experiments/boundaries weights_235",
+	// Experiment serves no experiment could be: out of range or invalid
+	// weights, which creating one refuses, and serves lacking what the
+	// server gives an experiment from its own (key, unit type, salts).
 	"experiments/invalid-allocation-above-range invalid",
 	"experiments/invalid-allocation-below-range invalid",
 	"experiments/invalid-duplicate-weight-variation invalid",
@@ -79,12 +73,6 @@ var refusedByTheAPI = []string{
 	"experiments/invalid-unknown-weight-variation invalid",
 	"experiments/invalid-weights-above-total invalid",
 	"experiments/invalid-weights-below-total invalid",
-	"overrides/influence checkout",
-	"overrides/influence checkout_not_included",
-	"overrides/influence checkout_off",
-	"overrides/influence checkout_shadow_prerequisite_fails",
-	"overrides/influence checkout_shadow_rule_first",
-	"overrides/influence gated_experiment",
 	// The writes closing each cycle.
 	"prerequisites/cycle b",
 	"prerequisites/cycle back",
@@ -123,6 +111,9 @@ type loadedFixture struct {
 	// fixtureIDs maps each identifier the server gave a rule to the
 	// fixture's, which may be empty.
 	fixtureIDs map[string]string
+	// experiments are the experiments created for each written flag's
+	// rules serving one, by flag key and rule index.
+	experiments map[string]map[int]management.Experiment
 }
 
 func TestEvaluateAgreesWithTheEvaluatorOnConformanceRulesets(t *testing.T) {
@@ -148,7 +139,7 @@ func TestEvaluateAgreesWithTheEvaluatorOnConformanceRulesets(t *testing.T) {
 			}
 			reference := withServerRules(t, f.Ruleset, loaded)
 			for _, c := range f.Cases {
-				reached, rollouts := reach(f.Ruleset, c.Flag)
+				reached, drawn := reach(f.Ruleset, c.Flag)
 				if slices.ContainsFunc(reached, func(key string) bool { return loaded.refused[key] != "" }) {
 					continue
 				}
@@ -170,9 +161,10 @@ func TestEvaluateAgreesWithTheEvaluatorOnConformanceRulesets(t *testing.T) {
 				if server, reference := resultJSON(t, got, nil), referenceJSON(t, want); !sameJSON(t, server, reference) {
 					t.Errorf("%s: server %s, reference evaluator %s", c.Name, server, reference)
 				}
-				// Without a rollout on the way, the salts the server gave
-				// change nothing, so the fixture's own expectation holds.
-				if server := resultJSON(t, got, loaded.fixtureIDs); !rollouts && !sameJSON(t, server, c.Expect) {
+				// Without a rollout or an experiment on the way, the salts
+				// the server drew change nothing, so the fixture's own
+				// expectation holds.
+				if server := resultJSON(t, got, loaded.fixtureIDs); !drawn && !sameJSON(t, server, c.Expect) {
 					t.Errorf("%s: server %s, fixture expects %s", c.Name, server, c.Expect)
 				}
 			}
@@ -212,7 +204,8 @@ func conformanceFiles(t *testing.T) []string {
 // configurations, recording what the API refuses.
 func loadFixture(t *testing.T, c *management.ClientWithResponses, project string, rs eval.Ruleset) loadedFixture {
 	t.Helper()
-	l := loadedFixture{refused: map[string]string{}, ruleIDs: map[string][]string{}, salts: map[string][]string{}, fixtureIDs: map[string]string{}}
+	l := loadedFixture{refused: map[string]string{}, ruleIDs: map[string][]string{}, salts: map[string][]string{},
+		fixtureIDs: map[string]string{}, experiments: map[string]map[int]management.Experiment{}}
 	units := map[string]bool{}
 	for _, u := range do(c.ListUnitTypesWithResponse(t.Context(), project)).JSON200.Items {
 		units[u.Key] = true
@@ -267,7 +260,12 @@ func loadFixture(t *testing.T, c *management.ClientWithResponses, project string
 		if l.refused[f.Key] != "" {
 			continue
 		}
-		res := putConfiguration(t, c, project, f.Key, "production", 1, configurationOf(f))
+		created, refusal := createExperiments(t, c, project, f)
+		if refusal != "" {
+			l.refused[f.Key] = refusal
+			continue
+		}
+		res := putConfiguration(t, c, project, f.Key, "production", 1, configurationOf(f, created))
 		if res.JSON200 == nil {
 			l.refused[f.Key] = string(res.Body)
 			continue
@@ -277,8 +275,52 @@ func loadFixture(t *testing.T, c *management.ClientWithResponses, project string
 			l.salts[f.Key] = append(l.salts[f.Key], valueOr(r.Serve.Salt))
 			l.fixtureIDs[r.Id.String()] = f.Rules[j].ID
 		}
+		// Each experiment starts once its rule is written, so the ruleset
+		// carries what it serves.
+		for j, e := range created {
+			started := startExperiment(t, c, project, e.Key, e.Version)
+			if started.JSON200 == nil {
+				t.Fatalf("start %s = %d %s", e.Key, started.StatusCode(), started.Body)
+			}
+			created[j] = *started.JSON200
+		}
+		l.experiments[f.Key] = created
 	}
 	return l
+}
+
+// createExperiments creates a draft experiment of f for each of its rules
+// serving one, by rule index, keyed after the flag and the rule: the API
+// binds an experiment to one flag, where a fixture may serve one key from
+// several flags with other weights. The server draws the salts. It answers
+// why f cannot be written instead when a serve lacks what an experiment
+// always has, or the API refuses the experiment.
+func createExperiments(t *testing.T, c *management.ClientWithResponses, project string, f eval.Flag) (map[int]management.Experiment, string) {
+	t.Helper()
+	out := map[int]management.Experiment{}
+	for j, r := range f.Rules {
+		s := r.Serve
+		if s.Kind != eval.ServeExperiment {
+			continue
+		}
+		if s.Experiment == "" || s.UnitType == "" || s.InclusionSalt == "" || s.VariationSalt == "" {
+			return nil, "an experiment always has a key, a unit type and both salts"
+		}
+		ws := make([]management.ExperimentWeight, len(s.Weights))
+		for i, w := range s.Weights {
+			ws[i] = management.ExperimentWeight{Variation: w.Variation, Weight: w.Weight}
+		}
+		res := do(c.CreateExperimentWithResponse(t.Context(), project, management.ExperimentCreate{
+			Key: f.Key + "_" + strconv.Itoa(j), Name: s.Experiment, Flag: f.Key, UnitType: s.UnitType, Variations: ws,
+			TrafficAllocation: &s.TrafficAllocation, Hypothesis: ptr("Pinned by a conformance fixture."),
+			ExpectedEndAt: &openapi_types.Date{Time: time.Date(2027, time.January, 31, 0, 0, 0, 0, time.UTC)},
+		}))
+		if res.JSON201 == nil {
+			return nil, string(res.Body)
+		}
+		out[j] = *res.JSON201
+	}
+	return out, ""
 }
 
 func sameVariations(got []management.Variation, want []eval.Variation) bool {
@@ -305,8 +347,9 @@ func nonEmpty(s string) *string {
 }
 
 // configurationOf returns f's configuration as a write sends it: rules
-// without identifiers or salts, which the server gives.
-func configurationOf(f eval.Flag) management.FlagConfigurationPut {
+// without identifiers or salts, which the server gives, serving the
+// experiments created for them by rule index.
+func configurationOf(f eval.Flag, created map[int]management.Experiment) management.FlagConfigurationPut {
 	out := management.FlagConfigurationPut{On: f.On, OffVariation: f.OffVariation, Fallthrough: f.Fallthrough,
 		Prerequisites: &[]management.Prerequisite{}, Overrides: &[]management.OverrideInput{}, Rules: &[]management.RuleInput{}}
 	for _, p := range f.Prerequisites {
@@ -315,10 +358,13 @@ func configurationOf(f eval.Flag) management.FlagConfigurationPut {
 	for _, o := range f.Overrides {
 		*out.Overrides = append(*out.Overrides, management.OverrideInput{UnitType: o.UnitType, UnitId: o.UnitID, Variation: o.Variation})
 	}
-	for _, r := range f.Rules {
+	for j, r := range f.Rules {
 		serve := management.Serve{Kind: r.Serve.Kind, Variation: nonEmpty(r.Serve.Variation), UnitType: nonEmpty(r.Serve.UnitType)}
-		if r.Serve.Kind == eval.ServeRollout {
+		switch r.Serve.Kind {
+		case eval.ServeRollout:
 			serve.Percentage = &r.Serve.Percentage
+		case eval.ServeExperiment:
+			serve = management.Serve{Kind: r.Serve.Kind, Experiment: ptr(created[j].Key)}
 		}
 		*out.Rules = append(*out.Rules, management.RuleInput{Conditions: conditionsOf(r.Conditions), Serve: serve})
 	}
@@ -326,7 +372,8 @@ func configurationOf(f eval.Flag) management.FlagConfigurationPut {
 }
 
 // withServerRules returns rs decoded with the rule identifiers and salts
-// the server gave the flags it wrote, which is the ruleset the server
+// the server gave the flags it wrote, and the keys and salts of the
+// experiments it created for them, which is the ruleset the server
 // evaluates for them.
 func withServerRules(t *testing.T, rs eval.Ruleset, l loadedFixture) *eval.Ruleset {
 	t.Helper()
@@ -339,8 +386,12 @@ func withServerRules(t *testing.T, rs eval.Ruleset, l loadedFixture) *eval.Rules
 		rules := slices.Clone(f.Rules)
 		for j := range rules {
 			rules[j].ID = ids[j]
-			if rules[j].Serve.Kind == eval.ServeRollout {
+			switch rules[j].Serve.Kind {
+			case eval.ServeRollout:
 				rules[j].Serve.Salt = l.salts[f.Key][j]
+			case eval.ServeExperiment:
+				e := l.experiments[f.Key][j]
+				rules[j].Serve.Experiment, rules[j].Serve.InclusionSalt, rules[j].Serve.VariationSalt = e.Key, e.InclusionSalt, e.VariationSalt
 			}
 		}
 		rs.Flags[i].Rules = rules
@@ -358,11 +409,12 @@ func withServerRules(t *testing.T, rs eval.Ruleset, l loadedFixture) *eval.Rules
 
 // reach returns the keys of the flags and segments evaluating flag may
 // consult in rs, itself included, and whether any of those flags serves a
-// rollout, whose bucket depends on the salt the server gave it.
+// rollout or an experiment, whose buckets depend on the salts the server
+// drew.
 func reach(rs eval.Ruleset, flag string) ([]string, bool) {
 	var (
-		out      []string
-		rollouts bool
+		out   []string
+		drawn bool
 	)
 	var walk func(key string)
 	walk = func(key string) {
@@ -379,7 +431,7 @@ func reach(rs eval.Ruleset, flag string) ([]string, bool) {
 			walk(p.Flag)
 		}
 		for _, r := range f.Rules {
-			rollouts = rollouts || r.Serve.Kind == eval.ServeRollout
+			drawn = drawn || r.Serve.Kind == eval.ServeRollout || r.Serve.Kind == eval.ServeExperiment
 			for _, c := range r.Conditions {
 				switch {
 				case c.Flag != "":
@@ -391,7 +443,7 @@ func reach(rs eval.Ruleset, flag string) ([]string, bool) {
 		}
 	}
 	walk(flag)
-	return out, rollouts
+	return out, drawn
 }
 
 // resultJSON returns r as JSON. With fixtureIDs, its rule identifier is the
