@@ -41,11 +41,30 @@ STORE_FAILED = "store_failed"
 #: warning: a getter asked for a type other than the flag's; logged once per flag key. Fields:
 #: flag, flag_type, requested_type.
 TYPE_MISMATCH = "type_mismatch"
-#: error: an internal failure was caught at the API boundary and the built-in default served.
-#: Fields: flag, cause.
+#: error: an internal failure was caught at the API boundary: a getter served the built-in default,
+#: or an exposure, alias or report was given up on. Fields: flag or operation, cause.
 EVALUATION_FAILED = "evaluation_failed"
 #: error: a listener raised. Fields: cause.
 LISTENER_FAILED = "listener_failed"
+#: warning: a batch of events failed and goes again with the same event IDs. Fields: cause, events,
+#: retry_in (seconds), status for an HTTP status, and kind for the evaluation summary.
+EVENTS_FAILED = "events_failed"
+#: warning: events or summary rows were given up on. Fields: cause (queue_full, client_error,
+#: refused_by_the_server, window_too_old) and what was dropped.
+QUEUE_DROPPED = "queue_dropped"
+#: warning: send_exposures is off, so no exposure or alias leaves this client; logged at construction.
+EXPOSURES_OFF = "exposures_off"
+#: debug: an exposure call found nothing to report. Fields: flag, cause (local_override,
+#: no_experiment for a flag no evaluation of which carried an experiment block, no_detail for a
+#: context the flag was not evaluated with).
+EXPOSURE_SKIPPED = "exposure_skipped"
+#: warning: local overrides are enabled; logged at construction.
+LOCAL_OVERRIDES_ALLOWED = "local_overrides_allowed"
+#: warning: a local override was set. Fields: flag.
+OVERRIDE_SET = "override_set"
+#: warning: a local override was refused or dropped. Fields: flag, cause (not_allowed,
+#: protected_environment), and environment for a protected one.
+OVERRIDE_REFUSED = "override_refused"
 
 
 def standard_logger(level: int, event: str, fields: Mapping[str, Any]) -> None:
