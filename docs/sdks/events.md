@@ -38,7 +38,7 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 
 | Code | When |
 |---|---|
-| `event_invalid` | A member is missing, of the wrong type, a string over 256 bytes or holding U+0000; a summary holds over 1,000 rows, a row counts less than 1 or names a reason that is none, or its interval starts after it ends. |
+| `event_invalid` | A member is missing, of the wrong type, a string over 256 bytes or holding U+0000; a summary holds over 1,000 rows, a row counts less than 1 or names a reason that is none, or its interval starts after it ends; an alias names the same unit type on both sides. |
 | `event_type_unknown` | The server does not know events of this `type`. |
 | `event_id_invalid` | `event_id` is not a lowercase UUIDv7. |
 | `out_of_window` | The time in `event_id`, or `occurred_at` (`interval_end` for a summary), is older than the retention window. |
@@ -48,6 +48,8 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `unknown_variation` | An exposure names a variation its experiment does not weigh. An exposure with `override` true is not checked against the weights, since an override decides the variation whatever they are. |
 
 An exposure is judged against its experiment in this order, and refused with the first check it fails: the experiment exists, the unit type is its own, the variation is one it weighs, then `flag_key` must be the experiment's flag and `evaluation_reason` `experiment` or `override` (both `event_invalid`). The codes are the same for every key; the `detail` of a refusal is specific for a server key and, for a client key, names no unit type, flag, variation or status of the experiment: a key that ships inside an app learns nothing of an experiment from it. Exposures refused for an experiment that exists are counted per experiment, environment and reason, and the counts go with the experiment; an exposure naming an experiment that does not exist is counted nowhere.
+
+An accepted alias links its pair of unit IDs in the environment of the key, once: the pair sent again under another `event_id`, as an app signing the same user in again does, is stored as an event but adds no link, and the link keeps the alias that occurred earliest. Links are kept for as long as the environment exists, after retention drops the raw aliases, so an anonymous ID can always be joined to the ID known after sign-up.
 
 A summary row's `reason` is a true reason (`rule`, `rollout`, `fallthrough`, `prerequisite_failed`, `off`, `override`, `experiment`, `error`), the SDK's own `fallback` or `local_override`, or `targeting_match`, which a client SDK counts from the answers it receives. A row naming a flag the project does not have (an archived flag is still one) is dropped and counted in `dropped_rows`; the rest of its summary is stored.
 

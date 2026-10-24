@@ -80,7 +80,7 @@ func (e RulesetScope) Valid() bool {
 	}
 }
 
-// AliasEvent Links the unit ID in use before sign-up to the one after.
+// AliasEvent Links the unit ID in use before sign-up to the one after. Both unit types must be declared by the project (`undeclared_unit_type`) and differ from each other (`event_invalid`). An accepted alias links its pair once per environment, keeping the alias that occurred earliest.
 type AliasEvent struct {
 	EventId      string         `json:"event_id"`
 	FromUnitId   string         `json:"from_unit_id"`

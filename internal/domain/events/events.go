@@ -224,6 +224,12 @@ func JudgeEvent(raw json.RawMessage, receivedAt time.Time, retention, skew time.
 		if len(r.faults) > 0 {
 			return e.reject(RejectEventInvalid, r.detail())
 		}
+		// An alias links a unit ID of one kind to one of another, an
+		// anonymous ID to a user ID say; two IDs of one unit type would be
+		// two units, and the link would join them in analysis.
+		if a.FromUnitType == a.ToUnitType {
+			return e.reject(RejectEventInvalid, "from_unit_type and to_unit_type must differ")
+		}
 		a.OccurredAt = a.OccurredAt.Add(skew)
 		if a.OccurredAt.Before(oldest) {
 			return e.reject(RejectOutOfWindow, "occurred_at is older than the raw retention")
@@ -446,6 +452,16 @@ type AliasRecord struct {
 	EventID    delivery.EventID
 	Key        delivery.SDKKey
 	SDK        delivery.SDKIdentity
+	Alias      Alias
+	ReceivedAt time.Time
+}
+
+// AliasLink is the one link of a pair of unit IDs in an environment: the
+// alias of the pair that occurred earliest, kept after its raw event is
+// dropped.
+type AliasLink struct {
+	// EventID is the event_id of the alias the link keeps.
+	EventID    delivery.EventID
 	Alias      Alias
 	ReceivedAt time.Time
 }

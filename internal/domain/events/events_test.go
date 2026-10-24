@@ -103,6 +103,7 @@ func TestEachEventIsRejectedWithItsCode(t *testing.T) {
 		"member of the wrong type": {with(alias(id), map[string]any{"to_unit_id": 7}), events.RejectEventInvalid, "to_unit_id must be a string"},
 		"string over 256 bytes":    {with(alias(id), map[string]any{"to_unit_id": strings.Repeat("u", 257)}), events.RejectEventInvalid, "to_unit_id is over 256 bytes"},
 		"string with NUL":          {with(alias(id), map[string]any{"to_unit_id": "u\x00"}), events.RejectEventInvalid, "to_unit_id must not contain U+0000"},
+		"one unit type both sides": {with(alias(id), map[string]any{"to_unit_type": "anonymous"}), events.RejectEventInvalid, "from_unit_type and to_unit_type must differ"},
 		"old event ID":             {alias(old), events.RejectOutOfWindow, "the event_id time is older than the raw retention"},
 		"old occurred_at":          {with(alias(id), map[string]any{"occurred_at": "2026-08-01T00:00:00Z"}), events.RejectOutOfWindow, "occurred_at is older than the raw retention"},
 		"old interval_end": {with(summary(id, row("checkout", "rule", 1)), map[string]any{
