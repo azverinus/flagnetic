@@ -24,6 +24,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `sdk_key.manage` | creating, renaming, rotating and revoking an environment's SDK keys and changing their allowed origins | `project:admin` | |
 | `experiment.edit` | creating experiments | `experiments:write` | |
 | `experiment.delete` | deleting draft experiments | `experiments:write` | |
+| `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening and cancelling one's own, copying any | `flags:write` | |
 
 A permission marked members only changes who has access to a project, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)).
 
@@ -66,6 +67,7 @@ A role is a fixed list of permissions. The four built-in roles are the same on e
 | `sdk_key.manage` | | | ✓ | ✓ |
 | `experiment.edit` | | ✓ | ✓ | ✓ |
 | `experiment.delete` | | | ✓ | ✓ |
+| `change_request.propose` | | ✓ | ✓ | ✓ |
 
 `GET /roles` lists every role with its permissions, so a client can explain which roles hold a permission a caller lacks. Later releases add permissions as features arrive and write them into the built-in roles.
 

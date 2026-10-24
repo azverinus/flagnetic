@@ -640,3 +640,30 @@ func (f Flag) CanConfigure() error {
 	}
 	return nil
 }
+
+// Proposable returns in with what only c may hold left out: a rule
+// identifier c has no rule with, and a salt that is not the salt of c's
+// rule the rule names. A proposal is written against the configuration of
+// its time and kept while others are written, and it may come from
+// elsewhere (another environment, an earlier proposal of whose new rules
+// the server named provisionally): what it names of a configuration that is
+// not c's is not c's to keep. The rule becomes a new one and the rollout
+// is given a salt of its own, instead of the proposal being refused for
+// naming what c never had.
+func (c Configuration) Proposable(in ConfigurationInput) ConfigurationInput {
+	out := in
+	out.Rules = slices.Clone(in.Rules)
+	for i, ri := range out.Rules {
+		live := -1
+		if ri.ID != nil {
+			live = slices.IndexFunc(c.Rules, func(rule Rule) bool { return rule.ID == *ri.ID })
+		}
+		if live < 0 {
+			out.Rules[i].ID = nil
+		}
+		if live < 0 || c.Rules[live].Serve.Kind != ServeRollout || c.Rules[live].Serve.Salt != ri.Serve.Salt {
+			out.Rules[i].Serve.Salt = ""
+		}
+	}
+	return out
+}

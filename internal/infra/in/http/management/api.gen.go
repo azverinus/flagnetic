@@ -76,6 +76,93 @@ func (e AttributeType) Valid() bool {
 	}
 }
 
+// Defines values for ChangeRequestAuthorKind.
+const (
+	ChangeRequestAuthorKindMember ChangeRequestAuthorKind = "member"
+	ChangeRequestAuthorKindToken  ChangeRequestAuthorKind = "token"
+)
+
+// Valid indicates whether the value is a known member of the ChangeRequestAuthorKind enum.
+func (e ChangeRequestAuthorKind) Valid() bool {
+	switch e {
+	case ChangeRequestAuthorKindMember:
+		return true
+	case ChangeRequestAuthorKindToken:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ChangeRequestCreateKind.
+const (
+	ChangeRequestCreateKindFlagConfiguration ChangeRequestCreateKind = "flag_configuration"
+)
+
+// Valid indicates whether the value is a known member of the ChangeRequestCreateKind enum.
+func (e ChangeRequestCreateKind) Valid() bool {
+	switch e {
+	case ChangeRequestCreateKindFlagConfiguration:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ChangeRequestKind.
+const (
+	ChangeRequestKindDefinition        ChangeRequestKind = "definition"
+	ChangeRequestKindExperiment        ChangeRequestKind = "experiment"
+	ChangeRequestKindFlagConfiguration ChangeRequestKind = "flag_configuration"
+)
+
+// Valid indicates whether the value is a known member of the ChangeRequestKind enum.
+func (e ChangeRequestKind) Valid() bool {
+	switch e {
+	case ChangeRequestKindDefinition:
+		return true
+	case ChangeRequestKindExperiment:
+		return true
+	case ChangeRequestKindFlagConfiguration:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ChangeRequestState.
+const (
+	ChangeRequestStateApplied    ChangeRequestState = "applied"
+	ChangeRequestStateApproved   ChangeRequestState = "approved"
+	ChangeRequestStateCancelled  ChangeRequestState = "cancelled"
+	ChangeRequestStateDraft      ChangeRequestState = "draft"
+	ChangeRequestStateOpen       ChangeRequestState = "open"
+	ChangeRequestStateRejected   ChangeRequestState = "rejected"
+	ChangeRequestStateSuperseded ChangeRequestState = "superseded"
+)
+
+// Valid indicates whether the value is a known member of the ChangeRequestState enum.
+func (e ChangeRequestState) Valid() bool {
+	switch e {
+	case ChangeRequestStateApplied:
+		return true
+	case ChangeRequestStateApproved:
+		return true
+	case ChangeRequestStateCancelled:
+		return true
+	case ChangeRequestStateDraft:
+		return true
+	case ChangeRequestStateOpen:
+		return true
+	case ChangeRequestStateRejected:
+		return true
+	case ChangeRequestStateSuperseded:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CredentialMethod.
 const (
 	CredentialMethodSession CredentialMethod = "session"
@@ -190,6 +277,27 @@ func (e MemberStatus) Valid() bool {
 	case MemberStatusDeactivated:
 		return true
 	case MemberStatusInvited:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchOperationOp.
+const (
+	PatchOperationOpAdd     PatchOperationOp = "add"
+	PatchOperationOpRemove  PatchOperationOp = "remove"
+	PatchOperationOpReplace PatchOperationOp = "replace"
+)
+
+// Valid indicates whether the value is a known member of the PatchOperationOp enum.
+func (e PatchOperationOp) Valid() bool {
+	switch e {
+	case PatchOperationOpAdd:
+		return true
+	case PatchOperationOpRemove:
+		return true
+	case PatchOperationOpReplace:
 		return true
 	default:
 		return false
@@ -555,6 +663,104 @@ type AuthSettings struct {
 	// TokenMaxLifetimeSeconds The furthest ahead an API token may expire. 31536000 (365 days) on a fresh instance.
 	TokenMaxLifetimeSeconds int64 `json:"token_max_lifetime_seconds"`
 }
+
+// ChangeRequest defines model for ChangeRequest.
+type ChangeRequest struct {
+	// Author The member or the project token that proposed the change request.
+	Author ChangeRequestAuthor `json:"author"`
+
+	// BaseVersion The version of the configuration the change request is based on.
+	BaseVersion int64     `json:"base_version"`
+	CreatedAt   time.Time `json:"created_at"`
+	Description string    `json:"description"`
+
+	// Diff The RFC 6902 patch from the configuration the change request is based on to `proposed`.
+	Diff []PatchOperation `json:"diff"`
+
+	// Environment The key of the environment of a `flag_configuration` change request.
+	Environment *string `json:"environment,omitempty"`
+
+	// Flag The key of the flag proposed for.
+	Flag *string            `json:"flag,omitempty"`
+	Id   openapi_types.UUID `json:"id"`
+
+	// Kind What a change request proposes: `flag_configuration`, a flag's
+	// configuration in one environment. Other kinds are to come; a client
+	// reads `proposed` by the kind.
+	Kind ChangeRequestKind `json:"kind"`
+
+	// Proposed A flag configuration as a change request proposes it: what it serves
+	// and the notes and descriptions that stay on the server, without who
+	// wrote it or when.
+	Proposed ProposedConfiguration `json:"proposed"`
+
+	// State `draft` (its author prepares it), `open` (offered for review),
+	// `approved`, `rejected`, `applied`, `cancelled`, `superseded` (what
+	// it was based on moved). The last four are final.
+	State     ChangeRequestState `json:"state"`
+	Title     string             `json:"title"`
+	UpdatedAt time.Time          `json:"updated_at"`
+
+	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
+	Version Version `json:"version"`
+}
+
+// ChangeRequestAuthor The member or the project token that proposed the change request.
+type ChangeRequestAuthor struct {
+	Id   openapi_types.UUID      `json:"id"`
+	Kind ChangeRequestAuthorKind `json:"kind"`
+
+	// Name The member's display name or the token's name, as it is now.
+	Name string `json:"name"`
+}
+
+// ChangeRequestAuthorKind defines model for ChangeRequestAuthor.Kind.
+type ChangeRequestAuthorKind string
+
+// ChangeRequestCreate defines model for ChangeRequestCreate.
+type ChangeRequestCreate struct {
+	Description *string `json:"description,omitempty"`
+
+	// Environment The key of the environment.
+	Environment string `json:"environment"`
+
+	// Flag The key of the flag.
+	Flag string                  `json:"flag"`
+	Kind ChangeRequestCreateKind `json:"kind"`
+
+	// Open Open the change request for review at once instead of drafting it.
+	Open     *bool                `json:"open,omitempty"`
+	Proposed FlagConfigurationPut `json:"proposed"`
+	Title    string               `json:"title"`
+}
+
+// ChangeRequestCreateKind defines model for ChangeRequestCreate.Kind.
+type ChangeRequestCreateKind string
+
+// ChangeRequestKind What a change request proposes: `flag_configuration`, a flag's
+// configuration in one environment. Other kinds are to come; a client
+// reads `proposed` by the kind.
+type ChangeRequestKind string
+
+// ChangeRequestList defines model for ChangeRequestList.
+type ChangeRequestList struct {
+	Items []ChangeRequest `json:"items"`
+
+	// NextCursor Pass as `cursor` for the next page; null on the last.
+	NextCursor *string `json:"next_cursor"`
+}
+
+// ChangeRequestPatch defines model for ChangeRequestPatch.
+type ChangeRequestPatch struct {
+	Description *string               `json:"description,omitempty"`
+	Proposed    *FlagConfigurationPut `json:"proposed,omitempty"`
+	Title       *string               `json:"title,omitempty"`
+}
+
+// ChangeRequestState `draft` (its author prepares it), `open` (offered for review),
+// `approved`, `rejected`, `applied`, `cancelled`, `superseded` (what
+// it was based on moved). The last four are final.
+type ChangeRequestState string
 
 // Condition One comparison inside a rule or a segment. An `attribute` condition
 // names an attribute or unit type, an operator (`op`) and a `value`
@@ -1294,6 +1500,20 @@ type PasswordChange struct {
 	NewPassword string `json:"new_password"`
 }
 
+// PatchOperation One operation of an RFC 6902 JSON Patch; `value` is absent from a `remove`.
+type PatchOperation struct {
+	Op PatchOperationOp `json:"op"`
+
+	// Path A JSON Pointer into `proposed`.
+	Path string `json:"path"`
+
+	// Value The value added or replaced, of any JSON type, null included.
+	Value *json.RawMessage `json:"value,omitempty"`
+}
+
+// PatchOperationOp defines model for PatchOperation.Op.
+type PatchOperationOp string
+
 // Permission A permission of the catalog, named entity.verb, such as `environment.manage`.
 type Permission = string
 
@@ -1441,6 +1661,26 @@ type ProjectTokenCreate struct {
 // ProjectTokenList defines model for ProjectTokenList.
 type ProjectTokenList struct {
 	Items []ProjectToken `json:"items"`
+}
+
+// ProposedConfiguration A flag configuration as a change request proposes it: what it serves
+// and the notes and descriptions that stay on the server, without who
+// wrote it or when.
+type ProposedConfiguration struct {
+	Fallthrough   string             `json:"fallthrough"`
+	OffVariation  string             `json:"off_variation"`
+	On            bool               `json:"on"`
+	Overrides     []ProposedOverride `json:"overrides"`
+	Prerequisites []Prerequisite     `json:"prerequisites"`
+	Rules         []Rule             `json:"rules"`
+}
+
+// ProposedOverride defines model for ProposedOverride.
+type ProposedOverride struct {
+	Note      *string `json:"note"`
+	UnitId    string  `json:"unit_id"`
+	UnitType  string  `json:"unit_type"`
+	Variation string  `json:"variation"`
 }
 
 // Reference defines model for Reference.
@@ -1901,6 +2141,9 @@ type AuditQ = string
 // AuditTo defines model for AuditTo.
 type AuditTo = time.Time
 
+// ChangeRequestID defines model for ChangeRequestID.
+type ChangeRequestID = openapi_types.UUID
+
 // Cursor defines model for Cursor.
 type Cursor = string
 
@@ -2102,6 +2345,66 @@ type ListProjectAuditEntriesParams struct {
 
 	// Limit How many entries a page holds at most.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListChangeRequestsParams defines parameters for ListChangeRequests.
+type ListChangeRequestsParams struct {
+	// Flag Only those naming the flag with this key.
+	Flag *string `form:"flag,omitempty" json:"flag,omitempty"`
+
+	// Environment Only those naming the environment with this key.
+	Environment *string             `form:"environment,omitempty" json:"environment,omitempty"`
+	Kind        *ChangeRequestKind  `form:"kind,omitempty" json:"kind,omitempty"`
+	State       *ChangeRequestState `form:"state,omitempty" json:"state,omitempty"`
+
+	// Author Only those authored by the member or the project token with this identifier.
+	Author *openapi_types.UUID `form:"author,omitempty" json:"author,omitempty"`
+
+	// Cursor The `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit How many entries a page holds at most.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// UpdateChangeRequestParams defines parameters for UpdateChangeRequest.
+type UpdateChangeRequestParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// CancelChangeRequestParams defines parameters for CancelChangeRequest.
+type CancelChangeRequestParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// OpenChangeRequestParams defines parameters for OpenChangeRequest.
+type OpenChangeRequestParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// RebaseChangeRequestParams defines parameters for RebaseChangeRequest.
+type RebaseChangeRequestParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // DeleteEnvironmentParams defines parameters for DeleteEnvironment.
@@ -2343,6 +2646,12 @@ type DeclareDiscoveredAttributeJSONRequestBody = DiscoveredAttributeDeclaration
 
 // UpdateAttributeJSONRequestBody defines body for UpdateAttribute for application/json ContentType.
 type UpdateAttributeJSONRequestBody = AttributePatch
+
+// CreateChangeRequestJSONRequestBody defines body for CreateChangeRequest for application/json ContentType.
+type CreateChangeRequestJSONRequestBody = ChangeRequestCreate
+
+// UpdateChangeRequestJSONRequestBody defines body for UpdateChangeRequest for application/json ContentType.
+type UpdateChangeRequestJSONRequestBody = ChangeRequestPatch
 
 // CreateEnvironmentJSONRequestBody defines body for CreateEnvironment for application/json ContentType.
 type CreateEnvironmentJSONRequestBody = EnvironmentCreate
@@ -3058,6 +3367,129 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/audit/{entry} (the `GetProjectAuditEntry` operationId).
 	GetProjectAuditEntry(ctx context.Context, project ProjectKey, entry string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListChangeRequests The project's change requests
+	//
+	// The project's change requests, newest first, narrowed by every
+	// filter given. Page with `cursor` set to the `next_cursor` of the
+	// previous page.
+	//
+	// Corresponds with GET /projects/{project}/change-requests (the `ListChangeRequests` operationId).
+	ListChangeRequests(ctx context.Context, project ProjectKey, params *ListChangeRequestsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateChangeRequestWithBody Propose a change
+	//
+	// Proposes a flag's configuration in one environment as a change
+	// request, as a draft or, with `open`, opened for review at once. The
+	// caller, a member or a project token, is its author. It is based on
+	// the configuration as it is now, and `diff` is the RFC 6902 patch from
+	// that configuration to `proposed`. `proposed` is checked as replacing
+	// the configuration would be, with the same refusals under
+	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+	// configuration has no rule with, and a `salt` that is not that rule's,
+	// are left out, so the rule is a new one. New rules and rollouts are
+	// given an identifier and a salt, which `proposed` holds. A title of 1
+	// to 200 characters is required and a description has at most 10,000
+	// (`invalid_change_request`).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
+	CreateChangeRequestWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateChangeRequest Propose a change
+	//
+	// Proposes a flag's configuration in one environment as a change
+	// request, as a draft or, with `open`, opened for review at once. The
+	// caller, a member or a project token, is its author. It is based on
+	// the configuration as it is now, and `diff` is the RFC 6902 patch from
+	// that configuration to `proposed`. `proposed` is checked as replacing
+	// the configuration would be, with the same refusals under
+	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+	// configuration has no rule with, and a `salt` that is not that rule's,
+	// are left out, so the rule is a new one. New rules and rollouts are
+	// given an identifier and a salt, which `proposed` holds. A title of 1
+	// to 200 characters is required and a description has at most 10,000
+	// (`invalid_change_request`).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
+	CreateChangeRequest(ctx context.Context, project ProjectKey, body CreateChangeRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetChangeRequest A change request
+	//
+	// Corresponds with GET /projects/{project}/change-requests/{change_request} (the `GetChangeRequest` operationId).
+	GetChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateChangeRequestWithBody Edit a change request
+	//
+	// Changes the title, the description or what is proposed, each left
+	// as it is when absent. Only the author edits (`not_author`), a draft
+	// or an open change request (`invalid_state`). A new `proposed` is
+	// checked as on creation, against the configuration as it is now, and
+	// `diff` is recomputed from the configuration the change request is
+	// based on; a rebase moves that. An edit that changes nothing changes
+	// nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /projects/{project}/change-requests/{change_request} (the `UpdateChangeRequest` operationId).
+	UpdateChangeRequestWithBody(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateChangeRequest Edit a change request
+	//
+	// Changes the title, the description or what is proposed, each left
+	// as it is when absent. Only the author edits (`not_author`), a draft
+	// or an open change request (`invalid_state`). A new `proposed` is
+	// checked as on creation, against the configuration as it is now, and
+	// `diff` is recomputed from the configuration the change request is
+	// based on; a rebase moves that. An edit that changes nothing changes
+	// nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /projects/{project}/change-requests/{change_request} (the `UpdateChangeRequest` operationId).
+	UpdateChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, body UpdateChangeRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelChangeRequest Cancel a change request
+	//
+	// The author cancels a draft, open or approved change request
+	// (`not_author`, `invalid_state`). A cancelled change request is
+	// final; copying it resumes its work.
+	//
+	// Corresponds with POST /projects/{project}/change-requests/{change_request}/cancel (the `CancelChangeRequest` operationId).
+	CancelChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *CancelChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CopyChangeRequest Copy a change request into a new draft
+	//
+	// Copies any change request, whatever its state and whoever wrote it,
+	// into a new draft of the caller's with the same title, description
+	// and proposal, based on the configuration as it is now and checked
+	// against it as a new change request is.
+	//
+	// Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
+	CopyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// OpenChangeRequest Open a draft change request for review
+	//
+	// Only the author opens (`not_author`), and only a draft
+	// (`invalid_state`). When the configuration was written since the
+	// change request was based on it, its diff no longer shows what it
+	// would do, and opening is refused (`base_moved`) until it is rebased.
+	//
+	// Corresponds with POST /projects/{project}/change-requests/{change_request}/open (the `OpenChangeRequest` operationId).
+	OpenChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *OpenChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RebaseChangeRequest Base a draft change request on the configuration as it is now
+	//
+	// Keeps what is proposed and recomputes `diff` from the configuration
+	// as it is now, which becomes `base_version`. Only the author rebases
+	// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
+	// base it has changes nothing and records nothing.
+	//
+	// Corresponds with POST /projects/{project}/change-requests/{change_request}/rebase (the `RebaseChangeRequest` operationId).
+	RebaseChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *RebaseChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListEnvironments The project's environments
 	//
@@ -5016,6 +5448,229 @@ func (c *Client) ListProjectAuditEntries(ctx context.Context, project ProjectKey
 // Corresponds with GET /projects/{project}/audit/{entry} (the `GetProjectAuditEntry` operationId).
 func (c *Client) GetProjectAuditEntry(ctx context.Context, project ProjectKey, entry string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetProjectAuditEntryRequest(c.Server, project, entry)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListChangeRequests The project's change requests
+//
+// The project's change requests, newest first, narrowed by every
+// filter given. Page with `cursor` set to the `next_cursor` of the
+// previous page.
+//
+// Corresponds with GET /projects/{project}/change-requests (the `ListChangeRequests` operationId).
+func (c *Client) ListChangeRequests(ctx context.Context, project ProjectKey, params *ListChangeRequestsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListChangeRequestsRequest(c.Server, project, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateChangeRequestWithBody Propose a change
+//
+// Proposes a flag's configuration in one environment as a change
+// request, as a draft or, with `open`, opened for review at once. The
+// caller, a member or a project token, is its author. It is based on
+// the configuration as it is now, and `diff` is the RFC 6902 patch from
+// that configuration to `proposed`. `proposed` is checked as replacing
+// the configuration would be, with the same refusals under
+// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+// configuration has no rule with, and a `salt` that is not that rule's,
+// are left out, so the rule is a new one. New rules and rollouts are
+// given an identifier and a salt, which `proposed` holds. A title of 1
+// to 200 characters is required and a description has at most 10,000
+// (`invalid_change_request`).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
+func (c *Client) CreateChangeRequestWithBody(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateChangeRequestRequestWithBody(c.Server, project, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateChangeRequest Propose a change
+//
+// Proposes a flag's configuration in one environment as a change
+// request, as a draft or, with `open`, opened for review at once. The
+// caller, a member or a project token, is its author. It is based on
+// the configuration as it is now, and `diff` is the RFC 6902 patch from
+// that configuration to `proposed`. `proposed` is checked as replacing
+// the configuration would be, with the same refusals under
+// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+// configuration has no rule with, and a `salt` that is not that rule's,
+// are left out, so the rule is a new one. New rules and rollouts are
+// given an identifier and a salt, which `proposed` holds. A title of 1
+// to 200 characters is required and a description has at most 10,000
+// (`invalid_change_request`).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
+func (c *Client) CreateChangeRequest(ctx context.Context, project ProjectKey, body CreateChangeRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateChangeRequestRequest(c.Server, project, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetChangeRequest A change request
+//
+// Corresponds with GET /projects/{project}/change-requests/{change_request} (the `GetChangeRequest` operationId).
+func (c *Client) GetChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetChangeRequestRequest(c.Server, project, changeRequest)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateChangeRequestWithBody Edit a change request
+//
+// Changes the title, the description or what is proposed, each left
+// as it is when absent. Only the author edits (`not_author`), a draft
+// or an open change request (`invalid_state`). A new `proposed` is
+// checked as on creation, against the configuration as it is now, and
+// `diff` is recomputed from the configuration the change request is
+// based on; a rebase moves that. An edit that changes nothing changes
+// nothing and records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /projects/{project}/change-requests/{change_request} (the `UpdateChangeRequest` operationId).
+func (c *Client) UpdateChangeRequestWithBody(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateChangeRequestRequestWithBody(c.Server, project, changeRequest, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateChangeRequest Edit a change request
+//
+// Changes the title, the description or what is proposed, each left
+// as it is when absent. Only the author edits (`not_author`), a draft
+// or an open change request (`invalid_state`). A new `proposed` is
+// checked as on creation, against the configuration as it is now, and
+// `diff` is recomputed from the configuration the change request is
+// based on; a rebase moves that. An edit that changes nothing changes
+// nothing and records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /projects/{project}/change-requests/{change_request} (the `UpdateChangeRequest` operationId).
+func (c *Client) UpdateChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, body UpdateChangeRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateChangeRequestRequest(c.Server, project, changeRequest, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CancelChangeRequest Cancel a change request
+//
+// The author cancels a draft, open or approved change request
+// (`not_author`, `invalid_state`). A cancelled change request is
+// final; copying it resumes its work.
+//
+// Corresponds with POST /projects/{project}/change-requests/{change_request}/cancel (the `CancelChangeRequest` operationId).
+func (c *Client) CancelChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *CancelChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCancelChangeRequestRequest(c.Server, project, changeRequest, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CopyChangeRequest Copy a change request into a new draft
+//
+// Copies any change request, whatever its state and whoever wrote it,
+// into a new draft of the caller's with the same title, description
+// and proposal, based on the configuration as it is now and checked
+// against it as a new change request is.
+//
+// Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
+func (c *Client) CopyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCopyChangeRequestRequest(c.Server, project, changeRequest)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// OpenChangeRequest Open a draft change request for review
+//
+// Only the author opens (`not_author`), and only a draft
+// (`invalid_state`). When the configuration was written since the
+// change request was based on it, its diff no longer shows what it
+// would do, and opening is refused (`base_moved`) until it is rebased.
+//
+// Corresponds with POST /projects/{project}/change-requests/{change_request}/open (the `OpenChangeRequest` operationId).
+func (c *Client) OpenChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *OpenChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewOpenChangeRequestRequest(c.Server, project, changeRequest, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RebaseChangeRequest Base a draft change request on the configuration as it is now
+//
+// Keeps what is proposed and recomputes `diff` from the configuration
+// as it is now, which becomes `base_version`. Only the author rebases
+// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
+// base it has changes nothing and records nothing.
+//
+// Corresponds with POST /projects/{project}/change-requests/{change_request}/rebase (the `RebaseChangeRequest` operationId).
+func (c *Client) RebaseChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *RebaseChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRebaseChangeRequestRequest(c.Server, project, changeRequest, params)
 	if err != nil {
 		return nil, err
 	}
@@ -8539,6 +9194,505 @@ func NewGetProjectAuditEntryRequest(server string, project ProjectKey, entry str
 	return req, nil
 }
 
+// NewListChangeRequestsRequest constructs an http.Request for the ListChangeRequests method
+func NewListChangeRequestsRequest(server string, project ProjectKey, params *ListChangeRequestsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/change-requests", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Flag != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "flag", *params.Flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Environment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", *params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Kind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kind", *params.Kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.State != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", *params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Author != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "author", *params.Author, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateChangeRequestRequest calls the generic CreateChangeRequest builder with application/json body
+func NewCreateChangeRequestRequest(server string, project ProjectKey, body CreateChangeRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateChangeRequestRequestWithBody(server, project, "application/json", bodyReader)
+}
+
+// NewCreateChangeRequestRequestWithBody constructs an http.Request for the CreateChangeRequest method, with any body, and a specified content type
+func NewCreateChangeRequestRequestWithBody(server string, project ProjectKey, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/change-requests", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetChangeRequestRequest constructs an http.Request for the GetChangeRequest method
+func NewGetChangeRequestRequest(server string, project ProjectKey, changeRequest ChangeRequestID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "change_request", changeRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/change-requests/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateChangeRequestRequest calls the generic UpdateChangeRequest builder with application/json body
+func NewUpdateChangeRequestRequest(server string, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, body UpdateChangeRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateChangeRequestRequestWithBody(server, project, changeRequest, params, "application/json", bodyReader)
+}
+
+// NewUpdateChangeRequestRequestWithBody constructs an http.Request for the UpdateChangeRequest method, with any body, and a specified content type
+func NewUpdateChangeRequestRequestWithBody(server string, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "change_request", changeRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/change-requests/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewCancelChangeRequestRequest constructs an http.Request for the CancelChangeRequest method
+func NewCancelChangeRequestRequest(server string, project ProjectKey, changeRequest ChangeRequestID, params *CancelChangeRequestParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "change_request", changeRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/change-requests/%s/cancel", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewCopyChangeRequestRequest constructs an http.Request for the CopyChangeRequest method
+func NewCopyChangeRequestRequest(server string, project ProjectKey, changeRequest ChangeRequestID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "change_request", changeRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/change-requests/%s/copy", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewOpenChangeRequestRequest constructs an http.Request for the OpenChangeRequest method
+func NewOpenChangeRequestRequest(server string, project ProjectKey, changeRequest ChangeRequestID, params *OpenChangeRequestParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "change_request", changeRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/change-requests/%s/open", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewRebaseChangeRequestRequest constructs an http.Request for the RebaseChangeRequest method
+func NewRebaseChangeRequestRequest(server string, project ProjectKey, changeRequest ChangeRequestID, params *RebaseChangeRequestParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "change_request", changeRequest, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/change-requests/%s/rebase", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewListEnvironmentsRequest constructs an http.Request for the ListEnvironments method
 func NewListEnvironmentsRequest(server string, project ProjectKey) (*http.Request, error) {
 	var err error
@@ -11956,6 +13110,141 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/audit/{entry} (the `GetProjectAuditEntry` operationId).
 	GetProjectAuditEntryWithResponse(ctx context.Context, project ProjectKey, entry string, reqEditors ...RequestEditorFn) (*GetProjectAuditEntryResponse, error)
+
+	// ListChangeRequestsWithResponse The project's change requests
+	//
+	// The project's change requests, newest first, narrowed by every
+	// filter given. Page with `cursor` set to the `next_cursor` of the
+	// previous page.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/change-requests (the `ListChangeRequests` operationId).
+	ListChangeRequestsWithResponse(ctx context.Context, project ProjectKey, params *ListChangeRequestsParams, reqEditors ...RequestEditorFn) (*ListChangeRequestsResponse, error)
+
+	// CreateChangeRequestWithBodyWithResponse Propose a change
+	//
+	// Proposes a flag's configuration in one environment as a change
+	// request, as a draft or, with `open`, opened for review at once. The
+	// caller, a member or a project token, is its author. It is based on
+	// the configuration as it is now, and `diff` is the RFC 6902 patch from
+	// that configuration to `proposed`. `proposed` is checked as replacing
+	// the configuration would be, with the same refusals under
+	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+	// configuration has no rule with, and a `salt` that is not that rule's,
+	// are left out, so the rule is a new one. New rules and rollouts are
+	// given an identifier and a salt, which `proposed` holds. A title of 1
+	// to 200 characters is required and a description has at most 10,000
+	// (`invalid_change_request`).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
+	CreateChangeRequestWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateChangeRequestResponse, error)
+
+	// CreateChangeRequestWithResponse Propose a change
+	//
+	// Proposes a flag's configuration in one environment as a change
+	// request, as a draft or, with `open`, opened for review at once. The
+	// caller, a member or a project token, is its author. It is based on
+	// the configuration as it is now, and `diff` is the RFC 6902 patch from
+	// that configuration to `proposed`. `proposed` is checked as replacing
+	// the configuration would be, with the same refusals under
+	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+	// configuration has no rule with, and a `salt` that is not that rule's,
+	// are left out, so the rule is a new one. New rules and rollouts are
+	// given an identifier and a salt, which `proposed` holds. A title of 1
+	// to 200 characters is required and a description has at most 10,000
+	// (`invalid_change_request`).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
+	CreateChangeRequestWithResponse(ctx context.Context, project ProjectKey, body CreateChangeRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateChangeRequestResponse, error)
+
+	// GetChangeRequestWithResponse A change request
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/change-requests/{change_request} (the `GetChangeRequest` operationId).
+	GetChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*GetChangeRequestResponse, error)
+
+	// UpdateChangeRequestWithBodyWithResponse Edit a change request
+	//
+	// Changes the title, the description or what is proposed, each left
+	// as it is when absent. Only the author edits (`not_author`), a draft
+	// or an open change request (`invalid_state`). A new `proposed` is
+	// checked as on creation, against the configuration as it is now, and
+	// `diff` is recomputed from the configuration the change request is
+	// based on; a rebase moves that. An edit that changes nothing changes
+	// nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/change-requests/{change_request} (the `UpdateChangeRequest` operationId).
+	UpdateChangeRequestWithBodyWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateChangeRequestResponse, error)
+
+	// UpdateChangeRequestWithResponse Edit a change request
+	//
+	// Changes the title, the description or what is proposed, each left
+	// as it is when absent. Only the author edits (`not_author`), a draft
+	// or an open change request (`invalid_state`). A new `proposed` is
+	// checked as on creation, against the configuration as it is now, and
+	// `diff` is recomputed from the configuration the change request is
+	// based on; a rebase moves that. An edit that changes nothing changes
+	// nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /projects/{project}/change-requests/{change_request} (the `UpdateChangeRequest` operationId).
+	UpdateChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, body UpdateChangeRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateChangeRequestResponse, error)
+
+	// CancelChangeRequestWithResponse Cancel a change request
+	//
+	// The author cancels a draft, open or approved change request
+	// (`not_author`, `invalid_state`). A cancelled change request is
+	// final; copying it resumes its work.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/change-requests/{change_request}/cancel (the `CancelChangeRequest` operationId).
+	CancelChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *CancelChangeRequestParams, reqEditors ...RequestEditorFn) (*CancelChangeRequestResponse, error)
+
+	// CopyChangeRequestWithResponse Copy a change request into a new draft
+	//
+	// Copies any change request, whatever its state and whoever wrote it,
+	// into a new draft of the caller's with the same title, description
+	// and proposal, based on the configuration as it is now and checked
+	// against it as a new change request is.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
+	CopyChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*CopyChangeRequestResponse, error)
+
+	// OpenChangeRequestWithResponse Open a draft change request for review
+	//
+	// Only the author opens (`not_author`), and only a draft
+	// (`invalid_state`). When the configuration was written since the
+	// change request was based on it, its diff no longer shows what it
+	// would do, and opening is refused (`base_moved`) until it is rebased.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/change-requests/{change_request}/open (the `OpenChangeRequest` operationId).
+	OpenChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *OpenChangeRequestParams, reqEditors ...RequestEditorFn) (*OpenChangeRequestResponse, error)
+
+	// RebaseChangeRequestWithResponse Base a draft change request on the configuration as it is now
+	//
+	// Keeps what is proposed and recomputes `diff` from the configuration
+	// as it is now, which becomes `base_version`. Only the author rebases
+	// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
+	// base it has changes nothing and records nothing.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/change-requests/{change_request}/rebase (the `RebaseChangeRequest` operationId).
+	RebaseChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *RebaseChangeRequestParams, reqEditors ...RequestEditorFn) (*RebaseChangeRequestResponse, error)
 
 	// ListEnvironmentsWithResponse The project's environments
 	//
@@ -16024,6 +17313,747 @@ func (r GetProjectAuditEntryResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetProjectAuditEntryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListChangeRequestsResponse401Headers the declared response headers of an HTTP 401 response for ListChangeRequests
+type ListChangeRequestsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListChangeRequestsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ChangeRequestList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListChangeRequestsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListChangeRequestsResponse) GetJSON200() *ChangeRequestList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListChangeRequestsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListChangeRequestsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListChangeRequestsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListChangeRequestsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListChangeRequestsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListChangeRequestsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListChangeRequestsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListChangeRequestsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateChangeRequestResponse201Headers the declared response headers of an HTTP 201 response for CreateChangeRequest
+type CreateChangeRequestResponse201Headers struct {
+	ETag *string
+}
+
+// CreateChangeRequestResponse401Headers the declared response headers of an HTTP 401 response for CreateChangeRequest
+type CreateChangeRequestResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateChangeRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ChangeRequest
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateChangeRequestResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateChangeRequestResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateChangeRequestResponse) GetJSON201() *ChangeRequest {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreateChangeRequestResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateChangeRequestResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateChangeRequestResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreateChangeRequestResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CreateChangeRequestResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateChangeRequestResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateChangeRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateChangeRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateChangeRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateChangeRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetChangeRequestResponse200Headers the declared response headers of an HTTP 200 response for GetChangeRequest
+type GetChangeRequestResponse200Headers struct {
+	ETag *string
+}
+
+// GetChangeRequestResponse401Headers the declared response headers of an HTTP 401 response for GetChangeRequest
+type GetChangeRequestResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetChangeRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ChangeRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetChangeRequestResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetChangeRequestResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetChangeRequestResponse) GetJSON200() *ChangeRequest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetChangeRequestResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetChangeRequestResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetChangeRequestResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetChangeRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetChangeRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetChangeRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetChangeRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateChangeRequestResponse200Headers the declared response headers of an HTTP 200 response for UpdateChangeRequest
+type UpdateChangeRequestResponse200Headers struct {
+	ETag *string
+}
+
+// UpdateChangeRequestResponse401Headers the declared response headers of an HTTP 401 response for UpdateChangeRequest
+type UpdateChangeRequestResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateChangeRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ChangeRequest
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateChangeRequestResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateChangeRequestResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateChangeRequestResponse) GetJSON200() *ChangeRequest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateChangeRequestResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateChangeRequestResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateChangeRequestResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateChangeRequestResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateChangeRequestResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateChangeRequestResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateChangeRequestResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateChangeRequestResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateChangeRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateChangeRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateChangeRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateChangeRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CancelChangeRequestResponse200Headers the declared response headers of an HTTP 200 response for CancelChangeRequest
+type CancelChangeRequestResponse200Headers struct {
+	ETag *string
+}
+
+// CancelChangeRequestResponse401Headers the declared response headers of an HTTP 401 response for CancelChangeRequest
+type CancelChangeRequestResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CancelChangeRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ChangeRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *CancelChangeRequestResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CancelChangeRequestResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CancelChangeRequestResponse) GetJSON200() *ChangeRequest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CancelChangeRequestResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CancelChangeRequestResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CancelChangeRequestResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CancelChangeRequestResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r CancelChangeRequestResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r CancelChangeRequestResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r CancelChangeRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CancelChangeRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CancelChangeRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CancelChangeRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CopyChangeRequestResponse201Headers the declared response headers of an HTTP 201 response for CopyChangeRequest
+type CopyChangeRequestResponse201Headers struct {
+	ETag *string
+}
+
+// CopyChangeRequestResponse401Headers the declared response headers of an HTTP 401 response for CopyChangeRequest
+type CopyChangeRequestResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CopyChangeRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ChangeRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CopyChangeRequestResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CopyChangeRequestResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CopyChangeRequestResponse) GetJSON201() *ChangeRequest {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CopyChangeRequestResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CopyChangeRequestResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CopyChangeRequestResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r CopyChangeRequestResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CopyChangeRequestResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CopyChangeRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CopyChangeRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CopyChangeRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CopyChangeRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// OpenChangeRequestResponse200Headers the declared response headers of an HTTP 200 response for OpenChangeRequest
+type OpenChangeRequestResponse200Headers struct {
+	ETag *string
+}
+
+// OpenChangeRequestResponse401Headers the declared response headers of an HTTP 401 response for OpenChangeRequest
+type OpenChangeRequestResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type OpenChangeRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ChangeRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *OpenChangeRequestResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *OpenChangeRequestResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r OpenChangeRequestResponse) GetJSON200() *ChangeRequest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r OpenChangeRequestResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r OpenChangeRequestResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r OpenChangeRequestResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r OpenChangeRequestResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r OpenChangeRequestResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r OpenChangeRequestResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r OpenChangeRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r OpenChangeRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r OpenChangeRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r OpenChangeRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RebaseChangeRequestResponse200Headers the declared response headers of an HTTP 200 response for RebaseChangeRequest
+type RebaseChangeRequestResponse200Headers struct {
+	ETag *string
+}
+
+// RebaseChangeRequestResponse401Headers the declared response headers of an HTTP 401 response for RebaseChangeRequest
+type RebaseChangeRequestResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RebaseChangeRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ChangeRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RebaseChangeRequestResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RebaseChangeRequestResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RebaseChangeRequestResponse) GetJSON200() *ChangeRequest {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RebaseChangeRequestResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RebaseChangeRequestResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RebaseChangeRequestResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RebaseChangeRequestResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r RebaseChangeRequestResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r RebaseChangeRequestResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r RebaseChangeRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RebaseChangeRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RebaseChangeRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RebaseChangeRequestResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -21290,6 +23320,201 @@ func (c *ClientWithResponses) GetProjectAuditEntryWithResponse(ctx context.Conte
 	return ParseGetProjectAuditEntryResponse(rsp)
 }
 
+// ListChangeRequestsWithResponse The project's change requests
+//
+// The project's change requests, newest first, narrowed by every
+// filter given. Page with `cursor` set to the `next_cursor` of the
+// previous page.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/change-requests (the `ListChangeRequests` operationId).
+func (c *ClientWithResponses) ListChangeRequestsWithResponse(ctx context.Context, project ProjectKey, params *ListChangeRequestsParams, reqEditors ...RequestEditorFn) (*ListChangeRequestsResponse, error) {
+	rsp, err := c.ListChangeRequests(ctx, project, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListChangeRequestsResponse(rsp)
+}
+
+// CreateChangeRequestWithBodyWithResponse Propose a change
+//
+// Proposes a flag's configuration in one environment as a change
+// request, as a draft or, with `open`, opened for review at once. The
+// caller, a member or a project token, is its author. It is based on
+// the configuration as it is now, and `diff` is the RFC 6902 patch from
+// that configuration to `proposed`. `proposed` is checked as replacing
+// the configuration would be, with the same refusals under
+// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+// configuration has no rule with, and a `salt` that is not that rule's,
+// are left out, so the rule is a new one. New rules and rollouts are
+// given an identifier and a salt, which `proposed` holds. A title of 1
+// to 200 characters is required and a description has at most 10,000
+// (`invalid_change_request`).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
+func (c *ClientWithResponses) CreateChangeRequestWithBodyWithResponse(ctx context.Context, project ProjectKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateChangeRequestResponse, error) {
+	rsp, err := c.CreateChangeRequestWithBody(ctx, project, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateChangeRequestResponse(rsp)
+}
+
+// CreateChangeRequestWithResponse Propose a change
+//
+// Proposes a flag's configuration in one environment as a change
+// request, as a draft or, with `open`, opened for review at once. The
+// caller, a member or a project token, is its author. It is based on
+// the configuration as it is now, and `diff` is the RFC 6902 patch from
+// that configuration to `proposed`. `proposed` is checked as replacing
+// the configuration would be, with the same refusals under
+// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
+// configuration has no rule with, and a `salt` that is not that rule's,
+// are left out, so the rule is a new one. New rules and rollouts are
+// given an identifier and a salt, which `proposed` holds. A title of 1
+// to 200 characters is required and a description has at most 10,000
+// (`invalid_change_request`).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
+func (c *ClientWithResponses) CreateChangeRequestWithResponse(ctx context.Context, project ProjectKey, body CreateChangeRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateChangeRequestResponse, error) {
+	rsp, err := c.CreateChangeRequest(ctx, project, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateChangeRequestResponse(rsp)
+}
+
+// GetChangeRequestWithResponse A change request
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/change-requests/{change_request} (the `GetChangeRequest` operationId).
+func (c *ClientWithResponses) GetChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*GetChangeRequestResponse, error) {
+	rsp, err := c.GetChangeRequest(ctx, project, changeRequest, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetChangeRequestResponse(rsp)
+}
+
+// UpdateChangeRequestWithBodyWithResponse Edit a change request
+//
+// Changes the title, the description or what is proposed, each left
+// as it is when absent. Only the author edits (`not_author`), a draft
+// or an open change request (`invalid_state`). A new `proposed` is
+// checked as on creation, against the configuration as it is now, and
+// `diff` is recomputed from the configuration the change request is
+// based on; a rebase moves that. An edit that changes nothing changes
+// nothing and records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/change-requests/{change_request} (the `UpdateChangeRequest` operationId).
+func (c *ClientWithResponses) UpdateChangeRequestWithBodyWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateChangeRequestResponse, error) {
+	rsp, err := c.UpdateChangeRequestWithBody(ctx, project, changeRequest, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateChangeRequestResponse(rsp)
+}
+
+// UpdateChangeRequestWithResponse Edit a change request
+//
+// Changes the title, the description or what is proposed, each left
+// as it is when absent. Only the author edits (`not_author`), a draft
+// or an open change request (`invalid_state`). A new `proposed` is
+// checked as on creation, against the configuration as it is now, and
+// `diff` is recomputed from the configuration the change request is
+// based on; a rebase moves that. An edit that changes nothing changes
+// nothing and records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /projects/{project}/change-requests/{change_request} (the `UpdateChangeRequest` operationId).
+func (c *ClientWithResponses) UpdateChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *UpdateChangeRequestParams, body UpdateChangeRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateChangeRequestResponse, error) {
+	rsp, err := c.UpdateChangeRequest(ctx, project, changeRequest, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateChangeRequestResponse(rsp)
+}
+
+// CancelChangeRequestWithResponse Cancel a change request
+//
+// The author cancels a draft, open or approved change request
+// (`not_author`, `invalid_state`). A cancelled change request is
+// final; copying it resumes its work.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/change-requests/{change_request}/cancel (the `CancelChangeRequest` operationId).
+func (c *ClientWithResponses) CancelChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *CancelChangeRequestParams, reqEditors ...RequestEditorFn) (*CancelChangeRequestResponse, error) {
+	rsp, err := c.CancelChangeRequest(ctx, project, changeRequest, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCancelChangeRequestResponse(rsp)
+}
+
+// CopyChangeRequestWithResponse Copy a change request into a new draft
+//
+// Copies any change request, whatever its state and whoever wrote it,
+// into a new draft of the caller's with the same title, description
+// and proposal, based on the configuration as it is now and checked
+// against it as a new change request is.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
+func (c *ClientWithResponses) CopyChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*CopyChangeRequestResponse, error) {
+	rsp, err := c.CopyChangeRequest(ctx, project, changeRequest, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCopyChangeRequestResponse(rsp)
+}
+
+// OpenChangeRequestWithResponse Open a draft change request for review
+//
+// Only the author opens (`not_author`), and only a draft
+// (`invalid_state`). When the configuration was written since the
+// change request was based on it, its diff no longer shows what it
+// would do, and opening is refused (`base_moved`) until it is rebased.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/change-requests/{change_request}/open (the `OpenChangeRequest` operationId).
+func (c *ClientWithResponses) OpenChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *OpenChangeRequestParams, reqEditors ...RequestEditorFn) (*OpenChangeRequestResponse, error) {
+	rsp, err := c.OpenChangeRequest(ctx, project, changeRequest, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseOpenChangeRequestResponse(rsp)
+}
+
+// RebaseChangeRequestWithResponse Base a draft change request on the configuration as it is now
+//
+// Keeps what is proposed and recomputes `diff` from the configuration
+// as it is now, which becomes `base_version`. Only the author rebases
+// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
+// base it has changes nothing and records nothing.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/change-requests/{change_request}/rebase (the `RebaseChangeRequest` operationId).
+func (c *ClientWithResponses) RebaseChangeRequestWithResponse(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *RebaseChangeRequestParams, reqEditors ...RequestEditorFn) (*RebaseChangeRequestResponse, error) {
+	rsp, err := c.RebaseChangeRequest(ctx, project, changeRequest, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRebaseChangeRequestResponse(rsp)
+}
+
 // ListEnvironmentsWithResponse The project's environments
 //
 // Returns a wrapper object for the known response body format(s).
@@ -25488,6 +27713,696 @@ func ParseGetProjectAuditEntryResponse(rsp *http.Response) (*GetProjectAuditEntr
 	return response, nil
 }
 
+// ParseListChangeRequestsResponse parses an HTTP response from a ListChangeRequestsWithResponse call
+func ParseListChangeRequestsResponse(rsp *http.Response) (*ListChangeRequestsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListChangeRequestsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ChangeRequestList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListChangeRequestsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateChangeRequestResponse parses an HTTP response from a CreateChangeRequestWithResponse call
+func ParseCreateChangeRequestResponse(rsp *http.Response) (*CreateChangeRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateChangeRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ChangeRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateChangeRequestResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CreateChangeRequestResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetChangeRequestResponse parses an HTTP response from a GetChangeRequestWithResponse call
+func ParseGetChangeRequestResponse(rsp *http.Response) (*GetChangeRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetChangeRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ChangeRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetChangeRequestResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetChangeRequestResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateChangeRequestResponse parses an HTTP response from a UpdateChangeRequestWithResponse call
+func ParseUpdateChangeRequestResponse(rsp *http.Response) (*UpdateChangeRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateChangeRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ChangeRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateChangeRequestResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers UpdateChangeRequestResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCancelChangeRequestResponse parses an HTTP response from a CancelChangeRequestWithResponse call
+func ParseCancelChangeRequestResponse(rsp *http.Response) (*CancelChangeRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CancelChangeRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ChangeRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers CancelChangeRequestResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers CancelChangeRequestResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCopyChangeRequestResponse parses an HTTP response from a CopyChangeRequestWithResponse call
+func ParseCopyChangeRequestResponse(rsp *http.Response) (*CopyChangeRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CopyChangeRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ChangeRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CopyChangeRequestResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CopyChangeRequestResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseOpenChangeRequestResponse parses an HTTP response from a OpenChangeRequestWithResponse call
+func ParseOpenChangeRequestResponse(rsp *http.Response) (*OpenChangeRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &OpenChangeRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ChangeRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers OpenChangeRequestResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers OpenChangeRequestResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRebaseChangeRequestResponse parses an HTTP response from a RebaseChangeRequestWithResponse call
+func ParseRebaseChangeRequestResponse(rsp *http.Response) (*RebaseChangeRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RebaseChangeRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ChangeRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RebaseChangeRequestResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RebaseChangeRequestResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListEnvironmentsResponse parses an HTTP response from a ListEnvironmentsWithResponse call
 func ParseListEnvironmentsResponse(rsp *http.Response) (*ListEnvironmentsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -29542,6 +32457,30 @@ type ServerInterface interface {
 	// GetProjectAuditEntry One audit entry of the project
 	// (GET /projects/{project}/audit/{entry})
 	GetProjectAuditEntry(w http.ResponseWriter, r *http.Request, project ProjectKey, entry string)
+	// ListChangeRequests The project's change requests
+	// (GET /projects/{project}/change-requests)
+	ListChangeRequests(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListChangeRequestsParams)
+	// CreateChangeRequest Propose a change
+	// (POST /projects/{project}/change-requests)
+	CreateChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey)
+	// GetChangeRequest A change request
+	// (GET /projects/{project}/change-requests/{change_request})
+	GetChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID)
+	// UpdateChangeRequest Edit a change request
+	// (PATCH /projects/{project}/change-requests/{change_request})
+	UpdateChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID, params UpdateChangeRequestParams)
+	// CancelChangeRequest Cancel a change request
+	// (POST /projects/{project}/change-requests/{change_request}/cancel)
+	CancelChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID, params CancelChangeRequestParams)
+	// CopyChangeRequest Copy a change request into a new draft
+	// (POST /projects/{project}/change-requests/{change_request}/copy)
+	CopyChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID)
+	// OpenChangeRequest Open a draft change request for review
+	// (POST /projects/{project}/change-requests/{change_request}/open)
+	OpenChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID, params OpenChangeRequestParams)
+	// RebaseChangeRequest Base a draft change request on the configuration as it is now
+	// (POST /projects/{project}/change-requests/{change_request}/rebase)
+	RebaseChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID, params RebaseChangeRequestParams)
 	// ListEnvironments The project's environments
 	// (GET /projects/{project}/environments)
 	ListEnvironments(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -31105,6 +34044,458 @@ func (siw *ServerInterfaceWrapper) GetProjectAuditEntry(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetProjectAuditEntry(w, r, project, entry)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListChangeRequests operation middleware
+func (siw *ServerInterfaceWrapper) ListChangeRequests(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListChangeRequestsParams
+
+	// ------------- Optional query parameter "flag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "flag", r.URL.Query(), &params.Flag, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "flag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "environment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "environment", r.URL.Query(), &params.Environment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "author" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "author", r.URL.Query(), &params.Author, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "author"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "author", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListChangeRequests(w, r, project, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateChangeRequest operation middleware
+func (siw *ServerInterfaceWrapper) CreateChangeRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateChangeRequest(w, r, project)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetChangeRequest operation middleware
+func (siw *ServerInterfaceWrapper) GetChangeRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "change_request" -------------
+	var changeRequest ChangeRequestID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "change_request", r.PathValue("change_request"), &changeRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetChangeRequest(w, r, project, changeRequest)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateChangeRequest operation middleware
+func (siw *ServerInterfaceWrapper) UpdateChangeRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "change_request" -------------
+	var changeRequest ChangeRequestID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "change_request", r.PathValue("change_request"), &changeRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_request", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateChangeRequestParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateChangeRequest(w, r, project, changeRequest, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelChangeRequest operation middleware
+func (siw *ServerInterfaceWrapper) CancelChangeRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "change_request" -------------
+	var changeRequest ChangeRequestID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "change_request", r.PathValue("change_request"), &changeRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_request", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CancelChangeRequestParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelChangeRequest(w, r, project, changeRequest, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CopyChangeRequest operation middleware
+func (siw *ServerInterfaceWrapper) CopyChangeRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "change_request" -------------
+	var changeRequest ChangeRequestID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "change_request", r.PathValue("change_request"), &changeRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_request", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CopyChangeRequest(w, r, project, changeRequest)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OpenChangeRequest operation middleware
+func (siw *ServerInterfaceWrapper) OpenChangeRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "change_request" -------------
+	var changeRequest ChangeRequestID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "change_request", r.PathValue("change_request"), &changeRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_request", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params OpenChangeRequestParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpenChangeRequest(w, r, project, changeRequest, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RebaseChangeRequest operation middleware
+func (siw *ServerInterfaceWrapper) RebaseChangeRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "change_request" -------------
+	var changeRequest ChangeRequestID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "change_request", r.PathValue("change_request"), &changeRequest, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "change_request", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RebaseChangeRequestParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RebaseChangeRequest(w, r, project, changeRequest, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -33573,6 +36964,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.ListExperiments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.CreateExperiment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.GetExperiment)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.ListChangeRequests)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.CreateChangeRequest)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}", wrapper.GetChangeRequest)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}", wrapper.UpdateChangeRequest)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}/open", wrapper.OpenChangeRequest)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}/rebase", wrapper.RebaseChangeRequest)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}/cancel", wrapper.CancelChangeRequest)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}/copy", wrapper.CopyChangeRequest)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/segments", wrapper.ListSegments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/segments", wrapper.CreateSegment)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/segments/{segment}", wrapper.DeleteSegment)
@@ -37259,6 +40658,993 @@ func (response GetProjectAuditEntry404ApplicationProblemPlusJSONResponse) VisitG
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChangeRequestsRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Params  ListChangeRequestsParams
+}
+
+type ListChangeRequestsResponseObject interface {
+	VisitListChangeRequestsResponse(w http.ResponseWriter) error
+}
+
+type ListChangeRequests200JSONResponse ChangeRequestList
+
+func (response ListChangeRequests200JSONResponse) VisitListChangeRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChangeRequests400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListChangeRequests400ApplicationProblemPlusJSONResponse) VisitListChangeRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChangeRequests401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListChangeRequests401ApplicationProblemPlusJSONResponse) VisitListChangeRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChangeRequests403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListChangeRequests403ApplicationProblemPlusJSONResponse) VisitListChangeRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListChangeRequests404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListChangeRequests404ApplicationProblemPlusJSONResponse) VisitListChangeRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChangeRequestRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Body    *CreateChangeRequestJSONRequestBody
+}
+
+type CreateChangeRequestResponseObject interface {
+	VisitCreateChangeRequestResponse(w http.ResponseWriter) error
+}
+
+type CreateChangeRequest201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateChangeRequest201JSONResponse struct {
+	Body    ChangeRequest
+	Headers CreateChangeRequest201ResponseHeaders
+}
+
+func (response CreateChangeRequest201JSONResponse) VisitCreateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChangeRequest400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateChangeRequest400ApplicationProblemPlusJSONResponse) VisitCreateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChangeRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateChangeRequest401ApplicationProblemPlusJSONResponse) VisitCreateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChangeRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateChangeRequest403ApplicationProblemPlusJSONResponse) VisitCreateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChangeRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CreateChangeRequest404ApplicationProblemPlusJSONResponse) VisitCreateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChangeRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateChangeRequest409ApplicationProblemPlusJSONResponse) VisitCreateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateChangeRequest422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateChangeRequest422ApplicationProblemPlusJSONResponse) VisitCreateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetChangeRequestRequestObject struct {
+	Project       ProjectKey      `json:"project"`
+	ChangeRequest ChangeRequestID `json:"change_request"`
+}
+
+type GetChangeRequestResponseObject interface {
+	VisitGetChangeRequestResponse(w http.ResponseWriter) error
+}
+
+type GetChangeRequest200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetChangeRequest200JSONResponse struct {
+	Body    ChangeRequest
+	Headers GetChangeRequest200ResponseHeaders
+}
+
+func (response GetChangeRequest200JSONResponse) VisitGetChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetChangeRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetChangeRequest401ApplicationProblemPlusJSONResponse) VisitGetChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetChangeRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetChangeRequest403ApplicationProblemPlusJSONResponse) VisitGetChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetChangeRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetChangeRequest404ApplicationProblemPlusJSONResponse) VisitGetChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChangeRequestRequestObject struct {
+	Project       ProjectKey      `json:"project"`
+	ChangeRequest ChangeRequestID `json:"change_request"`
+	Params        UpdateChangeRequestParams
+	Body          *UpdateChangeRequestJSONRequestBody
+}
+
+type UpdateChangeRequestResponseObject interface {
+	VisitUpdateChangeRequestResponse(w http.ResponseWriter) error
+}
+
+type UpdateChangeRequest200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateChangeRequest200JSONResponse struct {
+	Body    ChangeRequest
+	Headers UpdateChangeRequest200ResponseHeaders
+}
+
+func (response UpdateChangeRequest200JSONResponse) VisitUpdateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChangeRequest400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateChangeRequest400ApplicationProblemPlusJSONResponse) VisitUpdateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChangeRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateChangeRequest401ApplicationProblemPlusJSONResponse) VisitUpdateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChangeRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateChangeRequest403ApplicationProblemPlusJSONResponse) VisitUpdateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChangeRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateChangeRequest404ApplicationProblemPlusJSONResponse) VisitUpdateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChangeRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateChangeRequest409ApplicationProblemPlusJSONResponse) VisitUpdateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChangeRequest412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateChangeRequest412ApplicationProblemPlusJSONResponse) VisitUpdateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChangeRequest422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateChangeRequest422ApplicationProblemPlusJSONResponse) VisitUpdateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateChangeRequest428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateChangeRequest428ApplicationProblemPlusJSONResponse) VisitUpdateChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelChangeRequestRequestObject struct {
+	Project       ProjectKey      `json:"project"`
+	ChangeRequest ChangeRequestID `json:"change_request"`
+	Params        CancelChangeRequestParams
+}
+
+type CancelChangeRequestResponseObject interface {
+	VisitCancelChangeRequestResponse(w http.ResponseWriter) error
+}
+
+type CancelChangeRequest200ResponseHeaders struct {
+	ETag *string
+}
+
+type CancelChangeRequest200JSONResponse struct {
+	Body    ChangeRequest
+	Headers CancelChangeRequest200ResponseHeaders
+}
+
+func (response CancelChangeRequest200JSONResponse) VisitCancelChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelChangeRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CancelChangeRequest401ApplicationProblemPlusJSONResponse) VisitCancelChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelChangeRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CancelChangeRequest403ApplicationProblemPlusJSONResponse) VisitCancelChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelChangeRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CancelChangeRequest404ApplicationProblemPlusJSONResponse) VisitCancelChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelChangeRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CancelChangeRequest409ApplicationProblemPlusJSONResponse) VisitCancelChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelChangeRequest412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response CancelChangeRequest412ApplicationProblemPlusJSONResponse) VisitCancelChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelChangeRequest428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response CancelChangeRequest428ApplicationProblemPlusJSONResponse) VisitCancelChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyChangeRequestRequestObject struct {
+	Project       ProjectKey      `json:"project"`
+	ChangeRequest ChangeRequestID `json:"change_request"`
+}
+
+type CopyChangeRequestResponseObject interface {
+	VisitCopyChangeRequestResponse(w http.ResponseWriter) error
+}
+
+type CopyChangeRequest201ResponseHeaders struct {
+	ETag *string
+}
+
+type CopyChangeRequest201JSONResponse struct {
+	Body    ChangeRequest
+	Headers CopyChangeRequest201ResponseHeaders
+}
+
+func (response CopyChangeRequest201JSONResponse) VisitCopyChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyChangeRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CopyChangeRequest401ApplicationProblemPlusJSONResponse) VisitCopyChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyChangeRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CopyChangeRequest403ApplicationProblemPlusJSONResponse) VisitCopyChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyChangeRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response CopyChangeRequest404ApplicationProblemPlusJSONResponse) VisitCopyChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyChangeRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CopyChangeRequest409ApplicationProblemPlusJSONResponse) VisitCopyChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CopyChangeRequest422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CopyChangeRequest422ApplicationProblemPlusJSONResponse) VisitCopyChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenChangeRequestRequestObject struct {
+	Project       ProjectKey      `json:"project"`
+	ChangeRequest ChangeRequestID `json:"change_request"`
+	Params        OpenChangeRequestParams
+}
+
+type OpenChangeRequestResponseObject interface {
+	VisitOpenChangeRequestResponse(w http.ResponseWriter) error
+}
+
+type OpenChangeRequest200ResponseHeaders struct {
+	ETag *string
+}
+
+type OpenChangeRequest200JSONResponse struct {
+	Body    ChangeRequest
+	Headers OpenChangeRequest200ResponseHeaders
+}
+
+func (response OpenChangeRequest200JSONResponse) VisitOpenChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenChangeRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response OpenChangeRequest401ApplicationProblemPlusJSONResponse) VisitOpenChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenChangeRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response OpenChangeRequest403ApplicationProblemPlusJSONResponse) VisitOpenChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenChangeRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response OpenChangeRequest404ApplicationProblemPlusJSONResponse) VisitOpenChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenChangeRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response OpenChangeRequest409ApplicationProblemPlusJSONResponse) VisitOpenChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenChangeRequest412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response OpenChangeRequest412ApplicationProblemPlusJSONResponse) VisitOpenChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpenChangeRequest428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response OpenChangeRequest428ApplicationProblemPlusJSONResponse) VisitOpenChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RebaseChangeRequestRequestObject struct {
+	Project       ProjectKey      `json:"project"`
+	ChangeRequest ChangeRequestID `json:"change_request"`
+	Params        RebaseChangeRequestParams
+}
+
+type RebaseChangeRequestResponseObject interface {
+	VisitRebaseChangeRequestResponse(w http.ResponseWriter) error
+}
+
+type RebaseChangeRequest200ResponseHeaders struct {
+	ETag *string
+}
+
+type RebaseChangeRequest200JSONResponse struct {
+	Body    ChangeRequest
+	Headers RebaseChangeRequest200ResponseHeaders
+}
+
+func (response RebaseChangeRequest200JSONResponse) VisitRebaseChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RebaseChangeRequest401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RebaseChangeRequest401ApplicationProblemPlusJSONResponse) VisitRebaseChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RebaseChangeRequest403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RebaseChangeRequest403ApplicationProblemPlusJSONResponse) VisitRebaseChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RebaseChangeRequest404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RebaseChangeRequest404ApplicationProblemPlusJSONResponse) VisitRebaseChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RebaseChangeRequest409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RebaseChangeRequest409ApplicationProblemPlusJSONResponse) VisitRebaseChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RebaseChangeRequest412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response RebaseChangeRequest412ApplicationProblemPlusJSONResponse) VisitRebaseChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RebaseChangeRequest428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response RebaseChangeRequest428ApplicationProblemPlusJSONResponse) VisitRebaseChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -42861,6 +47247,30 @@ type StrictServerInterface interface {
 	// GetProjectAuditEntry One audit entry of the project
 	// (GET /projects/{project}/audit/{entry})
 	GetProjectAuditEntry(ctx context.Context, request GetProjectAuditEntryRequestObject) (GetProjectAuditEntryResponseObject, error)
+	// ListChangeRequests The project's change requests
+	// (GET /projects/{project}/change-requests)
+	ListChangeRequests(ctx context.Context, request ListChangeRequestsRequestObject) (ListChangeRequestsResponseObject, error)
+	// CreateChangeRequest Propose a change
+	// (POST /projects/{project}/change-requests)
+	CreateChangeRequest(ctx context.Context, request CreateChangeRequestRequestObject) (CreateChangeRequestResponseObject, error)
+	// GetChangeRequest A change request
+	// (GET /projects/{project}/change-requests/{change_request})
+	GetChangeRequest(ctx context.Context, request GetChangeRequestRequestObject) (GetChangeRequestResponseObject, error)
+	// UpdateChangeRequest Edit a change request
+	// (PATCH /projects/{project}/change-requests/{change_request})
+	UpdateChangeRequest(ctx context.Context, request UpdateChangeRequestRequestObject) (UpdateChangeRequestResponseObject, error)
+	// CancelChangeRequest Cancel a change request
+	// (POST /projects/{project}/change-requests/{change_request}/cancel)
+	CancelChangeRequest(ctx context.Context, request CancelChangeRequestRequestObject) (CancelChangeRequestResponseObject, error)
+	// CopyChangeRequest Copy a change request into a new draft
+	// (POST /projects/{project}/change-requests/{change_request}/copy)
+	CopyChangeRequest(ctx context.Context, request CopyChangeRequestRequestObject) (CopyChangeRequestResponseObject, error)
+	// OpenChangeRequest Open a draft change request for review
+	// (POST /projects/{project}/change-requests/{change_request}/open)
+	OpenChangeRequest(ctx context.Context, request OpenChangeRequestRequestObject) (OpenChangeRequestResponseObject, error)
+	// RebaseChangeRequest Base a draft change request on the configuration as it is now
+	// (POST /projects/{project}/change-requests/{change_request}/rebase)
+	RebaseChangeRequest(ctx context.Context, request RebaseChangeRequestRequestObject) (RebaseChangeRequestResponseObject, error)
 	// ListEnvironments The project's environments
 	// (GET /projects/{project}/environments)
 	ListEnvironments(ctx context.Context, request ListEnvironmentsRequestObject) (ListEnvironmentsResponseObject, error)
@@ -44214,6 +48624,239 @@ func (sh *strictHandler) GetProjectAuditEntry(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetProjectAuditEntryResponseObject); ok {
 		if err := validResponse.VisitGetProjectAuditEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListChangeRequests operation middleware
+func (sh *strictHandler) ListChangeRequests(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListChangeRequestsParams) {
+	var request ListChangeRequestsRequestObject
+
+	request.Project = project
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListChangeRequests(ctx, request.(ListChangeRequestsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListChangeRequests")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListChangeRequestsResponseObject); ok {
+		if err := validResponse.VisitListChangeRequestsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateChangeRequest operation middleware
+func (sh *strictHandler) CreateChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey) {
+	var request CreateChangeRequestRequestObject
+
+	request.Project = project
+
+	var body CreateChangeRequestJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateChangeRequest(ctx, request.(CreateChangeRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateChangeRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateChangeRequestResponseObject); ok {
+		if err := validResponse.VisitCreateChangeRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetChangeRequest operation middleware
+func (sh *strictHandler) GetChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID) {
+	var request GetChangeRequestRequestObject
+
+	request.Project = project
+	request.ChangeRequest = changeRequest
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetChangeRequest(ctx, request.(GetChangeRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetChangeRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetChangeRequestResponseObject); ok {
+		if err := validResponse.VisitGetChangeRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateChangeRequest operation middleware
+func (sh *strictHandler) UpdateChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID, params UpdateChangeRequestParams) {
+	var request UpdateChangeRequestRequestObject
+
+	request.Project = project
+	request.ChangeRequest = changeRequest
+	request.Params = params
+
+	var body UpdateChangeRequestJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateChangeRequest(ctx, request.(UpdateChangeRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateChangeRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateChangeRequestResponseObject); ok {
+		if err := validResponse.VisitUpdateChangeRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelChangeRequest operation middleware
+func (sh *strictHandler) CancelChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID, params CancelChangeRequestParams) {
+	var request CancelChangeRequestRequestObject
+
+	request.Project = project
+	request.ChangeRequest = changeRequest
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelChangeRequest(ctx, request.(CancelChangeRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelChangeRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelChangeRequestResponseObject); ok {
+		if err := validResponse.VisitCancelChangeRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CopyChangeRequest operation middleware
+func (sh *strictHandler) CopyChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID) {
+	var request CopyChangeRequestRequestObject
+
+	request.Project = project
+	request.ChangeRequest = changeRequest
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CopyChangeRequest(ctx, request.(CopyChangeRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CopyChangeRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CopyChangeRequestResponseObject); ok {
+		if err := validResponse.VisitCopyChangeRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// OpenChangeRequest operation middleware
+func (sh *strictHandler) OpenChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID, params OpenChangeRequestParams) {
+	var request OpenChangeRequestRequestObject
+
+	request.Project = project
+	request.ChangeRequest = changeRequest
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.OpenChangeRequest(ctx, request.(OpenChangeRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "OpenChangeRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(OpenChangeRequestResponseObject); ok {
+		if err := validResponse.VisitOpenChangeRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RebaseChangeRequest operation middleware
+func (sh *strictHandler) RebaseChangeRequest(w http.ResponseWriter, r *http.Request, project ProjectKey, changeRequest ChangeRequestID, params RebaseChangeRequestParams) {
+	var request RebaseChangeRequestRequestObject
+
+	request.Project = project
+	request.ChangeRequest = changeRequest
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RebaseChangeRequest(ctx, request.(RebaseChangeRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RebaseChangeRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RebaseChangeRequestResponseObject); ok {
+		if err := validResponse.VisitRebaseChangeRequestResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

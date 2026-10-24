@@ -750,6 +750,35 @@ msgstr "Изменять флаги, сегменты и объявления."
 msgid "Change password"
 msgstr "Сменить пароль"
 
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Change request"
+msgstr "Запрос на изменение"
+
+#: src/lib/audit.ts
+msgid "Change request cancelled"
+msgstr "Запрос на изменение отменён"
+
+#: src/lib/audit.ts
+msgid "Change request copied"
+msgstr "Запрос на изменение скопирован"
+
+#: src/lib/audit.ts
+msgid "Change request drafted"
+msgstr "Черновик запроса на изменение создан"
+
+#: src/lib/audit.ts
+msgid "Change request edited"
+msgstr "Запрос на изменение отредактирован"
+
+#: src/lib/audit.ts
+msgid "Change request opened"
+msgstr "Запрос на изменение открыт"
+
+#: src/lib/audit.ts
+msgid "Change request rebased"
+msgstr "Запрос на изменение перенесён на текущую версию"
+
 #: src/components/audit-entry-sheet.tsx
 msgid "changed"
 msgstr "изменено"
@@ -2753,6 +2782,10 @@ msgstr "Проект: {label}"
 #: src/routes/_signed-in/index.tsx
 msgid "Projects"
 msgstr "Проекты"
+
+#: src/lib/access-names.ts
+msgid "propose changes as change requests"
+msgstr "предлагать изменения через запросы на изменение"
 
 #: src/components/sdk-keys.tsx
 msgid "Put it in the client SDK’s configuration. It ships inside the browser or the app, so anyone can read it: it learns only the values served to a context, never the ruleset."

@@ -134,6 +134,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	owners := appaccess.NewOwnership(accessStore)
 	experimentStore := pgexperiments.NewStore(d.Pool)
 	experimentRec := appexperiments.NewRecorder(audit, d.Clock, d.IDs)
+	// A change request proposes a configuration the flags context checks as
+	// it would check writing it.
+	changeRequestStore := pggovernance.NewChangeRequests(d.Pool)
+	changeRequests := appgovernance.ChangeRequestDeps{
+		Tx: tx, Projects: changeRequestStore, Store: changeRequestStore,
+		Configurations: appflags.NewDraftConfiguration(ws, flagStore, d.IDs), Audit: audit, Clock: d.Clock, IDs: d.IDs,
+	}
 	// Deleting a unit type or attribute asks the flags context what still
 	// names it.
 	declarationGuard := appflags.NewDeclarationGuard(flagStore)
@@ -289,6 +296,15 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Owners: owners, Recorder: experimentRec,
 		}),
 		GetExperiment: appexperiments.NewGetExperiment(experimentStore),
+
+		ListChangeRequests:  appgovernance.NewListChangeRequests(changeRequestStore),
+		CreateChangeRequest: appgovernance.NewCreateChangeRequest(changeRequests),
+		GetChangeRequest:    appgovernance.NewGetChangeRequest(changeRequestStore),
+		UpdateChangeRequest: appgovernance.NewUpdateChangeRequest(changeRequests),
+		OpenChangeRequest:   appgovernance.NewOpenChangeRequest(changeRequests),
+		RebaseChangeRequest: appgovernance.NewRebaseChangeRequest(changeRequests),
+		CancelChangeRequest: appgovernance.NewCancelChangeRequest(changeRequests),
+		CopyChangeRequest:   appgovernance.NewCopyChangeRequest(changeRequests),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

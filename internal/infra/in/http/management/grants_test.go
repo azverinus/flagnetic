@@ -204,14 +204,14 @@ func TestAMembersPermissionsAreTheUnionOfTheirGrantsAndRemovingOneKeepsTheOthers
 
 	grant(t, admin, p.Key, m.ID, "developer")
 	maintainer := grant(t, admin, p.Key, m.ID, "maintainer")
-	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage"}) ||
+	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read", "environment.manage", "declaration.manage", "flag.edit", "flag.archive", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "segment.delete", "sdk_key.manage", "change_request.propose"}) ||
 		!slices.Equal(rolesOf(got.Grants), []string{"developer", "maintainer"}) {
 		t.Errorf("with two grants: %+v, want the union of developer and maintainer", got)
 	}
 	if res := do(admin.DeleteGrantWithResponse(t.Context(), p.Key, maintainer.Id.String())); res.StatusCode() != http.StatusNoContent {
 		t.Fatalf("removing the maintainer grant = %d: %s", res.StatusCode(), res.Body)
 	}
-	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit"}) ||
+	if got := projectMe(t, mc, p.Key); !slices.Equal(got.Permissions, []string{"project.read", "flag.edit", "flag_configuration.update", "flag_configuration.kill", "flag_configuration.revert", "segment.edit", "change_request.propose"}) ||
 		!slices.Equal(rolesOf(got.Grants), []string{"developer"}) {
 		t.Errorf("after removing one: %+v, want the developer grant alone", got)
 	}

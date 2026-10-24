@@ -750,6 +750,35 @@ msgstr ""
 msgid "Change password"
 msgstr ""
 
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Change request"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Change request cancelled"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Change request copied"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Change request drafted"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Change request edited"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Change request opened"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Change request rebased"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 msgid "changed"
 msgstr ""
@@ -2752,6 +2781,10 @@ msgstr ""
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/index.tsx
 msgid "Projects"
+msgstr ""
+
+#: src/lib/access-names.ts
+msgid "propose changes as change requests"
 msgstr ""
 
 #: src/components/sdk-keys.tsx

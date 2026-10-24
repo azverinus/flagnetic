@@ -606,3 +606,34 @@ func TestExperimentsHoldingAFlagAreReferencesToArchiveOrRemoveFromIt(t *testing.
 		t.Errorf("references of z = %v, want none", got)
 	}
 }
+
+func TestAProposalKeepsOnlyTheRuleIdentifiersAndSaltsTheConfigurationHolds(t *testing.T) {
+	in := base()
+	in.Rules = []flags.RuleInput{{Serve: rollout("user", "b", 1000)}, {Serve: serveVariation("c")}}
+	live := mustReplace(t, initial(), in)
+	rolloutID, variationID, stranger := live.Rules[0].ID, live.Rules[1].ID, id.New[flags.Rule](ids)
+	salt := live.Rules[0].Serve.Salt
+
+	withSalt := func(s flags.ServeInput, salt string) flags.ServeInput { s.Salt = salt; return s }
+	in.Rules = []flags.RuleInput{
+		{ID: &rolloutID, Serve: withSalt(rollout("user", "b", 2000), salt)},
+		{ID: &rolloutID, Serve: withSalt(rollout("user", "b", 2000), "elsewhere0000000")},
+		{ID: &variationID, Serve: withSalt(rollout("user", "b", 2000), salt)},
+		{ID: &stranger, Serve: withSalt(rollout("user", "b", 2000), salt)},
+		{Serve: withSalt(rollout("user", "b", 2000), salt)},
+	}
+	got := live.Proposable(in)
+	type kept struct {
+		id   *flags.RuleID
+		salt string
+	}
+	want := []kept{{&rolloutID, salt}, {&rolloutID, ""}, {&variationID, ""}, {nil, ""}, {nil, ""}}
+	for i, r := range got.Rules {
+		if (r.ID == nil) != (want[i].id == nil) || (r.ID != nil && *r.ID != *want[i].id) || r.Serve.Salt != want[i].salt {
+			t.Errorf("rule %d = id %v, salt %q; want id %v, salt %q", i, r.ID, r.Serve.Salt, want[i].id, want[i].salt)
+		}
+	}
+	if in.Rules[3].ID == nil || in.Rules[3].Serve.Salt == "" {
+		t.Error("the input given was changed")
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -69,6 +70,10 @@ const (
 type Author struct {
 	Member *access.MemberID
 	Token  *access.APITokenID
+	// Name is the member's display name or the token's name as it is now,
+	// filled in when a change request is read; it plays no part in who the
+	// author is.
+	Name string
 }
 
 // Is reports whether a is b.
@@ -107,7 +112,7 @@ type Subject struct {
 
 // FlagRef names a flag by identifier, and by the key it had when read.
 type FlagRef struct {
-	ID  string
+	ID  flags.FlagID
 	Key string
 }
 
