@@ -29,6 +29,10 @@ const maxSummaryRows = 1000;
 /// The largest decompressed envelope the endpoint accepts.
 const maxBatchBytes = 1 << 20;
 
+/// The bytes a browser lets one page hand to its beacons until they are
+/// sent: 64 KiB in every engine. A beacon over what is left is refused.
+const maxBeaconBytes = 64 * 1024;
+
 /// Everything an exposure reports about the evaluation that produced it.
 /// The SDK's name and version travel in the envelope; the
 /// environment and `received_at` are the platform's.
@@ -282,10 +286,16 @@ final class ExposureSuppressor {
 
 /// How many of [queue]'s leading events one batch may carry: at most
 /// [batchSize] and, with [envelopeOverhead] bytes of envelope, under
-/// [maxBatchBytes] decompressed. An event too large on its own is still a
+/// [maxBytes] ([maxBatchBytes] unless a beacon's quota is smaller)
+/// decompressed. An event too large on its own is still a
 /// batch of one, which the platform answers 413 and the caller drops.
-int batchLength(List<QueuedEvent> queue, int batchSize, int envelopeOverhead) {
-  final budget = maxBatchBytes - envelopeOverhead;
+int batchLength(
+  List<QueuedEvent> queue,
+  int batchSize,
+  int envelopeOverhead, {
+  int maxBytes = maxBatchBytes,
+}) {
+  final budget = maxBytes - envelopeOverhead;
   final limit = batchSize < maxEventsPerBatch ? batchSize : maxEventsPerBatch;
   var size = 0;
   var taken = 0;

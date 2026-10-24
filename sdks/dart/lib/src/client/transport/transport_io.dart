@@ -9,6 +9,16 @@ Transport createTransport() => _IoTransport();
 /// The operating system the app runs on.
 String hostPlatform() => Platform.operatingSystem;
 
+/// No page to follow: the app calls `foreground` and `background`.
+void Function()? watchPage({
+  required void Function() hidden,
+  required void Function() visible,
+  required void Function() online,
+}) => null;
+
+/// `User-Agent` names the platform.
+String? defaultPlatformAttribute() => null;
+
 final class _IoTransport implements Transport {
   final HttpClient _http = HttpClient()..autoUncompress = true;
   final Set<HttpClientRequest> _inFlight = {};
@@ -110,20 +120,44 @@ final class _IoTransport implements Transport {
 
   /// [response] with [request] removed from the in-flight set once its body
   /// ends, so `close` aborts only what is still open, and every error on the
-  /// way turned into a [TransportException].
+  /// way turned into a [TransportException]. Cancelling the subscription,
+  /// even before the first chunk, ends the connection.
   Stream<List<int>> _untilDone(
     HttpClientResponse response,
     HttpClientRequest request,
-  ) async* {
-    try {
-      yield* response.handleError(
-        (Object e) => throw TransportException(TransportFailure.network, '$e'),
-        test: (e) => e is! TransportException,
-      );
-    } finally {
-      _inFlight.remove(request);
-    }
+  ) {
+    late final StreamController<List<int>> out;
+    StreamSubscription<List<int>>? body;
+    out = StreamController<List<int>>(
+      onListen: () {
+        body = response.listen(
+          out.add,
+          onError: (Object e) => out.addError(
+            e is TransportException
+                ? e
+                : TransportException(TransportFailure.network, '$e'),
+          ),
+          onDone: () {
+            _inFlight.remove(request);
+            unawaited(out.close());
+          },
+        );
+      },
+      onPause: () => body?.pause(),
+      onResume: () => body?.resume(),
+      onCancel: () {
+        _inFlight.remove(request);
+        // A body nobody reads may never end by itself: the request is
+        // aborted rather than left holding its connection.
+        request.abort();
+        return body?.cancel();
+      },
+    );
+    return out.stream;
   }
+
+  @override
+  bool beacon(Uri url, String body) => false;
 
   @override
   void close() {

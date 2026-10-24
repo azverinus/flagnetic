@@ -519,6 +519,11 @@ void main() {
       await stale.send('event: ruleset\nid: 5\ndata: {"version":5}\n\n');
       await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(evaluates(), before, reason: 'the given-up stream is not read');
+      expect(
+        await stale.closedBySdk(const Duration(seconds: 1)),
+        isTrue,
+        reason: 'the given-up stream holds no connection',
+      );
 
       await held.send('event: ruleset\nid: 5\ndata: {"version":5}\n\n');
       await (await server.next(

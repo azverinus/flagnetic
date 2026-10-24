@@ -1,4 +1,6 @@
 // The getters that need no network: an offline client serves a document.
+import 'dart:math';
+
 import 'package:flagnetic/flagnetic.dart';
 import 'package:test/test.dart';
 
@@ -28,6 +30,8 @@ void main() {
       'whole_double': numberFlag(3.0),
       'fraction': numberFlag(2.5),
       'huge': numberFlag(1e300),
+      // Whole, but beyond what every platform holds exactly.
+      'beyond_2_53': numberFlag(pow(2, 60)),
     };
 
     test('serves a whole number as an int', () {
@@ -39,7 +43,7 @@ void main() {
 
     test('a number that is not whole serves the default as a mismatch', () {
       final client = offlineClient(flags);
-      for (final key in ['fraction', 'huge']) {
+      for (final key in ['fraction', 'huge', 'beyond_2_53']) {
         expect(client.getInt(key, 7), 7, reason: key);
         final detail = client.getDetail(key, 7);
         expect(detail.reason, Reasons.fallback, reason: key);

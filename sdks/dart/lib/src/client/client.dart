@@ -117,6 +117,13 @@ final class FlagneticClient {
   /// The keys this connection writes: its own values and its own event queue.
   final StoreKeys _keys;
   late final Random _jitter = _options.random ?? Random();
+
+  /// The platform the context, exposures and the events envelope name: the
+  /// options' choice, else `web` in a browser, where no `User-Agent` names
+  /// it.
+  late final String? _platform =
+      _options.platform ?? defaultPlatformAttribute();
+  void Function()? _unwatchPage;
   Timer? _rulesetWait;
   _Resume? _resume;
   Transport? _transport;
@@ -189,7 +196,7 @@ final class FlagneticClient {
       url: _sdkUrl(_baseUrl, 'events'),
       sdkKey: _sdkKey,
       settings: (
-        platform: _options.platform,
+        platform: _platform,
         appVersion: _options.appVersion,
         requestTimeout: _options.requestTimeout,
         flushInterval: _options.flushInterval,
@@ -212,6 +219,14 @@ final class FlagneticClient {
     // sent, so it goes out once, with the event IDs it was recorded under.
     unawaited(_ingest!.load());
     _ingest!.start();
+    // In a browser the page is the app's lifecycle: a hidden or unloaded
+    // page goes to the background, where its last events leave by beacon,
+    // and a page shown again, or one whose network came back, refetches.
+    _unwatchPage = watchPage(
+      hidden: background,
+      visible: foreground,
+      online: foreground,
+    );
     if (!_options.streamEnabled) {
       _trigger(_Trigger.start);
       return;
@@ -399,7 +414,9 @@ final class FlagneticClient {
   /// old, and run the interval again.
   ///
   /// `flagnetic_flutter` calls this from a `WidgetsBindingObserver`; a plain
-  /// Dart application calls it from whatever tells it the same.
+  /// Dart application calls it from whatever tells it the same. In a
+  /// browser the client calls it itself when the page is shown again or its
+  /// network comes back.
   void foreground() {
     try {
       if (_closed) return;
@@ -424,7 +441,9 @@ final class FlagneticClient {
   }
 
   /// The app went to the background: nothing is fetched until [foreground].
-  /// Values keep serving and queued events flush best effort.
+  /// Values keep serving and queued events flush best effort. In a browser
+  /// the client calls it itself when the page is hidden or unloaded, and
+  /// the queue leaves through `navigator.sendBeacon`.
   void background() {
     try {
       if (_closed) return;
@@ -611,7 +630,7 @@ final class FlagneticClient {
             : Reasons.experiment,
         rulesetVersion: detail.rulesetVersion ?? 0,
         override: experiment.override,
-        platform: _predeclared('platform', _options.platform),
+        platform: _predeclared('platform', _platform),
         appVersion: _predeclared('app_version', _options.appVersion),
       )),
     );
@@ -656,6 +675,8 @@ final class FlagneticClient {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    _unwatchPage?.call();
+    _unwatchPage = null;
     try {
       _timer?.cancel();
       _timer = null;
@@ -1116,7 +1137,7 @@ final class FlagneticClient {
     'context': {
       'units': context.units,
       'attributes': {
-        'platform': ?_options.platform,
+        'platform': ?_platform,
         'app_version': ?_options.appVersion,
         'sdk': sdkName,
         'sdk_version': sdkVersion,

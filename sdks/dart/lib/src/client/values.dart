@@ -29,12 +29,15 @@ bool fitsFlagType(String type, Object? value) => switch (type) {
 
 /// True when [value] is a number with no fractional part that an integer
 /// holds exactly on every platform, that is within ±2^53.
+///
+/// The bound is checked for an `int` too: compiled for the web every whole
+/// number is an `int`, `1e300` included, and on the VM an integer beyond it
+/// would serve a value the web could not.
 bool isWholeNumber(Object? value) =>
-    value is int ||
-    (value is double &&
-        value.isFinite &&
-        value == value.truncateToDouble() &&
-        value.abs() <= 9007199254740991);
+    value is num &&
+    value.isFinite &&
+    value.abs() <= 9007199254740991 &&
+    value == value.truncateToDouble();
 
 /// Why a document was refused.
 enum RefusalCause {

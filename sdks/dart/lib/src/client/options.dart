@@ -106,7 +106,8 @@ final class ClientOptions {
 
   /// The `platform` attribute and the platform in `User-Agent`, such as
   /// `android`, `ios` or `web`. When null, `User-Agent` names the operating
-  /// system and the context goes without the attribute.
+  /// system and the context goes without the attribute; in a browser, which
+  /// cannot send `User-Agent`, the attribute is `web`.
   final String? platform;
 
   /// The `app_version` attribute: the application's semantic version.

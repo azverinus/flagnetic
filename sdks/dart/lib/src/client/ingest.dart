@@ -139,17 +139,78 @@ final class Ingest {
   void start() => _arm();
 
   /// Follows the application: the interval runs while it is foregrounded,
-  /// and going to the background flushes best effort.
+  /// and going to the background flushes best effort: by beacon in a
+  /// browser, where the page may be gone before a request is answered, and
+  /// by a request elsewhere. Every call to the background flushes, not only
+  /// the first: a page hidden and then closed has its last events
+  /// recorded in between.
   void setForeground({required bool foreground}) {
-    if (foreground == _foreground) return;
-    _foreground = foreground;
     if (foreground) {
+      if (_foreground) return;
+      _foreground = true;
       _arm();
       return;
     }
+    _foreground = false;
     _timer?.cancel();
     _timer = null;
-    unawaited(flush());
+    if (!_beacon()) unawaited(flush());
+  }
+
+  /// Hands the queue to the browser's beacon, batch by batch within the
+  /// browser's quota for a page, and drops what the browser took: it posts
+  /// after the page has gone and nobody reads the answer, so the events are
+  /// not kept for a retry that would only count them as duplicates. What
+  /// the quota leaves stays queued for the next foreground or the next
+  /// load. A batch already in flight is left to its own request. False
+  /// where there is no beacon, so the caller flushes by a request instead.
+  ///
+  /// The client key travels as `sdk_key` and the envelope as `text/plain`,
+  /// since a beacon can set no header.
+  bool _beacon() {
+    if (_closed) return true;
+    _materialize();
+    final url = _url.replace(
+      queryParameters: {..._url.queryParameters, 'sdk_key': _sdkKey},
+    );
+    var budget = maxBeaconBytes;
+    var first = true;
+    while (true) {
+      final pending = [
+        for (final event in _queue)
+          if (!_inFlight.contains(event['event_id'])) event,
+      ];
+      if (pending.isEmpty) return true;
+      final overhead = _envelopeOverhead();
+      final batch = pending
+          .take(
+            batchLength(
+              pending,
+              _settings.eventBatchSize,
+              overhead,
+              maxBytes: budget,
+            ),
+          )
+          .toList();
+      final body = jsonEncode(_envelope(batch));
+      final size = utf8.encode(body).length;
+      if (size > budget || !_transport.beacon(url, body)) {
+        // Nothing taken (no beacon on this platform, or a first batch the
+        // browser refused): the caller sends the queue by a request, which
+        // may still land before the page goes.
+        if (first) return false;
+        _log(LogLevel.warn, LogEvents.eventsFailed, {
+          'cause': 'beacon_refused',
+          'events': pending.length,
+        });
+        return true;
+      }
+      first = false;
+      budget -= size;
+      final sent = {for (final event in batch) event['event_id']};
+      _queue.removeWhere((event) => sent.contains(event['event_id']));
+      _persist();
+    }
   }
 
   /// Appends one event and sends the queue once a batch has filled.
