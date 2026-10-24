@@ -155,7 +155,8 @@ type document struct {
 	Version     int64  `json:"version"`
 	Scope       string `json:"scope"`
 	Environment struct {
-		Key string `json:"key"`
+		Key       string `json:"key"`
+		Protected bool   `json:"protected"`
 	} `json:"environment"`
 	Flags []struct {
 		Key string `json:"key"`

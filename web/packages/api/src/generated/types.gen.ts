@@ -675,6 +675,10 @@ export type Environment = {
    */
   sort_order: number;
   version: Version;
+  /**
+   * Whether a change to what the environment's SDKs receive needs an approved change request. Set through `PUT …/environments/{environment}/protection`. A new project's production environment starts protected.
+   */
+  protected: boolean;
 };
 
 export type EnvironmentList = {
@@ -684,6 +688,10 @@ export type EnvironmentList = {
 export type EnvironmentCreate = {
   key: Key;
   name: Name;
+};
+
+export type EnvironmentProtection = {
+  protected: boolean;
 };
 
 export type EnvironmentPatch = {
@@ -3171,6 +3179,83 @@ export type UpdateEnvironmentResponses = {
 
 export type UpdateEnvironmentResponse =
   UpdateEnvironmentResponses[keyof UpdateEnvironmentResponses];
+
+export type SetEnvironmentProtectionData = {
+  body: EnvironmentProtection;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: never;
+  url: "/projects/{project}/environments/{environment}/protection";
+};
+
+export type SetEnvironmentProtectionErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type SetEnvironmentProtectionError =
+  SetEnvironmentProtectionErrors[keyof SetEnvironmentProtectionErrors];
+
+export type SetEnvironmentProtectionResponses = {
+  /**
+   * As protected or not.
+   */
+  200: Environment;
+};
+
+export type SetEnvironmentProtectionResponse =
+  SetEnvironmentProtectionResponses[keyof SetEnvironmentProtectionResponses];
 
 export type EvaluateData = {
   body: EvaluationRequest;

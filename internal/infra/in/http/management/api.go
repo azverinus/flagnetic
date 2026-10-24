@@ -71,11 +71,12 @@ type Handlers struct {
 	CreateProject *appworkspace.CreateProject
 	UpdateProject *appworkspace.UpdateProject
 
-	ListEnvironments  *appworkspace.List[workspace.Environment]
-	GetEnvironment    *appworkspace.Get[workspace.Environment]
-	CreateEnvironment *appworkspace.CreateEnvironment
-	UpdateEnvironment *appworkspace.UpdateEnvironment
-	DeleteEnvironment *appworkspace.DeleteEnvironment
+	ListEnvironments         *appworkspace.List[workspace.Environment]
+	GetEnvironment           *appworkspace.Get[workspace.Environment]
+	CreateEnvironment        *appworkspace.CreateEnvironment
+	UpdateEnvironment        *appworkspace.UpdateEnvironment
+	SetEnvironmentProtection *appworkspace.SetEnvironmentProtection
+	DeleteEnvironment        *appworkspace.DeleteEnvironment
 
 	ListUnitTypes  *appworkspace.ListUsed[workspace.UnitType]
 	GetUnitType    *appworkspace.Get[workspace.UnitType]

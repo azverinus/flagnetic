@@ -906,6 +906,9 @@ type Environment struct {
 	Key  Key  `json:"key"`
 	Name Name `json:"name"`
 
+	// Protected Whether a change to what the environment's SDKs receive needs an approved change request. Set through `PUT …/environments/{environment}/protection`. A new project's production environment starts protected.
+	Protected bool `json:"protected"`
+
 	// SortOrder Where the environment is listed among its project's, the first created first.
 	SortOrder int `json:"sort_order"`
 
@@ -930,6 +933,11 @@ type EnvironmentPatch struct {
 	// Key Refused with `key_immutable` whatever its value.
 	Key  *string `json:"key,omitempty"`
 	Name *Name   `json:"name,omitempty"`
+}
+
+// EnvironmentProtection defines model for EnvironmentProtection.
+type EnvironmentProtection struct {
+	Protected bool `json:"protected"`
 }
 
 // Evaluation defines model for Evaluation.
@@ -2591,6 +2599,16 @@ type UpdateEnvironmentParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// SetEnvironmentProtectionParams defines parameters for SetEnvironmentProtection.
+type SetEnvironmentProtectionParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // ListExperimentsParams defines parameters for ListExperiments.
 type ListExperimentsParams struct {
 	// Status Lists the experiments in this status.
@@ -2876,6 +2894,9 @@ type UpdateEnvironmentJSONRequestBody = EnvironmentPatch
 
 // EvaluateJSONRequestBody defines body for Evaluate for application/json ContentType.
 type EvaluateJSONRequestBody = EvaluationRequest
+
+// SetEnvironmentProtectionJSONRequestBody defines body for SetEnvironmentProtection for application/json ContentType.
+type SetEnvironmentProtectionJSONRequestBody = EnvironmentProtection
 
 // CreateSdkKeyJSONRequestBody defines body for CreateSdkKey for application/json ContentType.
 type CreateSdkKeyJSONRequestBody = SdkKeyCreate
@@ -3801,6 +3822,18 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 	Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetEnvironmentProtectionWithBody performs a PUT /projects/{project}/environments/{environment}/protection (the `SetEnvironmentProtection` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Protects the environment or stops protecting it. In a protected environment, a write that would change what its SDKs receive goes through an approved change request, and SDKs ignore local overrides. The environment's ruleset version moves, so SDKs learn the change. Asking for the protection the environment already has changes nothing and records nothing. Recorded in the audit log as `environment.protected` or `environment.unprotected`.
+	SetEnvironmentProtectionWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetEnvironmentProtection performs a PUT /projects/{project}/environments/{environment}/protection (the `SetEnvironmentProtection` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Protects the environment or stops protecting it. In a protected environment, a write that would change what its SDKs receive goes through an approved change request, and SDKs ignore local overrides. The environment's ruleset version moves, so SDKs learn the change. Asking for the protection the environment already has changes nothing and records nothing. Recorded in the audit log as `environment.protected` or `environment.unprotected`.
+	SetEnvironmentProtection(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, body SetEnvironmentProtectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
 	//
@@ -6221,6 +6254,38 @@ func (c *Client) EvaluateWithBody(ctx context.Context, project ProjectKey, envir
 // Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 func (c *Client) Evaluate(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEvaluateRequest(c.Server, project, environment, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetEnvironmentProtectionWithBody performs a PUT /projects/{project}/environments/{environment}/protection (the `SetEnvironmentProtection` operationId) request,
+// with any type of body and a specified content type.
+//
+// Protects the environment or stops protecting it. In a protected environment, a write that would change what its SDKs receive goes through an approved change request, and SDKs ignore local overrides. The environment's ruleset version moves, so SDKs learn the change. Asking for the protection the environment already has changes nothing and records nothing. Recorded in the audit log as `environment.protected` or `environment.unprotected`.
+func (c *Client) SetEnvironmentProtectionWithBody(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetEnvironmentProtectionRequestWithBody(c.Server, project, environment, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetEnvironmentProtection performs a PUT /projects/{project}/environments/{environment}/protection (the `SetEnvironmentProtection` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Protects the environment or stops protecting it. In a protected environment, a write that would change what its SDKs receive goes through an approved change request, and SDKs ignore local overrides. The environment's ruleset version moves, so SDKs learn the change. Asking for the protection the environment already has changes nothing and records nothing. Recorded in the audit log as `environment.protected` or `environment.unprotected`.
+func (c *Client) SetEnvironmentProtection(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, body SetEnvironmentProtectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetEnvironmentProtectionRequest(c.Server, project, environment, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -10606,6 +10671,75 @@ func NewEvaluateRequestWithBody(server string, project ProjectKey, environment E
 	return req, nil
 }
 
+// NewSetEnvironmentProtectionRequest calls the generic SetEnvironmentProtection builder with application/json body
+func NewSetEnvironmentProtectionRequest(server string, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, body SetEnvironmentProtectionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetEnvironmentProtectionRequestWithBody(server, project, environment, params, "application/json", bodyReader)
+}
+
+// NewSetEnvironmentProtectionRequestWithBody constructs an http.Request for the SetEnvironmentProtection method, with any body, and a specified content type
+func NewSetEnvironmentProtectionRequestWithBody(server string, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/environments/%s/protection", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewGetEnvironmentRulesetRequest constructs an http.Request for the GetEnvironmentRuleset method
 func NewGetEnvironmentRulesetRequest(server string, project ProjectKey, environment EnvironmentKey) (*http.Request, error) {
 	var err error
@@ -14358,6 +14492,20 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/evaluate (the `Evaluate` operationId).
 	EvaluateWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, body EvaluateJSONRequestBody, reqEditors ...RequestEditorFn) (*EvaluateResponse, error)
+
+	// SetEnvironmentProtectionWithBodyWithResponse performs a PUT /projects/{project}/environments/{environment}/protection (the `SetEnvironmentProtection` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Protects the environment or stops protecting it. In a protected environment, a write that would change what its SDKs receive goes through an approved change request, and SDKs ignore local overrides. The environment's ruleset version moves, so SDKs learn the change. Asking for the protection the environment already has changes nothing and records nothing. Recorded in the audit log as `environment.protected` or `environment.unprotected`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	SetEnvironmentProtectionWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetEnvironmentProtectionResponse, error)
+
+	// SetEnvironmentProtectionWithResponse performs a PUT /projects/{project}/environments/{environment}/protection (the `SetEnvironmentProtection` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Protects the environment or stops protecting it. In a protected environment, a write that would change what its SDKs receive goes through an approved change request, and SDKs ignore local overrides. The environment's ruleset version moves, so SDKs learn the change. Asking for the protection the environment already has changes nothing and records nothing. Recorded in the audit log as `environment.protected` or `environment.unprotected`.
+	SetEnvironmentProtectionWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, body SetEnvironmentProtectionJSONRequestBody, reqEditors ...RequestEditorFn) (*SetEnvironmentProtectionResponse, error)
 
 	// GetEnvironmentRulesetWithResponse The environment's ruleset, as server SDKs download it
 	//
@@ -19746,6 +19894,103 @@ func (r EvaluateResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r EvaluateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SetEnvironmentProtectionResponse200Headers the declared response headers of an HTTP 200 response for SetEnvironmentProtection
+type SetEnvironmentProtectionResponse200Headers struct {
+	ETag *string
+}
+
+// SetEnvironmentProtectionResponse401Headers the declared response headers of an HTTP 401 response for SetEnvironmentProtection
+type SetEnvironmentProtectionResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type SetEnvironmentProtectionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Environment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SetEnvironmentProtectionResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SetEnvironmentProtectionResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetEnvironmentProtectionResponse) GetJSON200() *Environment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetEnvironmentProtectionResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetEnvironmentProtectionResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetEnvironmentProtectionResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetEnvironmentProtectionResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r SetEnvironmentProtectionResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r SetEnvironmentProtectionResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r SetEnvironmentProtectionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetEnvironmentProtectionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetEnvironmentProtectionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetEnvironmentProtectionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -25398,6 +25643,32 @@ func (c *ClientWithResponses) EvaluateWithResponse(ctx context.Context, project 
 	return ParseEvaluateResponse(rsp)
 }
 
+// SetEnvironmentProtectionWithBodyWithResponse performs a PUT /projects/{project}/environments/{environment}/protection (the `SetEnvironmentProtection` operationId) request,
+// with any type of body and a specified content type.
+//
+// Protects the environment or stops protecting it. In a protected environment, a write that would change what its SDKs receive goes through an approved change request, and SDKs ignore local overrides. The environment's ruleset version moves, so SDKs learn the change. Asking for the protection the environment already has changes nothing and records nothing. Recorded in the audit log as `environment.protected` or `environment.unprotected`.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) SetEnvironmentProtectionWithBodyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetEnvironmentProtectionResponse, error) {
+	rsp, err := c.SetEnvironmentProtectionWithBody(ctx, project, environment, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetEnvironmentProtectionResponse(rsp)
+}
+
+// SetEnvironmentProtectionWithResponse performs a PUT /projects/{project}/environments/{environment}/protection (the `SetEnvironmentProtection` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Protects the environment or stops protecting it. In a protected environment, a write that would change what its SDKs receive goes through an approved change request, and SDKs ignore local overrides. The environment's ruleset version moves, so SDKs learn the change. Asking for the protection the environment already has changes nothing and records nothing. Recorded in the audit log as `environment.protected` or `environment.unprotected`.
+func (c *ClientWithResponses) SetEnvironmentProtectionWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, params *SetEnvironmentProtectionParams, body SetEnvironmentProtectionJSONRequestBody, reqEditors ...RequestEditorFn) (*SetEnvironmentProtectionResponse, error) {
+	rsp, err := c.SetEnvironmentProtection(ctx, project, environment, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetEnvironmentProtectionResponse(rsp)
+}
+
 // GetEnvironmentRulesetWithResponse The environment's ruleset, as server SDKs download it
 //
 // The environment's whole ruleset document, private segments
@@ -30823,6 +31094,97 @@ func ParseEvaluateResponse(rsp *http.Response) (*EvaluateResponse, error) {
 	return response, nil
 }
 
+// ParseSetEnvironmentProtectionResponse parses an HTTP response from a SetEnvironmentProtectionWithResponse call
+func ParseSetEnvironmentProtectionResponse(rsp *http.Response) (*SetEnvironmentProtectionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetEnvironmentProtectionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Environment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers SetEnvironmentProtectionResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers SetEnvironmentProtectionResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetEnvironmentRulesetResponse parses an HTTP response from a GetEnvironmentRulesetWithResponse call
 func ParseGetEnvironmentRulesetResponse(rsp *http.Response) (*GetEnvironmentRulesetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -34961,6 +35323,9 @@ type ServerInterface interface {
 	// Evaluate Evaluate flags for a context, as the environment's SDKs would
 	// (POST /projects/{project}/environments/{environment}/evaluate)
 	Evaluate(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
+
+	// (PUT /projects/{project}/environments/{environment}/protection)
+	SetEnvironmentProtection(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, params SetEnvironmentProtectionParams)
 	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
 	// (GET /projects/{project}/environments/{environment}/ruleset)
 	GetEnvironmentRuleset(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey)
@@ -37216,6 +37581,65 @@ func (siw *ServerInterfaceWrapper) Evaluate(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Evaluate(w, r, project, environment)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetEnvironmentProtection operation middleware
+func (siw *ServerInterfaceWrapper) SetEnvironmentProtection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SetEnvironmentProtectionParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetEnvironmentProtection(w, r, project, environment, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -39759,6 +40183,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.DeleteEnvironment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.GetEnvironment)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/environments/{environment}", wrapper.UpdateEnvironment)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/environments/{environment}/protection", wrapper.SetEnvironmentProtection)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/environments/{environment}/evaluate", wrapper.Evaluate)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/ruleset", wrapper.GetEnvironmentRuleset)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/environments/{environment}/sdk-inventory", wrapper.ListSdkInventory)
@@ -45164,6 +45589,140 @@ func (response Evaluate422ApplicationProblemPlusJSONResponse) VisitEvaluateRespo
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEnvironmentProtectionRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Environment EnvironmentKey `json:"environment"`
+	Params      SetEnvironmentProtectionParams
+	Body        *SetEnvironmentProtectionJSONRequestBody
+}
+
+type SetEnvironmentProtectionResponseObject interface {
+	VisitSetEnvironmentProtectionResponse(w http.ResponseWriter) error
+}
+
+type SetEnvironmentProtection200ResponseHeaders struct {
+	ETag *string
+}
+
+type SetEnvironmentProtection200JSONResponse struct {
+	Body    Environment
+	Headers SetEnvironmentProtection200ResponseHeaders
+}
+
+func (response SetEnvironmentProtection200JSONResponse) VisitSetEnvironmentProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEnvironmentProtection400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SetEnvironmentProtection400ApplicationProblemPlusJSONResponse) VisitSetEnvironmentProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEnvironmentProtection401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response SetEnvironmentProtection401ApplicationProblemPlusJSONResponse) VisitSetEnvironmentProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEnvironmentProtection403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SetEnvironmentProtection403ApplicationProblemPlusJSONResponse) VisitSetEnvironmentProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEnvironmentProtection404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SetEnvironmentProtection404ApplicationProblemPlusJSONResponse) VisitSetEnvironmentProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEnvironmentProtection412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response SetEnvironmentProtection412ApplicationProblemPlusJSONResponse) VisitSetEnvironmentProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetEnvironmentProtection428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response SetEnvironmentProtection428ApplicationProblemPlusJSONResponse) VisitSetEnvironmentProtectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -50907,6 +51466,9 @@ type StrictServerInterface interface {
 	// Evaluate Evaluate flags for a context, as the environment's SDKs would
 	// (POST /projects/{project}/environments/{environment}/evaluate)
 	Evaluate(ctx context.Context, request EvaluateRequestObject) (EvaluateResponseObject, error)
+
+	// (PUT /projects/{project}/environments/{environment}/protection)
+	SetEnvironmentProtection(ctx context.Context, request SetEnvironmentProtectionRequestObject) (SetEnvironmentProtectionResponseObject, error)
 	// GetEnvironmentRuleset The environment's ruleset, as server SDKs download it
 	// (GET /projects/{project}/environments/{environment}/ruleset)
 	GetEnvironmentRuleset(ctx context.Context, request GetEnvironmentRulesetRequestObject) (GetEnvironmentRulesetResponseObject, error)
@@ -52676,6 +53238,41 @@ func (sh *strictHandler) Evaluate(w http.ResponseWriter, r *http.Request, projec
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EvaluateResponseObject); ok {
 		if err := validResponse.VisitEvaluateResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetEnvironmentProtection operation middleware
+func (sh *strictHandler) SetEnvironmentProtection(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, params SetEnvironmentProtectionParams) {
+	var request SetEnvironmentProtectionRequestObject
+
+	request.Project = project
+	request.Environment = environment
+	request.Params = params
+
+	var body SetEnvironmentProtectionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetEnvironmentProtection(ctx, request.(SetEnvironmentProtectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetEnvironmentProtection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetEnvironmentProtectionResponseObject); ok {
+		if err := validResponse.VisitSetEnvironmentProtectionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

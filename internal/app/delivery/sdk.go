@@ -198,9 +198,10 @@ func (h *ServeRuleset) Handle(ctx context.Context, key delivery.SDKKey) (Ruleset
 // RulesetEnvironmentsByID reads the environment a ruleset is materialized
 // for by its identifier.
 type RulesetEnvironmentsByID interface {
-	// RulesetEnvironmentByID returns the project, key and ruleset version
-	// of environment, or ErrNotFound.
-	RulesetEnvironmentByID(ctx context.Context, environment workspace.EnvironmentID) (workspace.ProjectID, string, int64, error)
+	// RulesetEnvironmentByID returns the project of environment and the
+	// materials of its ruleset filled with what the environment itself
+	// says: its key, its protection and its ruleset version; or ErrNotFound.
+	RulesetEnvironmentByID(ctx context.Context, environment workspace.EnvironmentID) (workspace.ProjectID, delivery.Materials, error)
 }
 
 // MaterializeRulesetDeps are what MaterializeRuleset runs on.
@@ -227,11 +228,11 @@ func NewMaterializeRuleset(d MaterializeRulesetDeps) *MaterializeRuleset {
 func (h *MaterializeRuleset) Ruleset(ctx context.Context, environment workspace.EnvironmentID) (Ruleset, error) {
 	var m delivery.Materials
 	err := h.d.Snapshots.Snapshot(ctx, func(ctx context.Context) error {
-		project, key, version, err := h.d.Environments.RulesetEnvironmentByID(ctx, environment)
+		project, environmentOf, err := h.d.Environments.RulesetEnvironmentByID(ctx, environment)
 		if err != nil {
 			return err
 		}
-		m = delivery.Materials{Environment: key, Version: version}
+		m = environmentOf
 		return readMaterials(ctx, h.d.Declarations, h.d.Flags, project, environment, &m)
 	})
 	if errors.Is(err, ErrNotFound) {

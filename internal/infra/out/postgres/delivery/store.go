@@ -143,22 +143,22 @@ func (s *Store) RulesetEnvironment(ctx context.Context, project workspace.Projec
 	return id.FromBytes[workspace.Environment](environment), version, nil
 }
 
-// RulesetEnvironmentByID returns the project, key and ruleset version of
-// environment, or appdelivery.ErrNotFound.
+// RulesetEnvironmentByID returns the project of environment and the
+// materials of its ruleset filled with its key, protection and ruleset
+// version, or appdelivery.ErrNotFound.
 func (s *Store) RulesetEnvironmentByID(ctx context.Context, environment workspace.EnvironmentID,
-) (workspace.ProjectID, string, int64, error) {
+) (workspace.ProjectID, delivery.Materials, error) {
 	var (
 		project [16]byte
-		key     string
-		version int64
+		m       delivery.Materials
 	)
-	err := s.db(ctx).QueryRow(ctx, `SELECT project_id, key, ruleset_version FROM environments WHERE id = $1`,
-		environment.Bytes()).Scan(&project, &key, &version)
+	err := s.db(ctx).QueryRow(ctx, `SELECT project_id, key, protected, ruleset_version FROM environments WHERE id = $1`,
+		environment.Bytes()).Scan(&project, &m.Environment, &m.Protected, &m.Version)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return workspace.ProjectID{}, "", 0, appdelivery.ErrNotFound
+		return workspace.ProjectID{}, delivery.Materials{}, appdelivery.ErrNotFound
 	}
 	if err != nil {
-		return workspace.ProjectID{}, "", 0, fmt.Errorf("reading an environment's ruleset version: %w", err)
+		return workspace.ProjectID{}, delivery.Materials{}, fmt.Errorf("reading an environment's ruleset version: %w", err)
 	}
-	return id.FromBytes[workspace.Project](project), key, version, nil
+	return id.FromBytes[workspace.Project](project), m, nil
 }

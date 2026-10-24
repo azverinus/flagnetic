@@ -58,6 +58,23 @@ func (a *api) UpdateEnvironment(ctx context.Context, req UpdateEnvironmentReques
 	return UpdateEnvironment200JSONResponse{Body: environmentOut(e), Headers: UpdateEnvironment200ResponseHeaders{ETag: etag(e.Version)}}, nil
 }
 
+// SetEnvironmentProtection protects an environment or stops protecting it.
+func (a *api) SetEnvironmentProtection(ctx context.Context, req SetEnvironmentProtectionRequestObject) (SetEnvironmentProtectionResponseObject, error) {
+	expected, err := ifMatch(req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	e, err := a.h.SetEnvironmentProtection.Handle(ctx, appworkspace.SetEnvironmentProtectionCommand{
+		Project: projectID(ctx), Key: req.Environment, Protected: req.Body.Protected, Expected: expected, Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return SetEnvironmentProtection200JSONResponse{
+		Body: environmentOut(e), Headers: SetEnvironmentProtection200ResponseHeaders{ETag: etag(e.Version)},
+	}, nil
+}
+
 // DeleteEnvironment deletes an environment.
 func (a *api) DeleteEnvironment(ctx context.Context, req DeleteEnvironmentRequestObject) (DeleteEnvironmentResponseObject, error) {
 	expected, err := ifMatch(req.Params.IfMatch)
@@ -215,7 +232,9 @@ func valueOf(s *string) string {
 }
 
 func environmentOut(e workspace.Environment) Environment {
-	return Environment{Id: openapi_types.UUID(e.ID.Bytes()), Key: e.Key, Name: e.Name, SortOrder: e.SortOrder, Version: e.Version}
+	return Environment{
+		Id: openapi_types.UUID(e.ID.Bytes()), Key: e.Key, Name: e.Name, SortOrder: e.SortOrder, Version: e.Version, Protected: e.Protected,
+	}
 }
 
 func unitTypeOut(u workspace.UnitType) UnitType {

@@ -1,40 +1,4 @@
 {
   "description": "Answers the documents pin that this server does not give yet, and what it answers instead, grouped by what it lacks. The server's protocol run expects these answers in place of the documents', by exchange: a rejection replaced by its index, a member set by its JSON Pointer. SDKs read the documents alone. Deleting a group, once the server serves what it lacks, holds the server to the documents there.",
-  "until": {
-    "protected environments": {
-      "description": "The server answers every environment unprotected until it serves protected environments, so the production environment the documents describe as protected is answered with protected false.",
-      "exchanges": {
-        "ruleset": {
-          "members": {
-            "/environment/protected": false
-          }
-        },
-        "ruleset with a stale ETag": {
-          "members": {
-            "/environment/protected": false
-          }
-        },
-        "ruleset for a newer schema": {
-          "members": {
-            "/environment/protected": false
-          }
-        },
-        "evaluation": {
-          "members": {
-            "/environment/protected": false
-          }
-        },
-        "ruleset after a kill switch": {
-          "members": {
-            "/environment/protected": false
-          }
-        },
-        "evaluation after a kill switch": {
-          "members": {
-            "/environment/protected": false
-          }
-        }
-      }
-    }
-  }
+  "until": {}
 }

@@ -91,6 +91,8 @@ const actionLabels: Record<string, MessageDescriptor> = {
   "environment.created": msg`Environment created`,
   "environment.updated": msg`Environment updated`,
   "environment.deleted": msg`Environment deleted`,
+  "environment.protected": msg`Environment protected`,
+  "environment.unprotected": msg`Environment unprotected`,
   "unit_type.created": msg`Unit type declared`,
   "unit_type.updated": msg`Unit type updated`,
   "unit_type.deleted": msg`Unit type deleted`,

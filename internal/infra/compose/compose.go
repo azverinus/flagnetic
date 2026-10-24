@@ -209,11 +209,12 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateProject: appworkspace.NewCreateProject(tx, ws, rec),
 		UpdateProject: appworkspace.NewUpdateProject(tx, ws, rec),
 
-		ListEnvironments:  appworkspace.NewListEnvironments(ws),
-		GetEnvironment:    appworkspace.NewGetEnvironment(ws),
-		CreateEnvironment: appworkspace.NewCreateEnvironment(tx, ws, appflags.NewConfigureEnvironment(flagStore), rec),
-		UpdateEnvironment: appworkspace.NewUpdateEnvironment(tx, ws, rec),
-		DeleteEnvironment: appworkspace.NewDeleteEnvironment(tx, ws, rec),
+		ListEnvironments:         appworkspace.NewListEnvironments(ws),
+		GetEnvironment:           appworkspace.NewGetEnvironment(ws),
+		CreateEnvironment:        appworkspace.NewCreateEnvironment(tx, ws, appflags.NewConfigureEnvironment(flagStore), rec),
+		UpdateEnvironment:        appworkspace.NewUpdateEnvironment(tx, ws, rec),
+		SetEnvironmentProtection: appworkspace.NewSetEnvironmentProtection(tx, ws, rulesets, rec),
+		DeleteEnvironment:        appworkspace.NewDeleteEnvironment(tx, ws, rec),
 
 		ListUnitTypes:  appworkspace.NewListUnitTypes(tx, ws, declarationUsages),
 		GetUnitType:    appworkspace.NewGetUnitType(ws),

@@ -445,6 +445,10 @@ export const zEnvironmentCreate = z.object({
   name: zName,
 });
 
+export const zEnvironmentProtection = z.object({
+  protected: z.boolean(),
+});
+
 export const zEnvironmentPatch = z.object({
   key: z.string().optional(),
   name: zName.optional(),
@@ -612,6 +616,7 @@ export const zEnvironment = z.object({
   name: zName,
   sort_order: z.int(),
   version: zVersion,
+  protected: z.boolean(),
 });
 
 export const zEnvironmentList = z.object({
@@ -1563,6 +1568,22 @@ export const zUpdateEnvironmentPath = z.object({
  * As changed.
  */
 export const zUpdateEnvironmentResponse = zEnvironment;
+
+export const zSetEnvironmentProtectionBody = zEnvironmentProtection;
+
+export const zSetEnvironmentProtectionHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zSetEnvironmentProtectionPath = z.object({
+  project: z.string(),
+  environment: z.string(),
+});
+
+/**
+ * As protected or not.
+ */
+export const zSetEnvironmentProtectionResponse = zEnvironment;
 
 export const zEvaluateBody = zEvaluationRequest;
 
