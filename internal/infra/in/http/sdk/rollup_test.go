@@ -448,4 +448,13 @@ func TestTheRollupPassesOverTheExposuresOfADeletedExperiment(t *testing.T) {
 	if v := byVariation(f.exposures(t))["true"]; v.FirstExposures != 1 {
 		t.Errorf("true = %+v, want the exposure of the experiment still there rolled up", v)
 	}
+	project := projectIDOf(t, f.p)
+	counts, err := pgevents.NewStore(testkit.Pool(t)).EventCounts(t.Context(), project, f.clock.Now(), f.clock.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	received := events.EventDay{Project: project, Day: f.clock.Now().UTC().Truncate(24 * time.Hour), Type: events.EventExposure}
+	if counts[received] != 2 {
+		t.Errorf("event counts = %+v, want both exposures the project received, the deleted experiment's too", counts)
+	}
 }

@@ -166,6 +166,16 @@ type ExposureRollup struct {
 	Events map[EventDay]int64
 }
 
+// CountExposureEvents returns the exposures rows hold per project and UTC
+// day of receipt.
+func CountExposureEvents(rows []ExposureRow) map[EventDay]int64 {
+	out := map[EventDay]int64{}
+	for _, r := range rows {
+		out[EventDay{Project: r.Project, Day: day(r.ReceivedAt), Type: EventExposure}]++
+	}
+	return out
+}
+
 // day returns the UTC day of at.
 func day(at time.Time) time.Time { return at.UTC().Truncate(24 * time.Hour) }
 
@@ -179,7 +189,7 @@ func RollUpExposures(stored map[UnitKey]FirstExposure, rows []ExposureRow) Expos
 	out := ExposureRollup{
 		Records: map[UnitKey]FirstExposure{},
 		Days:    map[ExposureDay]ExposureDayCounts{},
-		Events:  map[EventDay]int64{},
+		Events:  CountExposureEvents(rows),
 	}
 	add := func(k ExposureDay, c ExposureDayCounts) {
 		sum := out.Days[k]
@@ -192,7 +202,6 @@ func RollUpExposures(stored map[UnitKey]FirstExposure, rows []ExposureRow) Expos
 		return ExposureDay{Environment: u.Environment, Experiment: u.Experiment, Variation: variation, Day: day(at)}
 	}
 	for _, r := range rows {
-		out.Events[EventDay{Project: r.Project, Day: day(r.ReceivedAt), Type: EventExposure}]++
 		if r.Override {
 			add(dayOf(r.Unit, r.Variation, r.ReceivedAt), ExposureDayCounts{Overridden: 1})
 			continue

@@ -100,7 +100,8 @@ func (h *RollUpExposures) batch(ctx context.Context) (int, error) {
 			return err
 		}
 		n = len(rows)
-		if rows, err = h.live(ctx, rows); err != nil {
+		rows, received, err := h.live(ctx, rows)
+		if err != nil {
 			return err
 		}
 		units := make([]events.UnitKey, 0, len(rows))
@@ -116,6 +117,9 @@ func (h *RollUpExposures) batch(ctx context.Context) (int, error) {
 			return err
 		}
 		out := events.RollUpExposures(stored, rows)
+		// The event volume counts what the project received, whether or not
+		// the experiment or environment the exposure names is gone since.
+		out.Events = events.CountExposureEvents(received)
 		if err = h.store.SaveFirstExposures(ctx, out.Records); err != nil {
 			return err
 		}
@@ -131,10 +135,11 @@ func (h *RollUpExposures) batch(ctx context.Context) (int, error) {
 }
 
 // live returns the rows whose project, environment and experiment still
-// exist, holding them until the unit of work ends: the raw rows of a deleted
-// experiment stay until retention drops them, and nothing reads their
-// aggregates any more.
-func (h *RollUpExposures) live(ctx context.Context, rows []events.ExposureRow) ([]events.ExposureRow, error) {
+// exist, and the rows whose project still exists, holding them until the
+// unit of work ends: the raw rows of a deleted experiment stay until
+// retention drops them, and nothing reads their aggregates any more, but the
+// project still received them.
+func (h *RollUpExposures) live(ctx context.Context, rows []events.ExposureRow) (live, received []events.ExposureRow, err error) {
 	var t RollupTargets
 	projects, environments, exps := map[workspace.ProjectID]bool{}, map[workspace.EnvironmentID]bool{}, map[experiments.ExperimentID]bool{}
 	for _, r := range rows {
@@ -153,7 +158,7 @@ func (h *RollUpExposures) live(ctx context.Context, rows []events.ExposureRow) (
 	}
 	found, err := h.store.LockTargets(ctx, t)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	clear(projects)
 	clear(environments)
@@ -167,13 +172,16 @@ func (h *RollUpExposures) live(ctx context.Context, rows []events.ExposureRow) (
 	for _, e := range found.Experiments {
 		exps[e] = true
 	}
-	out := rows[:0:0]
 	for _, r := range rows {
-		if projects[r.Project] && environments[r.Unit.Environment] && exps[r.Unit.Experiment] {
-			out = append(out, r)
+		if !projects[r.Project] {
+			continue
+		}
+		received = append(received, r)
+		if environments[r.Unit.Environment] && exps[r.Unit.Experiment] {
+			live = append(live, r)
 		}
 	}
-	return out, nil
+	return live, received, nil
 }
 
 // Lag returns how long the oldest exposure the rollup has not read yet has
