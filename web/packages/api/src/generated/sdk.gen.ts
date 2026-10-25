@@ -6,6 +6,12 @@ import type {
   AcceptInvitationData,
   AcceptInvitationErrors,
   AcceptInvitationResponses,
+  ApplyChangeRequestData,
+  ApplyChangeRequestErrors,
+  ApplyChangeRequestResponses,
+  ApproveChangeRequestData,
+  ApproveChangeRequestErrors,
+  ApproveChangeRequestResponses,
   ArchiveExperimentData,
   ArchiveExperimentErrors,
   ArchiveExperimentResponses,
@@ -267,6 +273,9 @@ import type {
   ReissueInvitationData,
   ReissueInvitationErrors,
   ReissueInvitationResponses,
+  RejectChangeRequestData,
+  RejectChangeRequestErrors,
+  RejectChangeRequestResponses,
   RestoreFlagData,
   RestoreFlagErrors,
   RestoreFlagResponses,
@@ -2796,9 +2805,10 @@ export const rebaseChangeRequest = <ThrowOnError extends boolean = false>(
 /**
  * Cancel a change request
  *
- * The author cancels a draft, open or approved change request
- * (`not_author`, `invalid_state`). A cancelled change request is
- * final; copying it resumes its work.
+ * The author, or a member holding `change_request.approve`, cancels
+ * a draft, open or approved change request (`not_author`,
+ * `invalid_state`). A cancelled change request is final; copying it
+ * resumes its work.
  *
  */
 export const cancelChangeRequest = <ThrowOnError extends boolean = false>(
@@ -2847,6 +2857,111 @@ export const copyChangeRequest = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/change-requests/{change_request}/copy",
+    ...options,
+  });
+
+/**
+ * Approve an open change request
+ *
+ * A member holding `change_request.approve` approves an open change
+ * request (`invalid_state`) with an optional comment of at most 2,000
+ * characters, unless they are its author (`author_cannot_approve`); a
+ * project token never decides one (`token_cannot_approve`). When the
+ * configuration was written since the change request was based on it,
+ * what would be approved is no longer what was reviewed: the change
+ * request is superseded and the approval refused (`base_moved`).
+ *
+ */
+export const approveChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<ApproveChangeRequestData, ThrowOnError>,
+): RequestResult<ApproveChangeRequestResponses, ApproveChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ApproveChangeRequestResponses,
+    ApproveChangeRequestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests/{change_request}/approve",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Reject an open change request
+ *
+ * A member holding `change_request.approve` rejects an open change
+ * request (`invalid_state`) with a comment telling its author why,
+ * required and at most 2,000 characters, unless they are its author
+ * (`author_cannot_approve`); a project token never decides one
+ * (`token_cannot_approve`). A rejected change request is final;
+ * copying it resumes its work.
+ *
+ */
+export const rejectChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<RejectChangeRequestData, ThrowOnError>,
+): RequestResult<RejectChangeRequestResponses, RejectChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RejectChangeRequestResponses,
+    RejectChangeRequestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests/{change_request}/reject",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Apply an approved change request
+ *
+ * Writes the configuration proposed, in a protected environment too,
+ * as one write whose audit entries carry the change request's
+ * identifier. Its author or a member holding `change_request.approve`
+ * applies it (`not_author`), once approved (`invalid_state`). When the
+ * configuration was written since the change request was based on it,
+ * the change request is superseded and the application refused
+ * (`base_moved`). The configuration is checked again as a replace is,
+ * since what it names may be gone since the approval: a refusal
+ * writes nothing and leaves the change request approved.
+ *
+ */
+export const applyChangeRequest = <ThrowOnError extends boolean = false>(
+  options: Options<ApplyChangeRequestData, ThrowOnError>,
+): RequestResult<ApplyChangeRequestResponses, ApplyChangeRequestErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ApplyChangeRequestResponses,
+    ApplyChangeRequestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/change-requests/{change_request}/apply",
     ...options,
   });
 

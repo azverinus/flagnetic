@@ -622,6 +622,10 @@ msgstr "Действует для флага во всех окружениях.
 msgid "Apply filters"
 msgstr "Применить фильтры"
 
+#: src/lib/access-names.ts
+msgid "approve and reject change requests"
+msgstr "одобрять и отклонять запросы на изменение"
+
 #: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archive"

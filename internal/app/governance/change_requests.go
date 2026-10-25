@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -74,12 +75,26 @@ type Configurations interface {
 	Current(ctx context.Context, project workspace.ProjectID, flag, environment string) (flags.Flag, flags.EnvironmentConfiguration, error)
 }
 
+// ProposalApplier is the flags context writing a configuration as a change
+// request proposes it.
+type ProposalApplier interface {
+	// Apply writes proposed in place of the configuration of project's
+	// flag keyed flag in the environment keyed environment, based on its
+	// version baseVersion, in the unit of work ctx carries, checked again
+	// as a replace is: a refusal is the write's, which rolls the
+	// application back. by is the member applying, nil for a project token
+	// or the system; req is who makes the change, for its audit entry.
+	Apply(ctx context.Context, project workspace.ProjectID, flag, environment string, proposed flags.ConfigurationInput,
+		baseVersion int64, by *access.MemberID, req governance.Request) error
+}
+
 // ChangeRequestDeps are what a change request's command handlers run on.
 type ChangeRequestDeps struct {
 	Tx             Transactor
 	Projects       ProjectLocker
 	Store          ChangeRequestStore
 	Configurations Configurations
+	Proposals      ProposalApplier
 	Audit          AuditLog
 	Clock          clock.Clock
 	IDs            *id.Source
@@ -158,12 +173,17 @@ type ChangeRequestCommand struct {
 // transition runs one transition of the change request cmd names: under the
 // project's lock it reads it, has change decide what it becomes, judges the
 // version the transition was based on, and stores and records the change
-// request as action when it changed.
+// request as action when it changed. A change refused as superseding is
+// stored and recorded as the change request superseded, and the refusal
+// answered once that is committed.
 func transition(ctx context.Context, d ChangeRequestDeps, cmd ChangeRequestCommand, action string,
 	change func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error),
 ) (governance.ChangeRequest, error) {
 	now := d.now()
-	var out governance.ChangeRequest
+	var (
+		out     governance.ChangeRequest
+		refusal error
+	)
 	err := d.Tx.Within(ctx, func(ctx context.Context) error {
 		if err := d.lockProject(ctx, cmd.Project); err != nil {
 			return err
@@ -173,6 +193,10 @@ func transition(ctx context.Context, d ChangeRequestDeps, cmd ChangeRequestComma
 			return err
 		}
 		after, changed, err := change(ctx, before, now)
+		var moved superseding
+		if errors.As(err, &moved) {
+			action, refusal, err = "change_request.superseded", moved.refusal, nil
+		}
 		if err != nil {
 			return err
 		}
@@ -186,13 +210,40 @@ func transition(ctx context.Context, d ChangeRequestDeps, cmd ChangeRequestComma
 		if err = d.Store.UpdateChangeRequest(ctx, after); err != nil {
 			return err
 		}
-		if err = d.record(ctx, now, cmd.Request, action, &before, after, nil); err != nil {
+		recordIn := ctx
+		if after.State == governance.StateApplied {
+			// The entry of the application is one of the entries the
+			// application wrote.
+			recordIn = applying(ctx, after.ID)
+		}
+		if err = d.record(recordIn, now, cmd.Request, action, &before, after, nil); err != nil {
 			return err
 		}
 		out, err = changeRequestOf(ctx, d.Store, cmd.Project, cmd.ChangeRequest)
 		return err
 	})
+	if err == nil && refusal != nil {
+		return out, refusal
+	}
 	return out, err
+}
+
+// superseding is how a transition's change answers a change request it
+// found based on what has moved since: the transition is refused with
+// refusal, and the change request it returns, superseded, is stored all
+// the same, since it can never be approved or applied any more.
+type superseding struct{ refusal error }
+
+func (s superseding) Error() string { return s.refusal.Error() }
+
+// supersededOr returns what a domain transition taking cr to next answered
+// as a transition's change does: next superseded, stored, and refused with
+// err when the domain superseded it; next and err otherwise.
+func supersededOr(cr, next governance.ChangeRequest, err error) (governance.ChangeRequest, bool, error) {
+	if err != nil && next.State == governance.StateSuperseded && cr.State != governance.StateSuperseded {
+		return next, true, superseding{refusal: err}
+	}
+	return next, err == nil, err
 }
 
 // subjectOf returns the subject of a configuration change request: the flag
@@ -295,6 +346,7 @@ type serveDoc struct {
 	UnitType   string `json:"unit_type,omitempty"`
 	Percentage *int   `json:"percentage,omitempty"`
 	Salt       string `json:"salt,omitempty"`
+	Experiment string `json:"experiment,omitempty"`
 }
 
 // configurationDocument returns c as the document a change request holds,
@@ -319,7 +371,7 @@ func configurationDocument(c flags.Configuration) (governance.Document, error) {
 	for i, r := range c.Rules {
 		rd := ruleDoc{
 			ID: r.ID.String(), Description: r.Description, Conditions: make([]conditionDoc, len(r.Conditions)),
-			Serve: serveDoc{Kind: r.Serve.Kind, Variation: r.Serve.Variation},
+			Serve: serveDoc{Kind: r.Serve.Kind, Variation: r.Serve.Variation, Experiment: r.Serve.Experiment},
 		}
 		for j, cond := range r.Conditions {
 			rd.Conditions[j] = conditionDoc(cond)
@@ -366,7 +418,7 @@ func configurationInputOf(doc governance.Document) (flags.ConfigurationInput, er
 			Description: r.Description, Conditions: make([]flags.Condition, len(r.Conditions)),
 			Serve: flags.ServeInput{
 				Kind: r.Serve.Kind, Variation: r.Serve.Variation, UnitType: r.Serve.UnitType, Percentage: r.Serve.Percentage,
-				Salt: r.Serve.Salt,
+				Salt: r.Serve.Salt, Experiment: r.Serve.Experiment,
 			},
 		}
 		if ruleID, err := id.Parse[flags.Rule](r.ID); err == nil {

@@ -42,7 +42,8 @@ func (a *api) ListAuditEntries(ctx context.Context, req ListAuditEntriesRequestO
 	q := req.Params
 	list, err := a.auditPage(ctx, project, ListProjectAuditEntriesParams{
 		Actor: q.Actor, ActorKind: q.ActorKind, Action: q.Action, EntityKind: q.EntityKind, EntityId: q.EntityId,
-		Environment: q.Environment, From: q.From, To: q.To, Q: q.Q, KillSwitch: q.KillSwitch, Cursor: q.Cursor, Limit: q.Limit,
+		Environment: q.Environment, From: q.From, To: q.To, Q: q.Q, KillSwitch: q.KillSwitch, ChangeRequest: q.ChangeRequest, Cursor: q.Cursor,
+		Limit: q.Limit,
 	})
 	if err != nil {
 		return nil, err
@@ -79,6 +80,9 @@ func (a *api) auditPage(ctx context.Context, project workspace.ProjectID, q List
 	}
 	if q.Environment != nil {
 		f.Environment = id.FromBytes[workspace.Environment](*q.Environment)
+	}
+	if q.ChangeRequest != nil {
+		f.ChangeRequest = id.FromBytes[governance.ChangeRequest](*q.ChangeRequest)
 	}
 	if q.From != nil {
 		f.From = *q.From
@@ -134,6 +138,10 @@ func auditEntryOut(e governance.Entry) AuditEntry {
 	if e.RequestID != "" {
 		r := e.RequestID
 		out.RequestId = &r
+	}
+	if !e.ChangeRequest.IsZero() {
+		cr := openapi_types.UUID(e.ChangeRequest.Bytes())
+		out.ChangeRequestId = &cr
 	}
 	return out
 }

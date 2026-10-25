@@ -139,6 +139,8 @@ func TestTheSeamJudgesReachThenSessionThenScopeThenProjectThenPermission(t *test
 	listMembers := access.Operation{Name: "listMembers", Requirement: "instance_admin", Read: true, Scope: access.ScopeRead}
 	updateMember := access.Operation{Name: "updateMember", Requirement: "instance_admin", Scope: access.ScopeInstanceAdmin}
 	listRoles := access.Operation{Name: "listRoles", Requirement: "member", Read: true}
+	approveChangeRequest := access.Operation{Name: "approveChangeRequest", Requirement: "change_request.approve",
+		Scope: access.ScopeFlagsWrite}
 
 	ids := newIDs()
 	mobile, web := id.New[workspace.Project](ids), id.New[workspace.Project](ids)
@@ -186,6 +188,14 @@ func TestTheSeamJudgesReachThenSessionThenScopeThenProjectThenPermission(t *test
 		// The project is judged in the seam; an operation needing a catalog
 		// permission judged without it is open to nobody.
 		"a catalog permission without its project is refused": {sessionCaller(true), updateProject, nil, "forbidden"},
+		// A token never decides a change request, so one whose role would
+		// is told so rather than that its role lacks the permission.
+		"a maintainer token is refused deciding": {projectTokenCaller(mobile, access.RoleMaintainer, access.ScopeFlagsWrite),
+			approveChangeRequest, holding(mobile), "token_cannot_approve"},
+		"a developer token is short of deciding": {projectTokenCaller(mobile, access.RoleDeveloper, access.ScopeFlagsWrite),
+			approveChangeRequest, holding(mobile), "forbidden"},
+		"a member without the permission is short of deciding": {sessionCaller(false), approveChangeRequest,
+			holding(mobile, "change_request.propose"), "forbidden"},
 	} {
 		if got := refusal(access.Authorize(tc.caller, tc.op, tc.in)); got != tc.want {
 			t.Errorf("%s: refusal = %q, want %q", name, got, tc.want)

@@ -37,6 +37,9 @@ type AuditFilter struct {
 	// Q is text found, whatever its case, in the action, the entity's key or
 	// the actor's name.
 	Q string
+	// ChangeRequest selects the entries the application of a change
+	// request wrote.
+	ChangeRequest governance.ChangeRequestID
 }
 
 // AuditPage asks for one page of the log, newest first.

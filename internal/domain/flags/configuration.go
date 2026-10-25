@@ -262,7 +262,7 @@ func (c Configuration) Revert(f Flag, recorded Configuration, r Referents, w Wri
 	if err := c.keepsExperimentRules(recorded); err != nil {
 		return c, Changed{}, err
 	}
-	return c.write(recorded, f, recorded.input(), r, Mint{}, w)
+	return c.write(recorded, f, recorded.Input(), r, Mint{}, w)
 }
 
 // errExperimentRulesChanged refuses a revert or a copy that would change
@@ -323,7 +323,7 @@ func (c Configuration) Copy(f Flag, source Configuration, overrides bool, r Refe
 	if !overrides {
 		doc.Overrides = c.Overrides
 	}
-	return c.write(doc, f, doc.input(), r, Mint{}, w)
+	return c.write(doc, f, doc.Input(), r, Mint{}, w)
 }
 
 // write returns c replaced by in, checked against r: a rule keeps the
@@ -349,10 +349,10 @@ func (c Configuration) write(basis Configuration, f Flag, in ConfigurationInput,
 	return after, changed, nil
 }
 
-// input returns c as a write gives it whole, every rule with its
+// Input returns c as a write gives it whole, every rule with its
 // identifier, every rollout with its salt and every experiment serve with
 // its experiment.
-func (c Configuration) input() ConfigurationInput {
+func (c Configuration) Input() ConfigurationInput {
 	in := ConfigurationInput{
 		On: c.On, OffVariation: c.OffVariation, Fallthrough: c.Fallthrough, Prerequisites: c.Prerequisites,
 		Overrides: make([]OverrideInput, len(c.Overrides)), Rules: make([]RuleInput, len(c.Rules)),
@@ -697,6 +697,36 @@ func (f Flag) CanConfigure() error {
 // sending back a proposal as it was answered would make every new rule new
 // again, and a rollout grown in an edit would move units out.
 func (c Configuration) Propose(f Flag, in ConfigurationInput, held []RuleInput, r Referents, m Mint) (Configuration, error) {
+	basis := c.holding(held)
+	out, _, err := c.write(basis, f, basis.Proposable(in), r, m, Write{})
+	return out, err
+}
+
+// Apply returns the configuration of f replaced by proposed, the document a
+// proposal holds, written by w, checked against r as a replace is, since
+// what it names may be gone since it was proposed. The rules proposed keep
+// the identifiers and salts the proposal was given, the new ones included:
+// they are what was reviewed, so the units the reviewers saw fall in a
+// rollout are the ones that do. m draws only for what proposed leaves
+// without, which a proposal never does.
+func (c Configuration) Apply(f Flag, proposed ConfigurationInput, r Referents, m Mint, w Write) (Configuration, Changed, error) {
+	basis := c.holding(proposed.Rules)
+	for _, ri := range proposed.Rules {
+		if ri.ID == nil || ri.Serve.Kind != ServeRollout {
+			continue
+		}
+		// A rule the proposal made a rollout was given its salt then.
+		j := slices.IndexFunc(basis.Rules, func(rule Rule) bool { return rule.ID == *ri.ID })
+		if basis.Rules[j].Serve.Salt != ri.Serve.Salt {
+			basis.Rules[j].Serve = Serve{Kind: ServeRollout, Salt: ri.Serve.Salt}
+		}
+	}
+	return c.write(basis, f, proposed, r, m, w)
+}
+
+// holding returns c with a rule for each of held that c has none with, so a
+// rule a proposal named and gave a salt is the same rule once written.
+func (c Configuration) holding(held []RuleInput) Configuration {
 	basis := c
 	basis.Rules = slices.Clone(c.Rules)
 	for _, ri := range held {
@@ -705,8 +735,7 @@ func (c Configuration) Propose(f Flag, in ConfigurationInput, held []RuleInput, 
 		}
 		basis.Rules = append(basis.Rules, Rule{ID: *ri.ID, Serve: Serve{Kind: ri.Serve.Kind, Salt: ri.Serve.Salt}})
 	}
-	out, _, err := c.write(basis, f, basis.Proposable(in), r, m, Write{})
-	return out, err
+	return basis
 }
 
 // Proposable returns in with what only c may hold left out: a rule

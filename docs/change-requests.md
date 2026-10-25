@@ -1,8 +1,8 @@
 # Change requests
 
-A change request proposes a change for someone to review before it is made. For now it proposes one [flag](flags.md)'s configuration in one environment: what the configuration would be, and the diff from what it is now. Proposing changes nothing any SDK receives. Approving and applying change requests come later; this page covers writing them.
+A change request proposes a change for someone to review before it is made. For now it proposes one [flag](flags.md)'s configuration in one environment: what the configuration would be, and the diff from what it is now. Proposing changes nothing any SDK receives; a member who is not the author approves it, and applying it makes the change.
 
-Every operation below needs the `change_request.propose` permission (token scope `flags:write`, developer and above), reads need `project.read`. A project token proposes like a member of its role: it is the author of its change requests and acts on its own only.
+Proposing and applying need the `change_request.propose` permission (token scope `flags:write`, developer and above); approving and rejecting need `change_request.approve` (maintainer and above, members only); reads need `project.read`. A project token proposes like a member of its role: it is the author of its change requests and acts on its own only, and it never decides one.
 
 ## Protected environments
 
@@ -16,7 +16,7 @@ A change request may propose a change to any environment. In a [protected enviro
 | `open` | Offered for review. |
 | `approved`, `rejected` | Decided. |
 | `applied` | Made. |
-| `cancelled` | Abandoned by its author. |
+| `cancelled` | Abandoned by its author, or by a member who may decide change requests. |
 | `superseded` | What it was based on moved before it was applied. |
 
 `rejected`, `applied`, `cancelled` and `superseded` are final: a copy carries the work on.
@@ -40,7 +40,7 @@ The change request answers `proposed` as it would leave the configuration, and `
 
 ## Its life
 
-Each of these is a `POST` to `/projects/{project}/change-requests/{id}/…`, or a `PATCH` of the change request, and needs `If-Match` with its version (`428 precondition_required`, `412 version_mismatch`). Only the author takes them (`403 not_author`), and only from the states listed (`409 invalid_state`).
+Each of these is a `POST` to `/projects/{project}/change-requests/{id}/…`, or a `PATCH` of the change request, and needs `If-Match` with its version (`428 precondition_required`, `412 version_mismatch`). Only the author takes them (`403 not_author`), but a member holding `change_request.approve` also cancels another's, and only from the states listed (`409 invalid_state`).
 
 | Operation | From | |
 |---|---|---|
@@ -50,7 +50,21 @@ Each of these is a `POST` to `/projects/{project}/change-requests/{id}/…`, or 
 | `/cancel` | `draft`, `open`, `approved` | Abandons it. |
 | `/copy` | any | Copies any change request, whoever wrote it, into a new draft of the caller's with its title, description and proposal, based on the configuration as it is now and checked again. Needs no `If-Match`. |
 
-Every transition is recorded in the audit log as `change_request.drafted`, `opened`, `updated`, `rebased`, `cancelled` or `copied`.
+## Approving and applying
+
+| Operation | From | |
+|---|---|---|
+| `/approve` | `open` | Approves it, with an optional `comment` of at most 2,000 characters. |
+| `/reject` | `open` | Rejects it, with a `comment` telling the author why, required and at most 2,000 characters (`422 invalid_change_request` at `/comment`). |
+| `/apply` | `approved` | Writes `proposed` as the configuration. |
+
+Approval is always a second person: a member holding `change_request.approve` approves or rejects, and is refused their own change request (`403 author_cannot_approve`). A project token never approves or rejects (`403 token_cannot_approve`), so a pipeline proposes and a member decides; a member may approve a change request a token they created proposed. One approval is enough. Once approved, a change request is no longer edited: what was approved is what is applied. `approval` and `rejection` answer who decided (`member` with `id` and `name`), when (`at`) and the `comment`.
+
+The author, whoever approved it, or any member holding `change_request.approve` applies an approved change request (`403 not_author` for anyone else, project tokens included). Applying writes the configuration as one write, the same refusals as replacing it, in a [protected environment](governance.md#protected-environments) too: the approval covers the change request's environment. The rules keep the identifiers and the rollouts the salts `proposed` shows, so the units the reviewers saw fall in a rollout are the ones that do, and the member applying becomes the author of the overrides it changes, as with a direct write. `applied_at` and `applied_by` (`kind` `member`, `token` or `system`, with `id` and `name`) record who applied it.
+
+When the configuration was written after the change request was based on it, approving or applying it is refused `409 base_moved` and the change request becomes `superseded`: what would be approved or written is no longer what was reviewed. Copy it to propose it again on the current configuration. When the configuration `proposed` no longer validates, because a flag or segment it names was archived or deleted since, applying is refused with the same `422` a direct write gets, its fields under `/proposed`; nothing is written and the change request stays approved.
+
+Every transition is recorded in the audit log as `change_request.drafted`, `opened`, `updated`, `rebased`, `cancelled`, `copied`, `approved`, `rejected`, `applied` or `superseded`. The entries an application writes, the configuration's and `change_request.applied`, carry the change request's identifier as `change_request_id`, and the audit log's `change_request` filter lists them, so a change to production traces back to its approval.
 
 ## Reading
 

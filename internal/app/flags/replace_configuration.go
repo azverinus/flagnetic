@@ -78,15 +78,21 @@ func (h *ReplaceConfiguration) Handle(ctx context.Context, cmd ReplaceConfigurat
 		if err = precondition.Check(c.Expected, before.Version); err != nil {
 			return configurationChange{}, err
 		}
-		action := "flag.configuration_updated"
-		switch {
-		case changed.Switched && after.On:
-			action = "flag.switched_on"
-		case changed.Switched:
-			action = "flag.switched_off"
-		}
-		return configurationChange{after: after, changed: changed, action: action}, nil
+		return configurationChange{after: after, changed: changed, action: replacedAction(after, changed)}, nil
 	})
+}
+
+// replacedAction is the audit action of replacing a configuration whole
+// with after: switching the flag on or off when that is all that changed of
+// what a ruleset carries, an update otherwise.
+func replacedAction(after flags.Configuration, changed flags.Changed) string {
+	switch {
+	case changed.Switched && after.On:
+		return "flag.switched_on"
+	case changed.Switched:
+		return "flag.switched_off"
+	}
+	return "flag.configuration_updated"
 }
 
 // referentsOf returns what a configuration of project in environment may
