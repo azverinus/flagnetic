@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/infra/out/postgres/projectrow"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -80,7 +81,11 @@ func (s *Store) ProjectByKey(ctx context.Context, key string) (workspace.Project
 // the unit of work ends, so changes to the project and to what it holds are
 // made one at a time.
 func (s *Store) LockProject(ctx context.Context, projectID workspace.ProjectID) (workspace.Project, error) {
-	return s.oneProject(ctx, `SELECT `+projectColumns+` FROM projects WHERE id = $1 FOR UPDATE`, projectID.Bytes())
+	p, err := s.oneProject(ctx, `SELECT `+projectColumns+` FROM projects WHERE id = $1 FOR UPDATE`, projectID.Bytes())
+	if err == nil {
+		projectrow.MarkHeld(ctx, projectID)
+	}
+	return p, err
 }
 
 func (s *Store) oneProject(ctx context.Context, sql string, arg any) (workspace.Project, error) {

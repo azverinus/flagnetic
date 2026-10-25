@@ -14,6 +14,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
+	"github.com/azverinus/flagnetic/internal/infra/out/postgres/projectrow"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/protection"
@@ -124,13 +125,15 @@ type committedVersionsKey struct{}
 // transaction does not hold their project's row, or when the write changes
 // the ruleset of one of them that is protected and not bypassed.
 func (g *ProtectionGuard) judge(ctx context.Context, where string, arg [16]byte) error {
-	// The row lock lives in the project row's xmax, or the row is the
-	// transaction's own when it updated it: either way the transaction's
-	// id is there, and no other transaction's can be while it holds the
-	// lock, which conflicts with every other.
+	// The transaction holds the project row when it locked it FOR UPDATE,
+	// which the lock records (package projectrow), or when the row is its
+	// own: it inserted or updated it, and keeps every other write's FOR
+	// UPDATE out until it ends. The row's xmax cannot tell: inserting a row
+	// that references the project leaves the transaction's id there too,
+	// through a key share lock that keeps no write out.
 	rows, err := pgxtx.Querier(ctx, g.d.Pool).Query(ctx, `
-		SELECT e.id, e.key, e.protected, e.ruleset_version,
-			xid(pg_current_xact_id()) IN (p.xmin, p.xmax)
+		SELECT e.id, e.project_id, e.key, e.protected, e.ruleset_version,
+			xid(pg_current_xact_id()) = p.xmin
 		FROM environments e JOIN projects p ON p.id = e.project_id
 		WHERE `+where+`
 		ORDER BY e.sort_order, e.key`, arg)
@@ -139,11 +142,13 @@ func (g *ProtectionGuard) judge(ctx context.Context, where string, arg [16]byte)
 	}
 	environments, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (bumped, error) {
 		var (
-			b           bumped
-			environment [16]byte
+			b                    bumped
+			environment, project [16]byte
+			own                  bool
 		)
-		scanErr := row.Scan(&environment, &b.key, &b.protected, &b.version, &b.held)
+		scanErr := row.Scan(&environment, &project, &b.key, &b.protected, &b.version, &own)
 		b.id = id.FromBytes[workspace.Environment](environment)
+		b.held = own || projectrow.Held(ctx, id.FromBytes[workspace.Project](project))
 		return b, scanErr
 	})
 	if err != nil {
