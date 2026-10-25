@@ -257,6 +257,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		ListProjects:  appworkspace.NewListProjects(ws),
 		CreateProject: appworkspace.NewCreateProject(tx, ws, rec),
 		UpdateProject: appworkspace.NewUpdateProject(tx, ws, rec),
+		DeleteProject: appworkspace.NewDeleteProject(tx, ws, rec),
 
 		ListEnvironments:         appworkspace.NewListEnvironments(ws),
 		GetEnvironment:           appworkspace.NewGetEnvironment(ws),
@@ -480,6 +481,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 				appevents.NewRunRetention(tx, eventStore, d.Clock, d.IDs, o.EventsRetention, o.EventsPartitionsAhead),
 				appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention), edge.Logger(), reg),
 			worker.WebhookFanOut(appgovernance.NewRunFanOut(tx, outbox, d.Clock, d.IDs), reg),
+			worker.ProjectPurge(appworkspace.NewPurgeDeletedProjects(tx, ws)),
 			worker.ExperimentChecks(appexperiments.CheckInterval, appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
 				Tx: tx, Lock: experimentStore, Running: experimentStore, Projects: experimentStore, Store: experimentStore,
 				Holders: flagStore, FirstExposures: eventStore, Checks: experimentStore, Recorder: experimentRec,

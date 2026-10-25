@@ -1546,6 +1546,10 @@ msgstr "Удалить сегмент"
 msgid "delete segments"
 msgstr "удалять сегменты"
 
+#: src/lib/access-names.ts
+msgid "delete the project"
+msgstr "удалять проект"
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete unit type"
 msgstr "Удалить тип единицы"

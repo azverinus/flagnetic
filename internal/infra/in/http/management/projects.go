@@ -75,6 +75,21 @@ func (a *api) UpdateProject(ctx context.Context, req UpdateProjectRequestObject)
 	return UpdateProject200JSONResponse{Body: out[0], Headers: UpdateProject200ResponseHeaders{ETag: etag(p.Version)}}, nil
 }
 
+// DeleteProject deletes the project with everything in it.
+func (a *api) DeleteProject(ctx context.Context, req DeleteProjectRequestObject) (DeleteProjectResponseObject, error) {
+	expected, err := ifMatch(req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	err = a.h.DeleteProject.Handle(ctx, appworkspace.DeleteProjectCommand{
+		Project: projectOf(ctx).project.ID, Expected: expected, Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return DeleteProject204Response{}, nil
+}
+
 // GetProjectMe answers what the caller holds in the project: their grants
 // and their effective permissions there.
 func (a *api) GetProjectMe(ctx context.Context, _ GetProjectMeRequestObject) (GetProjectMeResponseObject, error) {

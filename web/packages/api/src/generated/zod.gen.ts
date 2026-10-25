@@ -2024,6 +2024,19 @@ export const zCreateProjectBody = zProjectCreate;
  */
 export const zCreateProjectResponse = zProject;
 
+export const zDeleteProjectHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zDeleteProjectPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteProjectResponse = z.void();
+
 export const zGetProjectPath = z.object({
   project: z.string(),
 });

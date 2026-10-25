@@ -71,6 +71,7 @@ type Handlers struct {
 	ListProjects  *appworkspace.ListProjects
 	CreateProject *appworkspace.CreateProject
 	UpdateProject *appworkspace.UpdateProject
+	DeleteProject *appworkspace.DeleteProject
 
 	ListEnvironments         *appworkspace.List[workspace.Environment]
 	GetEnvironment           *appworkspace.Get[workspace.Environment]

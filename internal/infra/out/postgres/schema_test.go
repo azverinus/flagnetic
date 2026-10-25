@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -84,5 +85,54 @@ func TestIndexNamesCarryNoTypeSuffix(t *testing.T) {
 	slices.Sort(misnamed)
 	if len(misnamed) > 0 {
 		t.Errorf("indexes not named <table>_<what> without an _idx suffix:\n%s", strings.Join(misnamed, "\n"))
+	}
+}
+
+// Deleting a project removes what it holds by the cascades of its foreign
+// keys, and the project purge removes, after the project has gone, the rows
+// of the tables that have no foreign key to it. A table carrying a
+// project_id must be one or the other, or be kept on purpose, so a table
+// added later cannot be forgotten and keep a deleted project's rows forever.
+func TestEveryTableOfAProjectGoesWithIt(t *testing.T) {
+	// Kept after the project is gone, on purpose.
+	kept := map[string]string{
+		"audit_entries": "a deleted project's audit entries stay, read through the instance log by the project's id",
+		// Raw events are partitioned by day: retention drops whole days
+		// rather than deleting from every partition at once.
+		"evaluation_summary_events": "dropped with its partitions by retention",
+		"alias_events":              "dropped with its partitions by retention",
+		"exposure_events":           "dropped with its partitions by retention",
+	}
+	pool := testkit.Pool(t)
+	rows, err := pool.Query(t.Context(), `
+		SELECT c.relname
+		FROM pg_attribute a
+		JOIN pg_class c ON c.oid = a.attrelid
+		WHERE c.relnamespace = current_schema()::regnamespace AND c.relkind IN ('r', 'p') AND NOT c.relispartition
+		  AND a.attname = 'project_id' AND NOT a.attisdropped
+		  AND NOT EXISTS (
+			SELECT 1 FROM pg_constraint k
+			WHERE k.conrelid = c.oid AND k.contype = 'f' AND k.confrelid = 'projects'::regclass
+			  AND k.confdeltype = 'c' AND k.conkey = ARRAY[a.attnum])
+		ORDER BY 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stranded []string
+	for rows.Next() {
+		var table string
+		if err := rows.Scan(&table); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := kept[table]; !ok && !slices.Contains(pgworkspace.ProjectPurgeTables(), table) {
+			stranded = append(stranded, table)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(stranded) > 0 {
+		t.Errorf("tables with a project_id neither cascading from projects nor purged after a project's deletion:\n%s",
+			strings.Join(stranded, "\n"))
 	}
 }
