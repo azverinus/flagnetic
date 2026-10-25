@@ -94,6 +94,8 @@ export class ProviderState {
   private changing = 0;
   private revoked = false;
   private closed = false;
+  /** Counts the status events sent: READY, STALE and ERROR. */
+  private reported = 0;
   private readonly unsubscribe: (() => void)[];
 
   constructor(
@@ -147,11 +149,17 @@ export class ProviderState {
    * OpenFeature sets `READY` in a continuation of the promise the provider
    * returned, so the announcement waits for the next task, which runs after
    * every such continuation.
+   *
+   * A fetch under way when `initialize` resolves can answer before that
+   * task runs; what it reports is sent at once, as the client's state then
+   * is, so the announcement would only send it a second time and is
+   * dropped.
    */
   private announce(): void {
     if (!this.initialized || this.changing > 0) return;
+    const reported = this.reported;
     setTimeout(() => {
-      if (this.changing > 0) return;
+      if (this.changing > 0 || this.reported !== reported) return;
       if (this.revoked) this.error();
       else if (this.client.stage === "last_good") this.stale();
     }, 0);
@@ -170,16 +178,22 @@ export class ProviderState {
   private staged(stage: Stage): void {
     if (stage === "fresh") this.revoked = false;
     if (!this.initialized || this.changing > 0) return;
-    if (stage === "fresh") this.emit(READY);
+    if (stage === "fresh") this.report(READY);
     else if (stage === "last_good" && !this.revoked) this.stale();
   }
 
   private stale(): void {
-    this.emit(STALE, { message: "flagnetic: stage is last_good" });
+    this.report(STALE, { message: "flagnetic: stage is last_good" });
   }
 
   private error(): void {
-    this.emit(ERROR, { message: "flagnetic: sdk key revoked", errorCode: "GENERAL" });
+    this.report(ERROR, { message: "flagnetic: sdk key revoked", errorCode: "GENERAL" });
+  }
+
+  private report(event: string, details?: Readonly<Record<string, unknown>>): void {
+    if (this.closed) return;
+    this.reported++;
+    this.emit(event, details);
   }
 
   private emit(event: string, details?: Readonly<Record<string, unknown>>): void {
