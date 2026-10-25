@@ -23,6 +23,10 @@ msgstr ""
 msgid "{bucket} of {total}"
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "{conflictUnits, plural, one {# unit was exposed to a variation other than its first,} other {# units were exposed to a variation other than their first,}} {conflictTotal, plural, one {in # exposure.} other {in # exposures.}} The latest conflicts:"
+msgstr ""
+
 #: src/components/duration-input.tsx
 msgid "{count, plural, one {day} other {days}}"
 msgstr ""
@@ -61,8 +65,20 @@ msgstr ""
 msgid "{environment}, rule {position} “{description}”"
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "{exposures, plural, one {# exposure, {overridden} overridden} other {# exposures, {overridden} overridden}}"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "{exposures, plural, one {# exposure} other {# exposures}}"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "{first} and {second}"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "{firstExposed}, counted up to <0/>."
 msgstr ""
 
 #: src/lib/conditions.ts
@@ -75,6 +91,14 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/members.tsx
 msgid "{holder} no longer holds any role in this project and leaves its members. They stay a member of the instance."
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "{inclusion}, below the traffic allocation of {allocation}: included"
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "{inclusion}, not below the traffic allocation of {allocation}: left out"
 msgstr ""
 
 #: src/components/kill-switch-dialog.tsx
@@ -175,8 +199,16 @@ msgstr ""
 msgid "{to} takes the rules of {source} with their identifiers and salts, its prerequisites and its off and fallthrough variations. {to} stays on."
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "{total, plural, one {# unit first exposed} other {# units first exposed}}"
+msgstr ""
+
 #: src/lib/conditions.ts
 msgid "{variation} to {percent}% of {unitType} units"
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "{variationBucket}, the bucket it would take should the allocation grow"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -193,6 +225,14 @@ msgstr ""
 
 #: src/components/conflict-banner.tsx
 msgid "{who} saved this configuration on {when}, after this draft was loaded."
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "<0>{unit}</0> gets <1>{variation}</1>."
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "<0>{unit}</0> is left out of the experiment."
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
@@ -383,6 +423,10 @@ msgstr ""
 #: src/lib/flag-detail.ts
 #: src/lib/tester.ts
 msgid "A unit ID has at most {max} bytes."
+msgstr ""
+
+#: src/lib/experiment-health.ts
+msgid "A unit ID is at most 256 bytes."
 msgstr ""
 
 #: src/components/condition-row.tsx
@@ -664,6 +708,14 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Archived."
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "Assignment lookup"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "At"
 msgstr ""
 
 #: src/components/invitation-acceptance.tsx
@@ -1038,6 +1090,10 @@ msgstr ""
 msgid "Clear filters"
 msgstr ""
 
+#: src/components/experiment-assignment.tsx
+msgid "ClickHouse query"
+msgstr ""
+
 #: src/lib/sdk-keys.ts
 msgid "Client"
 msgstr ""
@@ -1135,6 +1191,14 @@ msgstr ""
 msgid "Confirm the password"
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "Conflicting units, the latest first"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Conflicts"
+msgstr ""
+
 #: src/lib/conditions.ts
 msgid "contains"
 msgstr ""
@@ -1151,6 +1215,7 @@ msgstr ""
 msgid "Contexts are served by the overrides, rules and fallthrough below."
 msgstr ""
 
+#: src/components/experiment-assignment.tsx
 #: src/components/ui/reveal-secret.tsx
 msgid "Copied to the clipboard."
 msgstr ""
@@ -1169,6 +1234,10 @@ msgstr ""
 
 #: src/components/compare-environments.tsx
 msgid "Copy configuration"
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "Copy query"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -1239,6 +1308,10 @@ msgstr ""
 msgid "Date"
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "Day (UTC)"
+msgstr ""
+
 #: src/components/member-actions.tsx
 msgid "Deactivate"
 msgstr ""
@@ -1285,6 +1358,10 @@ msgstr ""
 
 #: src/components/discovered-attributes.tsx
 msgid "Declaring {key} makes it usable in rules. Its type is fixed once declared."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "Definition"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -1562,6 +1639,10 @@ msgstr ""
 msgid "Enter a scheme, a host and an optional port, such as https://app.example.com."
 msgstr ""
 
+#: src/lib/experiment-health.ts
+msgid "Enter a unit ID."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Enter a valid email address."
 msgstr ""
@@ -1652,6 +1733,7 @@ msgstr ""
 msgid "Environment updated"
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/environments/route.tsx
@@ -1783,6 +1865,10 @@ msgstr ""
 msgid "Expected removal changed from {before} to {after}."
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "Expected share"
+msgstr ""
+
 #: src/components/rule-editor.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Experiment"
@@ -1837,6 +1923,10 @@ msgstr ""
 msgid "Expires"
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "Exposures"
+msgstr ""
+
 #: src/components/tester-panel.tsx
 msgid "Fallthrough"
 msgstr ""
@@ -1868,6 +1958,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Filter the segments"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "First exposed to"
 msgstr ""
 
 #: src/components/discovered-attributes.tsx
@@ -2098,6 +2192,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Include archived experiments"
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "Inclusion bucket"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -2405,6 +2503,10 @@ msgstr ""
 msgid "Locked out after failed sign-ins"
 msgstr ""
 
+#: src/components/experiment-assignment.tsx
+msgid "Look up"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
@@ -2688,6 +2790,10 @@ msgstr ""
 msgid "No experiment matches these filters."
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "No exposure has been received in this environment yet."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "No flag matches these filters."
 msgstr ""
@@ -2777,6 +2883,10 @@ msgstr ""
 msgid "No undeclared attribute has been seen."
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "No unit was exposed to a variation other than its first."
+msgstr ""
+
 #: src/components/tester-panel.tsx
 msgid "No value"
 msgstr ""
@@ -2811,6 +2921,10 @@ msgstr ""
 
 #: src/lib/sdk-keys.ts
 msgid "None, end the old key now"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Not counted yet: the exposures are first counted within seconds of arriving."
 msgstr ""
 
 #: src/routes/_signed-in/$.tsx
@@ -2875,6 +2989,10 @@ msgstr ""
 #. A JSON type an SDK sent.
 #: src/lib/attribute-types.ts
 msgid "Object"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Observed share"
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -2957,6 +3075,10 @@ msgstr ""
 
 #: src/components/condition-row.tsx
 msgid "Operator (condition {position})"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Overridden"
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -3052,6 +3174,14 @@ msgstr ""
 
 #: src/components/auth-settings-form.tsx
 msgid "Password minimum length"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Per day"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Per variation"
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -3241,6 +3371,14 @@ msgstr ""
 
 #: src/components/kill-switch-dialog.tsx
 msgid "Recorded in the audit log. Characters still needed: {missing}."
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Refresh"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Refused exposures"
 msgstr ""
 
 #: src/components/configuration-editor.tsx
@@ -3735,6 +3873,14 @@ msgstr ""
 msgid "Settings"
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "Shares against the weights"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Shares: {label}"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "Ship a winner: its rules serve the winning variation"
 msgstr ""
@@ -3784,6 +3930,10 @@ msgstr ""
 
 #: src/components/app-shell.tsx
 msgid "Skip to content"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Some exposures were refused and are not counted above. An SDK sends exposures the experiment does not take:"
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -4004,6 +4154,10 @@ msgstr ""
 
 #: src/components/auth-settings-form.tsx
 msgid "The auth settings are saved."
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "The browser refused the clipboard. Select the query and copy it by hand."
 msgstr ""
 
 #: src/components/ui/reveal-secret.tsx
@@ -4327,6 +4481,10 @@ msgstr ""
 msgid "The project has no environment with this key. It may have been deleted."
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "The project has no environment."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
 msgid "The project has no experiment with this key. It may have been deleted."
 msgstr ""
@@ -4516,6 +4674,10 @@ msgstr ""
 #: src/components/personal-menu.tsx
 #: src/components/theme-choice.tsx
 msgid "Theme"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Then exposed to"
 msgstr ""
 
 #: src/components/not-found.tsx
@@ -4775,8 +4937,16 @@ msgstr ""
 msgid "Types seen"
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
+msgid "Unit"
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "Unit ID"
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "Unit ID ({unitType})"
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -4834,6 +5004,18 @@ msgstr ""
 
 #: src/components/tester-panel.tsx
 msgid "Units"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Units first exposed"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Units first exposed per day and variation, with the exposures received that day"
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "Units first exposed to each variation against the shares its weights ask for, per day, and units exposed to more than one variation. Exposures are counted about every 10 seconds."
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -4903,6 +5085,7 @@ msgstr ""
 msgid "Values of {label}"
 msgstr ""
 
+#: src/components/experiment-exposures.tsx
 #: src/components/overrides-section.tsx
 #: src/components/rule-editor.tsx
 #: src/components/tester-panel.tsx
@@ -4932,6 +5115,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Variation <0>{key}</0> serves <1/> instead of <2/>."
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "Variation bucket"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -5046,6 +5233,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
+msgstr ""
+
+#: src/components/experiment-assignment.tsx
+msgid "Which variation the experiment gives a unit, from its salts and traffic allocation as they are now, and the query that recomputes it in ClickHouse. Looking up records nothing."
 msgstr ""
 
 #: src/components/rule-editor.tsx
