@@ -2,10 +2,11 @@
 // Exposures and aliases are appended with the event ID they keep for every
 // retry; the evaluation summary rides along in the same batch. The queue
 // lives in browser storage under the SDK key, so a tab closed mid-flush
-// sends its events on the next load.
+// sends its events on the next load, and a hidden or closing tab hands it
+// to the page's beacon.
 import { Backoff } from "../internal/backoff.js";
 import type { Clock } from "../internal/clock.js";
-import { summaryEvents, SummaryCounter, type QueuedEvent, type SummaryRow } from "../internal/events.js";
+import { summaryEvents, SummaryCounter, utf8Length, type QueuedEvent, type SummaryRow } from "../internal/events.js";
 import { causeOf, type LogLevel } from "../internal/logger.js";
 import type { SafeStore } from "./storage.js";
 import type { LogEvent, Reason } from "./types.js";
@@ -27,8 +28,9 @@ export interface IngestConfig {
   readonly capacity: number;
   /**
    * The store key of this SDK key's queue. Tabs of one origin with the same
-   * key share it, and each writes back its own queue, so another tab's
-   * unsent events can be overwritten.
+   * key share it, so every change reads it first and writes back what it
+   * read with only its own change applied: another tab's unsent events
+   * survive, and a closed tab's leftovers go with the next batch.
    */
   readonly queueKey: string;
   /** The most events one batch carries. */
@@ -45,6 +47,8 @@ export interface IngestConfig {
   readonly now: () => number;
   readonly random: () => number;
   readonly fetch: typeof fetch;
+  /** The page's `navigator.sendBeacon` with a string body; undefined where there is none. */
+  readonly beacon: ((url: string, body: string) => boolean) | undefined;
   /** The ruleset version the held values were evaluated against. */
   readonly rulesetVersion: () => number | undefined;
 }
@@ -52,13 +56,19 @@ export interface IngestConfig {
 type Log = (level: LogLevel, event: LogEvent, fields: Record<string, unknown>) => void;
 
 /**
+ * The bytes a page may have in beacons and `keepalive` requests not yet
+ * sent: browsers refuse a beacon beyond 64 KiB in flight.
+ */
+export const MAX_BEACON_BYTES = 64 * 1024;
+
+/**
  * The event queue and its sender. `record` appends, `flush` sends what is
  * queued, and a batch that failed for a reason worth retrying is kept with
  * its event IDs and retried with exponential backoff and full jitter.
  */
 export class Ingest {
-  private queue: QueuedEvent[] = [];
-  private sending = false;
+  /** The event IDs of the batch this tab is posting, which a beacon leaves to it. */
+  private inFlight = new Set<string>();
   private timer: unknown;
   private retryTimer: unknown;
   private closed = false;
@@ -75,12 +85,11 @@ export class Ingest {
     private readonly trace?: (event: "events_handled") => void,
   ) {
     this.backoff = new Backoff(config.retryInitial, config.random);
-    this.queue = this.read();
   }
 
-  /** How many events wait to be sent. */
+  /** How many events wait to be sent, from every tab sharing the key. */
   get queued(): number {
-    return this.queue.length;
+    return this.read().length;
   }
 
   /** Starts the flush interval; called once the client is running. */
@@ -105,14 +114,7 @@ export class Ingest {
 
   /** Appends an event, dropping the oldest when the queue is full. */
   record(event: QueuedEvent): void {
-    this.queue.push(event);
-    const over = this.queue.length - this.config.capacity;
-    if (over > 0) {
-      this.queue.splice(0, over);
-      this.log("warn", "queue_dropped", { dropped: over, capacity: this.config.capacity });
-    }
-    this.write();
-    if (this.queue.length >= this.config.batchSize) void this.flush();
+    if (this.append([event]) >= this.config.batchSize) void this.flush();
   }
 
   /**
@@ -122,12 +124,53 @@ export class Ingest {
    */
   async flush(): Promise<void> {
     this.materializeSummary();
-    if (this.queue.length === 0 || this.closed) return;
+    if (this.closed || this.read().length === 0) return;
     // A retry is already scheduled: let its backoff run rather than hammering.
     if (this.retryTimer !== undefined) return this.settled;
-    if (this.sending) return this.settled;
+    if (this.inFlight.size > 0) return this.settled;
     this.settled = this.send();
     return this.settled;
+  }
+
+  /**
+   * Hands the queue, the evaluation summary included, to the page's beacon,
+   * which the browser posts even after the page has gone: called on every
+   * hide, not only the first, since a page hidden and then closed records
+   * events in between. The beacon cannot set a header, so the client key
+   * travels as `sdk_key` and the envelope as `text/plain`, which make it a
+   * request without a CORS preflight. Batches go until the page's beacon
+   * quota is spent and leave the queue once the browser took them: nobody
+   * reads the answer, and a retry would only be dropped as a duplicate.
+   * What the quota leaves stays queued for the next load; a batch in flight
+   * is left to its own request. Where there is no beacon, or the browser
+   * takes none, the queue is flushed by a request, which may still land.
+   */
+  beacon(): void {
+    if (this.closed) return;
+    this.materializeSummary();
+    const beacon = this.config.beacon;
+    const url = `${this.config.baseUrl}${SDK_API_PATH}/events?sdk_key=${encodeURIComponent(this.config.sdkKey)}`;
+    let budget = MAX_BEACON_BYTES;
+    for (let first = true; ; first = false) {
+      const pending = this.read().filter((e) => !this.inFlight.has(e.event_id));
+      if (pending.length === 0) return;
+      let size = utf8Length(this.envelope([]));
+      const batch: QueuedEvent[] = [];
+      for (const e of pending) {
+        // One comma per event after the first.
+        const cost = utf8Length(JSON.stringify(e)) + (batch.length > 0 ? 1 : 0);
+        if (batch.length === this.config.batchSize || size + cost > budget) break;
+        batch.push(e);
+        size += cost;
+      }
+      if (batch.length === 0 || !beacon?.(url, this.envelope(batch))) {
+        if (first) void this.flush();
+        else this.log("warn", "events_failed", { cause: "beacon_refused", events: pending.length });
+        return;
+      }
+      budget -= size;
+      this.remove(batch);
+    }
   }
 
   /** Stops the timers; what is queued stays in storage for the next load. */
@@ -154,9 +197,29 @@ export class Ingest {
     }
   }
 
-  private write(): void {
-    if (this.queue.length === 0) this.store.remove(this.config.queueKey);
-    else this.store.set(this.config.queueKey, JSON.stringify(this.queue));
+  private write(queue: readonly QueuedEvent[]): void {
+    if (queue.length === 0) this.store.remove(this.config.queueKey);
+    else this.store.set(this.config.queueKey, JSON.stringify(queue));
+  }
+
+  /** Appends events to the stored queue, dropping its oldest beyond capacity; returns its length. */
+  private append(events: readonly QueuedEvent[]): number {
+    const queue = [...this.read(), ...events];
+    const over = queue.length - this.config.capacity;
+    if (over > 0) {
+      queue.splice(0, over);
+      this.log("warn", "queue_dropped", { dropped: over, capacity: this.config.capacity });
+    }
+    this.write(queue);
+    return queue.length;
+  }
+
+  /** Removes the events of a batch from the stored queue, and nothing another tab added since. */
+  private remove(batch: readonly QueuedEvent[]): number {
+    const sent = new Set(batch.map((e) => e.event_id));
+    const queue = this.read().filter((e) => !sent.has(e.event_id));
+    this.write(queue);
+    return queue.length;
   }
 
   // Turns the counts collected since the last batch into one summary event.
@@ -171,7 +234,7 @@ export class Ingest {
       rulesetVersion: this.config.rulesetVersion() ?? 0,
       ...(this.config.appVersion !== undefined && { appVersion: this.config.appVersion }),
     };
-    for (const e of summaryEvents(this.config.now(), this.config.random, window, counts)) this.record(e);
+    this.append(summaryEvents(this.config.now(), this.config.random, window, counts));
   }
 
   // ------------------------------------------------------------------ send
@@ -186,8 +249,8 @@ export class Ingest {
   }
 
   private async send(): Promise<void> {
-    this.sending = true;
-    const batch = this.queue.slice(0, this.config.batchSize);
+    const batch = this.read().slice(0, this.config.batchSize);
+    this.inFlight = new Set(batch.map((e) => e.event_id));
     let outcome: "sent" | "retry" | "drop" = "retry";
     let status: number | undefined;
     let cause = "";
@@ -210,19 +273,17 @@ export class Ingest {
     } catch (e) {
       cause = `network error: ${causeOf(e)}`;
     } finally {
-      this.sending = false;
+      this.inFlight = new Set();
       this.trace?.("events_handled");
     }
 
     if (outcome === "sent" || outcome === "drop") {
       // Rejected events are dropped with the accepted ones: the server will
       // never take them.
-      const sent = new Set(batch.map((e) => e.event_id));
-      this.queue = this.queue.filter((e) => !sent.has(e.event_id));
-      this.write();
+      const left = this.remove(batch);
       this.backoff.reset();
       if (outcome === "drop") this.log("warn", "events_failed", { cause, status, events: batch.length, dropped: batch.length });
-      if (this.queue.length > 0 && !this.closed) await this.flush();
+      if (left > 0 && !this.closed) await this.flush();
       return;
     }
     const cap = status === 401 || status === 403 ? this.config.unauthorizedMax : this.config.retryMax;
@@ -235,13 +296,17 @@ export class Ingest {
     }, delay);
   }
 
-  private async post(events: readonly QueuedEvent[]): Promise<Response> {
-    const body = JSON.stringify({
+  private envelope(events: readonly QueuedEvent[]): string {
+    return JSON.stringify({
       schema_version: SCHEMA_VERSION_MAX,
       sdk: { name: this.config.sdkName, version: this.config.sdkVersion, platform: this.config.platform },
       sent_at: new Date(this.config.now()).toISOString(),
       events,
     });
+  }
+
+  private async post(events: readonly QueuedEvent[]): Promise<Response> {
+    const body = this.envelope(events);
     const controller = new AbortController();
     const timer = this.config.clock.setTimeout(() => { controller.abort(new Error(`timed out after ${this.config.requestTimeout} ms`)); }, this.config.requestTimeout);
     try {

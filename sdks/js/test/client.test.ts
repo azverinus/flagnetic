@@ -88,6 +88,11 @@ class FakePage implements Page {
   }
 }
 
+/** The `from_unit_id` of every alias a request carries. */
+function unitIds(req: Pending): string[] {
+  return (JSON.parse(req.body ?? "{}") as { events: { from_unit_id: string }[] }).events.map((e) => e.from_unit_id);
+}
+
 async function settle(): Promise<void> {
   for (let i = 0; i < 8; i++) await new Promise<void>((resolve) => setTimeout(resolve, 0));
 }
@@ -100,6 +105,9 @@ class Harness {
   readonly clients: FlagneticClient[] = [];
   handled = { fetch: 0, events: 0 };
 
+  /** The page's beacon: the mock network's, which takes every one, unless a test replaces it. */
+  beacon: ((url: string, body: string) => boolean) | null = this.net.beacon;
+
   client(options: ClientOptions = {}, sdkKey = key, timing: Partial<Timing> = {}, internals: ClientInternals = {}): FlagneticClient {
     const c = createClientWith(
       sdkKey,
@@ -111,6 +119,7 @@ class Harness {
         random: () => 0.5,
         fetch: this.net.fetch,
         page: this.page,
+        beacon: this.beacon,
         timing,
         trace: (e: ClientTraceEvent) => {
           if (e === "fetch_handled") this.handled.fetch++;
@@ -156,6 +165,11 @@ class Harness {
     }
     this.clock.advanceTo(until);
     await settle();
+  }
+
+  /** Moves the clock a millisecond, so that the next event gets an ID of its own. */
+  tick(): void {
+    this.clock.advanceTo(this.clock.now() + 1);
   }
 
   count(event: LogEvent): number {
@@ -660,8 +674,8 @@ describe("the persisted event queue", () => {
     const store = new MemoryStore();
     const c = h.client({ store, pollInterval: 3_600_000, flushInterval: 5_000, sendSummaries: false });
     await h.serve("/sdk/v1/evaluate", values(1, {}));
-    c.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
     h.page.hide();
+    c.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
     await h.advance(60_000);
     expect(h.net.waiting("/sdk/v1/events"), "a hidden tab does not flush on its interval").toHaveLength(0);
     expect(store.getItem(keys.events)).not.toBeNull();
@@ -708,6 +722,29 @@ describe("the persisted event queue", () => {
     retried.answer({ status: 202, body: JSON.stringify({ accepted: 1, duplicates: 0, dropped_rows: 0, rejected: [] }) });
     await settle();
     expect(store.getItem(keys.events), "an accepted batch leaves nothing behind").toBeNull();
+  });
+
+  test("tabs sharing a key keep each other's unsent events, and a batch removes only its own", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const options = { store, pollInterval: 3_600_000, flushInterval: 3_600_000, sendSummaries: false };
+    const a = h.client(options);
+    const b = h.client(options);
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    // A millisecond apart, so that each event gets an ID of its own.
+    a.alias({ fromUnitType: "anonymous", fromUnitId: "d-a1", toUnitType: "user", toUnitId: "u-1001" });
+    h.tick();
+    b.alias({ fromUnitType: "anonymous", fromUnitId: "d-b1", toUnitType: "user", toUnitId: "u-1001" });
+    void b.flush();
+    const req = await h.waitFor("/sdk/v1/events");
+    expect(unitIds(req), "the other tab's event goes too").toStrictEqual(["d-a1", "d-b1"]);
+    h.tick();
+    a.alias({ fromUnitType: "anonymous", fromUnitId: "d-a2", toUnitType: "user", toUnitId: "u-1001" });
+    req.answer({ status: 202, body: JSON.stringify({ accepted: 2, duplicates: 0, dropped_rows: 0, rejected: [] }) });
+    await settle();
+    void a.flush();
+    expect(unitIds(await h.waitFor("/sdk/v1/events")), "recorded while the batch was in flight").toStrictEqual(["d-a2"]);
   });
 
   test("an exposure reports the assignment served, not the document that arrived since", async () => {
@@ -812,6 +849,82 @@ describe("the persisted event queue", () => {
 });
 
 // ---------------------------------------------------------------- offline
+
+describe("the beacon of a hidden or closing page", () => {
+  const link = (id: string) => ({ fromUnitType: "anonymous", fromUnitId: id, toUnitType: "user", toUnitId: "u-1001" });
+  const options = { pollInterval: 3_600_000, flushInterval: 3_600_000, sendSummaries: false };
+
+  test("a batch in flight is left to its own request", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const c = h.client({ ...options, store });
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    c.alias(link("d-1"));
+    void c.flush();
+    const req = await h.waitFor("/sdk/v1/events");
+    h.tick();
+    c.alias(link("d-2"));
+    h.page.hide();
+    const beacons = h.net.waiting("/sdk/v1/events").filter((p) => p.kind === "beacon");
+    expect(beacons.map(unitIds)).toStrictEqual([["d-2"]]);
+    req.answer({ status: 202, body: JSON.stringify({ accepted: 1, duplicates: 0, dropped_rows: 0, rejected: [] }) });
+    await settle();
+    expect(store.getItem(keys.events), "both left the queue").toBeNull();
+    for (const b of beacons) b.answer({ status: 202 });
+  });
+
+  test("the beacons of one hide stay within the page's quota, the rest staying queued", async () => {
+    const h = harness();
+    const store = new MemoryStore();
+    const c = h.client({ ...options, store });
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    // About 1.7 KiB each, fewer than a batch: 90 of them are over twice the quota.
+    const id = (i: number): string => `d-${String(i).padStart(4, "0")}-${"x".repeat(1_500)}`;
+    for (let i = 0; i < 90; i++, h.tick()) c.alias(link(id(i)));
+    h.page.hide();
+    const beacons = h.net.waiting("/sdk/v1/events");
+    expect(beacons.length).toBeGreaterThan(0);
+    expect(beacons.every((p) => p.kind === "beacon")).toBe(true);
+    expect(beacons.every((p) => unitIds(p).length <= 100), "at most a batch each").toBe(true);
+    const bytes = beacons.reduce((n, p) => n + new TextEncoder().encode(p.body ?? "").length, 0);
+    expect(bytes).toBeLessThanOrEqual(64 * 1024);
+    expect(bytes, "the quota is used, not wasted").toBeGreaterThan(60 * 1024);
+    const sent = beacons.flatMap(unitIds);
+    const left = (JSON.parse(store.getItem(keys.events) ?? "[]") as { from_unit_id: string }[]).map((e) => e.from_unit_id);
+    expect(sent.length + left.length).toBe(90);
+    expect(left[0], "the oldest go first").toBe(id(sent.length));
+    expect(h.count("events_failed")).toBe(1);
+    for (const b of beacons) b.answer({ status: 202 });
+  });
+
+  test("without a beacon, or when the browser refuses it, a hidden page flushes by request", async () => {
+    for (const beacon of [null, () => false]) {
+      const h = harness();
+      h.beacon = beacon;
+      const c = h.client({ ...options, store: false });
+      await h.serve("/sdk/v1/evaluate", values(1, {}));
+      c.alias(link("d-1"));
+      h.page.hide();
+      const req = await h.waitFor("/sdk/v1/events", 0);
+      expect(req.kind).toBe("fetch");
+      expect(req.headers.authorization).toBe(`Bearer ${key}`);
+      req.answer({ status: 202, body: JSON.stringify({ accepted: 1, duplicates: 0, dropped_rows: 0, rejected: [] }) });
+      await settle();
+    }
+  });
+
+  test("a closed client sends no beacon", async () => {
+    const h = harness();
+    const c = h.client({ ...options, store: false });
+    await h.serve("/sdk/v1/evaluate", values(1, {}));
+    const closing = c.close();
+    await h.advance(10_000);
+    await closing;
+    c.alias(link("d-1"));
+    h.page.hide();
+    expect(h.net.waiting("/sdk/v1/events")).toHaveLength(0);
+  });
+});
 
 describe("offline mode", () => {
   test("it makes no request, records events in memory and rewrites values in place", async () => {

@@ -1,0 +1,474 @@
+{
+  "scenarios": [
+    {
+      "name": "client: a page made visible again refetches, at most once per 10 seconds",
+      "mode": "client",
+      "covers": "visibility: a hidden page does not poll; becoming visible refetches at once, unless the last fetch was under 10 s ago",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 300000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation.json"
+          },
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          }
+        },
+        {
+          "call": {
+            "op": "visibility_hidden"
+          }
+        },
+        {
+          "note": "twice the poll interval, hidden",
+          "no_request": {
+            "for_ms": 600000
+          }
+        },
+        {
+          "call": {
+            "op": "visibility_visible"
+          }
+        },
+        {
+          "note": "becoming visible refetches",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation-after-kill-switch.json"
+          },
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          }
+        },
+        {
+          "advance_ms": 5000
+        },
+        {
+          "call": {
+            "op": "visibility_hidden"
+          }
+        },
+        {
+          "call": {
+            "op": "visibility_visible"
+          }
+        },
+        {
+          "note": "5 s after the last fetch",
+          "no_request": {
+            "path": "/sdk/v1/evaluate",
+            "for_ms": 4000
+          }
+        },
+        {
+          "advance_ms": 2000
+        },
+        {
+          "call": {
+            "op": "visibility_hidden"
+          }
+        },
+        {
+          "call": {
+            "op": "visibility_visible"
+          }
+        },
+        {
+          "note": "11 s after the last fetch",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation-after-kill-switch.json"
+          },
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: the network coming back refetches, at most once per 10 seconds",
+      "mode": "client",
+      "covers": "network return: `online` on a visible page refetches at once, unless the last fetch was under 10 s ago",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 300000,
+          "send_exposures": true,
+          "send_summaries": false,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation.json"
+          },
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          }
+        },
+        {
+          "call": {
+            "op": "online"
+          }
+        },
+        {
+          "note": "the first fetch was just now",
+          "no_request": {
+            "path": "/sdk/v1/evaluate",
+            "for_ms": 9000
+          }
+        },
+        {
+          "advance_ms": 2000
+        },
+        {
+          "call": {
+            "op": "online"
+          }
+        },
+        {
+          "note": "11 s after the last fetch",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation-after-kill-switch.json"
+          },
+          "expect": {
+            "answers_of": "server/evaluation-after-kill-switch.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          }
+        },
+        {
+          "call": {
+            "op": "online"
+          }
+        },
+        {
+          "no_request": {
+            "path": "/sdk/v1/evaluate",
+            "for_ms": 9000
+          }
+        }
+      ]
+    },
+    {
+      "name": "client: a hidden or closing page hands its events to a beacon",
+      "mode": "client",
+      "covers": "beacon flush: on visibilitychange to hidden and on pagehide the queue, summary included, goes to POST /sdk/v1/events with the client key as sdk_key and a text/plain body, no Authorization; what the beacon took is never sent again",
+      "given": {
+        "options": {
+          "allow_overrides": false,
+          "flush_interval_ms": 3600000,
+          "poll_interval_ms": 300000,
+          "send_exposures": true,
+          "send_summaries": true,
+          "sse": false,
+          "summary_interval_ms": 3600000
+        }
+      },
+      "steps": [
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation.json"
+          },
+          "expect": {
+            "answers_of": "server/evaluation.json",
+            "stage": "fresh",
+            "stale_since": "unset"
+          }
+        },
+        {
+          "call": {
+            "op": "evaluate",
+            "flag": "checkout",
+            "type": "boolean",
+            "default": false,
+            "times": 2
+          },
+          "expect": {
+            "result": {
+              "default": false,
+              "flag": "checkout",
+              "reason": "targeting_match",
+              "type": "boolean",
+              "value": true,
+              "variation": "true"
+            }
+          }
+        },
+        {
+          "call": {
+            "op": "alias"
+          }
+        },
+        {
+          "call": {
+            "op": "visibility_hidden"
+          }
+        },
+        {
+          "note": "the hidden page's beacon",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "query": {
+              "sdk_key": "<sdk key>"
+            },
+            "headers": {
+              "Content-Type": "text/plain;charset=UTF-8"
+            },
+            "absent_headers": [
+              "Authorization"
+            ],
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            },
+            "events": {
+              "types": [
+                "alias",
+                "evaluation_summary"
+              ],
+              "summary_counts": [
+                {
+                  "count": 2,
+                  "flag": "checkout",
+                  "reason": "targeting_match",
+                  "variation": "true"
+                }
+              ],
+              "summary_ruleset_version": 1
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        },
+        {
+          "note": "recorded a second later, while hidden",
+          "advance_ms": 1000,
+          "call": {
+            "op": "alias"
+          }
+        },
+        {
+          "call": {
+            "op": "pagehide"
+          }
+        },
+        {
+          "note": "the closing page's beacon",
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/events",
+            "query": {
+              "sdk_key": "<sdk key>"
+            },
+            "headers": {
+              "Content-Type": "text/plain;charset=UTF-8"
+            },
+            "absent_headers": [
+              "Authorization"
+            ],
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            },
+            "events": {
+              "types": [
+                "alias"
+              ],
+              "excludes_ids_of_step": 4
+            }
+          },
+          "respond": {
+            "status": 202,
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": "server/events-accepted.json"
+          }
+        },
+        {
+          "note": "the next load would send what the beacon left; it took everything",
+          "advance_ms": 11000
+        },
+        {
+          "call": {
+            "op": "visibility_visible"
+          }
+        },
+        {
+          "request": {
+            "method": "POST",
+            "path": "/sdk/v1/evaluate",
+            "headers": {
+              "Authorization": "Bearer <sdk key>",
+              "Content-Type": "application/json"
+            },
+            "delay_ms": {
+              "min": 0,
+              "max": 1000
+            }
+          },
+          "respond": {
+            "status": 200,
+            "headers": {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+              "RateLimit-Limit": "120",
+              "RateLimit-Remaining": "119",
+              "Vary": "Accept-Encoding"
+            },
+            "body": "server/evaluation.json"
+          },
+          "expect": {
+            "stage": "fresh"
+          },
+          "note": "looked at without evaluating, so the summary stays empty"
+        },
+        {
+          "call": {
+            "op": "flush"
+          }
+        },
+        {
+          "no_request": {
+            "path": "/sdk/v1/events",
+            "for_ms": 10000
+          }
+        }
+      ]
+    }
+  ]
+}

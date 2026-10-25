@@ -58,3 +58,20 @@ export function defaultPage(): Page {
     },
   };
 }
+
+/**
+ * The page's `navigator.sendBeacon`, posting a string body as
+ * `text/plain;charset=UTF-8`, or undefined outside a browser. A beacon the
+ * browser throws on counts as refused.
+ */
+export function defaultBeacon(): ((url: string, body: string) => boolean) | undefined {
+  const nav = (globalThis as { navigator?: { sendBeacon?: (url: string, data: string) => boolean } }).navigator;
+  if (typeof nav?.sendBeacon !== "function") return undefined;
+  return (url, body) => {
+    try {
+      return nav.sendBeacon?.(url, body) === true;
+    } catch {
+      return false;
+    }
+  };
+}

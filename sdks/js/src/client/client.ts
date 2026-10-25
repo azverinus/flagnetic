@@ -12,7 +12,7 @@ import { SDK_API_PATH, VERSION } from "../version.js";
 import { aliasEvent, exposureEvent, ExposureSuppressor, type AliasLink } from "../internal/events.js";
 import { Ingest, SummaryCounter, type QueuedEvent } from "./ingest.js";
 import { LocalOverrideRefused, LocalOverridesNotAllowed } from "../internal/overrides.js";
-import { defaultPage, type Page } from "./page.js";
+import { defaultBeacon, defaultPage, type Page } from "./page.js";
 import { Recorder } from "./recorder.js";
 import { serveDetail, type ServeBase } from "./serve.js";
 import { defaultStore, SafeStore, sameUnits, StoreKeys } from "./storage.js";
@@ -76,6 +76,8 @@ export interface ClientInternals {
   readonly now?: () => number;
   readonly fetch?: typeof fetch;
   readonly page?: Page;
+  /** Stands in for `navigator.sendBeacon`; null for a page without one. */
+  readonly beacon?: ((url: string, body: string) => boolean) | null;
   readonly trace?: (event: ClientTraceEvent) => void;
   /**
    * Makes no request until the first `setContext`, for an owner that learns
@@ -260,6 +262,7 @@ export class FlagneticClient {
         now: this.now,
         random: this.random,
         fetch: this.doFetch,
+        beacon: internals.beacon === null ? undefined : (internals.beacon ?? defaultBeacon()),
         queueKey: this.keys.events,
         rulesetVersion: () => this.values?.rulesetVersion,
       },
@@ -670,7 +673,11 @@ export class FlagneticClient {
   }
 
   private onHidden(): void {
-    if (this.closed || !this.visible) return;
+    if (this.closed) return;
+    // Every hide hands the queue to the beacon, `pagehide` after a
+    // `visibilitychange` included: the page may never run again.
+    this.ingest?.beacon();
+    if (!this.visible) return;
     this.visible = false;
     this.ingest?.setVisible(false);
     // The interval stops while the tab is hidden; a retry does not, so a
