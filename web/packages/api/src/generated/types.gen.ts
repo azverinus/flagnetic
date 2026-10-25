@@ -2225,9 +2225,12 @@ export type SignOutErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2406,9 +2409,12 @@ export type GetMeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2445,9 +2451,12 @@ export type UpdateMeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2492,9 +2501,12 @@ export type ChangeMyPasswordErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2559,9 +2571,12 @@ export type RevokeMySessionsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2598,9 +2613,12 @@ export type ListMySessionsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2642,9 +2660,12 @@ export type RevokeMySessionErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2685,9 +2706,12 @@ export type ListMyTokensErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2724,9 +2748,12 @@ export type CreateMyTokenErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2772,9 +2799,12 @@ export type RevokeMyTokenErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2815,9 +2845,12 @@ export type ListRolesErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2854,9 +2887,12 @@ export type ListProjectsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2893,9 +2929,12 @@ export type CreateProjectErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -2945,9 +2984,12 @@ export type GetProjectErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3008,9 +3050,12 @@ export type UpdateProjectErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3068,9 +3113,12 @@ export type GetProjectMeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3116,9 +3164,12 @@ export type ListEnvironmentsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3164,9 +3215,12 @@ export type CreateEnvironmentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3240,9 +3294,12 @@ export type DeleteEnvironmentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3305,9 +3362,12 @@ export type GetEnvironmentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3372,9 +3432,12 @@ export type UpdateEnvironmentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3452,9 +3515,12 @@ export type SetEnvironmentProtectionErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3518,9 +3584,12 @@ export type EvaluateErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3578,9 +3647,12 @@ export type GetEnvironmentRulesetErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3638,9 +3710,12 @@ export type ListSdkInventoryErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3690,9 +3765,12 @@ export type ListSdkKeysErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3746,9 +3824,12 @@ export type CreateSdkKeyErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3810,9 +3891,12 @@ export type RevokeSdkKeyErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3870,9 +3954,12 @@ export type UpdateSdkKeyErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3934,9 +4021,12 @@ export type RotateSdkKeyErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -3990,9 +4080,12 @@ export type ListUnitTypesErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4038,9 +4131,12 @@ export type CreateUnitTypeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4113,9 +4209,12 @@ export type DeleteUnitTypeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4177,9 +4276,12 @@ export type GetUnitTypeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4244,9 +4346,12 @@ export type UpdateUnitTypeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4304,9 +4409,12 @@ export type ListAttributesErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4352,9 +4460,12 @@ export type CreateAttributeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4408,9 +4519,12 @@ export type ListDiscoveredAttributesErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4462,9 +4576,12 @@ export type DismissDiscoveredAttributeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4520,9 +4637,12 @@ export type DeclareDiscoveredAttributeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4597,9 +4717,12 @@ export type DeleteAttributeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4661,9 +4784,12 @@ export type GetAttributeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4728,9 +4854,12 @@ export type UpdateAttributeErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4850,9 +4979,12 @@ export type ListFlagsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4898,9 +5030,12 @@ export type CreateFlagErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -4973,9 +5108,12 @@ export type DeleteFlagErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5037,9 +5175,12 @@ export type GetFlagErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5104,9 +5245,12 @@ export type UpdateFlagErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5187,9 +5331,12 @@ export type ArchiveFlagErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5262,9 +5409,12 @@ export type RestoreFlagErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5326,9 +5476,12 @@ export type GetFlagConfigurationErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5399,9 +5552,12 @@ export type PutFlagConfigurationErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5473,9 +5629,12 @@ export type KillFlagErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5552,9 +5711,12 @@ export type RevertFlagConfigurationErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5641,9 +5803,12 @@ export type CopyFlagConfigurationErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5723,9 +5888,12 @@ export type DeleteOverrideErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5791,9 +5959,12 @@ export type PutOverrideErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -5874,9 +6045,12 @@ export type RegenerateRolloutSaltErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6039,9 +6213,12 @@ export type ListExperimentsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6087,9 +6264,12 @@ export type CreateExperimentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6162,9 +6342,12 @@ export type DeleteExperimentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6226,9 +6409,12 @@ export type GetExperimentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6293,9 +6479,12 @@ export type UpdateExperimentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6376,9 +6565,12 @@ export type RegenerateExperimentSaltsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6457,9 +6649,12 @@ export type StartExperimentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6777,9 +6972,12 @@ export type CloneExperimentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6846,9 +7044,12 @@ export type GetExperimentAssignmentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6900,9 +7101,12 @@ export type CheckHashUniformityErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6966,9 +7170,12 @@ export type GetExperimentExposuresErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7037,9 +7244,12 @@ export type GetExperimentExposureTimelineErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7100,9 +7310,12 @@ export type GetExperimentConflictsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7177,9 +7390,12 @@ export type ListChangeRequestsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7230,9 +7446,12 @@ export type CreateChangeRequestErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7291,9 +7510,12 @@ export type GetChangeRequestErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7358,9 +7580,12 @@ export type UpdateChangeRequestErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7438,9 +7663,12 @@ export type OpenChangeRequestErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7514,9 +7742,12 @@ export type RebaseChangeRequestErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7590,9 +7821,12 @@ export type CancelChangeRequestErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7655,9 +7889,12 @@ export type CopyChangeRequestErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7712,9 +7949,12 @@ export type ListSegmentsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7760,9 +8000,12 @@ export type CreateSegmentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7835,9 +8078,12 @@ export type DeleteSegmentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7899,9 +8145,12 @@ export type GetSegmentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -7966,9 +8215,12 @@ export type UpdateSegmentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8030,9 +8282,12 @@ export type ListSegmentUsagesErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8079,9 +8334,12 @@ export type ListProjectMembersErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8128,9 +8386,12 @@ export type ListGrantsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8176,9 +8437,12 @@ export type CreateGrantErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8236,9 +8500,12 @@ export type DeleteGrantErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8288,9 +8555,12 @@ export type ListProjectTokensErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8337,9 +8607,12 @@ export type CreateProjectTokenErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8394,9 +8667,12 @@ export type RevokeProjectTokenErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8493,9 +8769,12 @@ export type ListProjectAuditEntriesErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8547,9 +8826,12 @@ export type GetProjectAuditEntryErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8605,9 +8887,12 @@ export type ListMembersErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8644,9 +8929,12 @@ export type InviteMemberErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8696,9 +8984,12 @@ export type GetMemberErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8744,9 +9035,12 @@ export type UpdateMemberErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8800,9 +9094,12 @@ export type DeactivateMemberErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8852,9 +9149,12 @@ export type ReactivateMemberErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8900,9 +9200,12 @@ export type ReissueInvitationErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -8953,9 +9256,12 @@ export type RevokeMemberSessionsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -9003,9 +9309,12 @@ export type ListMemberSessionsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -9052,9 +9361,12 @@ export type ListMemberTokensErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -9104,9 +9416,12 @@ export type RevokeMemberTokenErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -9148,9 +9463,12 @@ export type GetAuthSettingsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -9187,9 +9505,12 @@ export type UpdateAuthSettingsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -9285,9 +9606,12 @@ export type ListAuditEntriesErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;

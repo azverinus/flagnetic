@@ -2,7 +2,7 @@ import { evaluate, killFlag, listProjectAuditEntries } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { managementClient, must, seedProject } from "../support/console";
+import { managementClient, must, seedProject, unprotectProduction } from "../support/console";
 import {
   choose,
   openFlag,
@@ -84,6 +84,7 @@ test.describe("the kill switch", () => {
   test("switches a flag off with a reason, and shows who used it last", async ({ page }) => {
     const project = await seedProject("kill");
     await seedFlag(project, stringFlag("payments_v2"));
+    await unprotectProduction(project);
     await writeConfiguration(project, "payments_v2", "production", () => ({ on: true }));
     await openFlag(page, project, "payments_v2", { environment: "production" });
 

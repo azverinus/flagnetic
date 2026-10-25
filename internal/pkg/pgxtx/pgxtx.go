@@ -55,6 +55,8 @@ type current struct {
 	mode mode
 	// afterCommit are the hooks to run once tx commits, in order.
 	afterCommit []func()
+	// locals are the values kept for the transaction's life by Local.
+	locals map[any]any
 }
 
 // AfterCommit runs fn once the transaction ctx carries commits, and never if
@@ -69,6 +71,29 @@ func AfterCommit(ctx context.Context, fn func()) {
 		return
 	}
 	fn()
+}
+
+// Local returns the value the transaction ctx carries under key, storing
+// init() there first when it carries none, so code called more than once in
+// one unit of work remembers what it learned earlier in it, such as what a
+// row held before the unit of work changed it. key is compared as a map
+// key, so a package uses an unexported type of its own. Outside a
+// transaction there is nothing to remember: it returns init() and false.
+func Local[T any](ctx context.Context, key any, init func() T) (T, bool) {
+	c, ok := ctx.Value(txKey{}).(*current)
+	if !ok {
+		return init(), false
+	}
+	if v, ok := c.locals[key]; ok {
+		// Only Local stores under key, and always a T for that key.
+		return v.(T), true
+	}
+	if c.locals == nil {
+		c.locals = map[any]any{}
+	}
+	v := init()
+	c.locals[key] = v
+	return v, true
 }
 
 // Transactor begins transactions on a pool.

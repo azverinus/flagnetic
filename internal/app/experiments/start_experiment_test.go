@@ -114,6 +114,13 @@ func TestAStartWaitsForAConfigurationWriteAddingARuleServingIt(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	project := setUp(t, admin)
+	// Production is written directly here, and the start changes what it
+	// serves: neither needs a change request.
+	if res, err := admin.SetEnvironmentProtectionWithResponse(t.Context(), project.Key, "production",
+		&management.SetEnvironmentProtectionParams{IfMatch: ptr(`"1"`)}, management.EnvironmentProtection{Protected: false},
+	); err != nil || res.JSON200 == nil {
+		t.Fatalf("unprotect production: %v", err)
+	}
 	pool := testkit.Pool(t)
 	c := clock.System{}
 	ids := id.NewSource(c)

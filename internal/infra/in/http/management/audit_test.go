@@ -47,7 +47,7 @@ func writeAuditLog(t *testing.T) auditLog {
 	ctx := t.Context()
 
 	l.firstChange = c.Now()
-	l.mobile = createProject(t, l.admin, "mobile")
+	l.mobile = createProjectAsCreated(t, l.admin, "mobile")
 	c.Advance(time.Minute)
 	l.qa = *do(l.second.CreateEnvironmentWithResponse(ctx, "mobile", management.EnvironmentCreate{Key: "qa", Name: "QA"})).JSON201
 	c.Advance(time.Minute)
@@ -59,7 +59,7 @@ func writeAuditLog(t *testing.T) auditLog {
 	do(l.pipeline.CreateAttributeWithResponse(ctx, "mobile", management.AttributeCreate{Key: "plan_tier", Name: "Plan tier", Type: "string"}))
 	l.lastInMobile = c.Now()
 	c.Advance(time.Minute)
-	l.web = createProject(t, l.admin, "web")
+	l.web = createProjectAsCreated(t, l.admin, "web")
 	return l
 }
 
@@ -113,7 +113,7 @@ func TestAuditFiltersSelectExactlyTheMatchingEntries(t *testing.T) {
 
 func TestAuditFilterRefusesAnActorThatIsNoMemberID(t *testing.T) {
 	srv := testkit.StartServer(t)
-	p := createProject(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), projectKey())
+	p := createProjectAsCreated(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), projectKey())
 	for _, path := range []string{"/api/v1/projects/" + p.Key + "/audit?actor=not-a-uuid", "/api/v1/audit?actor=not-a-uuid"} {
 		res := request(t, http.MethodGet, srv.URL+path, testkit.InstanceAdminToken(t))
 		assertProblem(t, path, res.status, res.body, http.StatusBadRequest, "invalid_request")
@@ -167,7 +167,7 @@ func TestNoTokenValueAppearsInTheAuditLog(t *testing.T) {
 func TestAuditPaginationYieldsEveryEntryOnceWhileMoreAreWritten(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	p := createProject(t, admin, projectKey()).Key
+	p := createProjectAsCreated(t, admin, projectKey()).Key
 	for i := range 6 {
 		do(admin.CreateUnitTypeWithResponse(t.Context(), p, management.UnitTypeCreate{Key: "before_" + string(rune('a'+i)), Name: "x"}))
 	}

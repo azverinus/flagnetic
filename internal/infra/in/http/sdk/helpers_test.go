@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -35,8 +36,19 @@ type project struct {
 	admin *management.ClientWithResponses
 }
 
-// newProject creates a project through srv as the instance admin.
+// newProject creates a project through srv as the instance admin, with its
+// production unprotected: these tests write production directly, and what
+// protection refuses is judged through the management API.
 func newProject(t *testing.T, srv *testkit.Server) project {
+	t.Helper()
+	p := newProjectAsCreated(t, srv)
+	p.setProtected(t, "production", false)
+	return p
+}
+
+// newProjectAsCreated creates a project through srv as the instance admin,
+// with its production protected as every new project's is.
+func newProjectAsCreated(t *testing.T, srv *testkit.Server) project {
 	t.Helper()
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	key := "p" + strings.ToLower(rand.Text()[:12])
@@ -45,6 +57,21 @@ func newProject(t *testing.T, srv *testkit.Server) project {
 		t.Fatalf("POST /projects = %d: %s", res.StatusCode(), res.Body)
 	}
 	return project{key: key, admin: admin}
+}
+
+// setProtected sets the protection of environment.
+func (p project) setProtected(t *testing.T, environment string, protected bool) {
+	t.Helper()
+	e := do(p.admin.GetEnvironmentWithResponse(t.Context(), p.key, environment))
+	if e.JSON200 == nil {
+		t.Fatalf("GET …/environments/%s = %d: %s", environment, e.StatusCode(), e.Body)
+	}
+	res := do(p.admin.SetEnvironmentProtectionWithResponse(t.Context(), p.key, environment,
+		&management.SetEnvironmentProtectionParams{IfMatch: ptr(`"` + strconv.FormatInt(e.JSON200.Version, 10) + `"`)},
+		management.EnvironmentProtection{Protected: protected}))
+	if res.JSON200 == nil {
+		t.Fatalf("PUT …/environments/%s/protection = %d: %s", environment, res.StatusCode(), res.Body)
+	}
 }
 
 // sdkKey creates an SDK key of kind in environment, answering its value.

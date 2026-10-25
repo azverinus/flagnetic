@@ -3,6 +3,7 @@ package delivery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -167,6 +168,29 @@ func (c *RulesetCache) Ruleset(ctx context.Context, environment workspace.Enviro
 // the propagation measured is to SDKs, and a download answered first would
 // hide the time the first SDK waited.
 func (c *RulesetCache) Unmeasured() appdelivery.Rulesets { return unmeasuredRulesets{c} }
+
+// CommittedRuleset returns the ruleset of environment at version, a
+// version known to be committed and perhaps not yet announced to this
+// replica: from memory when it holds that version, otherwise from a
+// materialization of what the database has committed. The protection guard
+// reads what a write's environment serves before it through it. A ruleset
+// at another version is an error: the caller holds the project row every
+// bump of environment takes, so the committed version cannot have moved.
+// The answer does not count towards the propagation, which is to SDKs.
+func (c *RulesetCache) CommittedRuleset(ctx context.Context, environment workspace.EnvironmentID, version int64) (appdelivery.Ruleset, error) {
+	c.mu.Lock()
+	e := c.entry(environment)
+	e.latest = max(e.latest, version)
+	c.mu.Unlock()
+	rs, err := c.ruleset(ctx, environment, false)
+	if err != nil {
+		return appdelivery.Ruleset{}, err
+	}
+	if rs.Version != version {
+		return appdelivery.Ruleset{}, fmt.Errorf("the committed ruleset of %s is at version %d, want %d", environment, rs.Version, version)
+	}
+	return rs, nil
+}
 
 type unmeasuredRulesets struct{ c *RulesetCache }
 

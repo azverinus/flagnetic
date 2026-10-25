@@ -107,7 +107,7 @@ Every write of a configuration is checked against the project before it is store
 
 A `PUT` that changes nothing SDKs receive but `on` is recorded as `flag.switched_on` or `flag.switched_off`; any other as `flag.configuration_updated`.
 
-The **kill switch**, `POST /flags/{flag}/environments/{environment}/kill` with an optional `reason` of at most 2,000 characters, switches the flag off in the environment so it serves its off variation to everyone, and changes nothing else. It needs no `If-Match`, so it is never refused because the page it was pressed on is old, and it still moves the configuration's version on. It answers `{changed, configuration}`: a flag that is already off changes nothing and records nothing. Its audit entry `flag.killed` carries the reason and is marked as a kill switch, so the audit log lists kill switch uses with the `kill_switch` filter.
+The **kill switch**, `POST /flags/{flag}/environments/{environment}/kill` with an optional `reason` of at most 2,000 characters, switches the flag off in the environment so it serves its off variation to everyone, and changes nothing else. It needs no `If-Match`, so it is never refused because the page it was pressed on is old, and it still moves the configuration's version on. It answers `{changed, configuration}`: a flag that is already off changes nothing and records nothing. Its audit entry `flag.killed` carries the reason and is marked as a kill switch, so the audit log lists kill switch uses with the `kill_switch` filter. It is the one write a [protected environment](governance.md#protected-environments) takes directly; every other write that changes what its SDKs receive is refused `403 change_request_required`.
 
 ### What reaches SDKs
 

@@ -2,7 +2,14 @@ import { createAttribute, createSegment, createUnitType, deleteUnitType } from "
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
+import {
+  type Credentials,
+  managementClient,
+  must,
+  seedProject,
+  signIn,
+  unprotectProduction,
+} from "../support/console";
 import { seedFlag, stringFlag, writeConfiguration } from "../support/flags";
 import { admin, seededProject, viewer } from "../support/instance";
 
@@ -233,6 +240,7 @@ test.describe("what names a declaration", () => {
       }),
     );
     await seedFlag(projectKey, stringFlag("upsell"));
+    await unprotectProduction(projectKey);
     await writeConfiguration(projectKey, "upsell", "production", () => ({
       overrides: [
         { unit_type: "account", unit_id: "acme", variation: "treatment", note: "Pilot customer" },

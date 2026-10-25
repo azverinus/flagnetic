@@ -4,7 +4,9 @@ import {
   createClient,
   createConfig,
   createProject,
+  getEnvironment,
   inviteMember,
+  setEnvironmentProtection,
   signOut,
 } from "@flagnetic/api";
 import type { Page } from "@playwright/test";
@@ -72,6 +74,26 @@ export async function seedProject(prefix: string): Promise<string> {
     await createProject({ client: managementClient(), body: { key, name: `Project ${prefix}` } }),
   );
   return key;
+}
+
+/**
+ * Stops protecting a seeded project's production, for a spec that writes
+ * production directly: in a new project, production is protected, and a
+ * write changing what it serves would need a change request.
+ */
+export async function unprotectProduction(project: string): Promise<void> {
+  const client = managementClient();
+  const path = { project, environment: "production" };
+  const current = must(`reading production of ${project}`, await getEnvironment({ client, path }));
+  must(
+    `unprotecting production of ${project}`,
+    await setEnvironmentProtection({
+      client,
+      path,
+      headers: { "If-Match": `"${current.version}"` },
+      body: { protected: false },
+    }),
+  );
 }
 
 /**

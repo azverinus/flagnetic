@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { seedProject } from "../support/console";
+import { seedProject, unprotectProduction } from "../support/console";
 import {
   choose,
   openFlag,
@@ -66,6 +66,7 @@ test.describe("comparing environments", () => {
     page,
   }) => {
     const project = await seedProject("copy");
+    await unprotectProduction(project);
     const staging = await seed(project);
     await compareStagingWithProduction(page, project);
 

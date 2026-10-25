@@ -9,6 +9,7 @@ import {
   seedMember,
   seedProject,
   signIn,
+  unprotectProduction,
 } from "../support/console";
 import { writeConfiguration } from "../support/flags";
 import { admin, seededProject, viewer } from "../support/instance";
@@ -371,6 +372,7 @@ test.describe("the flags list", () => {
         },
       ],
     }));
+    await unprotectProduction(projectKey);
     await writeConfiguration(projectKey, "gamma", "production", () => ({ on: true }));
     await openFlags(page, projectKey);
     const keys = flagsTable(page).locator("tbody code");

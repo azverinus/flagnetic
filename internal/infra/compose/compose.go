@@ -120,17 +120,23 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// on, through the delivery context.
 	deliveryStore := pgdelivery.NewStore(d.Pool)
 	eventStore := pgevents.NewStore(d.Pool)
-	rulesets := appdelivery.NewBumpRulesets(deliveryStore, d.Clock)
+	materialize := appdelivery.NewMaterializeRuleset(appdelivery.MaterializeRulesetDeps{
+		Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
+	})
 	// Every replica serves rulesets from memory by version, learning each
 	// version from its notification, and its own writes' versions as they
 	// commit, before they are answered.
 	rulesetCache := pgdelivery.NewRulesetCache(pgdelivery.RulesetCacheOptions{
-		Load: appdelivery.NewMaterializeRuleset(appdelivery.MaterializeRulesetDeps{
-			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
-		}),
-		Clock: d.Clock, Registerer: reg, Logger: edge.Logger(), Fault: o.RulesetLoadFault,
+		Load: materialize, Clock: d.Clock, Registerer: reg, Logger: edge.Logger(), Fault: o.RulesetLoadFault,
 	})
 	deliveryStore.OnCommitted(rulesetCache.Committed)
+	// The bump refuses a write that would change a protected environment's
+	// ruleset, comparing what the write would serve with what the cache
+	// serves now.
+	rulesets := pggovernance.NewProtectionGuard(pggovernance.ProtectionGuardDeps{
+		Pool: d.Pool, Next: appdelivery.NewBumpRulesets(deliveryStore, d.Clock),
+		After: materialize, Before: rulesetCache, Registerer: reg,
+	})
 	sdkKeys := appdelivery.SDKKeyDeps{
 		Tx: tx, Store: deliveryStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 	}

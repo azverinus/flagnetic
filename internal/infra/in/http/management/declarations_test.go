@@ -101,7 +101,7 @@ func TestEnvironmentKeysMustMatchThePatternBeUniqueAndStayImmutable(t *testing.T
 func TestTheLastEnvironmentCannotBeDeleted(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	p := createProject(t, admin, projectKey()).Key
+	p := createProjectAsCreated(t, admin, projectKey()).Key
 	for _, key := range []string{"development", "staging"} {
 		res := do(admin.DeleteEnvironmentWithResponse(t.Context(), p, key, &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
 		status(t, "delete "+key, res.StatusCode(), res.Body, http.StatusNoContent)
@@ -116,7 +116,7 @@ func TestTheLastEnvironmentCannotBeDeleted(t *testing.T) {
 func TestTwoDeletionsAtOnceNeverRemoveTheLastEnvironment(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	p := createProject(t, admin, projectKey()).Key
+	p := createProjectAsCreated(t, admin, projectKey()).Key
 	do(admin.DeleteEnvironmentWithResponse(t.Context(), p, "development", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
 
 	statuses := make(chan int, 2)
@@ -389,7 +389,7 @@ func TestEveryWorkspaceWriteRecordsAnAuditEntry(t *testing.T) {
 	pool := testkit.FreshPool(t)
 	srv := testkit.StartServer(t, testkit.WithPool(pool))
 	admin := testkit.Client(t, srv, testkit.Bootstrap(t, pool))
-	project := createProject(t, admin, "mobile")
+	project := createProjectAsCreated(t, admin, "mobile")
 	p, ctx := project.Key, t.Context()
 
 	qa := do(admin.CreateEnvironmentWithResponse(ctx, p, management.EnvironmentCreate{Key: "qa", Name: "QA"})).JSON201

@@ -22,7 +22,7 @@ func protect(t *testing.T, c *management.ClientWithResponses, project, environme
 func TestANewProjectProtectsItsProductionEnvironmentAlone(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	p := createProject(t, admin, projectKey()).Key
+	p := createProjectAsCreated(t, admin, projectKey()).Key
 
 	res := do(admin.ListEnvironmentsWithResponse(t.Context(), p))
 	if res.JSON200 == nil {
@@ -47,7 +47,7 @@ func TestAnOwnerProtectsAndUnprotectsAnEnvironment(t *testing.T) {
 	pool := testkit.Pool(t)
 	srv := testkit.StartServer(t, testkit.WithPool(pool))
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	project := createProject(t, admin, projectKey())
+	project := createProjectAsCreated(t, admin, projectKey())
 	p := project.Key
 	owner := testkit.Client(t, srv, testkit.GrantedToken(t, pool, projectIDOf(project), access.RoleOwner))
 
@@ -105,7 +105,7 @@ func TestOnlyAMemberHoldingEnvironmentProtectChangesProtection(t *testing.T) {
 	pool := testkit.Pool(t)
 	srv := testkit.StartServer(t, testkit.WithPool(pool))
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	project := createProject(t, admin, projectKey())
+	project := createProjectAsCreated(t, admin, projectKey())
 	p := project.Key
 
 	for name, token := range map[string]string{
@@ -126,7 +126,7 @@ func TestOnlyAMemberHoldingEnvironmentProtectChangesProtection(t *testing.T) {
 func TestProtectionIsJudgedAgainstTheEnvironmentsVersion(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
-	p := createProject(t, admin, projectKey()).Key
+	p := createProjectAsCreated(t, admin, projectKey()).Key
 
 	missing := do(admin.SetEnvironmentProtectionWithResponse(t.Context(), p, "production",
 		&management.SetEnvironmentProtectionParams{}, management.EnvironmentProtection{Protected: false}))

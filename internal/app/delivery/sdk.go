@@ -226,19 +226,28 @@ func NewMaterializeRuleset(d MaterializeRulesetDeps) *MaterializeRuleset {
 // An environment that no longer exists has no ruleset to serve:
 // ErrRulesetUnavailable.
 func (h *MaterializeRuleset) Ruleset(ctx context.Context, environment workspace.EnvironmentID) (Ruleset, error) {
-	var m delivery.Materials
+	var rs Ruleset
 	err := h.d.Snapshots.Snapshot(ctx, func(ctx context.Context) error {
-		project, environmentOf, err := h.d.Environments.RulesetEnvironmentByID(ctx, environment)
-		if err != nil {
-			return err
-		}
-		m = environmentOf
-		return readMaterials(ctx, h.d.Declarations, h.d.Flags, project, environment, &m)
+		var err error
+		rs, err = h.InUnitOfWork(ctx, environment)
+		return err
 	})
 	if errors.Is(err, ErrNotFound) {
 		return Ruleset{}, ErrRulesetUnavailable
 	}
+	return rs, err
+}
+
+// InUnitOfWork materializes the ruleset of environment as the unit of work
+// ctx carries sees it, its own uncommitted writes included, which is what
+// the write would serve once it commits; or ErrNotFound for an environment
+// that does not exist there.
+func (h *MaterializeRuleset) InUnitOfWork(ctx context.Context, environment workspace.EnvironmentID) (Ruleset, error) {
+	project, m, err := h.d.Environments.RulesetEnvironmentByID(ctx, environment)
 	if err != nil {
+		return Ruleset{}, err
+	}
+	if err := readMaterials(ctx, h.d.Declarations, h.d.Flags, project, environment, &m); err != nil {
 		return Ruleset{}, err
 	}
 	doc, err := delivery.Materialize(m)
