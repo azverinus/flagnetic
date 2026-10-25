@@ -32,7 +32,7 @@ func OpenEventStream(t testing.TB, c *http.Client, req *http.Request) *EventStre
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
-	res, err := c.Do(req.WithContext(ctx))
+	res, err := c.Do(req.WithContext(ctx)) //nolint:gosec // a test opens the stream of the server it started
 	if err != nil {
 		cancel()
 		t.Fatal(err)
