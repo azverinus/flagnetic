@@ -75,14 +75,14 @@ export class FlagneticWebProvider implements Provider {
   /** Fetches values for OpenFeature's context, waiting at most `readyTimeout`, and never rejects. */
   async initialize(context?: EvaluationContext): Promise<void> {
     await this.load(context ?? {});
-    this.state.settle();
+    this.state.initializeResolved();
   }
 
   /** Fetches values for the new context, waiting at most `readyTimeout`, and never rejects. */
   async onContextChange(_oldContext: EvaluationContext, newContext: EvaluationContext): Promise<void> {
     this.state.change();
     await this.load(newContext);
-    this.state.settle();
+    this.state.changeResolved();
   }
 
   /** Closes the client, which reports what is queued one last time; no event is sent after it. */

@@ -86,7 +86,7 @@ export interface ObservedClient {
  * OpenFeature sets `READY` itself once `initialize` resolves, and on the web
  * once a context change resolves, whatever the client reached. Until
  * `initialize` has resolved, and while a context change is under way, stage
- * moves and a revoked key send nothing; `settle` then announces the real
+ * moves and a revoked key send nothing; `announce` then sends the real
  * state right after OpenFeature's `READY`.
  */
 export class ProviderState {
@@ -127,17 +127,29 @@ export class ProviderState {
     this.changing++;
   }
 
+  /** `initialize` has resolved: see announce. */
+  initializeResolved(): void {
+    this.initialized = true;
+    this.announce();
+  }
+
+  /** A context change has resolved: see announce. */
+  changeResolved(): void {
+    this.changing = Math.max(0, this.changing - 1);
+    this.announce();
+  }
+
   /**
    * Announces the client's state once `initialize` or a context change has
-   * resolved: `ERROR` for a revoked key, else `STALE` at `last_good`.
+   * resolved and no context change is under way: `ERROR` for a revoked key,
+   * else `STALE` at `last_good`. A context change OpenFeature begins before
+   * `initialize` resolves keeps every event back until it resolves too.
    * OpenFeature sets `READY` in a continuation of the promise the provider
    * returned, so the announcement waits for the next task, which runs after
    * every such continuation.
    */
-  settle(): void {
-    this.initialized = true;
-    this.changing = Math.max(0, this.changing - 1);
-    if (this.changing > 0) return;
+  private announce(): void {
+    if (!this.initialized || this.changing > 0) return;
     setTimeout(() => {
       if (this.changing > 0) return;
       if (this.revoked) this.error();
@@ -153,7 +165,7 @@ export class ProviderState {
   // A revoked key moves a fresh client to last_good right after the ERROR
   // it sent: STALE would hide that ERROR, so none is sent while the key
   // stays revoked. A move to fresh clears the revoked key even before
-  // initialize resolves, so settle does not announce an ERROR the client
+  // initialize resolves, so announce does not send an ERROR the client
   // has already recovered from.
   private staged(stage: Stage): void {
     if (stage === "fresh") this.revoked = false;

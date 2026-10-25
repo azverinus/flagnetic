@@ -175,6 +175,23 @@ describe("context changes", () => {
     expect(client.getBooleanValue("checkout", true)).toBe(false);
   });
 
+  test("a change begun before initialize resolved: no event until the change resolves, which ends READY", async () => {
+    const e = await endpoint();
+    const provider = new FlagneticWebProvider(key, e.baseUrl, { store: false, readyTimeout: 1_000 });
+    cleanups.push(() => provider.onClose());
+    const own = sent(provider);
+    const initialized = OpenFeature.setProviderAndWait(provider, { targetingKey: "u-1", country: "DE" });
+    await OpenFeature.setContext({ targetingKey: "u-2", country: "FR" });
+    await initialized;
+    await settled();
+    expect(e.contexts.at(-1)).toMatchObject({ units: { user: "u-2" }, attributes: { country: "FR" } });
+    // The values of the new context arriving while the change is under way
+    // move the client to fresh: that is the change itself, not news.
+    expect(own).toStrictEqual([ProviderEvents.ConfigurationChanged]);
+    expect(OpenFeature.getClient().providerStatus).toBe("READY");
+    expect(OpenFeature.getClient().getBooleanValue("checkout", true)).toBe(false);
+  });
+
   test("a key revoked during a change ends ERROR", async () => {
     const e = await endpoint();
     const { client } = await register(e, { targetingKey: "u-1", country: "DE" });

@@ -67,7 +67,7 @@ export class FlagneticServerProvider implements Provider {
   /** Waits for the first ruleset, at most `readyTimeout`, and never rejects. */
   async initialize(): Promise<void> {
     await this.client.ready(this.readyTimeout);
-    this.state.settle();
+    this.state.initializeResolved();
   }
 
   /** Closes the client, which reports what is queued one last time; no event is sent after it. */
