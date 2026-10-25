@@ -184,6 +184,9 @@ import type {
   GetUnitTypeErrors,
   GetUnitTypeResponses,
   GetWebhookData,
+  GetWebhookDeliveryData,
+  GetWebhookDeliveryErrors,
+  GetWebhookDeliveryResponses,
   GetWebhookErrors,
   GetWebhookResponses,
   InviteMemberData,
@@ -261,6 +264,9 @@ import type {
   ListUnitTypesData,
   ListUnitTypesErrors,
   ListUnitTypesResponses,
+  ListWebhookDeliveriesData,
+  ListWebhookDeliveriesErrors,
+  ListWebhookDeliveriesResponses,
   ListWebhookEventTypesData,
   ListWebhookEventTypesErrors,
   ListWebhookEventTypesResponses,
@@ -3917,4 +3923,57 @@ export const updateWebhook = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * A webhook subscription's delivery log
+ *
+ * Every event made a delivery to the subscription, newest first,
+ * filtered by every parameter given: one delivery per event the
+ * subscription wanted when the event happened, pending until it is
+ * sent. Page with `cursor` set to the `next_cursor` of the previous
+ * page: deliveries made meanwhile never shift a page.
+ *
+ */
+export const listWebhookDeliveries = <ThrowOnError extends boolean = false>(
+  options: Options<ListWebhookDeliveriesData, ThrowOnError>,
+): RequestResult<ListWebhookDeliveriesResponses, ListWebhookDeliveriesErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListWebhookDeliveriesResponses,
+    ListWebhookDeliveriesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}/deliveries",
+    ...options,
+  });
+
+/**
+ * One delivery of a webhook subscription
+ */
+export const getWebhookDelivery = <ThrowOnError extends boolean = false>(
+  options: Options<GetWebhookDeliveryData, ThrowOnError>,
+): RequestResult<GetWebhookDeliveryResponses, GetWebhookDeliveryErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetWebhookDeliveryResponses,
+    GetWebhookDeliveryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}",
+    ...options,
   });

@@ -2,11 +2,14 @@ package management
 
 import (
 	"context"
+	"fmt"
+	"slices"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
@@ -117,4 +120,70 @@ func webhookOut(w governance.Webhook) Webhook {
 		}
 	}
 	return out
+}
+
+// ListWebhookDeliveries answers a page of a subscription's delivery log.
+func (a *api) ListWebhookDeliveries(ctx context.Context, req ListWebhookDeliveriesRequestObject) (ListWebhookDeliveriesResponseObject, error) {
+	q := req.Params
+	f := appgovernance.DeliveryFilter{Type: valueOf(q.EventType)}
+	if q.Status != nil {
+		f.Status = governance.DeliveryStatus(*q.Status)
+		if !slices.Contains(governance.DeliveryStatuses, f.Status) {
+			return nil, flaghttp.InvalidRequest("status is not a delivery status")
+		}
+	}
+	if q.From != nil {
+		f.From = *q.From
+	}
+	if q.To != nil {
+		f.To = *q.To
+	}
+	page := appgovernance.DeliveryPage{Limit: defaultAuditLimit}
+	if q.Limit != nil {
+		if *q.Limit < 1 || *q.Limit > maxAuditLimit {
+			return nil, flaghttp.InvalidRequest(fmt.Sprintf("limit must be between 1 and %d", maxAuditLimit))
+		}
+		page.Limit = *q.Limit
+	}
+	if q.Cursor != nil {
+		after, err := id.Parse[governance.Delivery](*q.Cursor)
+		if err != nil {
+			return nil, flaghttp.InvalidRequest("cursor is not a next_cursor this API returned")
+		}
+		page.After = after
+	}
+	list, next, err := a.h.ListWebhookDeliveries.Handle(ctx, projectID(ctx), id.FromBytes[governance.Webhook](req.Webhook), f, page)
+	if err != nil {
+		return nil, err
+	}
+	out := WebhookDeliveryList{Items: each(list, deliveryOut)}
+	if !next.IsZero() {
+		cursor := next.String()
+		out.NextCursor = &cursor
+	}
+	return ListWebhookDeliveries200JSONResponse(out), nil
+}
+
+// GetWebhookDelivery answers one delivery of a subscription with its
+// attempts.
+func (a *api) GetWebhookDelivery(ctx context.Context, req GetWebhookDeliveryRequestObject) (GetWebhookDeliveryResponseObject, error) {
+	d, err := a.h.GetWebhookDelivery.Handle(ctx, projectID(ctx), id.FromBytes[governance.Webhook](req.Webhook),
+		id.FromBytes[governance.Delivery](req.Delivery))
+	if err != nil {
+		return nil, err
+	}
+	return GetWebhookDelivery200JSONResponse(deliveryOut(d)), nil
+}
+
+func deliveryOut(d governance.Delivery) WebhookDelivery {
+	return WebhookDelivery{
+		Id: openapi_types.UUID(d.ID.Bytes()), EventId: openapi_types.UUID(d.Event.Bytes()), EventType: d.Type,
+		Status: WebhookDeliveryStatus(d.Status), NextAttemptAt: d.NextAttemptAt, CreatedAt: d.CreatedAt,
+		Attempts: each(d.Attempts, func(a governance.DeliveryAttempt) WebhookDeliveryAttempt {
+			return WebhookDeliveryAttempt{
+				N: a.N, At: a.At, StatusCode: a.StatusCode, LatencyMs: a.LatencyMS, ResponseSnippet: a.ResponseSnippet,
+				Error: a.Error,
+			}
+		}),
+	}
 }

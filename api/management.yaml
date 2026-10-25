@@ -4449,6 +4449,89 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/webhooks/{webhook}/deliveries:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/WebhookID"
+    get:
+      operationId: listWebhookDeliveries
+      summary: A webhook subscription's delivery log
+      description: |
+        Every event made a delivery to the subscription, newest first,
+        filtered by every parameter given: one delivery per event the
+        subscription wanted when the event happened, pending until it is
+        sent. Page with `cursor` set to the `next_cursor` of the previous
+        page: deliveries made meanwhile never shift a page.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      parameters:
+      - name: status
+        in: query
+        schema:
+          $ref: "#/components/schemas/WebhookDeliveryStatus"
+      - name: event_type
+        in: query
+        description: An event type, such as `flag.kill_switch`.
+        schema:
+          type: string
+      - name: from
+        in: query
+        description: The earliest time a delivery was made, included.
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        description: The latest time a delivery was made, included.
+        schema:
+          type: string
+          format: date-time
+      - $ref: "#/components/parameters/Cursor"
+      - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of deliveries, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/webhooks/{webhook}/deliveries/{delivery}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/WebhookID"
+      - name: delivery
+        in: path
+        required: true
+        description: The delivery's identifier.
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getWebhookDelivery
+      summary: One delivery of a webhook subscription
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "200":
+          description: The delivery with every attempt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     AuditActor:
@@ -7682,3 +7765,77 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Webhook"
+    WebhookDeliveryStatus:
+      type: string
+      description: |
+        `pending` waits for its next attempt; `succeeded` was accepted by the
+        receiver; `failed` was refused in a way a retry would not change;
+        `exhausted` ran out of attempts; `dropped` was left unsent because
+        the platform disabled the subscription.
+      enum: [pending, succeeded, failed, exhausted, dropped]
+    WebhookDeliveryAttempt:
+      type: object
+      description: One call made to the receiver.
+      required: [n, at, status_code, latency_ms, response_snippet, error]
+      properties:
+        n:
+          type: integer
+          description: The attempt's number, from 1.
+        at:
+          type: string
+          format: date-time
+        status_code:
+          type: integer
+          nullable: true
+          description: The receiver's status code; null when no answer came.
+        latency_ms:
+          type: integer
+          format: int64
+        response_snippet:
+          type: string
+          nullable: true
+          description: The start of the receiver's answer.
+        error:
+          type: string
+          nullable: true
+          description: Why no answer came, such as a timeout.
+    WebhookDelivery:
+      type: object
+      description: One event sent, or to be sent, to the subscription.
+      required: [id, event_id, event_type, status, attempts, next_attempt_at, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+          description: The event's `id`, which every delivery of the event carries.
+        event_type:
+          type: string
+        status:
+          $ref: "#/components/schemas/WebhookDeliveryStatus"
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDeliveryAttempt"
+        next_attempt_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When a pending delivery is next attempted; null otherwise.
+        created_at:
+          type: string
+          format: date-time
+    WebhookDeliveryList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDelivery"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` for the next page; null on the last.
