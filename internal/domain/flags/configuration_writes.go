@@ -107,3 +107,24 @@ func (c Configuration) RegenerateSalt(rule RuleID, m Mint, w Write) (Configurati
 	after, changed := c.changedTo(out, w)
 	return after, changed, nil
 }
+
+// ResolveExperiment returns the configuration whose rules serving the
+// experiment keyed experiment were resolved by its stop, by w, and what
+// changed: each such rule serves winner instead, keeping its identifier,
+// description, conditions and place, or is deleted when winner is "", so
+// the flag goes on to its other rules. Every other rule stays as it is, and
+// a configuration with no rule serving the experiment changes nothing.
+func (c Configuration) ResolveExperiment(experiment, winner string, w Write) (Configuration, Changed) {
+	out := c
+	out.Rules = make([]Rule, 0, len(c.Rules))
+	for _, r := range c.Rules {
+		if r.Serve.Kind == ServeExperiment && r.Serve.Experiment == experiment {
+			if winner == "" {
+				continue
+			}
+			r.Serve = Serve{Kind: ServeVariation, Variation: winner}
+		}
+		out.Rules = append(out.Rules, r)
+	}
+	return c.changedTo(out, w)
+}

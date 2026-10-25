@@ -95,7 +95,7 @@ func TestAStartNamesEveryPreconditionItFails(t *testing.T) {
 }
 
 func TestOnlyADraftStarts(t *testing.T) {
-	for _, s := range []experiments.Status{experiments.StatusRunning, experiments.StatusStopped, experiments.StatusArchived} {
+	for _, s := range []experiments.Status{experiments.StatusRunning, experiments.StatusStopped} {
 		e := startable(t)
 		e.Status = s
 		// A status that cannot start is told first, even when the

@@ -34,7 +34,11 @@ type StartFacts struct {
 // flag, it has a hypothesis and an expected end date, so a running
 // experiment always says what it tests and when it should be over.
 func (e Experiment) Start(f StartFacts, now time.Time) (Experiment, error) {
-	if e.Status != StatusDraft {
+	switch e.Status {
+	case StatusDraft:
+	case StatusArchived:
+		return e, errArchived
+	default:
 		return e, errNotDraftToStart
 	}
 	c := newCheck()
@@ -60,16 +64,21 @@ func (e Experiment) Start(f StartFacts, now time.Time) (Experiment, error) {
 	return out, nil
 }
 
-// frozen returns ch without the fields of the split it names with the
-// values the running experiment has, or frozen naming every one it would
-// change: the flag, the unit type and the weights decide which variation
-// each unit gets, so changing any of them while the experiment runs would
-// mix two comparisons in one.
+// frozen returns ch without the fields the experiment's status freezes
+// that it names with the values the experiment has, or frozen naming every
+// one it would change. While it runs, the flag, the unit type and the
+// weights decide which variation each unit gets, so changing any of them
+// would mix two comparisons in one. Once stopped, the traffic allocation
+// and the expected end date are part of what was measured too, and only
+// the description and the decision's note still change.
 func (e Experiment) frozen(ch Change) (Change, error) {
+	detail := "a running experiment's flag, unit type and weights do not change"
+	if e.Status == StatusStopped {
+		detail = "a stopped experiment changes only its name, hypothesis, owner, tags and decision note"
+	}
 	var violations []apperrors.Violation
 	freeze := func(pointer string) {
-		violations = append(violations, apperrors.Violation{Pointer: pointer, Code: "frozen",
-			Detail: "a running experiment's flag, unit type and weights do not change"})
+		violations = append(violations, apperrors.Violation{Pointer: pointer, Code: "frozen", Detail: detail})
 	}
 	if ch.FlagKey != nil && *ch.FlagKey != e.FlagKey {
 		freeze("/flag")
@@ -80,8 +89,17 @@ func (e Experiment) frozen(ch Change) (Change, error) {
 	if ch.Variations != nil && !slices.Equal(*ch.Variations, e.Variations) {
 		freeze("/variations")
 	}
+	if e.Status == StatusStopped {
+		if ch.TrafficAllocation != nil && *ch.TrafficAllocation != e.TrafficAllocation {
+			freeze("/traffic_allocation")
+		}
+		if ch.ExpectedEndAt != nil && (e.ExpectedEndAt == nil || !day(*ch.ExpectedEndAt).Equal(*e.ExpectedEndAt)) {
+			freeze("/expected_end_at")
+		}
+		ch.TrafficAllocation, ch.ExpectedEndAt = nil, nil
+	}
 	if len(violations) > 0 {
-		err := apperrors.Conflict("frozen", "a running experiment's flag, unit type and weights do not change")
+		err := apperrors.Conflict("frozen", detail)
 		err.Violations = violations
 		return ch, err
 	}

@@ -104,6 +104,8 @@ type Experiment struct {
 	StartedAt     *time.Time
 	StoppedAt     *time.Time
 	ArchivedAt    *time.Time
+	// Decision is what the stop decided; nil until the experiment stops.
+	Decision *Decision
 	// CreatedBy is the member who created the experiment; nil for a
 	// project token.
 	CreatedBy *access.MemberID
