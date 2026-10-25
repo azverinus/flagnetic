@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { ConflictBanner } from "@/components/conflict-banner";
 import { ExperimentFields } from "@/components/experiment-fields";
+import { ExperimentOverview, ExperimentTransitions } from "@/components/experiment-transitions";
 import { FormRefusal } from "@/components/ui/form-page";
 import { ExperimentStatusBadge } from "@/components/experiment-status-badge";
 import { QueryError } from "@/components/query-error";
@@ -102,8 +103,8 @@ function ExperimentNotFound({ project }: { project: string }) {
 }
 
 /**
- * One experiment and its form, saved under the version the form was
- * filled from; fields its status locks are shown with the reason, and a
+ * One experiment: its transitions, its overview and its form, saved
+ * under the version the form was filled from; fields its status locks are shown with the reason, and a
  * save that meets a newer version shows who saved it and what changed.
  */
 function ExperimentPage({
@@ -202,6 +203,27 @@ function ExperimentPage({
             <ExperimentStatusBadge status={base.status} />
           </span>
         }
+        actions={
+          <ExperimentTransitions
+            project={project}
+            experiment={base}
+            unitTypes={unitTypes}
+            editing={dirty}
+            onChanged={restart}
+          />
+        }
+      />
+      {dirty && base.status !== "archived" ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          <Trans>Save or discard your edits before changing the experiment's status.</Trans>
+        </p>
+      ) : null}
+      <ExperimentOverview
+        project={project}
+        experiment={base}
+        nameOf={nameOf}
+        editing={dirty}
+        onChanged={restart}
       />
       {canEdit ? null : (
         <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">

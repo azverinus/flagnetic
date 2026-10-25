@@ -9,7 +9,7 @@ import {
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
-import { ApiError } from "./errors";
+import type { ApiError } from "./errors";
 import { parsePercent, percentText, weightDrafts, weightIssues } from "./experiments";
 import { nameSchema } from "./forms";
 import { problemMessage, violationMessage } from "./problem-messages";

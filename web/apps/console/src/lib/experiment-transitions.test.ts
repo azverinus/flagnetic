@@ -109,11 +109,10 @@ describe("what keeps a draft from starting", () => {
 
   it("names a weight on a variation the flag no longer has", () => {
     expect(
-      startBlockers(
-        i18n,
-        experiment,
-        { flag: { ...flag, variations: [{ key: "control" }] } as unknown as Flag, unitTypes },
-      ),
+      startBlockers(i18n, experiment, {
+        flag: { ...flag, variations: [{ key: "control" }] } as unknown as Flag,
+        unitTypes,
+      }),
     ).toEqual(["The flag has no such variation."]);
   });
 });
