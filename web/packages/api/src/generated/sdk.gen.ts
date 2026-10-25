@@ -102,6 +102,9 @@ import type {
   DeleteOverrideData,
   DeleteOverrideErrors,
   DeleteOverrideResponses,
+  DeleteProjectData,
+  DeleteProjectErrors,
+  DeleteProjectResponses,
   DeleteSegmentData,
   DeleteSegmentErrors,
   DeleteSegmentResponses,
@@ -836,6 +839,40 @@ export const createProject = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Delete a project
+ *
+ * Deletes the project and everything in it at once: its environments,
+ * flags, segments, experiments, change requests, grants, SDK keys,
+ * project tokens and webhook subscriptions. Its key is free for a new
+ * project as soon as the deletion is done, and its SDK keys are refused
+ * on every replica, their streams closed. There is no restore. Its
+ * audit entries stay, keeping the project's identifier: an instance
+ * admin reads them through `GET /audit?project=`. The
+ * deletion is recorded in the instance's log as `project.deleted`,
+ * with no project and the deleted project's `id`, `key` and `name` in
+ * `before`. Rows that refer to the project without a foreign key are
+ * purged in the background; raw events age out with their retention.
+ * An API token is refused `session_required`, so a leaked token cannot
+ * erase a project.
+ *
+ */
+export const deleteProject = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteProjectData, ThrowOnError>,
+): RequestResult<DeleteProjectResponses, DeleteProjectErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteProjectResponses, DeleteProjectErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}",
+    ...options,
   });
 
 /**

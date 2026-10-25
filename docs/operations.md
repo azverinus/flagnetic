@@ -241,6 +241,19 @@ A rollup far enough behind, held back by a long transaction for longer than the 
 
 Every 10 seconds, rollups read the raw events committed since their last round and keep what the API reads: first exposures, exposure counts per day and conflicts of each experiment, evaluations per day of each flag and when SDKs last evaluated it, and events received per day, aliases included. A rollup reads only the rows of transactions that have ended, along transaction IDs, so a row committing late is never skipped; one replica at a time moves each rollup, so nothing is counted twice. Any transaction left open in the database, by Flagnetic or anything else connected to it, holds every rollup back until it ends: `flagnetic_rollup_lag_seconds` shows it.
 
+## Deleting a project
+
+An owner of a project, or an instance admin, deletes it with `DELETE /api/v1/projects/{project}` under `If-Match` on the project's version, from a signed-in session: every API token is refused `403 session_required`, and a project token never holds `project.delete`. There is no restore, so download what you want to keep first (the console offers the audit log's download before asking you to type the project's key).
+
+The deletion is one transaction. It locks the project's row, so no write in the project is half done, records `project.deleted` in the instance's audit log, with no project and the project's `id`, `key` and `name` in `before`, and deletes the project's row: every environment, flag, segment, experiment, change request, grant, SDK key, project token and webhook subscription goes with it by the cascades of the schema. When it commits:
+
+- the key is free: a new project may take it at once, and shares nothing with the deleted one, not even its audit log, since audit entries name their project by identifier;
+- the deleted project's audit entries stay, keeping its identifier: an instance admin reads them with `GET /api/v1/audit?project=<id>` and finds the deletion with `?action=project.deleted&entity_id=<id>`;
+- its open and approved change requests end with it, recorded by `project.deleted` alone rather than one entry each;
+- every replica drops the project's SDK keys and rulesets on the notifications their deletion sends, as for a revoked key or a deleted environment (see [Notification listeners](#notification-listeners)), so its SDK keys are refused within about a second and its SDK streams close on their next heartbeat.
+
+Rows that refer to a project without a foreign key, the event IDs kept to recognise retries, cannot go in the deletion's transaction. Every replica runs the project purge worker once an hour, which deletes the rows of projects that no longer exist 1,000 at a time, each batch in a transaction of its own; replicas running it at once take turns. The raw events of a deleted project stay until retention drops their partitions (see [Raw events](#raw-events)); the rollups never count them.
+
 ## Webhook targets
 
 A webhook subscription's target is `https` on the public internet. A target over plain `http` is refused unless `FLAGNETIC_WEBHOOK_ALLOW_HTTP` is set, and one whose name resolves to a loopback, private, link-local, unspecified or multicast address unless `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS` is set, so that whoever manages a project's webhooks cannot make the instance call into the network it runs in. Set them for a receiver on the same host or a trusted network, such as in a trial or a test; see [Webhooks](webhooks.md).

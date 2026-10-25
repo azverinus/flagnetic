@@ -105,6 +105,8 @@ const (
 	// webhook subscriptions. Reading them needs it too: a subscription
 	// says where a project's changes are sent.
 	PermWebhookManage Permission = "webhook.manage"
+	// PermProjectDelete deletes a project with everything in it.
+	PermProjectDelete Permission = "project.delete"
 )
 
 // catalog is every permission an operation can require. Each context adds
@@ -151,6 +153,10 @@ var catalog = []PermissionSpec{
 	// project's changes; a subscription changes nothing SDKs receive and
 	// nobody's access.
 	{Name: PermWebhookManage, Scope: ScopeProjectAdmin},
+	// Deleting a project erases everything in it and cannot be undone, so
+	// it stays with members, and its operation further needs a session: a
+	// leaked token, a member's own included, cannot erase a project.
+	{Name: PermProjectDelete, Scope: ScopeProjectAdmin, MembersOnly: true},
 }
 
 // ErrTokenCannotApprove refuses a project token whose role would decide
@@ -246,6 +252,7 @@ var roles = []Role{
 		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
 		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete, PermSDKKeyManage,
 		PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermChangeRequestApprove, PermWebhookManage,
+		PermProjectDelete,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,

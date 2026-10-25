@@ -2,10 +2,12 @@ package sdk_test
 
 import (
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
@@ -108,4 +110,46 @@ func TestAReplicaWhoseListenerIsSilentRefusesARevokedKeyAtOnce(t *testing.T) {
 	p.revoke(t, "production", k)
 	res := ruleset(t, b, value)
 	refused(t, "b with a silent listener", res.StatusCode(), res.Body, http.StatusUnauthorized, "sdk_key_revoked")
+}
+
+func TestDeletingAProjectEndsItsKeysAndStreamsOnEveryReplica(t *testing.T) {
+	c := fakeClock()
+	a, b := testkit.StartServer(t, testkit.WithClock(c)), testkit.StartServer(t, testkit.WithClock(c))
+	p := newProject(t, a)
+	_, server := p.sdkKey(t, "production", management.SdkKeyKindServer)
+	_, client := p.sdkKey(t, "staging", management.SdkKeyKindClient)
+	for _, srv := range []*testkit.Server{a, b} {
+		if res := ruleset(t, srv, server); res.StatusCode() != http.StatusOK {
+			t.Fatalf("before the deletion: %d %s", res.StatusCode(), res.Body)
+		}
+	}
+	s := openStream(t, b, &sdk.StreamRulesetParams{SdkKey: &client})
+	s.started(t)
+	s.next(t) // the current version
+
+	// Deleting a project needs a session.
+	admin := testkit.NewMember(t, testkit.Pool(t), testkit.AsInstanceAdmin())
+	browser := testkit.NewBrowser(t, a.URL)
+	browser.SignIn(t, admin.Email, admin.Password)
+	got := do(browser.GetProjectWithResponse(t.Context(), p.key))
+	if got.JSON200 == nil {
+		t.Fatalf("GET /projects/%s = %d: %s", p.key, got.StatusCode(), got.Body)
+	}
+	deleted := do(browser.DeleteProjectWithResponse(t.Context(), p.key,
+		&management.DeleteProjectParams{IfMatch: ptr(`"` + strconv.FormatInt(got.JSON200.Version, 10) + `"`)}))
+	if deleted.StatusCode() != http.StatusNoContent {
+		t.Fatalf("DELETE /projects/%s = %d: %s", p.key, deleted.StatusCode(), deleted.Body)
+	}
+
+	for name, srv := range map[string]*testkit.Server{"a": a, "b": b} {
+		if !refusedWithin(t, srv, server, "sdk_key_invalid") {
+			t.Errorf("%s still accepts a key of the deleted project after a second", name)
+		}
+	}
+	if !eventually(2*time.Second, func() bool {
+		c.Advance(15 * time.Second)
+		return s.ended(100 * time.Millisecond)
+	}) {
+		t.Error("the stream of the deleted project's key is still open")
+	}
 }

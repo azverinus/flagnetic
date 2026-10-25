@@ -56,7 +56,7 @@ func TestARequirementIsACatalogPermissionOrAReservedValue(t *testing.T) {
 			t.Errorf("%s is not accepted", r)
 		}
 	}
-	for _, r := range []access.Requirement{"", "owner", "project.delete", "PUBLIC"} {
+	for _, r := range []access.Requirement{"", "owner", "project.archive", "PUBLIC"} {
 		if access.IsRequirement(r) {
 			t.Errorf("%q is accepted", r)
 		}
@@ -75,11 +75,12 @@ func TestTheScopeOfAnOperationFollowsItsRequirement(t *testing.T) {
 		{"instance_admin", true, access.ScopeRead},
 		{"instance_admin", false, access.ScopeInstanceAdmin},
 		{"project.read", true, access.ScopeRead},
+		{"project.delete", false, access.ScopeProjectAdmin},
 		{"project.update", false, access.ScopeProjectAdmin},
 		{"declaration.manage", false, access.ScopeFlagsWrite},
 		// A name outside the catalog falls under no scope; the operation
 		// table refuses such a requirement before any operation is served.
-		{"project.delete", false, ""},
+		{"project.archive", false, ""},
 	} {
 		if got := access.ScopeOf(tc.requirement, tc.read); got != tc.want {
 			t.Errorf("ScopeOf(%s, read %v) = %q, want %q", tc.requirement, tc.read, got, tc.want)

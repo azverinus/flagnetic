@@ -121,3 +121,11 @@ func collect[T any](rows pgx.Rows, scan func(pgx.Row) (T, error)) ([]T, error) {
 	}
 	return out, rows.Err()
 }
+
+// DeleteProject deletes the project's row; every table holding rows of the
+// project references it with ON DELETE CASCADE, or is cleared by the project
+// purge afterwards.
+func (s *Store) DeleteProject(ctx context.Context, projectID workspace.ProjectID) error {
+	_, err := s.db(ctx).Exec(ctx, `DELETE FROM projects WHERE id = $1`, projectID.Bytes())
+	return err
+}

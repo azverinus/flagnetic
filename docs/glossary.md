@@ -25,7 +25,7 @@ The instance-wide key, given as `FLAGNETIC_SECRET_KEY`. Every stored secret is s
 _Avoid_: master key, encryption key, salt (reserved for the public bucketing salt)
 
 **Project**:
-The isolation boundary for flags, experiments, segments, environments and members. Nothing is shared across projects. Deleting a project removes everything in it except its audit entries, and frees its key.
+The isolation boundary for flags, experiments, segments, environments and members. Nothing is shared across projects. Deleting a project removes everything in it at once except its audit entries, which keep its identifier and are read through the instance's audit log, and frees its key; there is no restore.
 _Avoid_: workspace, tenant, app, organization
 
 **Environment**:
