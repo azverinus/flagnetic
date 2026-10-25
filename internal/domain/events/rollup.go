@@ -7,6 +7,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 )
 
@@ -35,8 +36,11 @@ type UnitKey struct {
 
 // ExposureRow is a stored exposure as the exposure rollup reads it.
 type ExposureRow struct {
-	Project    workspace.ProjectID
-	Unit       UnitKey
+	Project workspace.ProjectID
+	Unit    UnitKey
+	// Flag is the experiment's flag, the zero ID when the experiment is
+	// gone.
+	Flag       flags.FlagID
 	EventID    delivery.EventID
 	Variation  string
 	Override   bool

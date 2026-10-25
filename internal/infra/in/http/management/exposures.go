@@ -2,6 +2,7 @@ package management
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 	appevents "github.com/azverinus/flagnetic/internal/app/events"
 	"github.com/azverinus/flagnetic/internal/domain/events"
+	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 )
 
 // GetExperimentExposures answers what an experiment's exposures in one
@@ -79,5 +81,31 @@ func (a *api) GetExperimentConflicts(ctx context.Context, req GetExperimentConfl
 			UnitType: c.UnitType, UnitId: c.UnitID, FirstVariation: c.FirstVariation,
 			ConflictingVariation: c.ConflictingVariation, ConflictingAt: c.ConflictingAt,
 		}
+	})}, nil
+}
+
+// GetFlagEvaluations answers a flag's evaluations per day in one
+// environment.
+func (a *api) GetFlagEvaluations(ctx context.Context, req GetFlagEvaluationsRequestObject) (GetFlagEvaluationsResponseObject, error) {
+	days, err := a.h.GetFlagEvaluations.Handle(ctx, appevents.EvaluationQuery{
+		Project: projectID(ctx), Flag: req.Flag, Environment: req.Environment,
+		From: dayOf(req.Params.From), To: dayOf(req.Params.To),
+	})
+	var rangeErr *events.RangeError
+	if errors.As(err, &rangeErr) {
+		return nil, flaghttp.InvalidRequest(rangeErr.Error())
+	}
+	if err != nil {
+		return nil, err
+	}
+	return GetFlagEvaluations200JSONResponse{Items: each(days, func(d events.FlagEvaluationDay) FlagEvaluationDay {
+		out := FlagEvaluationDay{
+			Day: openapi_types.Date{Time: d.Day}, Source: EvaluationSource(d.Source), Reason: d.Reason, Evaluations: d.Evaluations,
+		}
+		if d.Variation != "" {
+			v := d.Variation
+			out.Variation = &v
+		}
+		return out
 	})}, nil
 }

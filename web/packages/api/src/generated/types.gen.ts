@@ -1307,10 +1307,14 @@ export type FlagDefinition = {
 };
 
 /**
- * A flag's definition with its configuration in every environment, by the environments' order.
+ * A flag's definition with its configuration in every environment, and
+ * when an SDK last evaluated it in each, both by the environments'
+ * order.
+ *
  */
 export type Flag = FlagDefinition & {
   environments: Array<FlagConfiguration>;
+  last_evaluated: Array<FlagLastEvaluated>;
 };
 
 /**
@@ -1643,6 +1647,7 @@ export type FlagListItem = FlagDefinition & {
  */
 export type FlagState = {
   environment: Key;
+  last_evaluated_at: LastEvaluatedAt;
   on: boolean;
   /**
    * The configuration has at least one rule, whether the flag is on or off.
@@ -1657,6 +1662,56 @@ export type FlagState = {
    */
   has_experiment: boolean;
 };
+
+export type FlagEvaluations = {
+  items: Array<FlagEvaluationDay>;
+};
+
+export type FlagEvaluationDay = {
+  /**
+   * The UTC day the evaluations were received.
+   */
+  day: string;
+  source: EvaluationSource;
+  /**
+   * The variation served; null when none was.
+   */
+  variation: string | null;
+  /**
+   * The evaluation reason as counted: a true reason, an SDK's own
+   * `fallback` or `local_override`, or `targeting_match`, which a
+   * client SDK counts from the answers it receives.
+   *
+   */
+  reason: string;
+  /**
+   * Stops at the largest int64 rather than overflow.
+   */
+  evaluations: number;
+};
+
+/**
+ * Who counted the evaluations: an SDK reporting those it made (`sdk`),
+ * or the server counting every flag of every remote evaluation it
+ * answered (`remote_evaluation`).
+ *
+ */
+export type EvaluationSource = "sdk" | "remote_evaluation";
+
+export type FlagLastEvaluated = {
+  environment: Key;
+  last_evaluated_at: LastEvaluatedAt;
+};
+
+/**
+ * When an SDK last evaluated the flag in the environment, by the end of
+ * the interval its evaluation summary covers or the time of an
+ * exposure it recorded, never later than the server received them;
+ * null when none ever did. Remote evaluations the server answered
+ * never move it.
+ *
+ */
+export type LastEvaluatedAt = string | null;
 
 export type FlagCreate = {
   /**
@@ -5813,6 +5868,76 @@ export type RegenerateRolloutSaltResponses = {
 
 export type RegenerateRolloutSaltResponse =
   RegenerateRolloutSaltResponses[keyof RegenerateRolloutSaltResponses];
+
+export type GetFlagEvaluationsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The flag's key.
+     */
+    flag: string;
+    /**
+     * The environment's key.
+     */
+    environment: string;
+  };
+  query?: {
+    /**
+     * The first UTC day, included; 29 days before `to` when absent.
+     */
+    from?: string;
+    /**
+     * The last UTC day, included; today when absent.
+     */
+    to?: string;
+  };
+  url: "/projects/{project}/flags/{flag}/environments/{environment}/evaluations";
+};
+
+export type GetFlagEvaluationsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetFlagEvaluationsError = GetFlagEvaluationsErrors[keyof GetFlagEvaluationsErrors];
+
+export type GetFlagEvaluationsResponses = {
+  /**
+   * The evaluations per day.
+   */
+  200: FlagEvaluations;
+};
+
+export type GetFlagEvaluationsResponse =
+  GetFlagEvaluationsResponses[keyof GetFlagEvaluationsResponses];
 
 export type ListExperimentsData = {
   body?: never;

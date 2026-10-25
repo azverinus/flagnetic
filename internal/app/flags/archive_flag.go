@@ -13,11 +13,12 @@ import (
 // ArchivalDeps are what restoring a flag runs on, and archiving one besides
 // finding the flags that require it.
 type ArchivalDeps struct {
-	Tx       Transactor
-	Projects ProjectLocker
-	Store    FlagUpdater
-	Rulesets Rulesets
-	Recorder Recorder
+	Tx          Transactor
+	Projects    ProjectLocker
+	Store       FlagUpdater
+	Rulesets    Rulesets
+	Recorder    Recorder
+	Evaluations LastEvaluations
 }
 
 // FlagArchiver stores a flag archived once no other flag requires it.
@@ -29,11 +30,12 @@ type FlagArchiver interface {
 
 // ArchiveFlagDeps are what ArchiveFlag runs on.
 type ArchiveFlagDeps struct {
-	Tx       Transactor
-	Projects ProjectLocker
-	Store    FlagArchiver
-	Rulesets Rulesets
-	Recorder Recorder
+	Tx          Transactor
+	Projects    ProjectLocker
+	Store       FlagArchiver
+	Rulesets    Rulesets
+	Recorder    Recorder
+	Evaluations LastEvaluations
 }
 
 // ArchiveFlag archives a flag: SDKs stop receiving it in every environment,
@@ -59,7 +61,10 @@ type FlagCommand struct {
 // require a flag no SDK receives. Nor is one with a draft or running
 // experiment, which would lose its flag.
 func (h *ArchiveFlag) Handle(ctx context.Context, cmd FlagCommand) (FlagView, error) {
-	d := ArchivalDeps{Tx: h.d.Tx, Projects: h.d.Projects, Store: h.d.Store, Rulesets: h.d.Rulesets, Recorder: h.d.Recorder}
+	d := ArchivalDeps{
+		Tx: h.d.Tx, Projects: h.d.Projects, Store: h.d.Store, Rulesets: h.d.Rulesets, Recorder: h.d.Recorder,
+		Evaluations: h.d.Evaluations,
+	}
 	return archival(ctx, d, cmd, "flag.archived", flags.Flag.Archive, func(ctx context.Context, f flags.Flag) error {
 		dependents, err := h.d.Store.Dependents(ctx, cmd.Project, f.Key)
 		if err != nil {
@@ -102,6 +107,9 @@ func archival(ctx context.Context, d ArchivalDeps, cmd FlagCommand, action strin
 			return err
 		}
 		out = FlagView{Flag: after, Configurations: configs}
+		if out.LastEvaluated, err = lastEvaluated(ctx, d.Evaluations, before.ID); err != nil {
+			return err
+		}
 		if !changed {
 			return nil
 		}

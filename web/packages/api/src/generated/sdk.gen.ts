@@ -137,6 +137,9 @@ import type {
   GetFlagConfigurationResponses,
   GetFlagData,
   GetFlagErrors,
+  GetFlagEvaluationsData,
+  GetFlagEvaluationsErrors,
+  GetFlagEvaluationsResponses,
   GetFlagResponses,
   GetInvitationData,
   GetInvitationErrors,
@@ -1998,6 +2001,41 @@ export const regenerateRolloutSalt = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt",
+    ...options,
+  });
+
+/**
+ * A flag's evaluations per day in one environment
+ *
+ * The flag's evaluations per UTC day the summaries were received, by
+ * day, source, variation key and reason; a day without an evaluation
+ * is left out. Evaluations SDKs reported (`sdk`) and the remote
+ * evaluations the server answered (`remote_evaluation`) are separate
+ * series and are never added together: a client SDK is sent every
+ * flag whether its application reads it or not, and counts again
+ * those it reads. A range from after `to`, or of more than 90 days,
+ * is `invalid_request`. The counts lag the SDKs by the summary
+ * rollup's round, ten seconds, besides the time a long transaction
+ * holds it back.
+ *
+ */
+export const getFlagEvaluations = <ThrowOnError extends boolean = false>(
+  options: Options<GetFlagEvaluationsData, ThrowOnError>,
+): RequestResult<GetFlagEvaluationsResponses, GetFlagEvaluationsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetFlagEvaluationsResponses,
+    GetFlagEvaluationsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/flags/{flag}/environments/{environment}/evaluations",
     ...options,
   });
 

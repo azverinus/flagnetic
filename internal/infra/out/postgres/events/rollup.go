@@ -13,6 +13,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -25,10 +26,13 @@ func (s *Store) ExposuresAfter(ctx context.Context, from events.Cursor, limit in
 	if err != nil || b.Rows == 0 {
 		return nil, b.To, err
 	}
-	where, args := b.where()
-	rows, err := s.db(ctx).Query(ctx, `SELECT project_id, environment_id, experiment_id, unit_type, unit_id, event_id,
-			variation_key, override, occurred_at, received_at
-		FROM exposure_events WHERE `+where+` ORDER BY xid, seq`, args...)
+	where, args := b.where("r")
+	// The flag of an experiment deleted since is null; the rollup leaves the
+	// exposures of a deleted experiment out.
+	rows, err := s.db(ctx).Query(ctx, `SELECT r.project_id, r.environment_id, r.experiment_id, x.flag_id, r.unit_type, r.unit_id,
+			r.event_id, r.variation_key, r.override, r.occurred_at, r.received_at
+		FROM exposure_events r LEFT JOIN experiments x ON x.id = r.experiment_id
+		WHERE `+where+` ORDER BY r.xid, r.seq`, args...)
 	if err != nil {
 		return nil, events.Cursor{}, fmt.Errorf("reading exposures to roll up: %w", err)
 	}
@@ -36,9 +40,13 @@ func (s *Store) ExposuresAfter(ctx context.Context, from events.Cursor, limit in
 		var (
 			r                                   events.ExposureRow
 			project, environment, experiment, e [16]byte
+			flag                                *[16]byte
 		)
-		scanErr := row.Scan(&project, &environment, &experiment, &r.Unit.UnitType, &r.Unit.UnitID, &e, &r.Variation, &r.Override,
+		scanErr := row.Scan(&project, &environment, &experiment, &flag, &r.Unit.UnitType, &r.Unit.UnitID, &e, &r.Variation, &r.Override,
 			&r.OccurredAt, &r.ReceivedAt)
+		if flag != nil {
+			r.Flag = id.FromBytes[flags.Flag](*flag)
+		}
 		r.Project = id.FromBytes[workspace.Project](project)
 		r.Unit.Environment = id.FromBytes[workspace.Environment](environment)
 		r.Unit.Experiment = id.FromBytes[experiments.Experiment](experiment)
@@ -52,8 +60,8 @@ func (s *Store) ExposuresAfter(ctx context.Context, from events.Cursor, limit in
 	return out, b.To, nil
 }
 
-// LockTargets returns which of the projects, environments and experiments
-// given still exist, each held against deletion until the unit of work ends,
+// LockTargets returns which of the projects, environments, flags and
+// experiments given still exist, each held against deletion until the unit of work ends,
 // so that the rollup's writes referencing them never fail on one deleted
 // meanwhile. Raw rows outlive what they name until retention drops them.
 func (s *Store) LockTargets(ctx context.Context, t appevents.RollupTargets) (appevents.RollupTargets, error) {
@@ -73,13 +81,18 @@ func (s *Store) LockTargets(ctx context.Context, t appevents.RollupTargets) (app
 		return out, nil
 	}
 	var out appevents.RollupTargets
-	// Projects, then environments, then experiments: the order a project's
-	// deletion takes them in.
+	// Projects, then environments, then flags, then experiments: the order a
+	// project's deletion takes them in, and a flag's deletion takes its
+	// experiments after it.
 	projects, err := lock("projects", bytesOf(t.Projects))
 	if err != nil {
 		return out, err
 	}
 	environments, err := lock("environments", bytesOf(t.Environments))
+	if err != nil {
+		return out, err
+	}
+	fs, err := lock("flags", bytesOf(t.Flags))
 	if err != nil {
 		return out, err
 	}
@@ -95,6 +108,11 @@ func (s *Store) LockTargets(ctx context.Context, t appevents.RollupTargets) (app
 	for _, e := range t.Environments {
 		if environments[e.Bytes()] {
 			out.Environments = append(out.Environments, e)
+		}
+	}
+	for _, f := range t.Flags {
+		if fs[f.Bytes()] {
+			out.Flags = append(out.Flags, f)
 		}
 	}
 	for _, e := range t.Experiments {

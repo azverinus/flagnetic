@@ -261,7 +261,10 @@ func flagListItemOut(l appflags.ListedFlag) FlagListItem {
 		Variations: d.Variations, ArchivedAt: d.ArchivedAt, CreatedBy: d.CreatedBy, CreatedAt: d.CreatedAt,
 		UpdatedAt: d.UpdatedAt, Version: d.Version,
 		States: each(l.States, func(s appflags.FlagState) FlagState {
-			return FlagState{Environment: s.Environment, On: s.On, HasRules: s.HasRules, HasRollout: s.HasRollout, HasExperiment: s.HasExperiment}
+			return FlagState{
+				Environment: s.Environment, On: s.On, HasRules: s.HasRules, HasRollout: s.HasRollout, HasExperiment: s.HasExperiment,
+				LastEvaluatedAt: s.LastEvaluatedAt,
+			}
 		}),
 	}
 }
@@ -291,6 +294,13 @@ func flagOut(v appflags.FlagView) Flag {
 		Variations: d.Variations, ArchivedAt: d.ArchivedAt, CreatedBy: d.CreatedBy, CreatedAt: d.CreatedAt,
 		UpdatedAt: d.UpdatedAt, Version: d.Version,
 		Environments: each(v.Configurations, configurationOut),
+		LastEvaluated: each(v.Configurations, func(c flags.EnvironmentConfiguration) FlagLastEvaluated {
+			out := FlagLastEvaluated{Environment: c.Environment}
+			if at, ok := v.LastEvaluated[c.Environment]; ok {
+				out.LastEvaluatedAt = &at
+			}
+			return out
+		}),
 	}
 }
 

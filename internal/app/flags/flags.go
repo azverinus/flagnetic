@@ -231,4 +231,22 @@ func flagValues(v FlagView) map[string]any {
 type FlagView struct {
 	Flag           flags.Flag
 	Configurations []flags.EnvironmentConfiguration
+	// LastEvaluated is when an SDK last evaluated the flag, by environment
+	// key; an environment it was never evaluated in is absent.
+	LastEvaluated map[string]time.Time
+}
+
+// LastEvaluations reads when SDKs last evaluated flags, which the events
+// context learns from evaluation summaries and exposures.
+type LastEvaluations interface {
+	// LastEvaluated returns when each of fs was last evaluated, by flag
+	// then environment key; a flag never evaluated in an environment is
+	// absent.
+	LastEvaluated(ctx context.Context, fs []flags.FlagID) (map[flags.FlagID]map[string]time.Time, error)
+}
+
+// lastEvaluated returns when flag was last evaluated, by environment key.
+func lastEvaluated(ctx context.Context, evaluations LastEvaluations, flag flags.FlagID) (map[string]time.Time, error) {
+	last, err := evaluations.LastEvaluated(ctx, []flags.FlagID{flag})
+	return last[flag], err
 }

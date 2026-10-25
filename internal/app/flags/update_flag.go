@@ -50,12 +50,13 @@ type DefinitionUpdater interface {
 
 // UpdateFlagDeps are what UpdateFlag runs on.
 type UpdateFlagDeps struct {
-	Tx       Transactor
-	Projects ProjectLocker
-	Store    DefinitionUpdater
-	Owners   Owners
-	Rulesets Rulesets
-	Recorder Recorder
+	Tx          Transactor
+	Projects    ProjectLocker
+	Store       DefinitionUpdater
+	Owners      Owners
+	Rulesets    Rulesets
+	Recorder    Recorder
+	Evaluations LastEvaluations
 }
 
 // UpdateFlag changes a flag's definition.
@@ -107,6 +108,9 @@ func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagVie
 			return err
 		}
 		out = FlagView{Flag: after, Configurations: configs}
+		if out.LastEvaluated, err = lastEvaluated(ctx, h.d.Evaluations, before.ID); err != nil {
+			return err
+		}
 		if !changed.Any {
 			return nil
 		}

@@ -17,6 +17,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
+	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
@@ -38,7 +39,7 @@ func TestWritesOfAProjectGoneBeforeItsLockAreNotFound(t *testing.T) {
 	rec := appflags.NewRecorder(appgovernance.NewRecord(pggovernance.NewAuditLog(pool)), c, ids)
 	rulesets := appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool), c)
 	owners := appaccess.NewOwnership(pgaccess.NewStore(pool))
-	archival := appflags.ArchivalDeps{Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec}
+	archival := appflags.ArchivalDeps{Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec, Evaluations: pgevents.NewStore(pool)}
 
 	gone := id.New[workspace.Project](ids)
 	req := governance.Request{Actor: governance.CLIActor("test")}
@@ -58,12 +59,13 @@ func TestWritesOfAProjectGoneBeforeItsLockAreNotFound(t *testing.T) {
 		"update flag": func(ctx context.Context) error {
 			_, err := appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
 				Tx: tx, Projects: store, Store: store, Owners: owners, Rulesets: rulesets, Recorder: rec,
+				Evaluations: pgevents.NewStore(pool),
 			}).Handle(ctx, appflags.UpdateFlagCommand{Project: gone, Key: flag.Key, Request: req})
 			return err
 		},
 		"archive flag": func(ctx context.Context) error {
 			_, err := appflags.NewArchiveFlag(appflags.ArchiveFlagDeps{
-				Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec,
+				Tx: tx, Projects: store, Store: store, Rulesets: rulesets, Recorder: rec, Evaluations: pgevents.NewStore(pool),
 			}).Handle(ctx, flag)
 			return err
 		},

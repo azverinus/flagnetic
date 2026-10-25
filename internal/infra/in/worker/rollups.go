@@ -15,6 +15,10 @@ import (
 // and Tick.
 const ExposureRollupName = "exposure_rollup"
 
+// SummaryRollupName names the worker rolling evaluation summaries up in
+// logs, metrics and Tick.
+const SummaryRollupName = "summary_rollup"
+
 // rollupInterval is how often a rollup stream reads what was committed since
 // its last round: the experiment pages are this far behind the SDKs at most,
 // besides the time a long transaction holds the horizon back.
