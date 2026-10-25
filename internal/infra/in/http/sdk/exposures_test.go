@@ -10,6 +10,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/events"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -428,7 +429,7 @@ func TestTheShiftOfAWrongClockDecidesTheWindow(t *testing.T) {
 func TestThePartitionWorkerKeepsPartitionsOfExposuresAheadOfTheClock(t *testing.T) {
 	f := startExposures(t)
 	f.clock.Advance(10 * 24 * time.Hour)
-	if err := f.srv.Tick(t, "event_partitions"); err != nil {
+	if err := f.srv.Tick(t, worker.EventRetentionName); err != nil {
 		t.Fatal(err)
 	}
 	// Received 3 days after the worker's round, whose partitions were made
