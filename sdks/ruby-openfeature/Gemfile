@@ -1,0 +1,15 @@
+# frozen_string_literal: true
+
+# FLAGNETIC_GEM=released resolves flagnetic from RubyGems, as a consumer's
+# bundle does, instead of the working tree; OPENFEATURE_SDK_VERSION pins
+# openfeature-sdk, for the run on the oldest release the gem supports.
+
+source "https://rubygems.org"
+
+gemspec
+
+gem "flagnetic", path: "../ruby" unless ENV["FLAGNETIC_GEM"] == "released"
+gem "minitest", "~> 5.25"
+gem "openfeature-sdk", ENV.fetch("OPENFEATURE_SDK_VERSION") if ENV.key?("OPENFEATURE_SDK_VERSION")
+gem "rake", "~> 13.0"
+gem "rubocop", "~> 1.71.0", require: false
