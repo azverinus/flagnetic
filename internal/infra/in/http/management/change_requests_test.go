@@ -569,3 +569,46 @@ func TestAChangeRequestGoesWithTheFlagItProposesFor(t *testing.T) {
 	got := do(f.dev.GetChangeRequestWithResponse(t.Context(), f.project.Key, cr.Id))
 	assertProblem(t, "a change request of a deleted flag", got.StatusCode(), got.Body, http.StatusNotFound, "not_found")
 }
+
+func TestAwaitingMyDecisionListsTheOpenChangeRequestsTheCallerMayApprove(t *testing.T) {
+	f := startChangeRequests(t)
+	maintainer, _ := grantedSession(t, f.srv, f.project, access.RoleMaintainer)
+	ci := pipeline(t, f.srv, f.project, "maintainer", management.ScopeFlagsWrite)
+
+	byDeveloper := openedIn(t, f.dev.ClientWithResponses, f.project.Key, "production", proposedOn())
+	byToken := openedIn(t, ci, f.project.Key, "staging", proposedOn())
+	openedIn(t, maintainer.ClientWithResponses, f.project.Key, "staging", proposedOn())
+	createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("Still a draft", proposedOn()))
+	decided := openedIn(t, f.dev.ClientWithResponses, f.project.Key, "staging", proposedOn())
+	mustApprove(t, maintainer.ClientWithResponses, f.project.Key, decided)
+
+	awaiting := func(c *management.ClientWithResponses, params management.ListChangeRequestsParams) []openapi_types.UUID {
+		t.Helper()
+		params.AwaitingMyDecision = ptr(true)
+		res := do(c.ListChangeRequestsWithResponse(t.Context(), f.project.Key, &params))
+		if res.JSON200 == nil {
+			t.Fatalf("GET change-requests?awaiting_my_decision = %d: %s", res.StatusCode(), res.Body)
+		}
+		var ids []openapi_types.UUID
+		for _, cr := range res.JSON200.Items {
+			ids = append(ids, cr.Id)
+		}
+		return ids
+	}
+	if got := awaiting(maintainer.ClientWithResponses, management.ListChangeRequestsParams{}); !slices.Equal(got, []openapi_types.UUID{byToken.Id, byDeveloper.Id}) {
+		t.Errorf("the maintainer's = %v, want the token's and the developer's open ones", got)
+	}
+	if got := awaiting(maintainer.ClientWithResponses, management.ListChangeRequestsParams{Environment: ptr("production")}); !slices.Equal(got, []openapi_types.UUID{byDeveloper.Id}) {
+		t.Errorf("the maintainer's in production = %v, want the developer's", got)
+	}
+	approved := management.ChangeRequestStateApproved
+	if got := awaiting(maintainer.ClientWithResponses, management.ListChangeRequestsParams{State: &approved}); len(got) != 0 {
+		t.Errorf("the maintainer's approved = %v, want none: only open ones await a decision", got)
+	}
+	if got := awaiting(f.dev.ClientWithResponses, management.ListChangeRequestsParams{}); len(got) != 0 {
+		t.Errorf("the developer's = %v, want none without change_request.approve", got)
+	}
+	if got := awaiting(ci, management.ListChangeRequestsParams{}); len(got) != 0 {
+		t.Errorf("the token's = %v, want none: a token never decides", got)
+	}
+}
