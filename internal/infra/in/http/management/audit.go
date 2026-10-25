@@ -116,10 +116,20 @@ func (a *api) auditPage(ctx context.Context, project workspace.ProjectID, q List
 	return out, nil
 }
 
+// actorOut returns a as the audit log names it.
+func actorOut(a governance.Actor) Actor {
+	out := Actor{Kind: ActorKind(a.Kind), Id: a.ID, Name: a.Name}
+	if m, err := id.Parse[access.Member](a.MemberID); err == nil {
+		member := openapi_types.UUID(m.Bytes())
+		out.MemberId = &member
+	}
+	return out
+}
+
 func auditEntryOut(e governance.Entry) AuditEntry {
 	out := AuditEntry{
 		Id: openapi_types.UUID(e.ID.Bytes()), OccurredAt: e.OccurredAt.UTC(), Action: e.Action,
-		Actor:  Actor{Kind: ActorKind(e.Actor.Kind), Id: e.Actor.ID, Name: e.Actor.Name},
+		Actor:  actorOut(e.Actor),
 		Entity: AuditEntity{Kind: e.Entity.Kind, Id: e.Entity.ID, Key: e.Entity.Key},
 		Before: e.Before, After: e.After, KillSwitch: e.KillSwitch,
 	}
@@ -130,10 +140,6 @@ func auditEntryOut(e governance.Entry) AuditEntry {
 	if !e.Environment.IsZero() {
 		env := openapi_types.UUID(e.Environment.Bytes())
 		out.EnvironmentId = &env
-	}
-	if m, err := id.Parse[access.Member](e.Actor.MemberID); err == nil {
-		member := openapi_types.UUID(m.Bytes())
-		out.Actor.MemberId = &member
 	}
 	if e.RequestID != "" {
 		r := e.RequestID

@@ -77,6 +77,21 @@ func Metric(t testing.TB, scrape, series string) float64 {
 	return -1
 }
 
+// AwaitListening returns once the replica listens on channel, failing after
+// 5 seconds. A replica starts listening shortly after it starts serving; a
+// test that must not see what a replica does while it is not listening yet
+// waits for it.
+func (s *Server) AwaitListening(t testing.TB, channel string) {
+	t.Helper()
+	series := `flagnetic_listener_up{channel="` + channel + `"}`
+	for deadline := time.Now().Add(5 * time.Second); Metric(t, s.Scrape(t), series) != 1; {
+		if time.Now().After(deadline) {
+			t.Fatalf("the replica is not listening on %s after 5 seconds", channel)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 // Tick runs one round of the worker called name, through the runner's
 // wrapper. The in-process server never starts the workers' timers: a test
 // drives every round it wants, when it wants.

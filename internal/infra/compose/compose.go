@@ -124,10 +124,15 @@ type Listener struct {
 func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Options) Background {
 	tx, auditLog, outbox := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool), pggovernance.NewOutbox(d.Pool)
 	// Every context records its audit entries through the governance
-	// context, which supersedes the change requests they move and writes
-	// the catalogue events they cause to the outbox.
+	// context, which supersedes the change requests they move, writes the
+	// catalogue events they cause to the outbox and announces them to the
+	// management change streams.
 	changeRequestStore := pggovernance.NewChangeRequests(d.Pool)
-	audit := appgovernance.NewRecord(auditLog, changeRequestStore, d.IDs, appgovernance.WithOutbox(outbox, d.IDs))
+	audit := appgovernance.NewRecord(auditLog, changeRequestStore, d.IDs,
+		appgovernance.WithOutbox(outbox, d.IDs), appgovernance.WithChangeStream(auditLog))
+	// Every replica offers the entries announced to the change streams it
+	// holds, reading them from the audit log.
+	changeHub := pggovernance.NewChangeHub(auditLog, edge.Logger())
 	rec := appworkspace.NewRecorder(audit, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
 	flagStore, flagRec := pgflags.NewStore(d.Pool), appflags.NewRecorder(audit, d.Clock, d.IDs)
@@ -211,6 +216,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// replica and written in rounds, so no evaluation waits on recording.
 	discoveries := appdelivery.NewDiscoveries(tx, deliveryStore)
 	createAttribute := appworkspace.NewCreateAttribute(tx, ws, rulesets, rec)
+	managementOptions := o.Options
+	managementOptions.Clock = d.Clock
 	management.Mount(edge, management.Handlers{
 		AuthenticateToken:   appaccess.NewAuthenticateToken(accessStore, tokenUses, d.Clock),
 		AuthenticateSession: appaccess.NewAuthenticateSession(accessStore, settings, d.Clock, sessionKey),
@@ -436,7 +443,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 
 		ListAuditEntries: appgovernance.NewListAuditEntries(auditLog),
 		GetAuditEntry:    appgovernance.NewGetAuditEntry(auditLog),
-	}, reg, o.Options)
+		StreamChanges:    appgovernance.NewStreamChanges(changeHub, auditLog),
+	}, reg, managementOptions)
 	// Every replica keeps the SDK keys it authenticated, dropped on a
 	// notification of each change, and writes their uses in rounds.
 	sdkKeyCache := pgdelivery.NewSDKKeyCache(deliveryStore)
@@ -491,9 +499,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},
 			{Channel: pgdelivery.SDKKeysChannel, Handler: sdkKeyCache},
 			{Channel: pgdelivery.RulesetsChannel, Handler: rulesetStream},
+			{Channel: pggovernance.ChangesChannel, Handler: changeHub},
 		},
 		Close: func() {
 			rulesetStream.Close()
+			changeHub.Close()
 			rulesetCache.Close()
 			guardPool.Close()
 			// The requests are done: what they counted since the last round

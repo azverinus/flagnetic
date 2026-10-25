@@ -176,6 +176,7 @@ type Handlers struct {
 
 	ListAuditEntries *appgovernance.ListAuditEntries
 	GetAuditEntry    *appgovernance.GetAuditEntry
+	StreamChanges    *appgovernance.StreamChanges
 }
 
 // api serves every operation of the document.
@@ -185,6 +186,7 @@ type api struct {
 	opts     Options
 	origins  *http.CrossOriginProtection
 	refusals *prometheus.CounterVec
+	streams  *changeStreams
 }
 
 var _ StrictServerInterface = (*api)(nil)
@@ -193,6 +195,7 @@ var _ StrictServerInterface = (*api)(nil)
 // permission seam, and registers its metrics on reg.
 func Mount(edge *flaghttp.Server, h Handlers, reg prometheus.Registerer, opts Options) {
 	a := newAPI(edge, h, newRefusals(reg), opts)
+	a.streams = newChangeStreams(reg)
 	invalidRequest := func(w http.ResponseWriter, r *http.Request, err error) {
 		edge.WriteError(w, r, flaghttp.InvalidRequest(err.Error()))
 	}

@@ -3218,6 +3218,19 @@ export const zGetProjectAuditEntryPath = z.object({
  */
 export const zGetProjectAuditEntryResponse = zAuditEntry;
 
+export const zStreamProjectChangesHeaders = z.object({
+  "Last-Event-ID": z.string().optional(),
+});
+
+export const zStreamProjectChangesPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The stream, held open.
+ */
+export const zStreamProjectChangesResponse = z.string();
+
 export const zListMembersQuery = z.object({
   status: zMemberStatus.optional(),
   q: z.string().optional(),

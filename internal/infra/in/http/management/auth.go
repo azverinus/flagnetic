@@ -11,6 +11,7 @@ import (
 
 	appaccess "github.com/azverinus/flagnetic/internal/app/access"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
@@ -26,6 +27,16 @@ type Options struct {
 	// InsecureCookies lets the session cookie go without Secure over plain
 	// HTTP off localhost.
 	InsecureCookies bool
+	// Clock times the change streams' heartbeats and lifetimes; nil for the
+	// system's.
+	Clock clock.Clock
+}
+
+func (o Options) clock() clock.Clock {
+	if o.Clock == nil {
+		return clock.System{}
+	}
+	return o.Clock
 }
 
 // errCrossOrigin refuses a request signed in by the session cookie that a

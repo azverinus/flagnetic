@@ -4023,6 +4023,84 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/stream:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: streamProjectChanges
+      summary: The project's change stream
+      description: |
+        A server-sent event stream with one notice per audit entry the
+        project records, from whichever replica made the change, so a client
+        refetches what it shows of the entity named. A notice never carries
+        the change itself.
+
+        The first frame is `retry: 3000`. Each notice is a frame
+        `event: change`, `id: <audit entry id>`, `data:
+        {"kind", "key", "environment", "version", "actor"}`: the entity's
+        kind and key as the entry names them, the key of the environment
+        the change addressed (null for none, or once that environment is
+        gone), the entity's version after the change (before it for a
+        deletion; null for an entity without one) and the actor as the
+        audit log names it. Notices not yet sent are coalesced per entity:
+        a later change of an entity replaces the one waiting.
+
+        `event: refetch` with `data: {}` tells the client to refetch
+        everything it shows of the project: after the replica may have
+        missed a notice, when more than 1,000 notices wait unsent, and when
+        `Last-Event-ID` names no entry of the project. With a known
+        `Last-Event-ID`, the entries after it are sent first, up to 1,000;
+        more than that is a refetch.
+
+        A comment `: hb` every 15 seconds tells a quiet stream from a dead
+        one. The caller's access to the project is resolved again at every
+        notice and heartbeat, and the stream ends once it no longer holds
+        `project.read` or the project is gone. The server closes a stream
+        after about an hour (60 minutes plus up to 5 of jitter) and when it
+        shuts down; the client reconnects with `Last-Event-ID`. A caller (a
+        member, or a project token) holds at most 10 streams open on one
+        replica.
+      x-permission: project.read
+      tags: [audit]
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          description: The id of the last notice the client heard.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The stream, held open.
+          headers:
+            Cache-Control:
+              description: "`no-cache`."
+              schema:
+                type: string
+            X-Accel-Buffering:
+              description: "`no`, so a proxy passes each frame on at once."
+              schema:
+                type: string
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          description: "`too_many_streams`: the caller holds 10 change streams open on this replica already; `Retry-After` gives the seconds to wait."
+          headers:
+            Retry-After:
+              description: Seconds to wait before trying again.
+              schema:
+                type: integer
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /members:
     get:
       operationId: listMembers
