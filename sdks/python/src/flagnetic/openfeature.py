@@ -166,6 +166,8 @@ class Provider(AbstractProvider):
         self._unit_type = unit_type or "user"
         self._ready_timeout = ready_timeout
         self._closed = threading.Event()
+        # Set by a revoked SDK key until the client is fresh again.
+        self._revoked = False
         logger: Logger | None = options.pop("logger", None)
         self._logger: Logger = logger if logger is not None else standard_logger
         self._client = Client(sdk_key, base_url, logger=self._observe, **options)
@@ -279,10 +281,13 @@ class Provider(AbstractProvider):
         # Ready on every move to fresh, so the OpenFeature status leaves STALE when the client
         # recovers; the first fetch may also land while initialize waits, a ready the OpenFeature
         # SDK repeats once initialize returns.
-        if stage is Stage.LAST_GOOD:
+        # A revoked key moves a fresh client to last_good right after the ERROR it fired: STALE would
+        # hide the ERROR, so it is not sent while the key stays revoked.
+        if stage is Stage.LAST_GOOD and not self._revoked:
             details = ProviderEventDetails(message="flagnetic: ruleset stage is last_good")
             self._emit_if_open(self.emit_provider_stale, details)
         elif stage is Stage.FRESH:
+            self._revoked = False
             self._emit_if_open(self.emit_provider_ready, ProviderEventDetails())
 
     def _observe(self, level: int, event: str, fields: Mapping[str, Any]) -> None:
@@ -294,6 +299,7 @@ class Provider(AbstractProvider):
         # The event goes first: the client swallows an exception from its logger, which would
         # otherwise also swallow the event.
         if event == _events.KEY_REVOKED:
+            self._revoked = True
             details = ProviderEventDetails(message="flagnetic: sdk key revoked", error_code=ErrorCode.GENERAL)
             self._emit_if_open(self.emit_provider_error, details)
         self._logger(level, event, fields)

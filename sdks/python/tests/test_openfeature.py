@@ -484,6 +484,35 @@ def test_a_failed_fetch_is_stale_and_recovery_is_ready() -> None:
         server.close()
 
 
+def test_a_key_revoked_while_fresh_leaves_the_provider_in_error_until_it_recovers() -> None:
+    revoked = threading.Event()
+    document = json.dumps(_document()).encode()
+
+    def handler(request: Request) -> Response:
+        if request.path.endswith("/stream"):
+            return Response(404)
+        if revoked.is_set():
+            return Response(401)
+        return Response(200, {"Content-Type": "application/json", "ETag": '"1"'}, document)
+
+    server = MockServer(handler)
+    provider = Provider(SDK_KEY, server.url, stream=False, logger=_quiet, _time_divisor=100)
+    try:
+        client = register(provider, "revoked-while-fresh")
+        assert provider.client.stage is flagnetic.Stage.FRESH
+        heard = Heard(client)
+        start = len(heard.kinds())
+        revoked.set()
+        wait_until(lambda: provider.client.stage is flagnetic.Stage.LAST_GOOD)
+        wait_until(lambda: ProviderEvent.PROVIDER_ERROR in heard.kinds()[start:])
+        assert ProviderEvent.PROVIDER_STALE not in heard.kinds()[start:]
+        assert client.get_provider_status() is ProviderStatus.ERROR
+        revoked.clear()
+        wait_until(lambda: client.get_provider_status() is ProviderStatus.READY)
+    finally:
+        server.close()
+
+
 def test_a_revoked_key_is_a_provider_error_and_still_logged() -> None:
     server = MockServer(lambda _request: Response(401))
     logs = Logs()
