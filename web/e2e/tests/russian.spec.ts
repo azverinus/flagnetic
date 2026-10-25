@@ -1,4 +1,4 @@
-import { createGrant } from "@flagnetic/api";
+import { createChangeRequest, createGrant } from "@flagnetic/api";
 import { expect, test } from "@playwright/test";
 
 import { expectNoSeriousViolations } from "../support/axe";
@@ -247,5 +247,49 @@ test.describe("the console in Russian", () => {
     await page.getByRole("button", { name: "Скрыть plan" }).click();
     await expect(page.getByRole("dialog", { name: "Скрыть plan" })).toBeVisible();
     await expectNoSeriousViolations(page, "the dismiss dialog in Russian");
+  });
+
+  test("reads the change requests awaiting a decision and one change request in Russian", async ({
+    page,
+  }) => {
+    await seedFlag(project, stringFlag("checkout_banner"));
+    const proposed = must(
+      "proposing a change to checkout_banner",
+      await createChangeRequest({
+        client: managementClient(),
+        path: { project },
+        body: {
+          kind: "flag_configuration",
+          flag: "checkout_banner",
+          environment: "production",
+          title: "Включить баннер",
+          proposed: { on: true, off_variation: "control", fallthrough: "treatment" },
+          open: true,
+        },
+      }),
+    );
+
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${project}/change-requests?tab=awaiting`);
+    await expect(
+      page.getByRole("heading", { name: "Запросы на изменение", level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Ждут моего решения" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(
+      page
+        .getByRole("navigation", { name: "Проект" })
+        .getByText("1 запрос на изменение ждёт вашего решения"),
+    ).toBeAttached();
+    await expectNoSeriousViolations(page, "the change requests in Russian");
+
+    await page.goto(`/projects/${project}/change-requests/${proposed.id}`);
+    await expect(page.getByRole("heading", { name: "Включить баннер", level: 1 })).toBeVisible();
+    await expect(page.getByText("Открыт", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Отклонить", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Отклонить запрос на изменение" })).toBeVisible();
+    await expectNoSeriousViolations(page, "the reject dialog in Russian");
   });
 });

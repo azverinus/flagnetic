@@ -7724,6 +7724,14 @@ export type ListChangeRequestsData = {
      */
     author?: string;
     /**
+     * When true, only the open change requests the caller may approve
+     * or reject: those of others, for a member holding
+     * `change_request.approve`. None for anyone else, a project token
+     * included.
+     *
+     */
+    awaiting_my_decision?: boolean;
+    /**
      * The `next_cursor` of the previous page.
      */
     cursor?: string;

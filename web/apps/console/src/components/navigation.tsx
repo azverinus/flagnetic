@@ -1,5 +1,5 @@
 import type { MessageDescriptor } from "@lingui/core";
-import { msg } from "@lingui/core/macro";
+import { msg, plural } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, type LinkProps } from "@tanstack/react-router";
@@ -7,6 +7,7 @@ import {
   BoxesIcon,
   FlagIcon,
   FlaskConicalIcon,
+  GitPullRequestArrowIcon,
   HistoryIcon,
   LayersIcon,
   KeyRoundIcon,
@@ -19,14 +20,14 @@ import {
   UsersIcon,
   UsersRoundIcon,
 } from "lucide-react";
-import { useId } from "react";
+import { type ReactNode, useId } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Permission } from "@/lib/access-names";
 import { cn } from "@/lib/cn";
 import { ApiError } from "@/lib/errors";
-import { meQuery, projectMeQuery } from "@/lib/queries";
+import { awaitingCountLimit, awaitingDecisionQuery, meQuery, projectMeQuery } from "@/lib/queries";
 
 type Screen = {
   label: MessageDescriptor;
@@ -72,6 +73,12 @@ const projectScreens = [
     to: "/projects/$project/segments",
     label: msg`Segments`,
     icon: UsersRoundIcon,
+    permission: "project.read",
+  },
+  {
+    to: "/projects/$project/change-requests",
+    label: msg`Change requests`,
+    icon: GitPullRequestArrowIcon,
     permission: "project.read",
   },
   {
@@ -133,8 +140,19 @@ const instanceScreens: InstanceScreen[] = [
 const linkClassName =
   "flex h-9 items-center gap-2 rounded-md px-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground data-[status=active]:bg-accent data-[status=active]:font-medium data-[status=active]:text-foreground";
 
-/** What a screen's link shows: its icon, and its name unless the sidebar is a rail. */
-function ScreenLabel({ screen, collapsed }: { screen: Screen; collapsed: boolean }) {
+/**
+ * What a screen's link shows: its icon, its name unless the sidebar is a
+ * rail, and what waits there for the caller.
+ */
+function ScreenLabel({
+  screen,
+  collapsed,
+  children,
+}: {
+  screen: Screen;
+  collapsed: boolean;
+  children?: ReactNode;
+}) {
   const { i18n } = useLingui();
   const Icon = screen.icon;
   return (
@@ -143,7 +161,37 @@ function ScreenLabel({ screen, collapsed }: { screen: Screen; collapsed: boolean
       <span className={cn("truncate", collapsed ? "sr-only" : "sr-only md:not-sr-only")}>
         {i18n._(screen.label)}
       </span>
+      {children}
     </>
+  );
+}
+
+/**
+ * How many open change requests await the caller's decision, beside the
+ * change requests screen; nothing when none does. Past the count it reads,
+ * it says there are more.
+ */
+function AwaitingDecisionCount({ project }: { project: string }) {
+  const { t } = useLingui();
+  const awaiting = useQuery(awaitingDecisionQuery(project));
+  const count = awaiting.data?.items.length ?? 0;
+  if (count === 0) return null;
+  const more = count > awaitingCountLimit;
+  const shown = more ? `${awaitingCountLimit}+` : String(count);
+  const label = more
+    ? t`More than ${awaitingCountLimit} change requests await your decision`
+    : t`${plural(count, {
+        one: "# change request awaits your decision",
+        other: "# change requests await your decision",
+      })}`;
+  return (
+    <span
+      className="ml-auto rounded-full bg-primary px-1.5 text-xs leading-5 font-medium text-primary-foreground"
+      title={label}
+    >
+      <span aria-hidden>{shown}</span>
+      <span className="sr-only">{label}</span>
+    </span>
   );
 }
 
@@ -200,17 +248,27 @@ export function ProjectNavigation({ project, collapsed }: { project: string; col
     <nav aria-label={t`Project`} className="flex flex-col gap-1">
       {projectScreens
         .filter((screen) => held.has(screen.permission))
-        .map((screen) => (
-          <Link
-            key={screen.to}
-            to={screen.to}
-            params={{ project }}
-            activeOptions={{ exact: screen.exact ?? false }}
-            className={linkClassName}
-          >
-            <ScreenLabel screen={screen} collapsed={collapsed} />
-          </Link>
-        ))}
+        .map((screen) => {
+          // A member who decides change requests is taken to those
+          // awaiting their decision, which the counter beside it counts.
+          const decides =
+            screen.to === "/projects/$project/change-requests" &&
+            held.has("change_request.approve");
+          return (
+            <Link
+              key={screen.to}
+              to={screen.to}
+              params={{ project }}
+              {...(decides ? { search: { tab: "awaiting" } } : {})}
+              activeOptions={{ exact: screen.exact ?? false, includeSearch: false }}
+              className={linkClassName}
+            >
+              <ScreenLabel screen={screen} collapsed={collapsed}>
+                {decides ? <AwaitingDecisionCount project={project} /> : null}
+              </ScreenLabel>
+            </Link>
+          );
+        })}
     </nav>
   );
 }

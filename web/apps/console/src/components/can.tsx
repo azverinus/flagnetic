@@ -33,9 +33,10 @@ export type CanProps = {
 /** Renders an action as the caller's permissions in the project allow. */
 export function Can({ permission, whenMissing, children }: CanProps) {
   const can = useCan(permission);
+  const reason = useMissingPermissionReason(permission);
   if (can) return children;
   if (whenMissing === "hide") return null;
-  return <DisabledAction permission={permission}>{children}</DisabledAction>;
+  return <DisabledAction reason={reason}>{children}</DisabledAction>;
 }
 
 /**
@@ -45,14 +46,14 @@ export function Can({ permission, whenMissing, children }: CanProps) {
  * itself takes no pointer events, so hovering lands on the tooltip's
  * wrapper.
  */
-function DisabledAction({
-  permission,
+export function DisabledAction({
+  reason,
   children,
 }: {
-  permission: Permission;
+  /** Why the action cannot be taken, as a sentence. */
+  reason: string;
   children: ReactElement<ActionProps>;
 }) {
-  const reason = useMissingPermissionReason(permission);
   const action = Children.only(children);
   const refuse = (event: MouseEvent) => {
     event.preventDefault();

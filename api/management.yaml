@@ -3030,6 +3030,15 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: awaiting_my_decision
+          in: query
+          description: |
+            When true, only the open change requests the caller may approve
+            or reject: those of others, for a member holding
+            `change_request.approve`. None for anyone else, a project token
+            included.
+          schema:
+            type: boolean
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:

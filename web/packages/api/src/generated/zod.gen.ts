@@ -2721,6 +2721,7 @@ export const zListChangeRequestsQuery = z.object({
   kind: zChangeRequestKind.optional(),
   state: zChangeRequestState.optional(),
   author: z.uuid().optional(),
+  awaiting_my_decision: z.boolean().optional(),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });

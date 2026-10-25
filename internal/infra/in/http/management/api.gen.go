@@ -3115,6 +3115,12 @@ type ListChangeRequestsParams struct {
 	// Author Only those authored by the member or the project token with this identifier.
 	Author *openapi_types.UUID `form:"author,omitempty" json:"author,omitempty"`
 
+	// AwaitingMyDecision When true, only the open change requests the caller may approve
+	// or reject: those of others, for a member holding
+	// `change_request.approve`. None for anyone else, a project token
+	// included.
+	AwaitingMyDecision *bool `form:"awaiting_my_decision,omitempty" json:"awaiting_my_decision,omitempty"`
+
 	// Cursor The `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
@@ -11746,6 +11752,18 @@ func NewListChangeRequestsRequest(server string, project ProjectKey, params *Lis
 		if params.Author != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "author", *params.Author, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uuid"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AwaitingMyDecision != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "awaiting_my_decision", *params.AwaitingMyDecision, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -43974,6 +43992,19 @@ func (siw *ServerInterfaceWrapper) ListChangeRequests(w http.ResponseWriter, r *
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "author"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "author", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "awaiting_my_decision" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "awaiting_my_decision", r.URL.Query(), &params.AwaitingMyDecision, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "awaiting_my_decision"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "awaiting_my_decision", Err: err})
 		}
 		return
 	}
