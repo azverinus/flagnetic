@@ -132,11 +132,12 @@ func later(last map[FlagEnvironment]time.Time, k FlagEnvironment, at, receivedAt
 	}
 }
 
-// The days evaluations per day are read over: a month by default, and a
-// quarter at most, which bounds the rows one request reads.
+// The days counts per day, of evaluations or of events received, are read
+// over: a month by default, and a quarter at most, which bounds the rows one
+// request reads.
 const (
-	DefaultEvaluationDays = 30
-	MaxEvaluationDays     = 90
+	DefaultDaysRead = 30
+	MaxDaysRead     = 90
 )
 
 // RangeError is a range of days that cannot be read.
@@ -144,24 +145,24 @@ type RangeError struct{ Reason string }
 
 func (e *RangeError) Error() string { return e.Reason }
 
-// EvaluationDays returns the first and last UTC day evaluations are read
-// over, both included: to's day, else today's, and from's day, else the day
-// DefaultEvaluationDays before the last. A first day after the last, or more
-// than MaxEvaluationDays, is a RangeError.
-func EvaluationDays(from, to *time.Time, today time.Time) (first, last time.Time, err error) {
+// DaysRead returns the first and last UTC day counts per day are read over,
+// both included: to's day, else today's, and from's day, else the day
+// DefaultDaysRead before the last. A first day after the last, or more
+// than MaxDaysRead, is a RangeError.
+func DaysRead(from, to *time.Time, today time.Time) (first, last time.Time, err error) {
 	last = day(today)
 	if to != nil {
 		last = day(*to)
 	}
-	first = last.AddDate(0, 0, 1-DefaultEvaluationDays)
+	first = last.AddDate(0, 0, 1-DefaultDaysRead)
 	if from != nil {
 		first = day(*from)
 	}
 	if first.After(last) {
 		return time.Time{}, time.Time{}, &RangeError{Reason: "from is after to"}
 	}
-	if first.AddDate(0, 0, MaxEvaluationDays).Before(last.AddDate(0, 0, 1)) {
-		return time.Time{}, time.Time{}, &RangeError{Reason: fmt.Sprintf("from and to span more than %d days", MaxEvaluationDays)}
+	if first.AddDate(0, 0, MaxDaysRead).Before(last.AddDate(0, 0, 1)) {
+		return time.Time{}, time.Time{}, &RangeError{Reason: fmt.Sprintf("from and to span more than %d days", MaxDaysRead)}
 	}
 	return first, last, nil
 }

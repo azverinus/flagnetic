@@ -1119,6 +1119,41 @@ export const zKill = z.object({
 });
 
 /**
+ * The type of an event as SDKs post it to `/sdk/v1/events`.
+ */
+export const zEventType = z.enum(["evaluation_summary", "alias", "exposure"]);
+
+export const zEventVolumeDay = z.object({
+  day: z.iso.date(),
+  type: zEventType,
+  events: z.coerce
+    .bigint()
+    .gte(BigInt(1))
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zEventGap = z.object({
+  stream: z.string(),
+  type: zEventType,
+  period_start: z.iso.datetime(),
+  period_end: z.iso.datetime(),
+  rows: z.coerce
+    .bigint()
+    .gte(BigInt(1))
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  dropped_at: z.iso.datetime(),
+});
+
+export const zEventVolume = z.object({
+  days: z.array(zEventVolumeDay),
+  gaps: z.array(zEventGap),
+});
+
+/**
  * Who counted the evaluations: an SDK reporting those it made (`sdk`),
  * or the server counting every flag of every remote evaluation it
  * answered (`remote_evaluation`).
@@ -2436,6 +2471,20 @@ export const zGetFlagEvaluationsQuery = z.object({
  * The evaluations per day.
  */
 export const zGetFlagEvaluationsResponse = zFlagEvaluations;
+
+export const zGetEventVolumePath = z.object({
+  project: z.string(),
+});
+
+export const zGetEventVolumeQuery = z.object({
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+});
+
+/**
+ * The events per day and the gaps.
+ */
+export const zGetEventVolumeResponse = zEventVolume;
 
 export const zListExperimentsPath = z.object({
   project: z.string(),

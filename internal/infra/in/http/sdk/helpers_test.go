@@ -50,7 +50,14 @@ func newProject(t *testing.T, srv *testkit.Server) project {
 // with its production protected as every new project's is.
 func newProjectAsCreated(t *testing.T, srv *testkit.Server) project {
 	t.Helper()
-	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	return newProjectAs(t, srv, testkit.InstanceAdminToken(t))
+}
+
+// newProjectAs creates a project through srv as the holder of token, with its
+// production protected as every new project's is.
+func newProjectAs(t *testing.T, srv *testkit.Server, token string) project {
+	t.Helper()
+	admin := testkit.Client(t, srv, token)
 	key := "p" + strings.ToLower(rand.Text()[:12])
 	res := do(admin.CreateProjectWithResponse(t.Context(), management.ProjectCreate{Key: key, Name: "Project " + key}))
 	if res.JSON201 == nil {

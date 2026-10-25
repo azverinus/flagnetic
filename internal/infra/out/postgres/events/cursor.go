@@ -133,6 +133,7 @@ func (s *Store) CursorMovedAt(ctx context.Context, stream events.Stream) (at tim
 var streamTables = map[events.Stream]string{
 	events.StreamExposures:           "exposure_events",
 	events.StreamEvaluationSummaries: "evaluation_summary_events",
+	events.StreamAliases:             "alias_events",
 }
 
 // OldestUnread returns when the first row past stream's cursor was received,

@@ -12,7 +12,7 @@ func TestTheStreamsReadingEachRawTable(t *testing.T) {
 	cases := map[events.EventType][]events.Stream{
 		events.EventExposure:          {events.StreamExposures},
 		events.EventEvaluationSummary: {events.StreamEvaluationSummaries},
-		events.EventAlias:             nil,
+		events.EventAlias:             {events.StreamAliases},
 	}
 	for typ, want := range cases {
 		got := events.StreamsReading(typ)

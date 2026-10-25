@@ -356,7 +356,7 @@ A configured destination that receives a durable copy of events: ClickHouse, obj
 _Avoid_: export target, destination, integration, connector
 
 **Stream**:
-One reader of a raw event table moving an `(xid, seq)` cursor of its own: a rollup stream (such as `exposures`, keeping first exposures and daily counts, or `evaluation_summaries`, keeping evaluations per day), or one `(sink, event kind)` pair, a sink with all three event kinds selected moving three streams, each at its own pace. It reads only rows of transactions below the snapshot horizon, which have all ended, so its cursor is a position below which every row is either already applied or delivered, or never will be.
+One reader of a raw event table moving an `(xid, seq)` cursor of its own: a rollup stream (such as `exposures`, keeping first exposures and daily counts, `evaluation_summaries`, keeping evaluations per day, or `aliases`, counting the aliases received per day), or one `(sink, event kind)` pair, a sink with all three event kinds selected moving three streams, each at its own pace. It reads only rows of transactions below the snapshot horizon, which have all ended, so its cursor is a position below which every row is either already applied or delivered, or never will be.
 _Avoid_: subscription (reserved for a webhook subscription), channel, topic, position (as a field name; the word is cursor)
 
 **In-flight batch**:

@@ -1774,6 +1774,59 @@ export type FlagState = {
   has_experiment: boolean;
 };
 
+export type EventVolume = {
+  /**
+   * By day, then type.
+   */
+  days: Array<EventVolumeDay>;
+  /**
+   * By when their first event was received.
+   */
+  gaps: Array<EventGap>;
+};
+
+export type EventVolumeDay = {
+  /**
+   * The UTC day the events were received.
+   */
+  day: string;
+  type: EventType;
+  events: number;
+};
+
+/**
+ * The type of an event as SDKs post it to `/sdk/v1/events`.
+ */
+export type EventType = "evaluation_summary" | "alias" | "exposure";
+
+export type EventGap = {
+  /**
+   * The reader that lost the events: `exposures`,
+   * `evaluation_summaries` or `aliases`, the rollup streams.
+   *
+   */
+  stream: string;
+  type: EventType;
+  /**
+   * When the first event lost was received.
+   */
+  period_start: string;
+  /**
+   * When the last event lost was received.
+   */
+  period_end: string;
+  /**
+   * The raw rows lost, every project's: an evaluation summary is
+   * stored as one row per flag, variation and reason it counts.
+   *
+   */
+  rows: number;
+  /**
+   * When retention dropped them.
+   */
+  dropped_at: string;
+};
+
 export type FlagEvaluations = {
   items: Array<FlagEvaluationDay>;
 };
@@ -6390,6 +6443,70 @@ export type GetFlagEvaluationsResponses = {
 
 export type GetFlagEvaluationsResponse =
   GetFlagEvaluationsResponses[keyof GetFlagEvaluationsResponses];
+
+export type GetEventVolumeData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: {
+    /**
+     * The first UTC day, included; 29 days before `to` when absent.
+     */
+    from?: string;
+    /**
+     * The last UTC day, included; today when absent.
+     */
+    to?: string;
+  };
+  url: "/projects/{project}/events/volume";
+};
+
+export type GetEventVolumeErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetEventVolumeError = GetEventVolumeErrors[keyof GetEventVolumeErrors];
+
+export type GetEventVolumeResponses = {
+  /**
+   * The events per day and the gaps.
+   */
+  200: EventVolume;
+};
+
+export type GetEventVolumeResponse = GetEventVolumeResponses[keyof GetEventVolumeResponses];
 
 export type ListExperimentsData = {
   body?: never;

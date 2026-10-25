@@ -132,6 +132,9 @@ import type {
   GetEnvironmentRulesetData,
   GetEnvironmentRulesetErrors,
   GetEnvironmentRulesetResponses,
+  GetEventVolumeData,
+  GetEventVolumeErrors,
+  GetEventVolumeResponses,
   GetExperimentAssignmentData,
   GetExperimentAssignmentErrors,
   GetExperimentAssignmentResponses,
@@ -2082,6 +2085,38 @@ export const getFlagEvaluations = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/flags/{flag}/environments/{environment}/evaluations",
+    ...options,
+  });
+
+/**
+ * The events the project received per day, and the gaps
+ *
+ * The events SDKs posted to the project per UTC day they were
+ * received and type, as the rollups counted them; a day without an
+ * event of a type is left out. The counts are kept after retention
+ * drops the raw events. `gaps` are the raw events retention dropped
+ * before the stream reading them had read them, each gap whose
+ * received period meets the range: they are the instance's, so
+ * `rows` counts every project's events, and what those events would
+ * have added is missing from the counts and from what the streams
+ * feed. A range from after `to`, or of more than 90 days, is
+ * `invalid_request`. The counts lag the SDKs by the rollups' round,
+ * ten seconds, besides the time a long transaction holds them back.
+ *
+ */
+export const getEventVolume = <ThrowOnError extends boolean = false>(
+  options: Options<GetEventVolumeData, ThrowOnError>,
+): RequestResult<GetEventVolumeResponses, GetEventVolumeErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetEventVolumeResponses, GetEventVolumeErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/events/volume",
     ...options,
   });
 

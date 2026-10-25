@@ -12,13 +12,14 @@ import (
 var RawEventTypes = []EventType{EventEvaluationSummary, EventAlias, EventExposure}
 
 // StreamsReading returns the rollup streams reading the raw rows of typ.
-// Aliases are linked as they arrive, so no stream reads them.
 func StreamsReading(typ EventType) []Stream {
 	switch typ {
 	case EventExposure:
 		return []Stream{StreamExposures}
 	case EventEvaluationSummary:
 		return []Stream{StreamEvaluationSummaries}
+	case EventAlias:
+		return []Stream{StreamAliases}
 	default:
 		return nil
 	}

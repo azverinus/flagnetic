@@ -60,6 +60,34 @@ func (s *Store) ExposuresAfter(ctx context.Context, from events.Cursor, limit in
 	return out, b.To, nil
 }
 
+// AliasesAfter returns the next batch of at most limit aliases past from, of
+// transactions below the snapshot horizon, and the cursor of the last; from
+// itself when there is none.
+func (s *Store) AliasesAfter(ctx context.Context, from events.Cursor, limit int) ([]events.AliasRow, events.Cursor, error) {
+	b, err := bound(ctx, s.db(ctx), "alias_events", from, limit)
+	if err != nil || b.Rows == 0 {
+		return nil, b.To, err
+	}
+	where, args := b.where("r")
+	rows, err := s.db(ctx).Query(ctx, `SELECT r.project_id, r.received_at FROM alias_events r WHERE `+where+` ORDER BY r.xid, r.seq`, args...)
+	if err != nil {
+		return nil, events.Cursor{}, fmt.Errorf("reading aliases to roll up: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (events.AliasRow, error) {
+		var (
+			r       events.AliasRow
+			project [16]byte
+		)
+		scanErr := row.Scan(&project, &r.ReceivedAt)
+		r.Project, r.ReceivedAt = id.FromBytes[workspace.Project](project), r.ReceivedAt.UTC()
+		return r, scanErr
+	})
+	if err != nil {
+		return nil, events.Cursor{}, fmt.Errorf("reading aliases to roll up: %w", err)
+	}
+	return out, b.To, nil
+}
+
 // LockTargets returns which of the projects, environments, flags and
 // experiments given still exist, each held against deletion until the unit of work ends,
 // so that the rollup's writes referencing them never fail on one deleted

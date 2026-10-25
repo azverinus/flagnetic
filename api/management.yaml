@@ -2233,6 +2233,54 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/events/volume:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: getEventVolume
+      summary: The events the project received per day, and the gaps
+      description: |
+        The events SDKs posted to the project per UTC day they were
+        received and type, as the rollups counted them; a day without an
+        event of a type is left out. The counts are kept after retention
+        drops the raw events. `gaps` are the raw events retention dropped
+        before the stream reading them had read them, each gap whose
+        received period meets the range: they are the instance's, so
+        `rows` counts every project's events, and what those events would
+        have added is missing from the counts and from what the streams
+        feed. A range from after `to`, or of more than 90 days, is
+        `invalid_request`. The counts lag the SDKs by the rollups' round,
+        ten seconds, besides the time a long transaction holds them back.
+      x-permission: project.read
+      tags: [events]
+      parameters:
+        - name: from
+          in: query
+          description: The first UTC day, included; 29 days before `to` when absent.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: The last UTC day, included; today when absent.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: The events per day and the gaps.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventVolume"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/experiments:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -6991,6 +7039,68 @@ components:
         has_experiment:
           type: boolean
           description: A rule of the configuration serves an experiment.
+    EventVolume:
+      type: object
+      required: [days, gaps]
+      properties:
+        days:
+          type: array
+          description: By day, then type.
+          items:
+            $ref: "#/components/schemas/EventVolumeDay"
+        gaps:
+          type: array
+          description: By when their first event was received.
+          items:
+            $ref: "#/components/schemas/EventGap"
+    EventVolumeDay:
+      type: object
+      required: [day, type, events]
+      properties:
+        day:
+          type: string
+          format: date
+          description: The UTC day the events were received.
+        type:
+          $ref: "#/components/schemas/EventType"
+        events:
+          type: integer
+          format: int64
+          minimum: 1
+    EventType:
+      type: string
+      description: The type of an event as SDKs post it to `/sdk/v1/events`.
+      enum: [evaluation_summary, alias, exposure]
+    EventGap:
+      type: object
+      required: [stream, type, period_start, period_end, rows, dropped_at]
+      properties:
+        stream:
+          type: string
+          description: |
+            The reader that lost the events: `exposures`,
+            `evaluation_summaries` or `aliases`, the rollup streams.
+        type:
+          $ref: "#/components/schemas/EventType"
+        period_start:
+          type: string
+          format: date-time
+          description: When the first event lost was received.
+        period_end:
+          type: string
+          format: date-time
+          description: When the last event lost was received.
+        rows:
+          type: integer
+          format: int64
+          minimum: 1
+          description: |
+            The raw rows lost, every project's: an evaluation summary is
+            stored as one row per flag, variation and reason it counts.
+        dropped_at:
+          type: string
+          format: date-time
+          description: When retention dropped them.
     FlagEvaluations:
       type: object
       required: [items]
