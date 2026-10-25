@@ -1,5 +1,7 @@
 // The ruleset the server-rendering tests evaluate: one flag a private segment
-// decides, one string flag and one JSON flag.
+// decides, one string flag and one JSON flag; and values documents as the
+// server answers a client key.
+import type { JsonValue } from "../../src/client.js";
 
 export interface RulesetOptions {
   /** A protected environment: the browser refuses local overrides there. */
@@ -52,4 +54,24 @@ export function ruleset(options: RulesetOptions = {}): Record<string, unknown> {
       },
     ],
   };
+}
+
+/**
+ * A values document serving exactly these values, as the server answers a
+ * client key: every value decided by targeting, so its reason is
+ * `targeting_match`.
+ */
+export function valuesFor(values: Record<string, JsonValue>, rulesetVersion = 7): Record<string, unknown> {
+  const flags: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(values)) {
+    flags[key] = {
+      type: typeof value === "boolean" ? "boolean" : typeof value === "string" ? "string" : typeof value === "number" ? "number" : "json",
+      value,
+      variation: "v",
+      reason: "targeting_match",
+      automatic_exposure: false,
+      override_influenced: false,
+    };
+  }
+  return { schema_version: 1, ruleset_version: rulesetVersion, environment: { key: "production", protected: false }, flags };
 }

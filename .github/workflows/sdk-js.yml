@@ -103,7 +103,8 @@ jobs:
       - name: Conformance suite in Chromium
         run: pnpm test:browser
 
-  # The browser client against a server on another origin, in each engine.
+  # The browser client against a server on another origin, and the React
+  # bindings mounting and hydrating, in each engine.
   browsers:
     name: browser client (${{ matrix.browser }})
     runs-on: ubuntu-latest
@@ -127,7 +128,7 @@ jobs:
         run: pnpm exec playwright install --with-deps "$FLAGNETIC_BROWSERS"
         env:
           FLAGNETIC_BROWSERS: ${{ matrix.browser }}
-      - name: Browser client, cross-origin
+      - name: Browser client cross-origin, React in the DOM
         run: pnpm test:browsers
         env:
           FLAGNETIC_BROWSERS: ${{ matrix.browser }}

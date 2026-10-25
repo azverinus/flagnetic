@@ -20,7 +20,7 @@ const chromium = {
 };
 
 // The browser client's own tests run in Chromium, Firefox and WebKit against
-// a server on another origin. FLAGNETIC_BROWSERS narrows the engines, as CI
+// a server on another origin, and the React bindings mount and hydrate in each. FLAGNETIC_BROWSERS narrows the engines, as CI
 // does to run one per job.
 const engines = (process.env.FLAGNETIC_BROWSERS ?? "chromium,firefox,webkit").split(",") as ("chromium" | "firefox" | "webkit")[];
 
@@ -48,10 +48,10 @@ export default defineConfig({
           name: "node",
           environment: "node",
           include: ["test/**/*.test.{ts,tsx}"],
-          // A `.dom.test.tsx` needs a document to mount into, so it runs in
-          // the browser project alone; the React tests that only render to a
-          // string run here too.
-          exclude: ["test/**/*.browser.test.ts", "test/**/*.dom.test.tsx", "test/**/*.p99.test.ts"],
+          // A `.browser.test` needs a document, so it runs in the engines'
+          // project alone; the React tests that only render to a string run
+          // here too.
+          exclude: ["test/**/*.browser.test.{ts,tsx}", "test/**/*.p99.test.ts"],
           benchmark: { include: ["bench/**/*.bench.ts"] },
         },
       },
@@ -70,7 +70,7 @@ export default defineConfig({
         test: {
           name: "browser",
           include: ["test/**/*.test.{ts,tsx}"],
-          exclude: ["test/**/*.node.test.{ts,tsx}", "test/**/*.browser.test.ts", "test/**/*.p99.test.ts"],
+          exclude: ["test/**/*.node.test.{ts,tsx}", "test/**/*.browser.test.{ts,tsx}", "test/**/*.p99.test.ts"],
           browser: chromium,
         },
       },
@@ -78,7 +78,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "browsers",
-          include: ["test/**/*.browser.test.ts"],
+          include: ["test/**/*.browser.test.{ts,tsx}"],
           browser: {
             ...chromium,
             provider: playwright(),
