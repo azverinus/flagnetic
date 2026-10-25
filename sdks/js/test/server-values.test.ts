@@ -4,6 +4,7 @@
 // and the page never tells how a value was reached. No network: these run in
 // the browser environment too.
 import { describe, expect, test } from "vitest";
+import { ValuesDocument } from "../src/client/values.js";
 import { createServerWith } from "../src/server/client.js";
 import { createServer } from "../src/server.js";
 import { ruleset, type RulesetOptions } from "./support/flags-fixture.js";
@@ -82,6 +83,17 @@ describe("the values document for server rendering", () => {
     expect(JSON.stringify(offline().values(germanUser))).not.toContain("germans");
   });
 
+  test("is what flagnetic/client parses, with the values the server serves", () => {
+    const flags = offline();
+    const parsed = ValuesDocument.parse(JSON.parse(JSON.stringify(flags.values(germanUser))));
+
+    expect(parsed.rulesetVersion).toBe(7);
+    expect(parsed.flags.get("checkout")?.value).toBe(flags.getBool(germanUser, "checkout", false));
+    expect(parsed.flags.get("checkout")?.reason).toBe("targeting_match");
+    expect(parsed.flags.get("paywall_copy")?.value).toBe(flags.getString(germanUser, "paywall_copy", ""));
+    expect(parsed.flags.get("theme")?.automaticExposure).toBe(true);
+  });
+
   test("is nothing at stage built_in: there is nothing to render from", async () => {
     const clock = new VirtualClock();
     const flags = createServerWith(
@@ -93,6 +105,107 @@ describe("the values document for server rendering", () => {
     expect(flags.stage).toBe("built_in");
     expect(flags.values(germanUser)).toBeUndefined();
     await flags.close();
+  });
+});
+
+// One flag per way a value is reached, so each reason's mask is pinned.
+const everyReason = {
+  schema_version: 1,
+  version: 3,
+  scope: "server",
+  environment: { key: "production", protected: false },
+  unit_types: ["user"],
+  attributes: [],
+  segments: [],
+  flags: [
+    flag("rolled_out", { rules: [{ id: "r-roll", conditions: [], serve: { kind: "rollout", unit_type: "user", variation: "on", percentage: 10000, salt: "s-roll" } }] }),
+    flag("switched_off", { on: false }),
+    flag("gated", { prerequisites: [{ flag: "switched_off", variation: "on" }] }),
+    flag("pinned", { overrides: [{ unit_type: "user", unit_id: "u-1", variation: "on" }] }),
+    flag("tested", {
+      rules: [
+        {
+          id: "r-exp",
+          conditions: [],
+          serve: {
+            kind: "experiment",
+            experiment: "checkout_v2",
+            unit_type: "user",
+            inclusion_salt: "inclusion-salt",
+            variation_salt: "variation-salt",
+            traffic_allocation: 10000,
+            weights: [
+              { variation: "on", weight: 10000 },
+              { variation: "off", weight: 0 },
+            ],
+          },
+        },
+      ],
+    }),
+  ],
+};
+
+function flag(key: string, extra: Record<string, unknown>) {
+  return {
+    key,
+    type: "boolean",
+    on: true,
+    off_variation: "off",
+    fallthrough: "off",
+    variations: [
+      { key: "on", value: true },
+      { key: "off", value: false },
+    ],
+    prerequisites: [],
+    overrides: [],
+    rules: [],
+    ...extra,
+  };
+}
+
+describe("the mask, reason by reason", () => {
+  const flags = createServer("", "", { offline: everyReason, logger: () => undefined });
+  const doc = flags.values(germanUser);
+
+  test.each([
+    ["rolled_out", "rollout"],
+    ["gated", "prerequisite_failed"],
+  ])("serves %s, decided by %s, as targeting_match", (key, reason) => {
+    expect(flags.getDetail(germanUser, key, false).reason).toBe(reason);
+    expect(doc?.flags[key]?.reason).toBe("targeting_match");
+  });
+
+  test.each([
+    ["switched_off", "off"],
+    ["pinned", "override"],
+    ["tested", "experiment"],
+  ])("serves %s, decided by %s, under its own reason: a client key is told it too", (key, reason) => {
+    expect(doc?.flags[key]?.reason).toBe(reason);
+  });
+
+  test("keeps the experiment block whole: the browser reports the exposure from it", () => {
+    expect(doc?.flags.tested?.experiment).toEqual({
+      key: "checkout_v2",
+      variation: "on",
+      unit_type: "user",
+      unit_id: "u-1",
+      inclusion_salt: "inclusion-salt",
+      variation_salt: "variation-salt",
+      inclusion_bucket: 8367,
+      variation_bucket: 7363,
+      override: false,
+    });
+  });
+
+  test("names no rule, prerequisite or bucket on any flag", () => {
+    for (const served of Object.values(doc?.flags ?? {})) {
+      for (const field of ["rule_id", "prerequisite", "bucket"]) {
+        expect(Object.keys(served)).not.toContain(field);
+      }
+    }
+    const json = JSON.stringify(doc);
+    expect(json).not.toContain("r-roll");
+    expect(json).not.toContain("r-exp");
   });
 });
 
