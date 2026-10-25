@@ -167,8 +167,8 @@ jobs:
   # end-to-end suite: the console, its handlers and the suite itself, with
   # the generated client left out, as it changes with every edit of the
   # management API; server changes behind it are covered by the runs on main,
-  # on release pull requests and nightly. For the Ruby gem: its directory,
-  # the conformance suite, the SDK contract and its workflow.
+  # on release pull requests and nightly. For the Ruby gems: their
+  # directories, the conformance suite, the SDK contract and their workflow.
   changes:
     name: what changed
     runs-on: ubuntu-latest
@@ -194,7 +194,7 @@ jobs:
             echo "e2e=false" >> "$GITHUB_OUTPUT"
           fi
           if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/ruby/|conformance/|api/sdk\.yaml$|go\.mod$|\.github/workflows/(ci|sdk-ruby)\.yml$)'; then
+            grep -qE '^(sdks/ruby/|sdks/ruby-openfeature/|conformance/|api/sdk\.yaml$|go\.mod$|\.github/workflows/(ci|sdk-ruby)\.yml$)'; then
             echo "ruby=true" >> "$GITHUB_OUTPUT"
           else
             echo "ruby=false" >> "$GITHUB_OUTPUT"
@@ -295,11 +295,12 @@ jobs:
           path: web/e2e/playwright-report
           retention-days: 7
 
-  # The Ruby gem: rubocop, the tests on every supported Ruby with the
-  # conformance suite, and the Unicode tables compared with Go's. On a pull
-  # request it runs when the gem, the conformance suite, the SDK contract or
-  # its workflow changes; on main, on release pull requests and nightly
-  # always.
+  # The Ruby gems: rubocop, the tests on every supported Ruby with the
+  # conformance suite, the Unicode tables compared with Go's, and the
+  # OpenFeature provider against the working tree and the released core. On
+  # a pull request it runs when either gem, the conformance suite, the SDK
+  # contract or its workflow changes; on main, on release pull requests and
+  # nightly always.
   sdk-ruby:
     name: Ruby SDK
     needs: changes

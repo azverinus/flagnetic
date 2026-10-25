@@ -1,7 +1,8 @@
 name: sdk-ruby
 
-# The Ruby gem, called from ci.yml when the gem, the conformance suite, the
-# SDK contract or this workflow changes.
+# The Ruby gems, flagnetic and flagnetic-openfeature, called from ci.yml
+# when either gem, the conformance suite, the SDK contract or this workflow
+# changes.
 on:
   workflow_call:
 
@@ -80,6 +81,72 @@ jobs:
           bundler-cache: true
           working-directory: sdks/ruby/rails
       - name: Test
+        run: bundle exec rake test
+
+  # The OpenFeature provider on the Ruby versions it supports (3.4 and the
+  # newest) against the core gem of the working tree, and on the oldest
+  # openfeature-sdk it supports, the first release with track. It runs the
+  # shared OpenFeature reasons and every conformance case first.
+  openfeature:
+    name: ruby-openfeature ${{ matrix.ruby }}${{ matrix.openfeature && format(' openfeature-sdk {0}', matrix.openfeature) || '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ruby: "3.4"
+          - ruby: "4.0"
+          - ruby: "3.4"
+            openfeature: "0.6.1"
+    env:
+      OPENFEATURE_SDK_VERSION: ${{ matrix.openfeature }}
+    defaults:
+      run:
+        working-directory: sdks/ruby-openfeature
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+          working-directory: sdks/ruby-openfeature
+      - name: Rubocop
+        run: bundle exec rubocop
+      - name: Test
+        run: bundle exec rake test
+      - name: Gem builds
+        run: gem build --strict flagnetic-openfeature.gemspec
+
+  # What bundle add gives a consumer: the provider against the flagnetic gem
+  # published on RubyGems rather than the working tree. Skipped while
+  # flagnetic has no release.
+  openfeature-released:
+    name: ruby-openfeature against the released flagnetic
+    runs-on: ubuntu-latest
+    env:
+      FLAGNETIC_GEM: released
+    defaults:
+      run:
+        working-directory: sdks/ruby-openfeature
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+      - id: released
+        name: Look for a released flagnetic
+        run: |
+          if gem list --remote --exact flagnetic | grep -q '^flagnetic '; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "flagnetic has no release on RubyGems yet; skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install
+        if: steps.released.outputs.found == 'true'
+        run: bundle install
+      - name: Test
+        if: steps.released.outputs.found == 'true'
         run: bundle exec rake test
 
   # The case folding orbits and property names come from the Go the server is
