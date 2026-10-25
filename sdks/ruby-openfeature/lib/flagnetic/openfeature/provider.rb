@@ -195,13 +195,15 @@ module Flagnetic
       # leaves STALE or ERROR when the client recovers, and STALE on a move
       # to last_good. A revoked key moves a fresh client to last_good right
       # after the ERROR it sent: STALE would hide the ERROR, so none is sent
-      # while the key stays revoked.
+      # while the key stays revoked. A move to fresh clears the revoked key
+      # even before init returns, so init does not announce an ERROR the
+      # client has already recovered from.
       def staged(stage)
+        @revoked = false if stage == :fresh
         return unless @initialized
 
         case stage
         when :fresh
-          @revoked = false
           emit(::OpenFeature::SDK::ProviderEvent::PROVIDER_READY)
         when :last_good
           stale unless @revoked

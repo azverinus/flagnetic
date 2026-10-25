@@ -131,6 +131,28 @@ class EventsTest < Minitest::Test
     assert_equal true, client.fetch_boolean_value(flag_key: "greeting", default_value: true)
   end
 
+  # A key refused and accepted again before init returns leaves the client
+  # fresh, with no stage change to come; init must announce READY then.
+  def test_a_key_accepted_again_before_init_is_ready
+    @server.publish(document(1))
+    refused = true
+    @server.on_ruleset do |_|
+      next nil unless refused
+
+      refused = false
+      [401, {}, ""]
+    end
+    provider = Flagnetic::OpenFeature::Provider.new(
+      "fn_srv_#{"a" * 40}", base_url: @server.base_url, stream: false, timing: FAST, logger: QUIET
+    )
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 3
+    sleep 0.02 until provider.client.stage == :fresh || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+    assert_equal :fresh, provider.client.stage
+
+    _, client = register(provider)
+    assert_equal OF::ProviderState::READY, client.provider_status
+  end
+
   def test_a_failed_first_fetch_is_ready_serving_built_in_defaults
     @server.on_ruleset { |_| [503, {}, ""] }
     _, client = online_provider(ready_timeout: 0.5)
