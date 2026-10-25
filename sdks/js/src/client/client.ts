@@ -283,12 +283,12 @@ export class FlagneticClient {
     this.ingest.setVisible(this.visible);
     this.ingest.start();
 
-    if (!this.deferred) this.begin(true);
+    if (!this.deferred) this.begin();
   }
 
-  // begin opens the change stream when it is on and, when first, starts the
-  // first evaluation, which with the stream waits for it to open.
-  private begin(first: boolean): void {
+  // begin opens the change stream when it is on and starts the first
+  // evaluation, which with the stream waits for it to open.
+  private begin(): void {
     if (this.options.stream === true) {
       this.stream = new ChangeStream(
         {
@@ -318,10 +318,10 @@ export class FlagneticClient {
       this.stream.open();
       // The stream opens first so that no change falls between the two; the
       // first evaluation waits for it no longer than this.
-      if (first) this.firstWait = this.clock.setTimeout(() => { if (!this.started) this.refetch("start"); }, this.timing.streamFirstWait);
+      this.firstWait = this.clock.setTimeout(() => { if (!this.started) this.refetch("start"); }, this.timing.streamFirstWait);
       return;
     }
-    if (first) this.refetch("start");
+    this.refetch("start");
   }
 
   // ------------------------------------------------------------ lifecycle
@@ -370,17 +370,20 @@ export class FlagneticClient {
   setContext(context: Context): Promise<Stage> {
     if (this.closed || this.offline) return Promise.resolve(this.currentStage);
     this.context = context;
-    if (this.deferred) {
-      this.deferred = false;
-      this.begin(false);
-    }
     // The details held answer the previous context; an exposure reports the
     // detail of the context the flag was evaluated for.
     this.served.clear();
     // The previous values are no longer the server's answer for this
     // context, so they serve as last good until the new ones arrive.
     if (this.currentStage === "fresh") this.setStage("last_good");
-    return this.attemptAfter("context");
+    if (this.deferred) {
+      // The first context starts the client as the constructor would have:
+      // with the stream on, the evaluation waits for it to open, so a page
+      // load sends one evaluation and no change falls between the two.
+      this.deferred = false;
+      return this.attemptAfter(() => { this.begin(); });
+    }
+    return this.attemptAfter(() => { this.refetch("context"); });
   }
 
   /**
@@ -685,11 +688,11 @@ export class FlagneticClient {
     this.refetch("stream");
   }
 
-  /** Refetches and resolves once an evaluation started no earlier than now has settled. */
-  private attemptAfter(trigger: Trigger): Promise<Stage> {
+  /** Runs start, which starts an evaluation, and resolves once an evaluation started no earlier than now has settled. */
+  private attemptAfter(start: () => void): Promise<Stage> {
     const minSeq = this.attemptSeq + 1;
     const waited = new Promise<Stage>((resolve) => this.attemptWaiters.push({ minSeq, resolve }));
-    this.refetch(trigger);
+    start();
     return waited;
   }
 
