@@ -458,6 +458,10 @@ Future<void> _runScenario(
       ? InMemoryStore()
       : await storeHoldingVia(harness, storedDoc, context);
   var scenarioNow = DateTime.utc(2026, 1, 1);
+  // Every scenario starts on a visible page, whatever the one before it
+  // left behind: a browser run plays every scenario in one test, and one
+  // that failed while hidden would otherwise fail the next as well.
+  harness.page?.show();
   final server = await harness.startServer();
   final logs = LogRecorder();
   final offlineSource = offline == null
@@ -478,9 +482,9 @@ Future<void> _runScenario(
         sse: options['sse'] as bool?,
         // The scenarios' 0–3 s wait, divided like every duration.
         rulesetEventJitter: scaled(3000),
-        // Time as the scenario counts it: it moves only by `advance_ms`, so
-        // the 10 s minimum refetch gap is tested in the protocol's own
-        // seconds.
+        // Time as the scenario counts it: it moves only by `advance_ms` and
+        // `no_request`, so the 10 s minimum refetch gap is tested in the
+        // protocol's own seconds.
         clock: () => scenarioNow,
         minimumRefetchGap: const Duration(seconds: 10),
         offline: offlineSource,

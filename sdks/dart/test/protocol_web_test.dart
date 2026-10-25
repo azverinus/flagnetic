@@ -27,8 +27,6 @@ void main() {
     );
     suite = ProtocolSuite.read(harness.fixtures, inPage: true);
   });
-  // Every scenario leaves the page as the next one expects to find it.
-  tearDown(() => showPage('visible'));
 
   test('every degradation case of POST /sdk/v1/evaluate', () async {
     await playAll(
