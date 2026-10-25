@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"maps"
 	"reflect"
 	"slices"
 	"strconv"
@@ -256,7 +257,43 @@ func (c Configuration) Replace(f Flag, in ConfigurationInput, r Referents, m Min
 // authors as they were. It is checked against r as a replace is, since a
 // variation, segment, declaration or flag it names may be gone since.
 func (c Configuration) Revert(f Flag, recorded Configuration, r Referents, w Write) (Configuration, Changed, error) {
+	if err := c.keepsExperimentRules(recorded); err != nil {
+		return c, Changed{}, err
+	}
 	return c.write(recorded, f, recorded.input(), r, Mint{}, w)
+}
+
+// errExperimentRulesChanged refuses a revert or a copy that would change
+// which rules serve which experiment.
+var errExperimentRulesChanged = apperrors.Conflict("experiment_rules_changed",
+	"a revert or a copy never adds, removes or retargets a rule serving an experiment; edit the rules instead")
+
+// keepsExperimentRules refuses doc, a document a revert or a copy would
+// write whole over c, when a rule serving an experiment in one is not the
+// same rule serving the same experiment in the other. Whether an experiment
+// runs lives on the experiment, not in the configuration: bringing such a
+// rule in would put an experiment into an environment nobody chose, taking
+// one out would starve a running experiment there, and an old document
+// written back across a stop would replace the decision with a rule serving
+// what no longer runs. An experiment reaches an environment, or leaves it,
+// only through an explicit rule edit.
+func (c Configuration) keepsExperimentRules(doc Configuration) error {
+	if !maps.Equal(c.experimentRules(), doc.experimentRules()) {
+		return errExperimentRulesChanged
+	}
+	return nil
+}
+
+// experimentRules returns the experiment each rule of c serving one serves,
+// by rule identifier.
+func (c Configuration) experimentRules() map[RuleID]string {
+	out := map[RuleID]string{}
+	for _, rule := range c.Rules {
+		if rule.Serve.Kind == ServeExperiment {
+			out[rule.ID] = rule.Serve.Experiment
+		}
+	}
+	return out
 }
 
 // Copy returns the configuration of f made by w what source, f's
@@ -273,6 +310,9 @@ func (c Configuration) Copy(f Flag, source Configuration, overrides bool, r Refe
 		ck := newCheck(invalidConfiguration, configurationNotValid)
 		ck.add("/from", "invalid_value", "a configuration is copied from another environment", nil)
 		return c, Changed{}, ck.err()
+	}
+	if err := c.keepsExperimentRules(source); err != nil {
+		return c, Changed{}, err
 	}
 	doc := source
 	doc.On = c.On
