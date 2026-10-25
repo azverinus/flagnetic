@@ -1,4 +1,4 @@
-import type { Rule, RuleInput, Serve } from "@flagnetic/api";
+import type { Experiment, Rule, RuleInput, Serve } from "@flagnetic/api";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 
@@ -20,12 +20,14 @@ export const maxConditions = 20;
 
 /**
  * What a rule serves as the editor edits it: every kind's fields kept, so
- * switching from a rollout to a variation and back loses nothing, its
- * salt included. The percentage is text as typed.
+ * switching from a rollout to a variation or an experiment and back loses
+ * nothing, its salt included. The percentage is text as typed.
  */
 export type ServeDraft = {
-  kind: "variation" | "rollout";
+  kind: "variation" | "rollout" | "experiment";
   variation: string;
+  /** The key of the experiment served, for kind `experiment`. */
+  experiment: string;
   unitType: string;
   percent: string;
   /** The rollout's salt, given by the server; absent until the rule is saved as a rollout. */
@@ -68,10 +70,15 @@ export function basisPoints(text: string): number | undefined {
   return points <= 10_000 ? points : undefined;
 }
 
+function serveKind(kind: string): ServeDraft["kind"] {
+  return kind === "rollout" || kind === "experiment" ? kind : "variation";
+}
+
 function serveDraft(serve: Serve): ServeDraft {
   return {
-    kind: serve.kind === "rollout" ? "rollout" : "variation",
+    kind: serveKind(serve.kind),
     variation: serve.variation ?? "",
+    experiment: serve.experiment ?? "",
     unitType: serve.unit_type ?? "",
     percent: serve.percentage === undefined ? "" : percentText(serve.percentage),
     ...(serve.salt ? { salt: serve.salt } : {}),
@@ -91,6 +98,7 @@ export function ruleDrafts(rules: readonly Rule[], types: AttributeTypes): RuleD
 
 function serveOf(serve: ServeDraft): Serve {
   if (serve.kind === "variation") return { kind: "variation", variation: serve.variation };
+  if (serve.kind === "experiment") return { kind: "experiment", experiment: serve.experiment };
   return {
     kind: "rollout",
     variation: serve.variation,
@@ -116,8 +124,24 @@ export function newRule(variation: string, unitType: string): RuleDraft {
     key: newRuleKey(),
     description: "",
     conditions: [],
-    serve: { kind: "variation", variation, unitType, percent: "" },
+    serve: { kind: "variation", variation, experiment: "", unitType, percent: "" },
   };
+}
+
+/**
+ * The experiments of the flag a rule may be set to serve, in the order
+ * given: the draft and running ones, and the one the rule serves already
+ * whatever its status, since the server keeps a rule serving a stopped or
+ * archived experiment but refuses a rule newly set to serve one.
+ */
+export function servableExperiments(
+  experiments: readonly Experiment[],
+  served: string,
+): Experiment[] {
+  return experiments.filter(
+    (experiment) =>
+      experiment.status === "draft" || experiment.status === "running" || experiment.key === served,
+  );
 }
 
 /** The rules with the one keyed `key` replaced by what `change` makes of it. */
@@ -165,7 +189,7 @@ export type RuleContext = ConditionContext & {
 /**
  * What the rules still need before the server would take them, by where
  * it shows: a condition by its key, a serve's field by the rule's key and
- * the field (`variation`, `unit_type`, `percent`), and a rule with too
+ * the field (`variation`, `experiment`, `unit_type`, `percent`), and a rule with too
  * many conditions by its key and `conditions`.
  */
 export function ruleIssues(
@@ -185,6 +209,12 @@ export function ruleIssues(
       if (issue) issues.set(condition.key, issue);
     }
     const { serve } = rule;
+    if (serve.kind === "experiment") {
+      if (serve.experiment === "") {
+        issues.set(`${rule.key}/experiment`, i18n._(msg`Choose an experiment.`));
+      }
+      continue;
+    }
     if (serve.variation === "") {
       issues.set(`${rule.key}/variation`, i18n._(msg`Choose a variation.`));
     } else if (!context.variations.includes(serve.variation)) {

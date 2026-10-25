@@ -1,4 +1,4 @@
-import { createSegment } from "@flagnetic/api";
+import { createExperiment, createSegment, deleteExperiment } from "@flagnetic/api";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
@@ -33,6 +33,30 @@ async function seedRuleProject(prefix: string): Promise<string> {
     }),
   );
   return project;
+}
+
+/** A draft experiment comparing the edited flag's two variations evenly, over users. */
+async function seedExperiment(project: string, key: string, name: string) {
+  return must(
+    `creating ${key}`,
+    await createExperiment({
+      client: managementClient(),
+      path: { project },
+      body: {
+        key,
+        name,
+        hypothesis: "The shorter checkout converts better.",
+        flag: "checkout_variant",
+        unit_type: "user",
+        variations: [
+          { variation: "control", weight: 5000 },
+          { variation: "treatment", weight: 5000 },
+        ],
+        traffic_allocation: 2500,
+        expected_end_at: "2027-01-31",
+      },
+    }),
+  );
 }
 
 async function openRules(page: Page, project: string) {
@@ -327,11 +351,74 @@ test.describe("the rule editor", () => {
   });
 });
 
+test.describe("a rule serving an experiment", () => {
+  test("serves a draft experiment, shows it as it is, and marks the flag in the list", async ({
+    page,
+  }) => {
+    const project = await seedRuleProject("rules-experiment");
+    await seedExperiment(project, "checkout_test", "Shorter checkout");
+    const gone = await seedExperiment(project, "gone_test", "Gone");
+    await openRules(page, project);
+
+    await page.getByRole("button", { name: "Add rule" }).click();
+    await rule(page, 1).getByRole("radio", { name: "Experiment" }).check();
+    await rule(page, 1).getByRole("combobox", { name: "Experiment (rule 1)" }).click();
+    await expect(page.getByRole("option", { name: "gone_test" })).toBeVisible();
+    await page.getByRole("option", { name: "checkout_test", exact: true }).click();
+    // The experiment's status, allocation and weights show as they are, with its page a link away.
+    await expect(rule(page, 1).getByText("Draft", { exact: true })).toBeVisible();
+    await expect(rule(page, 1).getByText("25.00% of user units included")).toBeVisible();
+    const weights = rule(page, 1).getByRole("list", { name: "Weights (rule 1)" });
+    await expect(weights.getByRole("listitem")).toHaveText(["control 50.00%", "treatment 50.00%"]);
+    await expect(rule(page, 1).getByText(/SDKs do not receive this rule/)).toBeVisible();
+    await expect(rule(page, 1).getByRole("link", { name: "Shorter checkout" })).toHaveAttribute(
+      "href",
+      `/projects/${project}/experiments/checkout_test`,
+    );
+
+    // Saving without an experiment chosen is stopped on the rule.
+    await page.getByRole("button", { name: "Add rule" }).click();
+    await rule(page, 2).getByRole("radio", { name: "Experiment" }).check();
+    const bar = page.getByRole("region", { name: "Unsaved changes" });
+    await bar.getByRole("button", { name: "Save" }).click();
+    await expect(rule(page, 2).getByText("Choose an experiment.")).toBeVisible();
+
+    // An experiment deleted while the page is open is refused by the
+    // server, and the refusal is pinned on the rule that served it.
+    await pick(page, rule(page, 2), "Experiment (rule 2)", "gone_test");
+    must(
+      "deleting gone_test",
+      await deleteExperiment({
+        client: managementClient(),
+        path: { project, experiment: "gone_test" },
+        headers: { "If-Match": `"${gone.version}"` },
+      }),
+    );
+    await bar.getByRole("button", { name: "Save" }).click();
+    await expect(rule(page, 2).getByText("The project has no such experiment.")).toBeVisible();
+
+    await rule(page, 2).getByRole("button", { name: "Remove rule 2" }).click();
+    await bar.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("The configuration in Development is saved.")).toBeVisible();
+    const saved = await readConfiguration(project, "checkout_variant", "development");
+    expect(saved.rules.map((r) => r.serve)).toEqual([
+      { kind: "experiment", experiment: "checkout_test" },
+    ]);
+
+    // The flags list marks the environment and filters by it.
+    await page.goto(`/projects/${project}/flags?environment=development&state=experiment`);
+    await expect(page.getByRole("link", { name: "checkout_variant" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "payments_v2" })).toHaveCount(0);
+    await expect(page.getByTitle("Serves an experiment")).toHaveCount(1);
+  });
+});
+
 test.describe("accessibility", () => {
   for (const theme of ["light", "dark"] as const) {
     test(`the rule editor has no serious violation in the ${theme} theme`, async ({ page }) => {
       await useTheme(page, theme);
       const project = await seedRuleProject(`rules-axe-${theme}`);
+      await seedExperiment(project, "checkout_test", "Shorter checkout");
       await writeConfiguration(project, "checkout_variant", "development", () => ({
         prerequisites: [{ flag: "payments_v2", variation: "treatment" }],
         rules: [
@@ -346,6 +433,11 @@ test.describe("accessibility", () => {
             description: "VIP rollout",
             conditions: [{ kind: "in_segment", segment: "vip" }],
             serve: { kind: "rollout", variation: "treatment", unit_type: "user", percentage: 2500 },
+          },
+          {
+            description: "Checkout test",
+            conditions: [],
+            serve: { kind: "experiment", experiment: "checkout_test" },
           },
         ],
       }));

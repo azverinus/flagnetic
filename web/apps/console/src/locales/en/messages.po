@@ -11,6 +11,10 @@ msgstr ""
 msgid "“{bad}” is not an origin. Use a scheme, a host and an optional port, such as https://app.example.com."
 msgstr "“{bad}” is not an origin. Use a scheme, a host and an optional port, such as https://app.example.com."
 
+#: src/components/rule-editor.tsx
+msgid "{allocation}% of {unitType} units included"
+msgstr "{allocation}% of {unitType} units included"
+
 #: src/lib/device.ts
 msgid "{browser} on {os}"
 msgstr "{browser} on {os}"
@@ -937,6 +941,14 @@ msgstr "Choose an attribute"
 msgid "Choose an attribute."
 msgstr "Choose an attribute."
 
+#: src/components/rule-editor.tsx
+msgid "Choose an experiment"
+msgstr "Choose an experiment"
+
+#: src/lib/rule-editor.ts
+msgid "Choose an experiment."
+msgstr "Choose an experiment."
+
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered languages."
 msgstr "Choose one of the offered languages."
@@ -1672,9 +1684,18 @@ msgstr "Expected removal"
 msgid "Expected removal changed from {before} to {after}."
 msgstr "Expected removal changed from {before} to {after}."
 
+#: src/components/rule-editor.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Experiment"
 msgstr "Experiment"
+
+#: src/components/rule-editor.tsx
+msgid "Experiment (rule {position})"
+msgstr "Experiment (rule {position})"
+
+#: src/lib/conditions.ts
+msgid "experiment {experiment}"
+msgstr "experiment {experiment}"
 
 #: src/lib/audit.ts
 msgid "Experiment cloned"
@@ -3469,6 +3490,10 @@ msgstr "Serves <0/> instead of <1/>."
 msgid "Serves <0>{serves}</0>"
 msgstr "Serves <0>{serves}</0>"
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Serves an experiment"
+msgstr "Serves an experiment"
+
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 msgid "Session"
@@ -3802,6 +3827,10 @@ msgstr "The environments serve differently where marked."
 msgid "The experiment {key} is created."
 msgstr "The experiment {key} is created."
 
+#: src/components/rule-editor.tsx
+msgid "The experiment has ended: SDKs no longer receive this rule, and units continue to the next rule."
+msgstr "The experiment has ended: SDKs no longer receive this rule, and units continue to the next rule."
+
 #: src/lib/experiments.ts
 msgid "The experiment is archived: nothing about it changes any more."
 msgstr "The experiment is archived: nothing about it changes any more."
@@ -3861,6 +3890,10 @@ msgstr "The flag and its configuration in every environment are deleted. This ca
 #: src/components/tester-panel.tsx
 msgid "The flag could not be evaluated."
 msgstr "The flag could not be evaluated."
+
+#: src/components/rule-editor.tsx
+msgid "The flag has no draft or running experiment. <0>Create one</0> to serve it here."
+msgstr "The flag has no draft or running experiment. <0>Create one</0> to serve it here."
 
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
@@ -4498,6 +4531,10 @@ msgid "Units"
 msgstr "Units"
 
 #: src/components/rule-editor.tsx
+msgid "Units matching this rule are assigned to the variations by the experiment's weights. Its weights and unit type change only on the experiment's page."
+msgstr "Units matching this rule are assigned to the variations by the experiment's weights. Its weights and unit type change only on the experiment's page."
+
+#: src/components/rule-editor.tsx
 msgid "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
 msgstr "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
 
@@ -4628,6 +4665,10 @@ msgstr "Viewer"
 msgid "Weight of variation {n} (%)"
 msgstr "Weight of variation {n} (%)"
 
+#: src/components/rule-editor.tsx
+msgid "Weights (rule {position})"
+msgstr "Weights (rule {position})"
+
 #: src/components/structural-diff-view.tsx
 msgid "Weights changed to <0>{weights}</0>."
 msgstr "Weights changed to <0>{weights}</0>."
@@ -4675,6 +4716,10 @@ msgstr "Where the project serves from. A key is fixed once created; the name can
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
 msgstr "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
+
+#: src/components/rule-editor.tsx
+msgid "While the experiment is a draft, SDKs do not receive this rule: units continue to the next rule until it starts."
+msgstr "While the experiment is a draft, SDKs do not receive this rule: units continue to the next rule until it starts."
 
 #: src/lib/experiments.ts
 msgid "While the experiment runs its traffic allocation can only grow, from {from} %."

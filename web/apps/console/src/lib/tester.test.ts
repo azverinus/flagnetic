@@ -112,7 +112,7 @@ describe("the rule a result names", () => {
     ...(id ? { id } : {}),
     description: "",
     conditions: [],
-    serve: { kind: "variation", variation: "on", unitType: "user", percent: "" },
+    serve: { kind: "variation", variation: "on", experiment: "", unitType: "user", percent: "" },
   });
 
   it("is the card of the rule by its identifier, with its position", () => {

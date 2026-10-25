@@ -1,4 +1,4 @@
-import type { Rule } from "@flagnetic/api";
+import type { Experiment, Rule } from "@flagnetic/api";
 import { i18n } from "@lingui/core";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -16,6 +16,7 @@ import {
   ruleDrafts,
   ruleInputs,
   ruleIssues,
+  servableExperiments,
   withRule,
 } from "./rule-editor";
 
@@ -46,6 +47,13 @@ const saved: Rule[] = [
     },
   },
 ];
+
+const servingExperiment: Rule = {
+  id: "r3",
+  description: "Checkout test",
+  conditions: [],
+  serve: { kind: "experiment", experiment: "checkout-test" },
+};
 
 describe("rules to and from the API", () => {
   it("sends saved rules back as they were, identifiers and salts included", () => {
@@ -82,6 +90,55 @@ describe("rules to and from the API", () => {
     });
     const back = { ...asVariation, serve: { ...asVariation.serve, kind: "rollout" as const } };
     expect(ruleInputs([back], types)[0]!.serve.salt).toBe("abcdefgh12345678");
+  });
+
+  it("sends a saved experiment serve back as it was", () => {
+    expect(ruleInputs(ruleDrafts([servingExperiment], types), types)).toEqual([servingExperiment]);
+  });
+
+  it("sends an experiment serve with the experiment's key and nothing else", () => {
+    const [, rollout] = ruleDrafts(saved, types) as [RuleDraft, RuleDraft];
+    const asExperiment = {
+      ...rollout,
+      serve: { ...rollout.serve, kind: "experiment" as const, experiment: "checkout-test" },
+    };
+    expect(ruleInputs([asExperiment], types)[0]!.serve).toEqual({
+      kind: "experiment",
+      experiment: "checkout-test",
+    });
+    const back = { ...asExperiment, serve: { ...asExperiment.serve, kind: "rollout" as const } };
+    expect(ruleInputs([back], types)[0]!.serve).toMatchObject({
+      variation: "treatment",
+      salt: "abcdefgh12345678",
+    });
+  });
+});
+
+function experiment(key: string, status: Experiment["status"]): Experiment {
+  return { key, status } as Experiment;
+}
+
+describe("the experiments a rule may serve", () => {
+  const experiments = [
+    experiment("archived-test", "archived"),
+    experiment("draft-test", "draft"),
+    experiment("running-test", "running"),
+    experiment("stopped-test", "stopped"),
+  ];
+
+  it("are the flag's draft and running experiments", () => {
+    expect(servableExperiments(experiments, "").map((e) => e.key)).toEqual([
+      "draft-test",
+      "running-test",
+    ]);
+  });
+
+  it("keep the one the rule serves already, whatever its status", () => {
+    expect(servableExperiments(experiments, "stopped-test").map((e) => e.key)).toEqual([
+      "draft-test",
+      "running-test",
+      "stopped-test",
+    ]);
   });
 });
 
@@ -154,7 +211,7 @@ describe("what a rule still needs", () => {
   };
 
   it("passes the saved rules", () => {
-    const issues = ruleIssues(i18n, ruleDrafts(saved, types), context);
+    const issues = ruleIssues(i18n, ruleDrafts([...saved, servingExperiment], types), context);
     expect(issues.size).toBe(0);
   });
 
@@ -195,5 +252,12 @@ describe("what a rule still needs", () => {
     expect(ruleIssues(i18n, [gone], context).get(`${gone.key}/variation`)).toBe(
       "The flag has no such variation.",
     );
+  });
+
+  it("asks for an experiment, and for no variation, when the rule serves one", () => {
+    const rule = newRule("", "user");
+    const serving = { ...rule, serve: { ...rule.serve, kind: "experiment" as const } };
+    const issues = ruleIssues(i18n, [serving], context);
+    expect([...issues]).toEqual([[`${rule.key}/experiment`, "Choose an experiment."]]);
   });
 });

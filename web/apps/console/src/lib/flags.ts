@@ -13,9 +13,15 @@ import { ApiError } from "./errors";
 import { violationMessage } from "./problem-messages";
 
 /** What a flag's configuration in the list's environment is filtered by. */
-export type FlagStateFilter = "on" | "off" | "rules" | "rollout";
+export type FlagStateFilter = "on" | "off" | "rules" | "rollout" | "experiment";
 
-export const flagStateFilters: readonly FlagStateFilter[] = ["on", "off", "rules", "rollout"];
+export const flagStateFilters: readonly FlagStateFilter[] = [
+  "on",
+  "off",
+  "rules",
+  "rollout",
+  "experiment",
+];
 
 /** How the flags list is ordered: by key, by name, or the latest change to a definition first. */
 export type FlagsSort = "key" | "name" | "updated";
