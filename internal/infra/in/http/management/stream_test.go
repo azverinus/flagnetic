@@ -415,3 +415,26 @@ func TestAChangeStreamRefetchesOnceItsReplicaListensAgain(t *testing.T) {
 		t.Errorf("notice %+v after listening again, want the flag search", n)
 	}
 }
+
+func TestADeletedProjectsStreamsCloseAtTheirNextHeartbeat(t *testing.T) {
+	c := clock.NewFake(time.Now())
+	srv := testkit.StartServer(t, testkit.WithClock(c))
+	token := testkit.InstanceAdminToken(t)
+	admin := testkit.Client(t, srv, token)
+	p := createProject(t, admin, projectKey())
+	// An instance admin holds every permission in every project, so only
+	// the project's being gone ends their stream.
+	s := openChanges(t, srv, token, p.Key, "")
+	s.Started(t)
+
+	deleter := signedIn(t, srv, testkit.NewMember(t, testkit.Pool(t), testkit.AsInstanceAdmin()))
+	if res := deleteProject(t, deleter.ClientWithResponses, p.Key, p.Version); res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("DELETE project = %d %s", res.StatusCode(), res.Body)
+	}
+	// A new project taking the freed key is another project.
+	createProject(t, admin, p.Key)
+	c.Advance(15 * time.Second)
+	if !s.Ended(2 * time.Second) {
+		t.Error("the stream of a deleted project is open after its next heartbeat")
+	}
+}
