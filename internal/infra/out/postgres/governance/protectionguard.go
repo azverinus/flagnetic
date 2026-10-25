@@ -142,9 +142,9 @@ func (g *ProtectionGuard) judge(ctx context.Context, where string, arg [16]byte)
 			b           bumped
 			environment [16]byte
 		)
-		err := row.Scan(&environment, &b.key, &b.protected, &b.version, &b.held)
+		scanErr := row.Scan(&environment, &b.key, &b.protected, &b.version, &b.held)
 		b.id = id.FromBytes[workspace.Environment](environment)
-		return b, err
+		return b, scanErr
 	})
 	if err != nil {
 		return fmt.Errorf("reading the environments a bump reaches: %w", err)

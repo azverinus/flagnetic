@@ -35,12 +35,12 @@ func TestABumpWithoutTheProjectsRowHeldIsRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	ws := pgworkspace.NewStore(pool)
-	if err := ws.CreateProject(t.Context(), p); err != nil {
+	if err = ws.CreateProject(t.Context(), p); err != nil {
 		t.Fatal(err)
 	}
 	var staging workspace.EnvironmentID
 	for _, e := range workspace.DefaultsOf(p, envIDs{ids}).Environments {
-		if err := ws.CreateEnvironment(t.Context(), e); err != nil {
+		if err = ws.CreateEnvironment(t.Context(), e); err != nil {
 			t.Fatal(err)
 		}
 		if e.Key == "staging" {
@@ -53,9 +53,9 @@ func TestABumpWithoutTheProjectsRowHeldIsRefused(t *testing.T) {
 	})
 	tx, locker := postgres.NewTransactor(pool), pgflags.NewStore(pool)
 	version := func() int64 {
-		v, err := deliveryStore.RulesetVersions(t.Context(), p.ID)
-		if err != nil {
-			t.Fatal(err)
+		v, readErr := deliveryStore.RulesetVersions(t.Context(), p.ID)
+		if readErr != nil {
+			t.Fatal(readErr)
 		}
 		return v["staging"]
 	}
@@ -70,8 +70,8 @@ func TestABumpWithoutTheProjectsRowHeldIsRefused(t *testing.T) {
 			return tx.Within(t.Context(), func(ctx context.Context) error { return guard.Project(ctx, p.ID) })
 		},
 	} {
-		if err := bump(); !errors.Is(err, pggovernance.ErrProjectNotHeld) {
-			t.Errorf("%s: err = %v, want ErrProjectNotHeld", name, err)
+		if bumpErr := bump(); !errors.Is(bumpErr, pggovernance.ErrProjectNotHeld) {
+			t.Errorf("%s: err = %v, want ErrProjectNotHeld", name, bumpErr)
 		}
 	}
 	if got := version(); got != before {
@@ -79,8 +79,8 @@ func TestABumpWithoutTheProjectsRowHeldIsRefused(t *testing.T) {
 	}
 
 	err = tx.Within(t.Context(), func(ctx context.Context) error {
-		if err := locker.LockProject(ctx, p.ID); err != nil {
-			return err
+		if lockErr := locker.LockProject(ctx, p.ID); lockErr != nil {
+			return lockErr
 		}
 		return guard.Environment(ctx, staging)
 	})

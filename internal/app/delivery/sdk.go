@@ -247,7 +247,7 @@ func (h *MaterializeRuleset) InUnitOfWork(ctx context.Context, environment works
 	if err != nil {
 		return Ruleset{}, err
 	}
-	if err := readMaterials(ctx, h.d.Declarations, h.d.Flags, project, environment, &m); err != nil {
+	if err = readMaterials(ctx, h.d.Declarations, h.d.Flags, project, environment, &m); err != nil {
 		return Ruleset{}, err
 	}
 	doc, err := delivery.Materialize(m)
