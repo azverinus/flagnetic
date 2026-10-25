@@ -152,6 +152,13 @@ type Handlers struct {
 	ApplyChangeRequest   *appgovernance.ApplyChangeRequest
 	CopyChangeRequest    *appgovernance.CopyChangeRequest
 
+	ListWebhookEventTypes *appgovernance.ListWebhookEventTypes
+	ListWebhooks          *appgovernance.ListWebhooks
+	CreateWebhook         *appgovernance.CreateWebhook
+	GetWebhook            *appgovernance.GetWebhook
+	UpdateWebhook         *appgovernance.UpdateWebhook
+	DeleteWebhook         *appgovernance.DeleteWebhook
+
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment
 	CreateSegment     *appflags.CreateSegment

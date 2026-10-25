@@ -94,6 +94,13 @@ func TestSecretsAreRecordedFromTextByTheirShape(t *testing.T) {
 	}
 }
 
+func TestTheRedactionOfASecretIsNotRecordedAsOne(t *testing.T) {
+	testkit.RecordSecret("[redacted]")
+	if slices.Contains(testkit.RecordedSecrets(), "[redacted]") {
+		t.Error("the redaction was recorded as a secret, so every entry redacting one would be refused")
+	}
+}
+
 func TestTheTestClientRecordsThePasswordsItSends(t *testing.T) {
 	c := testkit.Client(t, testkit.StartServer(t), "")
 	res, err := c.CreateProjectWithBodyWithResponse(t.Context(), "application/json",

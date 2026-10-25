@@ -99,6 +99,11 @@ type Config struct {
 	// SDKInventoryRetentionDays is how many days a row of the SDK
 	// inventory is kept after its SDK was last seen.
 	SDKInventoryRetentionDays int
+	// WebhookAllowHTTP accepts plain http webhook targets.
+	WebhookAllowHTTP bool
+	// WebhookAllowPrivateNetworks accepts webhook targets on loopback,
+	// private, link-local, unspecified and multicast addresses.
+	WebhookAllowPrivateNetworks bool
 }
 
 // RateLimits are the limits of the SDK API, each counted by every replica on
@@ -483,6 +488,25 @@ func Settings() []Setting {
 			Example: "90",
 			apply:   wholeNumber(func(c *Config, n int) { c.SDKInventoryRetentionDays = n }),
 		},
+		{
+			Name:    "FLAGNETIC_WEBHOOK_ALLOW_HTTP",
+			Key:     "webhook_allow_http",
+			Default: "false",
+			Description: "Accept webhook subscriptions whose target is plain `http`, which sends events and their signatures unencrypted. " +
+				"Without it such a target is refused `insecure_url`. Meant for a receiver on the same host or a trusted network.",
+			Example: "true",
+			apply:   boolSetting(func(c *Config, b bool) { c.WebhookAllowHTTP = b }),
+		},
+		{
+			Name:    "FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS",
+			Key:     "webhook_allow_private_networks",
+			Default: "false",
+			Description: "Accept webhook targets that resolve to loopback, private, link-local, unspecified or multicast addresses. " +
+				"Without it such a target is refused `private_network_target` when a subscription is written, " +
+				"so that whoever manages webhooks cannot reach the network the instance runs in.",
+			Example: "true",
+			apply:   boolSetting(func(c *Config, b bool) { c.WebhookAllowPrivateNetworks = b }),
+		},
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "120", "requests per minute",
 			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP.",
 			func(l *RateLimits) *int { return &l.ClientEvaluate }),
@@ -549,6 +573,18 @@ func wholeNumber(set func(*Config, int)) func(*Config, string) error {
 			return errors.New("not a whole number of at least 1")
 		}
 		set(cfg, n)
+		return nil
+	}
+}
+
+// boolSetting parses true or false into the field set picks.
+func boolSetting(set func(*Config, bool)) func(*Config, string) error {
+	return func(cfg *Config, v string) error {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return errors.New("not true or false")
+		}
+		set(cfg, b)
 		return nil
 	}
 }

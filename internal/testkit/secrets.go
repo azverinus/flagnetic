@@ -44,9 +44,14 @@ const minSecretLength = 8
 // base62 characters, and not its hint, which the audit log does record.
 var tokenValueShape = regexp.MustCompile(`fn_[a-z]{3}_[0-9A-Za-z]{40}`)
 
+// redactedSecret is what an entry, and a response reading one, writes in
+// place of a secret, such as a webhook subscription's: a member named
+// secret holding it is the redaction, not a value to guard.
+const redactedSecret = "[redacted]"
+
 // RecordSecret records v as a secret value no audit entry may hold.
 func RecordSecret(v string) {
-	if len(v) < minSecretLength {
+	if len(v) < minSecretLength || v == redactedSecret {
 		return
 	}
 	recorded.mu.Lock()

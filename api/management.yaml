@@ -4217,6 +4217,181 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /webhook-event-types:
+    get:
+      operationId: listWebhookEventTypes
+      summary: The event catalogue
+      description: |
+        Every event type a webhook subscription may name, with what emits
+        it. `*` in a subscription's `events` matches every type but
+        `audit.entry`, which a subscription names to get.
+      x-permission: member
+      tags: [webhooks]
+      responses:
+        "200":
+          description: The catalogue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookEventTypeList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /projects/{project}/webhooks:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listWebhooks
+      summary: The project's webhook subscriptions
+      description: The oldest first. A secret is never listed; it is shown once, when it is issued.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "200":
+          description: The project's webhook subscriptions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createWebhook
+      summary: Subscribe to events
+      description: |
+        Creates a webhook subscription and answers it with its `secret`,
+        shown this once: it is stored sealed under `FLAGNETIC_SECRET_KEY`
+        and never answered again, and audit entries record it as
+        `[redacted]`. A subscription created now is sent only events of
+        changes made after it.
+
+        `url` must be `https` (`insecure_url`) unless the operator set
+        `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
+        loopback, private, link-local, unspecified or multicast address is
+        refused (`private_network_target`) unless the operator set
+        `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
+        resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
+        A blank name or one over 200 characters, a `url` that is not an
+        absolute http or https URL without credentials or a fragment, no
+        event type, and an environment the project does not have are
+        `invalid_webhook`.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookCreate"
+      responses:
+        "201":
+          description: The new subscription with its secret, shown this once.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookWithSecret"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/Invalid"
+  /projects/{project}/webhooks/{webhook}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/WebhookID"
+    get:
+      operationId: getWebhook
+      summary: A webhook subscription
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "200":
+          description: The subscription; its `ETag` is its version.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateWebhook
+      summary: Edit a webhook subscription
+      description: |
+        Changes each property present and leaves the others as they are,
+        with the refusals of creation; a new `url` is checked as on
+        creation. An edit that changes nothing stores and records nothing.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookPatch"
+      responses:
+        "200":
+          description: The subscription as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+    delete:
+      operationId: deleteWebhook
+      summary: Delete a webhook subscription
+      description: |
+        The subscription goes, and nothing more is sent under it. Unlike an
+        edit it takes no `If-Match`: whatever the subscription became, the
+        caller wants nothing more sent to its target.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "204":
+          description: Deleted.
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   parameters:
     AuditActor:
@@ -4316,6 +4491,14 @@ components:
       in: path
       required: true
       description: The change request's identifier.
+      schema:
+        type: string
+        format: uuid
+    WebhookID:
+      name: webhook
+      in: path
+      required: true
+      description: The webhook subscription's identifier.
       schema:
         type: string
         format: uuid
@@ -7182,3 +7365,201 @@ components:
         override_influenced:
           type: boolean
           description: Whether an override decided the result, directly or through a prerequisite.
+    WebhookEventType:
+      type: string
+      x-go-type: string
+      description: |
+        A type of the event catalogue, or `*` for every type but
+        `audit.entry`. `GET /webhook-event-types` lists the catalogue with
+        what emits each type.
+      enum:
+        - "flag.created"
+        - "flag.updated"
+        - "flag.deleted"
+        - "flag.switched_on"
+        - "flag.switched_off"
+        - "flag.kill_switch"
+        - "flag.rules_changed"
+        - "flag.reverted"
+        - "segment.created"
+        - "segment.updated"
+        - "segment.deleted"
+        - "experiment.started"
+        - "experiment.stopped"
+        - "experiment.archived"
+        - "experiment.traffic_allocation_changed"
+        - "experiment.srm_detected"
+        - "experiment.srm_cleared"
+        - "experiment.no_exposures"
+        - "experiment.exposure_conflicts"
+        - "experiment.past_expected_end"
+        - "change_request.opened"
+        - "change_request.approved"
+        - "change_request.rejected"
+        - "change_request.applied"
+        - "change_request.cancelled"
+        - "change_request.superseded"
+        - "change_request.scheduled"
+        - "change_request.schedule_failed"
+        - "grant.created"
+        - "grant.deleted"
+        - "sdk_key.created"
+        - "sdk_key.revoked"
+        - "webhook.disabled"
+        - "report.stale_flags"
+        - "audit.entry"
+        - "ping"
+        - "*"
+    WebhookEventTypeInfo:
+      type: object
+      required: [type, description]
+      properties:
+        type:
+          type: string
+        description:
+          type: string
+          description: What emits an event of this type.
+    WebhookEventTypeList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventTypeInfo"
+    WebhookDisabledReason:
+      type: string
+      enum: [persistent_failure]
+      description: Why the platform disabled a subscription.
+    WebhookCreator:
+      type: object
+      description: The member or the project token that created a webhook subscription.
+      required: [kind, id, name]
+      properties:
+        kind:
+          type: string
+          enum: [member, token]
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: The member's display name or the token's name, as it is now.
+    Webhook:
+      type: object
+      required: [id, name, url, events, environments, enabled, disabled_reason, created_by, last_success_at,
+        consecutive_failures, previous_secret_expires_at, created_at, updated_at, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          $ref: "#/components/schemas/Name"
+        url:
+          type: string
+          description: |
+            Where every event is posted: `https` unless the operator set
+            `FLAGNETIC_WEBHOOK_ALLOW_HTTP`.
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        environments:
+          type: array
+          description: |
+            The keys of the environments whose events are sent; empty for
+            every one. An event of no environment is always sent.
+          items:
+            type: string
+        enabled:
+          type: boolean
+        disabled_reason:
+          allOf:
+            - $ref: "#/components/schemas/WebhookDisabledReason"
+          nullable: true
+          description: Why the platform disabled the subscription; null when it is enabled or a member disabled it.
+        created_by:
+          allOf:
+            - $ref: "#/components/schemas/WebhookCreator"
+          nullable: true
+        last_success_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When a call last succeeded; null before the first.
+        consecutive_failures:
+          type: integer
+          description: The calls that failed since the last success or the last enable.
+        previous_secret_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Until when the secret the last rotation replaced signs beside the
+            current one; null outside a rotation's overlap.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        version:
+          $ref: "#/components/schemas/Version"
+    WebhookWithSecret:
+      allOf:
+        - $ref: "#/components/schemas/Webhook"
+        - type: object
+          required: [secret]
+          properties:
+            secret:
+              type: string
+              description: |
+                Base64url of 32 random bytes, the key of every signature
+                under this subscription. Shown once, by the operation that
+                issued it: it is stored sealed and never answered again.
+    WebhookCreate:
+      type: object
+      required: [name, url, events]
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        environments:
+          type: array
+          description: The keys of the environments whose events to send; empty or absent for every one.
+          items:
+            type: string
+        enabled:
+          type: boolean
+          description: Whether events are sent; true when absent.
+    WebhookPatch:
+      type: object
+      description: The properties to change; each absent one is left as it is.
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        environments:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+    WebhookList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Webhook"

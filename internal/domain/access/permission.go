@@ -101,6 +101,10 @@ const (
 	// PermChangeRequestApprove decides change requests: approves and
 	// rejects another's, and cancels or applies another's.
 	PermChangeRequestApprove Permission = "change_request.approve"
+	// PermWebhookManage creates, reads, edits and deletes a project's
+	// webhook subscriptions. Reading them needs it too: a subscription
+	// says where a project's changes are sent.
+	PermWebhookManage Permission = "webhook.manage"
 )
 
 // catalog is every permission an operation can require. Each context adds
@@ -143,6 +147,10 @@ var catalog = []PermissionSpec{
 	// members: an owner could otherwise create a token and approve their own
 	// change request with it, one person standing for two.
 	{Name: PermChangeRequestApprove, Scope: ScopeFlagsWrite, MembersOnly: true, TokenRefusal: ErrTokenCannotApprove},
+	// A pipeline provisioning a project may subscribe its tools to the
+	// project's changes; a subscription changes nothing SDKs receive and
+	// nobody's access.
+	{Name: PermWebhookManage, Scope: ScopeProjectAdmin},
 }
 
 // ErrTokenCannotApprove refuses a project token whose role would decide
@@ -237,12 +245,12 @@ var roles = []Role{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermEnvironmentProtect, PermDeclarationManage,
 		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
 		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete, PermSDKKeyManage,
-		PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermChangeRequestApprove,
+		PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermChangeRequestApprove, PermWebhookManage,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
 		PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete,
-		PermSDKKeyManage, PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermChangeRequestApprove,
+		PermSDKKeyManage, PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermChangeRequestApprove, PermWebhookManage,
 	}},
 	{Name: RoleDeveloper, Permissions: []Permission{
 		PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert,

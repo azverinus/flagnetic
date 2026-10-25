@@ -2449,6 +2449,10 @@ msgid "manage unit types and attributes"
 msgstr ""
 
 #: src/lib/access-names.ts
+msgid "manage webhook subscriptions"
+msgstr ""
+
+#: src/lib/access-names.ts
 msgid "manage who has access"
 msgstr ""
 
@@ -4965,6 +4969,23 @@ msgstr ""
 #. The name of a built-in role.
 #: src/lib/access-names.ts
 msgid "Viewer"
+msgstr ""
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Webhook subscription"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Webhook subscription created"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Webhook subscription deleted"
+msgstr ""
+
+#: src/lib/audit.ts
+msgid "Webhook subscription updated"
 msgstr ""
 
 #: src/components/weights-input.tsx

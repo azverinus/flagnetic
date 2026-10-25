@@ -33,7 +33,8 @@ export type Permission =
   | "experiment.edit"
   | "experiment.delete"
   | "change_request.propose"
-  | "change_request.approve";
+  | "change_request.approve"
+  | "webhook.manage";
 
 /** Each permission as what it lets a member do, to complete "the permission to …". */
 const permissionNames: Record<Permission, MessageDescriptor> = {
@@ -56,6 +57,7 @@ const permissionNames: Record<Permission, MessageDescriptor> = {
   "experiment.delete": msg`delete draft experiments`,
   "change_request.propose": msg`propose changes as change requests`,
   "change_request.approve": msg`approve and reject change requests`,
+  "webhook.manage": msg`manage webhook subscriptions`,
 };
 
 const roleNames: Record<string, MessageDescriptor> = {

@@ -1471,6 +1471,121 @@ export const zEvaluation = z.object({
 });
 
 /**
+ * A type of the event catalogue, or `*` for every type but
+ * `audit.entry`. `GET /webhook-event-types` lists the catalogue with
+ * what emits each type.
+ *
+ */
+export const zWebhookEventType = z.enum([
+  "flag.created",
+  "flag.updated",
+  "flag.deleted",
+  "flag.switched_on",
+  "flag.switched_off",
+  "flag.kill_switch",
+  "flag.rules_changed",
+  "flag.reverted",
+  "segment.created",
+  "segment.updated",
+  "segment.deleted",
+  "experiment.started",
+  "experiment.stopped",
+  "experiment.archived",
+  "experiment.traffic_allocation_changed",
+  "experiment.srm_detected",
+  "experiment.srm_cleared",
+  "experiment.no_exposures",
+  "experiment.exposure_conflicts",
+  "experiment.past_expected_end",
+  "change_request.opened",
+  "change_request.approved",
+  "change_request.rejected",
+  "change_request.applied",
+  "change_request.cancelled",
+  "change_request.superseded",
+  "change_request.scheduled",
+  "change_request.schedule_failed",
+  "grant.created",
+  "grant.deleted",
+  "sdk_key.created",
+  "sdk_key.revoked",
+  "webhook.disabled",
+  "report.stale_flags",
+  "audit.entry",
+  "ping",
+  "*",
+]);
+
+export const zWebhookEventTypeInfo = z.object({
+  type: z.string(),
+  description: z.string(),
+});
+
+export const zWebhookEventTypeList = z.object({
+  items: z.array(zWebhookEventTypeInfo),
+});
+
+/**
+ * Why the platform disabled a subscription.
+ */
+export const zWebhookDisabledReason = z.enum(["persistent_failure"]);
+
+/**
+ * The member or the project token that created a webhook subscription.
+ */
+export const zWebhookCreator = z.object({
+  kind: z.enum(["member", "token"]),
+  id: z.uuid(),
+  name: z.string(),
+});
+
+export const zWebhook = z.object({
+  id: z.uuid(),
+  name: zName,
+  url: z.string(),
+  events: z.array(zWebhookEventType),
+  environments: z.array(z.string()),
+  enabled: z.boolean(),
+  disabled_reason: zWebhookDisabledReason.nullable(),
+  created_by: zWebhookCreator.nullable(),
+  last_success_at: z.iso.datetime().nullable(),
+  consecutive_failures: z.int(),
+  previous_secret_expires_at: z.iso.datetime().nullable(),
+  created_at: z.iso.datetime(),
+  updated_at: z.iso.datetime(),
+  version: zVersion,
+});
+
+export const zWebhookWithSecret = zWebhook.and(
+  z.object({
+    secret: z.string(),
+  }),
+);
+
+export const zWebhookCreate = z.object({
+  name: z.string(),
+  url: z.string(),
+  events: z.array(zWebhookEventType),
+  environments: z.array(z.string()).optional(),
+  enabled: z.boolean().optional(),
+});
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export const zWebhookPatch = z.object({
+  name: z.string().optional(),
+  url: z.string().optional(),
+  events: z.array(zWebhookEventType).optional(),
+  environments: z.array(z.string()).optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const zWebhookList = z.object({
+  items: z.array(zWebhook),
+});
+
+/**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
 export const zAuditActor = z.uuid();
@@ -1541,6 +1656,11 @@ export const zFlagKey = z.string();
  * The change request's identifier.
  */
 export const zChangeRequestId = z.uuid();
+
+/**
+ * The webhook subscription's identifier.
+ */
+export const zWebhookId = z.uuid();
 
 /**
  * The experiment's key.
@@ -3004,3 +3124,64 @@ export const zListAuditEntriesQuery = z.object({
  * One page of entries, newest first.
  */
 export const zListAuditEntriesResponse = zAuditEntryList;
+
+/**
+ * The catalogue.
+ */
+export const zListWebhookEventTypesResponse = zWebhookEventTypeList;
+
+export const zListWebhooksPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The project's webhook subscriptions.
+ */
+export const zListWebhooksResponse = zWebhookList;
+
+export const zCreateWebhookBody = zWebhookCreate;
+
+export const zCreateWebhookPath = z.object({
+  project: z.string(),
+});
+
+/**
+ * The new subscription with its secret, shown this once.
+ */
+export const zCreateWebhookResponse = zWebhookWithSecret;
+
+export const zDeleteWebhookPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteWebhookResponse = z.void();
+
+export const zGetWebhookPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+});
+
+/**
+ * The subscription; its `ETag` is its version.
+ */
+export const zGetWebhookResponse = zWebhook;
+
+export const zUpdateWebhookBody = zWebhookPatch;
+
+export const zUpdateWebhookHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateWebhookPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+});
+
+/**
+ * The subscription as it is now.
+ */
+export const zUpdateWebhookResponse = zWebhook;

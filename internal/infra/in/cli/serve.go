@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
@@ -101,7 +102,10 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
-		Options:               management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
+		WebhookTargets: governance.TargetPolicy{
+			AllowHTTP: cfg.WebhookAllowHTTP, AllowPrivateNetworks: cfg.WebhookAllowPrivateNetworks,
+		},
+		Options: management.Options{BaseURL: cfg.BaseURL, InsecureCookies: cfg.InsecureCookies},
 	})
 	// Run on every way out, after the requests are done.
 	defer background.Close()
