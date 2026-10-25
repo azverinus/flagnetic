@@ -325,6 +325,32 @@ func TestAnAcknowledgedAlertStaysUntilItClearsAndAReturningMismatchRaisesANewOne
 	}
 }
 
+// An alert that cleared before anyone saw it can still be acknowledged: the
+// acknowledgement is recorded and the alert stays cleared.
+func TestAClearedAlertCanBeAcknowledged(t *testing.T) {
+	srv, c := startSampleRatioServer(t)
+	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
+	f.expose(t, "staging", map[string]int{"true": 5200, "false": 4800})
+	check(t, srv)
+	c.Advance(10 * time.Minute)
+	f.expose(t, "staging", map[string]int{"false": 400})
+	check(t, srv)
+	clearedAt := c.Now()
+	cleared := f.alerts(t, ptr(false))
+	if len(cleared) != 1 || cleared[0].AcknowledgedAt != nil {
+		t.Fatalf("cleared alerts = %+v, want one, unacknowledged", cleared)
+	}
+
+	c.Advance(time.Minute)
+	ack := f.acknowledge(t, cleared[0].Id)
+	if ack.AcknowledgedAt == nil || !ack.AcknowledgedAt.Equal(c.Now()) || ack.ClearedAt == nil || !ack.ClearedAt.Equal(clearedAt) {
+		t.Fatalf("acknowledged = %+v, want acknowledged now and still cleared at %s", ack, clearedAt)
+	}
+	if got := f.audited(t, "experiment.alert_acknowledged"); len(got) != 1 {
+		t.Errorf("experiment.alert_acknowledged entries = %+v, want one", got)
+	}
+}
+
 func TestAcknowledgingAnAlertOfAnotherExperimentIsNotFound(t *testing.T) {
 	srv, c := startSampleRatioServer(t)
 	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
