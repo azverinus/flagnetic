@@ -2,7 +2,7 @@
 
 # The console, built once on the build platform: its output is the same for
 # every target, and the Go build embeds it.
-FROM --platform=$BUILDPLATFORM node:25-alpine AS console
+FROM --platform=$BUILDPLATFORM node:26-alpine AS console
 WORKDIR /src/web
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 # The pnpm the workspace names in packageManager, so its version has one home.
