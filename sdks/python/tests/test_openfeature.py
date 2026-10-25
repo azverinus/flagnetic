@@ -503,6 +503,21 @@ def test_a_revoked_key_is_a_provider_error_and_still_logged() -> None:
         server.close()
 
 
+def test_a_revoked_key_is_a_provider_error_even_when_the_logger_raises() -> None:
+    server = MockServer(lambda _request: Response(401))
+
+    def raising(_level: int, _event: str, _fields: Mapping[str, Any]) -> None:
+        raise RuntimeError("logger broke")
+
+    provider = Provider(SDK_KEY, server.url, stream=False, logger=raising, ready_timeout=0.05)
+    try:
+        heard = Heard(None)
+        register(provider, "revoked-raising")
+        wait_until(lambda: ProviderEvent.PROVIDER_ERROR in heard.kinds())
+    finally:
+        server.close()
+
+
 def test_shutdown_closes_the_client_and_silences_events(offline: Any) -> None:
     provider, client = offline(allow_overrides=True)
     heard = Heard(client)

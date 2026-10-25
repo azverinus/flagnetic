@@ -97,8 +97,10 @@ client.track("exposure", context, TrackingEventDetails().add("flag", "pricing"))
 client.track(
     "alias",
     tracking_event_details=TrackingEventDetails()
-    .add("fromUnitType", "anonymous").add("fromUnitId", "d-8f1c")
-    .add("toUnitType", "user").add("toUnitId", "u-1001"),
+    .add("fromUnitType", "anonymous")
+    .add("fromUnitId", "d-8f1c")
+    .add("toUnitType", "user")
+    .add("toUnitId", "u-1001"),
 )
 ```
 
@@ -112,6 +114,7 @@ attribute is an attribute of the context. Reasons map as in every Flagnetic prov
 | `fallthrough` | `DEFAULT` |
 | `off` | `DISABLED` |
 | `local_override` | `STATIC` |
+| `error` | `ERROR` |
 | `fallback` | `ERROR`, with `FLAG_NOT_FOUND`, `TYPE_MISMATCH` or `GENERAL` |
 
 The flag metadata carries the Flagnetic reason as `flagnetic_reason`, with `stage`, `ruleset_version`, `variation`,

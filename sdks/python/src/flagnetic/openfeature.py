@@ -276,8 +276,9 @@ class Provider(AbstractProvider):
         self._emit_if_open(self.emit_provider_configuration_changed, details)
 
     def _on_stage(self, stage: Stage) -> None:
-        # Ready after a stale period tells the OpenFeature SDK the provider recovered; the first
-        # ready is initialize's to signal.
+        # Ready on every move to fresh, so the OpenFeature status leaves STALE when the client
+        # recovers; the first fetch may also land while initialize waits, a ready the OpenFeature
+        # SDK repeats once initialize returns.
         if stage is Stage.LAST_GOOD:
             details = ProviderEventDetails(message="flagnetic: ruleset stage is last_good")
             self._emit_if_open(self.emit_provider_stale, details)
@@ -290,10 +291,12 @@ class Provider(AbstractProvider):
         A revoked key is the one fetch failure stage last_good alone does not
         tell from an ordinary outage.
         """
-        self._logger(level, event, fields)
+        # The event goes first: the client swallows an exception from its logger, which would
+        # otherwise also swallow the event.
         if event == _events.KEY_REVOKED:
             details = ProviderEventDetails(message="flagnetic: sdk key revoked", error_code=ErrorCode.GENERAL)
             self._emit_if_open(self.emit_provider_error, details)
+        self._logger(level, event, fields)
 
     def _emit_if_open(self, emit: Any, details: ProviderEventDetails) -> None:
         if self._closed.is_set():
