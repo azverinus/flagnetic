@@ -8,6 +8,7 @@ library;
 
 import 'package:test/test.dart';
 
+import 'support/page.dart';
 import 'support/protocol_runner.dart';
 import 'support/remote_server.dart';
 
@@ -22,8 +23,9 @@ void main() {
       fixtures: remote.fixtures,
       // Each scripted step crosses to the isolate and back.
       latency: const Duration(milliseconds: 250),
+      page: const DomPage(),
     );
-    suite = ProtocolSuite.read(harness.fixtures);
+    suite = ProtocolSuite.read(harness.fixtures, inPage: true);
   });
 
   test('every degradation case of POST /sdk/v1/evaluate', () async {
