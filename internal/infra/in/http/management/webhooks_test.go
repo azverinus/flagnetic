@@ -288,3 +288,18 @@ func TestOnlyAMaintainerReadsAndManagesWebhookSubscriptions(t *testing.T) {
 		}
 	}
 }
+
+func TestAProjectTokenCreatingASubscriptionIsNamedItsCreator(t *testing.T) {
+	srv := testkit.StartServer(t)
+	p := createProject(t, testkit.Client(t, srv, testkit.InstanceAdminToken(t)), projectKey())
+	ci := pipeline(t, srv, p, "maintainer", management.ScopeProjectAdmin)
+
+	created := createWebhook(t, ci, p.Key, siem())
+	read := do(ci.GetWebhookWithResponse(t.Context(), p.Key, created.Id))
+	if read.JSON200 == nil {
+		t.Fatalf("get = %d: %s", read.StatusCode(), read.Body)
+	}
+	if c := read.JSON200.CreatedBy; c == nil || c.Kind != management.WebhookCreatorKindToken || c.Name != "ci" {
+		t.Errorf("created by %+v, want the project token named ci", c)
+	}
+}

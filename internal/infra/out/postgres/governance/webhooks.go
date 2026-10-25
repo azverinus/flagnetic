@@ -171,10 +171,11 @@ func reasonOf(w governance.Webhook) any {
 	return string(w.DisabledReason)
 }
 
-// UpdateWebhook stores what an edit changes of w. Its secrets, creator and
+// UpdateWebhook stores what an edit changes of w, which its caller read
+// under the project's lock. Its secrets, creator and
 // delivery counters are left to the operations that change them.
 func (s *Webhooks) UpdateWebhook(ctx context.Context, w governance.Webhook) error {
-	tag, err := s.db(ctx).Exec(ctx, `
+	_, err := s.db(ctx).Exec(ctx, `
 		UPDATE webhook_subscriptions
 		SET name = $3, url = $4, events = $5, environments = $6, enabled = $7, disabled_reason = $8, enabled_at = $9,
 		    updated_at = $10, version = $11
@@ -184,22 +185,15 @@ func (s *Webhooks) UpdateWebhook(ctx context.Context, w governance.Webhook) erro
 	if err != nil {
 		return fmt.Errorf("updating a webhook subscription: %w", err)
 	}
-	if tag.RowsAffected() != 1 {
-		return appgovernance.ErrNotFound
-	}
 	return nil
 }
 
-// DeleteWebhook deletes project's subscription with webhook, or answers
-// appgovernance.ErrNotFound.
+// DeleteWebhook deletes project's subscription with webhook.
 func (s *Webhooks) DeleteWebhook(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID) error {
-	tag, err := s.db(ctx).Exec(ctx, `DELETE FROM webhook_subscriptions WHERE project_id = $1 AND id = $2`,
+	_, err := s.db(ctx).Exec(ctx, `DELETE FROM webhook_subscriptions WHERE project_id = $1 AND id = $2`,
 		project.Bytes(), webhook.Bytes())
 	if err != nil {
 		return fmt.Errorf("deleting a webhook subscription: %w", err)
-	}
-	if tag.RowsAffected() != 1 {
-		return appgovernance.ErrNotFound
 	}
 	return nil
 }

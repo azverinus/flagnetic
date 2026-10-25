@@ -27,10 +27,10 @@ type WebhookStore interface {
 	Webhook(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID) (governance.Webhook, error)
 	CreateWebhook(ctx context.Context, w governance.Webhook) error
 	// UpdateWebhook stores w in place of the subscription with its
-	// identifier.
+	// identifier, read under the project's lock.
 	UpdateWebhook(ctx context.Context, w governance.Webhook) error
-	// DeleteWebhook deletes project's subscription with webhook, or answers
-	// ErrNotFound.
+	// DeleteWebhook deletes project's subscription with webhook, read under
+	// the project's lock.
 	DeleteWebhook(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID) error
 }
 
