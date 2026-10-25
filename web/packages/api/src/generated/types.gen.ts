@@ -2310,6 +2310,66 @@ export type WebhookList = {
 };
 
 /**
+ * `pending` waits for its next attempt; `succeeded` was accepted by the
+ * receiver; `failed` was refused in a way a retry would not change;
+ * `exhausted` ran out of attempts; `dropped` was left unsent because
+ * the platform disabled the subscription.
+ *
+ */
+export type WebhookDeliveryStatus = "pending" | "succeeded" | "failed" | "exhausted" | "dropped";
+
+/**
+ * One call made to the receiver.
+ */
+export type WebhookDeliveryAttempt = {
+  /**
+   * The attempt's number, from 1.
+   */
+  n: number;
+  at: string;
+  /**
+   * The receiver's status code; null when no answer came.
+   */
+  status_code: number | null;
+  latency_ms: number;
+  /**
+   * The start of the receiver's answer.
+   */
+  response_snippet: string | null;
+  /**
+   * Why no answer came, such as a timeout.
+   */
+  error: string | null;
+};
+
+/**
+ * One event sent, or to be sent, to the subscription.
+ */
+export type WebhookDelivery = {
+  id: string;
+  /**
+   * The event's `id`, which every delivery of the event carries.
+   */
+  event_id: string;
+  event_type: string;
+  status: WebhookDeliveryStatus;
+  attempts: Array<WebhookDeliveryAttempt>;
+  /**
+   * When a pending delivery is next attempted; null otherwise.
+   */
+  next_attempt_at: string | null;
+  created_at: string;
+};
+
+export type WebhookDeliveryList = {
+  items: Array<WebhookDelivery>;
+  /**
+   * Pass as `cursor` for the next page; null on the last.
+   */
+  next_cursor: string | null;
+};
+
+/**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
 export type AuditActor = string;
@@ -7747,6 +7807,14 @@ export type ListChangeRequestsData = {
      */
     author?: string;
     /**
+     * When true, only the open change requests the caller may approve
+     * or reject: those of others, for a member holding
+     * `change_request.approve`. None for anyone else, a project token
+     * included.
+     *
+     */
+    awaiting_my_decision?: boolean;
+    /**
      * The `next_cursor` of the previous page.
      */
     cursor?: string;
@@ -10620,3 +10688,146 @@ export type UpdateWebhookResponses = {
 };
 
 export type UpdateWebhookResponse = UpdateWebhookResponses[keyof UpdateWebhookResponses];
+
+export type ListWebhookDeliveriesData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The webhook subscription's identifier.
+     */
+    webhook: string;
+  };
+  query?: {
+    status?: WebhookDeliveryStatus;
+    /**
+     * An event type, such as `flag.kill_switch`.
+     */
+    event_type?: string;
+    /**
+     * The earliest time a delivery was made, included.
+     */
+    from?: string;
+    /**
+     * The latest time a delivery was made, included.
+     */
+    to?: string;
+    /**
+     * The `next_cursor` of the previous page.
+     */
+    cursor?: string;
+    /**
+     * How many entries a page holds at most.
+     */
+    limit?: number;
+  };
+  url: "/projects/{project}/webhooks/{webhook}/deliveries";
+};
+
+export type ListWebhookDeliveriesErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListWebhookDeliveriesError =
+  ListWebhookDeliveriesErrors[keyof ListWebhookDeliveriesErrors];
+
+export type ListWebhookDeliveriesResponses = {
+  /**
+   * One page of deliveries, newest first.
+   */
+  200: WebhookDeliveryList;
+};
+
+export type ListWebhookDeliveriesResponse =
+  ListWebhookDeliveriesResponses[keyof ListWebhookDeliveriesResponses];
+
+export type GetWebhookDeliveryData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The webhook subscription's identifier.
+     */
+    webhook: string;
+    /**
+     * The delivery's identifier.
+     */
+    delivery: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}";
+};
+
+export type GetWebhookDeliveryErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetWebhookDeliveryError = GetWebhookDeliveryErrors[keyof GetWebhookDeliveryErrors];
+
+export type GetWebhookDeliveryResponses = {
+  /**
+   * The delivery with every attempt.
+   */
+  200: WebhookDelivery;
+};
+
+export type GetWebhookDeliveryResponse =
+  GetWebhookDeliveryResponses[keyof GetWebhookDeliveryResponses];

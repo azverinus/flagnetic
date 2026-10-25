@@ -325,6 +325,14 @@ type ChangeRequestFilter struct {
 	// Author selects the change requests of a member or a project token,
 	// by its identifier.
 	Author string
+	// AwaitingDecisionOf, when set, selects the open change requests it
+	// may approve or reject: none unless it may decide change requests and
+	// is a member, since a project token never decides, and none it
+	// authored.
+	AwaitingDecisionOf *governance.Taker
+	// NotAuthoredBy leaves out the change requests of the member with this
+	// identifier.
+	NotAuthoredBy string
 }
 
 // ChangeRequestPage asks for one page of change requests, newest first.
@@ -348,6 +356,12 @@ func NewListChangeRequests(store ChangeRequestReader) *ListChangeRequests {
 // identifier, a change request created meanwhile never shifts a page.
 func (h *ListChangeRequests) Handle(ctx context.Context, f ChangeRequestFilter, p ChangeRequestPage,
 ) ([]governance.ChangeRequest, governance.ChangeRequestID, error) {
+	if by := f.AwaitingDecisionOf; by != nil {
+		if !by.MayDecide || by.As.Member == nil || (f.State != "" && f.State != governance.StateOpen) {
+			return []governance.ChangeRequest{}, governance.ChangeRequestID{}, nil
+		}
+		f.State, f.NotAuthoredBy = governance.StateOpen, by.As.Member.String()
+	}
 	list, err := h.store.ChangeRequests(ctx, f, p.After, p.Limit+1)
 	if err != nil || len(list) <= p.Limit {
 		return list, governance.ChangeRequestID{}, err

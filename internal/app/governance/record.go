@@ -25,30 +25,60 @@ type WaitingChangeRequests interface {
 	UpdateChangeRequest(ctx context.Context, cr governance.ChangeRequest) error
 }
 
+// Outbox holds the catalogue events waiting to be fanned out to
+// subscriptions.
+type Outbox interface {
+	// WantedEventTypes returns the event types the enabled subscriptions of
+	// project name, `*` among them; zero project for the instance's.
+	WantedEventTypes(ctx context.Context, project workspace.ProjectID) ([]string, error)
+	// ScopeKeys returns the keys of project and of environment, "" for a
+	// zero identifier or one that no longer exists.
+	ScopeKeys(ctx context.Context, project workspace.ProjectID, environment workspace.EnvironmentID) (string, string, error)
+	// Enqueue writes events to the outbox in the unit of work ctx carries.
+	Enqueue(ctx context.Context, events []governance.QueuedEvent) error
+}
+
 // Record is how every context records its audit entries: each context
 // declares an audit port of its own and this service satisfies all of them.
 // Recording runs in the writing transaction, so an entry is kept exactly when
 // the change it records is. Being the one place every audited write passes,
 // it is where what an entry sets in motion beyond the log belongs, without
 // any other context knowing of it: it supersedes the change requests the
-// entry's write moved.
+// entry's write moved, and writes the catalogue events each entry causes to
+// the outbox in the same transaction, so a change that rolls back notifies
+// nobody.
 type Record struct {
 	log            AuditAppender
 	changeRequests WaitingChangeRequests
+	outbox         Outbox
 	ids            *id.Source
+}
+
+// RecordOption configures a Record.
+type RecordOption func(*Record)
+
+// WithOutbox writes the catalogue events each entry causes to outbox,
+// identified from ids. Without it, recording writes no event.
+func WithOutbox(outbox Outbox, ids *id.Source) RecordOption {
+	return func(r *Record) { r.outbox, r.ids = outbox, ids }
 }
 
 // NewRecord returns the service appending to log and superseding the change
 // requests of changeRequests, its entries identified from ids.
-func NewRecord(log AuditAppender, changeRequests WaitingChangeRequests, ids *id.Source) *Record {
-	return &Record{log: log, changeRequests: changeRequests, ids: ids}
+func NewRecord(log AuditAppender, changeRequests WaitingChangeRequests, ids *id.Source, opts ...RecordOption) *Record {
+	r := &Record{log: log, changeRequests: changeRequests, ids: ids}
+	for _, o := range opts {
+		o(r)
+	}
+	return r
 }
 
-// Record appends e to the audit log in the unit of work ctx carries, then
-// supersedes every open or approved change request e's write moved. An
-// entry recorded while a change request is applied carries its identifier,
-// whichever context wrote the change, so an auditor traces the change to
-// its approval, and that change request is not superseded by it.
+// Record appends e to the audit log in the unit of work ctx carries, with
+// the events it causes, then supersedes every open or approved change
+// request e's write moved. An entry recorded while a change request is
+// applied carries its identifier, whichever context wrote the change, so an
+// auditor traces the change to its approval, and that change request is not
+// superseded by it.
 func (r *Record) Record(ctx context.Context, e governance.Entry) error {
 	if applying, ok := ctx.Value(applyingKey{}).(governance.ChangeRequestID); ok {
 		e.ChangeRequest = applying
@@ -59,8 +89,14 @@ func (r *Record) Record(ctx context.Context, e governance.Entry) error {
 	return r.supersede(ctx, e)
 }
 
-// keep appends e, recorded or set in motion by another entry, to the log.
-func (r *Record) keep(ctx context.Context, e governance.Entry) error { return r.log.Append(ctx, e) }
+// keep appends e, recorded or set in motion by another entry, to the log,
+// and the events it causes to the outbox.
+func (r *Record) keep(ctx context.Context, e governance.Entry) error {
+	if err := r.log.Append(ctx, e); err != nil {
+		return err
+	}
+	return r.emit(ctx, e)
+}
 
 // supersede supersedes the change requests e moves, each recorded as
 // change_request.superseded by e's actor in e's request at e's instant,
@@ -90,6 +126,45 @@ func (r *Record) supersede(ctx context.Context, e governance.Entry) error {
 		}
 	}
 	return nil
+}
+
+// emit writes the events e causes that an enabled subscription of e's scope
+// wants. The subscriptions are read in the writing transaction, and nothing
+// more is read or written when none wants anything, which is the common
+// case: an instance without subscriptions pays one indexed read per entry.
+// Which subscription receives an event, by its environments and its
+// creation, is the fan-out's to decide.
+func (r *Record) emit(ctx context.Context, e governance.Entry) error {
+	if r.outbox == nil {
+		return nil
+	}
+	wanted, err := r.outbox.WantedEventTypes(ctx, e.Project)
+	if err != nil || len(wanted) == 0 {
+		return err
+	}
+	var derived []governance.Derived
+	for _, d := range governance.DeriveEvents(e) {
+		if governance.WantsEventType(wanted, d.Type) {
+			derived = append(derived, d)
+		}
+	}
+	if len(derived) == 0 {
+		return nil
+	}
+	// An environment's deletion is recorded before its row goes, so its key
+	// is found as any other environment's is.
+	projectKey, environmentKey, err := r.outbox.ScopeKeys(ctx, e.Project, e.Environment)
+	if err != nil {
+		return err
+	}
+	queued := make([]governance.QueuedEvent, len(derived))
+	for i, d := range derived {
+		event := governance.EntryEvent(id.New[governance.Event](r.ids), e, d, projectKey, environmentKey)
+		if queued[i], err = event.Queue(); err != nil {
+			return err
+		}
+	}
+	return r.outbox.Enqueue(ctx, queued)
 }
 
 type applyingKey struct{}

@@ -1,0 +1,13 @@
+# frozen_string_literal: true
+
+require "rake/testtask"
+
+Rake::TestTask.new(:test) do |t|
+  t.libs << "test"
+  t.test_files = FileList["test/**/*_test.rb"]
+  # openfeature-sdk warns about its own code under -w (a circular require,
+  # unused variables); rubocop covers this gem's.
+  t.warning = false
+end
+
+task default: :test

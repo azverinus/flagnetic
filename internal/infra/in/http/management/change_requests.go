@@ -44,6 +44,9 @@ func (a *api) ListChangeRequests(ctx context.Context, req ListChangeRequestsRequ
 	if p.Author != nil {
 		f.Author = p.Author.String()
 	}
+	if p.AwaitingMyDecision != nil && *p.AwaitingMyDecision {
+		f.AwaitingDecisionOf = &governance.Taker{As: authorOf(ctx), MayDecide: mayDecide(ctx)}
+	}
 	page := appgovernance.ChangeRequestPage{Limit: defaultChangeRequestLimit}
 	if l := p.Limit; l != nil {
 		if *l < 1 || *l > maxChangeRequestLimit {
@@ -264,13 +267,17 @@ func changeRequestCommand(ctx context.Context, changeRequest ChangeRequestID, he
 	if err != nil {
 		return appgovernance.ChangeRequestCommand{}, err
 	}
-	// Whoever may decide change requests may also cancel or apply
-	// another's; a project token never holds the permission.
-	mayDecide := slices.Contains(projectOf(ctx).permissions, access.PermChangeRequestApprove)
 	return appgovernance.ChangeRequestCommand{
 		Project: projectID(ctx), ChangeRequest: id.FromBytes[governance.ChangeRequest](changeRequest), Expected: expected,
-		By: governance.Taker{As: authorOf(ctx), MayDecide: mayDecide}, Request: requestOf(ctx),
+		By: governance.Taker{As: authorOf(ctx), MayDecide: mayDecide(ctx)}, Request: requestOf(ctx),
 	}, nil
+}
+
+// mayDecide reports whether the caller of ctx may decide change requests:
+// whoever may also cancels or applies another's. A project token never holds
+// the permission.
+func mayDecide(ctx context.Context) bool {
+	return slices.Contains(projectOf(ctx).permissions, access.PermChangeRequestApprove)
 }
 
 // authorOf returns who the request ctx belongs to proposes as: the member

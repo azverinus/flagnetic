@@ -58,7 +58,7 @@ func documents(cr governance.ChangeRequest) (base, proposed, diff []byte, err er
 	}
 	ops := make([]map[string]any, len(cr.Diff))
 	for i, op := range cr.Diff {
-		ops[i] = appgovernance.PatchOperationValues(op)
+		ops[i] = op.Values()
 	}
 	diff, err = json.Marshal(ops)
 	return base, proposed, diff, err
@@ -288,9 +288,10 @@ func (s *ChangeRequests) ChangeRequests(ctx context.Context, f appgovernance.Cha
 		  AND ($5 = '' OR cr.state = $5)
 		  AND ($6 = '' OR cr.author_id::text = $6 OR cr.author_token_id::text = $6)
 		  AND ($7::uuid IS NULL OR cr.id < $7)
+		  AND ($9 = '' OR cr.author_id IS NULL OR cr.author_id::text <> $9)
 		ORDER BY cr.id DESC
 		LIMIT $8`,
-		f.Project.Bytes(), f.Flag, f.Environment, string(f.Kind), string(f.State), f.Author, cursor, limit)
+		f.Project.Bytes(), f.Flag, f.Environment, string(f.Kind), string(f.State), f.Author, cursor, limit, f.NotAuthoredBy)
 	if err != nil {
 		return nil, fmt.Errorf("listing change requests: %w", err)
 	}

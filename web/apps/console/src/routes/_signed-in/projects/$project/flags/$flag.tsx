@@ -30,6 +30,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs } from "@/components/ui/tabs";
+import { WaitingChangeRequests } from "@/components/waiting-change-requests";
 import { formatDateTime } from "@/i18n/format";
 import { cn } from "@/lib/cn";
 import { ApiError, unwrap } from "@/lib/errors";
@@ -502,6 +503,11 @@ function EnvironmentPanel(props: PanelProps) {
 
   return (
     <div className="flex flex-col gap-8">
+      <WaitingChangeRequests
+        project={project}
+        flag={flag.key}
+        environment={configuration.environment}
+      />
       {frozen ? (
         <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">
           {frozen}

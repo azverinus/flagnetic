@@ -82,4 +82,12 @@ Every transition is recorded in the audit log as `change_request.drafted`, `open
 
 ## Reading
 
-`GET /projects/{project}/change-requests` lists them newest first, filtered by `flag` and `environment` (keys), `kind`, `state` and `author` (a member's or a project token's identifier), a page of `limit` (at most 200, 50 by default) at a time with `cursor`. `GET …/change-requests/{id}` reads one, its version as its `ETag`.
+`GET /projects/{project}/change-requests` lists them newest first, filtered by `flag` and `environment` (keys), `kind`, `state` and `author` (a member's or a project token's identifier), and with `awaiting_my_decision=true` to the open change requests of others the caller may approve or reject (none for a caller without `change_request.approve`, a project token included), a page of `limit` (at most 200, 50 by default) at a time with `cursor`. `GET …/change-requests/{id}` reads one, its version as its `ETag`.
+
+## In the console
+
+The project's **Change requests** screen lists them in three tabs: those awaiting your decision, your own, and all, with the filters above. The navigation counts the change requests awaiting your decision when you hold `change_request.approve`.
+
+A change request's page shows its flag and environment, its author, the decisions with their comments, and what it would change: compared with the configuration it was based on while it still waits on that version, and otherwise as its patch, operation by operation. Its actions are those its state allows: editing the title and description, opening, rebasing, approving, rejecting, applying, cancelling and copying. What only its author may do is shown to the author alone; an action needing a permission you lack is shown disabled with the permission and the roles holding it. A decision on a change request someone changed meanwhile is refused, and the page shows the newer version.
+
+A flag's environment tab lists the open and approved change requests waiting on that configuration.

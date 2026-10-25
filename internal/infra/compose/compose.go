@@ -122,10 +122,12 @@ type Listener struct {
 // Management mounts the management API and the SDK API on edge, their
 // metrics on reg, and returns the background work their use cases need.
 func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Options) Background {
-	tx, auditLog := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool)
-	// Every context records its audit entries through the governance context.
+	tx, auditLog, outbox := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool), pggovernance.NewOutbox(d.Pool)
+	// Every context records its audit entries through the governance
+	// context, which supersedes the change requests they move and writes
+	// the catalogue events they cause to the outbox.
 	changeRequestStore := pggovernance.NewChangeRequests(d.Pool)
-	audit := appgovernance.NewRecord(auditLog, changeRequestStore, d.IDs)
+	audit := appgovernance.NewRecord(auditLog, changeRequestStore, d.IDs, appgovernance.WithOutbox(outbox, d.IDs))
 	rec := appworkspace.NewRecorder(audit, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
 	flagStore, flagRec := pgflags.NewStore(d.Pool), appflags.NewRecorder(audit, d.Clock, d.IDs)
@@ -409,6 +411,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetWebhook:            appgovernance.NewGetWebhook(webhookStore),
 		UpdateWebhook:         appgovernance.NewUpdateWebhook(webhooks),
 		DeleteWebhook:         appgovernance.NewDeleteWebhook(webhooks),
+		ListWebhookDeliveries: appgovernance.NewListDeliveries(webhookStore, webhookStore),
+		GetWebhookDelivery:    appgovernance.NewGetDelivery(webhookStore, webhookStore),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),
@@ -469,6 +473,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.EventRetention(
 				appevents.NewRunRetention(tx, eventStore, d.Clock, d.IDs, o.EventsRetention, o.EventsPartitionsAhead),
 				appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention), edge.Logger(), reg),
+			worker.WebhookFanOut(appgovernance.NewRunFanOut(tx, outbox, d.Clock, d.IDs), reg),
 		},
 		Listeners: []Listener{
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},
@@ -540,5 +545,6 @@ func Console(edge *flaghttp.Server, defaultLocale string) (bool, error) {
 // record returns the audit port of a use case run from the command line,
 // recording through the governance context like every other.
 func record(d Deps) *appgovernance.Record {
-	return appgovernance.NewRecord(pggovernance.NewAuditLog(d.Pool), pggovernance.NewChangeRequests(d.Pool), d.IDs)
+	return appgovernance.NewRecord(pggovernance.NewAuditLog(d.Pool), pggovernance.NewChangeRequests(d.Pool), d.IDs,
+		appgovernance.WithOutbox(pggovernance.NewOutbox(d.Pool), d.IDs))
 }

@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 
-import { createExperiment, createSegment, listProjectAuditEntries } from "@flagnetic/api";
+import {
+  createChangeRequest,
+  createExperiment,
+  createSegment,
+  listProjectAuditEntries,
+} from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { seriousViolations, useTheme } from "../support/axe";
@@ -26,7 +31,13 @@ import { seedFlag, stringFlag } from "../support/flags";
  * invitation's path and an audit entry of the project, whose flag is
  * {@link sweepFlag}.
  */
-type Seeded = { project: string; member: string; invitation: string; auditEntry: string };
+type Seeded = {
+  project: string;
+  member: string;
+  invitation: string;
+  auditEntry: string;
+  changeRequest: string;
+};
 
 /** The key of the flag the sweep creates in its project. */
 const sweepFlag = "sweep_flag";
@@ -93,6 +104,7 @@ const signedIn: Route[] = [
     "experiments/-/new",
     "segments",
     "segments/-/new",
+    "change-requests",
     "environments",
     "unit-types",
     "attributes",
@@ -129,6 +141,16 @@ const signedIn: Route[] = [
     name: "project experiment",
     route: "/projects/$project/experiments/$experiment",
     path: (s) => `/projects/${s.project}/experiments/${sweepExperiment}`,
+  },
+  {
+    name: "project change requests: awaiting my decision",
+    route: "/projects/$project/change-requests",
+    path: (s) => `/projects/${s.project}/change-requests?tab=awaiting`,
+  },
+  {
+    name: "project change request",
+    route: "/projects/$project/change-requests/$changeRequest",
+    path: (s) => `/projects/${s.project}/change-requests/${s.changeRequest}`,
   },
   {
     name: "project segment",
@@ -201,13 +223,35 @@ async function seed(): Promise<Seeded> {
       },
     }),
   );
+  const changeRequest = must(
+    `proposing a change to ${sweepFlag}`,
+    await createChangeRequest({
+      client: managementClient(),
+      path: { project },
+      body: {
+        kind: "flag_configuration",
+        flag: sweepFlag,
+        environment: "production",
+        title: "Switch the sweep flag on",
+        description: "So the sweep sees a change request open for review.",
+        proposed: { on: true, off_variation: "control", fallthrough: "treatment" },
+        open: true,
+      },
+    }),
+  );
   const audit = must(
     `listing the audit log of ${project}`,
     await listProjectAuditEntries({ client: managementClient(), path: { project } }),
   );
   const auditEntry = audit.items[0]?.id;
   if (!auditEntry) throw new Error(`${project} has no audit entry`);
-  return { project, member: invited.id, invitation: pathOf(invited.link), auditEntry };
+  return {
+    project,
+    member: invited.id,
+    invitation: pathOf(invited.link),
+    auditEntry,
+    changeRequest: changeRequest.id,
+  };
 }
 
 /** A screen has loaded once its heading is up and no skeleton remains. */
