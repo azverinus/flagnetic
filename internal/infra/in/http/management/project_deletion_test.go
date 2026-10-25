@@ -40,7 +40,9 @@ func TestAnOwnerDeletesAProjectWithEverythingInItAndItsKeyIsFreeAtOnce(t *testin
 	p := createProject(t, admin, projectKey())
 	stringFlag(t, admin, p.Key, "checkout_title")
 	owner, _ := grantedSession(t, srv, p, access.RoleOwner)
-	token := mustCreateProjectToken(t, owner, p.Key, management.ProjectTokenCreate{Name: "ci", Role: "developer"})
+	token := mustCreateProjectToken(t, owner, p.Key, management.ProjectTokenCreate{
+		Name: "ci", Role: "maintainer", Scopes: ptr(scopes(management.ScopeProjectAdmin, management.ScopeFlagsWrite)),
+	})
 	pipeline := testkit.Client(t, srv, token.Value)
 	// A change request waiting for review ends with the project, recorded by
 	// the project's deletion alone.
@@ -49,6 +51,10 @@ func TestAnOwnerDeletesAProjectWithEverythingInItAndItsKeyIsFreeAtOnce(t *testin
 	if res := openChangeRequest(t, dev.ClientWithResponses, p.Key, cr); res.JSON200 == nil {
 		t.Fatalf("open = %d: %s", res.StatusCode(), res.Body)
 	}
+	// What a project token wrote names the token, which goes with the
+	// project in the same deletion.
+	createChangeRequest(t, pipeline, p.Key, configurationRequest("From CI", proposedOn()))
+	createWebhook(t, pipeline, p.Key, siem())
 	before := instanceEntries(t, admin, management.ListAuditEntriesParams{Project: &p.Id, Limit: ptr(200)})
 
 	unconditional := do(owner.DeleteProjectWithResponse(t.Context(), p.Key, &management.DeleteProjectParams{}))
