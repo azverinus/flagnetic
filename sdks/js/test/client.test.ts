@@ -5,7 +5,7 @@
 // browser, on a virtual clock, against the mock of `fetch` in
 // test/support/mock-network.ts.
 import { afterEach, describe, expect, test } from "vitest";
-import { createClient, createClientWith, type ClientTraceEvent, type FlagneticClient, type Timing } from "../src/client/client.js";
+import { createClient, createClientWith, type ClientInternals, type ClientTraceEvent, type FlagneticClient, type Timing } from "../src/client/client.js";
 import { LocalOverridesNotAllowed } from "../src/client.js";
 import { testServer } from "../src/server.js";
 import { ruleset } from "./support/flags-fixture.js";
@@ -100,7 +100,7 @@ class Harness {
   readonly clients: FlagneticClient[] = [];
   handled = { fetch: 0, events: 0 };
 
-  client(options: ClientOptions = {}, sdkKey = key, timing: Partial<Timing> = {}): FlagneticClient {
+  client(options: ClientOptions = {}, sdkKey = key, timing: Partial<Timing> = {}, internals: ClientInternals = {}): FlagneticClient {
     const c = createClientWith(
       sdkKey,
       baseUrl,
@@ -116,6 +116,7 @@ class Harness {
           if (e === "fetch_handled") this.handled.fetch++;
           else this.handled.events++;
         },
+        ...internals,
       },
     );
     this.clients.push(c);
@@ -197,6 +198,24 @@ describe("construction", () => {
     expect(c.getBool("checkout", true)).toBe(true);
     expect(c.getDetail("checkout", true)).toMatchObject({ reason: "fallback", errorCode: "no_values", stage: "built_in" });
     await h.waitFor("/sdk/v1/evaluate");
+  });
+
+  test("a client deferring its start makes no request until its first context, then opens the stream and evaluates that context", async () => {
+    const h = harness();
+    const c = h.client({ store: false, stream: true }, key, {}, { deferStart: true });
+    h.page.hide();
+    h.page.show();
+    h.page.online();
+    await h.advance(600_000);
+    expect(h.net.seen, "nothing is evaluated for the constructor's context").toHaveLength(0);
+
+    const switched = c.setContext({ units: { user: "u-2002" } });
+    const evaluate = await h.waitFor("/sdk/v1/evaluate");
+    expect(JSON.parse(evaluate.body ?? "{}")).toMatchObject({ context: { units: { user: "u-2002" } } });
+    expect(h.net.waiting("/sdk/v1/stream")).toHaveLength(1);
+    evaluate.answer({ status: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify(values(1, { checkout: boolFlag(true) })) });
+    expect(await switched).toBe("fresh");
+    expect(h.net.seen.filter((r) => r.path === "/sdk/v1/evaluate")).toHaveLength(1);
   });
 
   test("last good loads synchronously from browser storage under the unit-set key", async () => {

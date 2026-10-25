@@ -2,7 +2,7 @@
 // over a browser client. Only OpenFeature's types are imported, so nothing
 // of `@openfeature/web-sdk` is loaded at run time.
 import type { EvaluationContext, EventHandler, JsonValue, Provider, ResolutionDetails, TrackingEventDetails } from "@openfeature/web-sdk";
-import { createClient, type FlagneticClient } from "../client/client.js";
+import { createClientWith, type FlagneticClient } from "../client/client.js";
 import { consoleLogger } from "../client/logger.js";
 import type { ClientOptions, JsonValue as FlagneticJson } from "../client/types.js";
 import { toFlagneticContext } from "./context.js";
@@ -53,15 +53,22 @@ export class FlagneticWebProvider implements Provider {
       logger("error", "listener_failed", { cause });
     });
     let state: ProviderState | undefined;
-    this.client = createClient(sdkKey, baseUrl, {
-      ...clientOptions,
-      // The event goes first: the client ignores a logger that throws,
-      // which would otherwise lose the event as well.
-      logger: (level, event, fields) => {
-        state?.observe(event);
-        logger(level, event, fields);
+    // The client makes no request until initialize hands it OpenFeature's
+    // context: values for the empty one would only be thrown away.
+    this.client = createClientWith(
+      sdkKey,
+      baseUrl,
+      {
+        ...clientOptions,
+        // The event goes first: the client ignores a logger that throws,
+        // which would otherwise lose the event as well.
+        logger: (level, event, fields) => {
+          state?.observe(event);
+          logger(level, event, fields);
+        },
       },
-    });
+      { deferStart: true },
+    );
     this.state = state = new ProviderState(this.client, this.events);
   }
 

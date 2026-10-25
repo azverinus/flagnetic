@@ -117,7 +117,10 @@ describe("initialize", () => {
     expect(provider.client.stage).toBe("fresh");
     expect(client.providerStatus).toBe("READY");
     expect(client.getBooleanDetails("checkout", false)).toMatchObject({ value: true, reason: "TARGETING_MATCH" });
-    expect(e.contexts.at(-1)).toMatchObject({ units: { user: "u-1" }, attributes: { country: "DE" } });
+    // The provider is built before OpenFeature hands it a context: nothing
+    // is evaluated for the empty one meanwhile.
+    expect(e.contexts).toHaveLength(1);
+    expect(e.contexts[0]).toMatchObject({ units: { user: "u-1" }, attributes: { country: "DE" } });
   });
 
   test("a key revoked before initialize resolved: ERROR right after OpenFeature's READY, and the default served", async () => {
