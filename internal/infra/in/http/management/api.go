@@ -159,6 +159,8 @@ type Handlers struct {
 	GetWebhook            *appgovernance.GetWebhook
 	UpdateWebhook         *appgovernance.UpdateWebhook
 	DeleteWebhook         *appgovernance.DeleteWebhook
+	ListWebhookDeliveries *appgovernance.ListDeliveries
+	GetWebhookDelivery    *appgovernance.GetDelivery
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

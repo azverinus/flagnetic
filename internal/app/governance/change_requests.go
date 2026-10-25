@@ -287,7 +287,6 @@ func changeRequestValues(cr governance.ChangeRequest) map[string]any {
 	return out
 }
 
-
 // configurationDoc is the document a configuration change request bases
 // itself on and proposes: what the configuration serves and what stays on
 // the server with it, without who wrote it or when, which a proposal does

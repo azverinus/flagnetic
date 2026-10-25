@@ -1621,6 +1621,58 @@ export const zWebhookList = z.object({
 });
 
 /**
+ * `pending` waits for its next attempt; `succeeded` was accepted by the
+ * receiver; `failed` was refused in a way a retry would not change;
+ * `exhausted` ran out of attempts; `dropped` was left unsent because
+ * the platform disabled the subscription.
+ *
+ */
+export const zWebhookDeliveryStatus = z.enum([
+  "pending",
+  "succeeded",
+  "failed",
+  "exhausted",
+  "dropped",
+]);
+
+/**
+ * One call made to the receiver.
+ */
+export const zWebhookDeliveryAttempt = z.object({
+  n: z.int(),
+  at: z.iso.datetime(),
+  status_code: z.int().nullable(),
+  latency_ms: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  response_snippet: z.string().nullable(),
+  error: z.string().nullable(),
+});
+
+/**
+ * One event sent, or to be sent, to the subscription.
+ */
+export const zWebhookDelivery = z.object({
+  id: z.uuid(),
+  event_id: z.uuid(),
+  event_type: z.string(),
+  status: zWebhookDeliveryStatus,
+  attempts: z.array(zWebhookDeliveryAttempt),
+  next_attempt_at: z.iso.datetime().nullable(),
+  created_at: z.iso.datetime(),
+});
+
+export const zWebhookDeliveryList = z.object({
+  items: z.array(zWebhookDelivery),
+  next_cursor: z.string().nullable(),
+});
+
+/**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
 export const zAuditActor = z.uuid();
@@ -3234,3 +3286,33 @@ export const zUpdateWebhookPath = z.object({
  * The subscription as it is now.
  */
 export const zUpdateWebhookResponse = zWebhook;
+
+export const zListWebhookDeliveriesPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+});
+
+export const zListWebhookDeliveriesQuery = z.object({
+  status: zWebhookDeliveryStatus.optional(),
+  event_type: z.string().optional(),
+  from: z.iso.datetime().optional(),
+  to: z.iso.datetime().optional(),
+  cursor: z.string().optional(),
+  limit: z.int().gte(1).lte(200).optional().default(50),
+});
+
+/**
+ * One page of deliveries, newest first.
+ */
+export const zListWebhookDeliveriesResponse = zWebhookDeliveryList;
+
+export const zGetWebhookDeliveryPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+  delivery: z.uuid(),
+});
+
+/**
+ * The delivery with every attempt.
+ */
+export const zGetWebhookDeliveryResponse = zWebhookDelivery;
