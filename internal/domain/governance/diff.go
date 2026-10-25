@@ -15,6 +15,16 @@ type PatchOperation struct {
 	Value any
 }
 
+// Values returns op as RFC 6902 writes it: with a value for an add or a
+// replace, null included, and none for a remove.
+func (op PatchOperation) Values() map[string]any {
+	out := map[string]any{"op": op.Op, "path": op.Path}
+	if op.Op != "remove" {
+		out["value"] = op.Value
+	}
+	return out
+}
+
 // Diff returns the JSON Patch turning base into proposed, both JSON values as
 // encoding/json decodes them into an any; empty, never nil, when they are
 // equal. Object members are compared in the order of their names, so the

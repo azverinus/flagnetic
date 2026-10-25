@@ -58,7 +58,7 @@ func documents(cr governance.ChangeRequest) (base, proposed, diff []byte, err er
 	}
 	ops := make([]map[string]any, len(cr.Diff))
 	for i, op := range cr.Diff {
-		ops[i] = appgovernance.PatchOperationValues(op)
+		ops[i] = op.Values()
 	}
 	diff, err = json.Marshal(ops)
 	return base, proposed, diff, err

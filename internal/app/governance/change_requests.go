@@ -272,7 +272,7 @@ func changeRequestValues(cr governance.ChangeRequest) map[string]any {
 	}
 	diff := make([]map[string]any, len(cr.Diff))
 	for i, op := range cr.Diff {
-		diff[i] = PatchOperationValues(op)
+		diff[i] = op.Values()
 	}
 	out := map[string]any{
 		"kind": cr.Kind, "state": cr.State, "title": cr.Title, "description": cr.Description,
@@ -287,15 +287,6 @@ func changeRequestValues(cr governance.ChangeRequest) map[string]any {
 	return out
 }
 
-// PatchOperationValues returns op as RFC 6902 writes it: with a value for an
-// add or a replace, null included, and none for a remove.
-func PatchOperationValues(op governance.PatchOperation) map[string]any {
-	out := map[string]any{"op": op.Op, "path": op.Path}
-	if op.Op != "remove" {
-		out["value"] = op.Value
-	}
-	return out
-}
 
 // configurationDoc is the document a configuration change request bases
 // itself on and proposes: what the configuration serves and what stays on
