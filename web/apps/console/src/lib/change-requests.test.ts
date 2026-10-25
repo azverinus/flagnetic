@@ -119,6 +119,24 @@ describe("the transitions a change request offers", () => {
     ]);
   });
 
+  it("asks the permission to propose of whoever applies or cancels, deciding or not", () => {
+    const approval = { member: { id: other, name: "Bo" }, at: "2026-10-25T11:00:00Z", comment: "" };
+    const others = changeRequest({
+      state: "approved",
+      approval,
+      author: { kind: "member", id: other, name: "Bo" },
+    });
+    const decider = {
+      member: me,
+      permissions: new Set(["project.read", "change_request.approve"]),
+    };
+    expect(offered(changeRequestOffers(others, decider))).toEqual([
+      "apply (change_request.propose)",
+      "cancel (change_request.propose)",
+      "copy (change_request.propose)",
+    ]);
+  });
+
   it("offers only copying a final one, and shows a viewer what writing needs", () => {
     for (const state of ["rejected", "applied", "cancelled", "superseded"] as const) {
       expect(offered(changeRequestOffers(changeRequest({ state }), developer))).toEqual(["copy"]);
@@ -128,7 +146,7 @@ describe("the transitions a change request offers", () => {
       author: { kind: "member", id: other, name: "Bo" },
     });
     expect(offered(changeRequestOffers(others, viewer))).toEqual([
-      "cancel (change_request.approve)",
+      "cancel (change_request.propose)",
       "copy (change_request.propose)",
     ]);
     expect(offered(changeRequestOffers(changeRequest({ state: "draft" }), viewer))).toEqual([
@@ -150,6 +168,7 @@ describe("the change requests list's search", () => {
         environment: "production",
         kind: "flag_configuration",
         state: "open",
+        author: other,
         cursor: "abc",
         other: "x",
       }),
@@ -159,6 +178,7 @@ describe("the change requests list's search", () => {
       environment: "production",
       kind: "flag_configuration",
       state: "open",
+      author: other,
       cursor: "abc",
     });
     expect(
@@ -175,7 +195,10 @@ describe("the change requests list's search", () => {
       flag: "f",
       author: me,
     });
-    expect(listChangeRequestsQueryOf({ cursor: "c" }, me)).toEqual({ cursor: "c" });
+    expect(listChangeRequestsQueryOf({ author: other, cursor: "c" }, me)).toEqual({
+      author: other,
+      cursor: "c",
+    });
   });
 });
 

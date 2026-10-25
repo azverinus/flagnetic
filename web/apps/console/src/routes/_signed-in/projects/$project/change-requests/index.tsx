@@ -26,7 +26,13 @@ import {
   isChangeRequestsFiltered,
   validateChangeRequestsSearch,
 } from "@/lib/change-requests";
-import { changeRequestsQuery, environmentsQuery, flagChoicesQuery, meQuery } from "@/lib/queries";
+import {
+  changeRequestsQuery,
+  environmentsQuery,
+  flagChoicesQuery,
+  meQuery,
+  projectMembersQuery,
+} from "@/lib/queries";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/change-requests/")({
   validateSearch: validateChangeRequestsSearch,
@@ -83,8 +89,10 @@ function ChangeRequests() {
         onValueChange={(next) =>
           filter({
             tab: next === "awaiting" || next === "mine" ? next : undefined,
-            // Only open change requests await a decision.
+            // Only open change requests await a decision, and the
+            // caller's own are those the caller wrote.
             ...(next === "awaiting" ? { state: undefined } : {}),
+            ...(next === "mine" ? { author: undefined } : {}),
           })
         }
         tabs={[
@@ -109,7 +117,9 @@ function ChangeRequestFilters({
   const { i18n, t } = useLingui();
   const flags = useQuery(flagChoicesQuery(project));
   const environments = useQuery(environmentsQuery(project));
+  const members = useQuery(projectMembersQuery(project));
   const flagKeys = (flags.data ?? []).map((flag) => flag.key);
+  const memberIds = (members.data ?? []).map((member) => member.member);
 
   return (
     <div
@@ -180,6 +190,26 @@ function ChangeRequestFilters({
           ))}
         </Select>
       </Field>
+      {search.tab === "mine" ? null : (
+        <Field label={<Trans>Author</Trans>} className="w-56">
+          <Select
+            value={search.author ?? any}
+            onValueChange={(value) => onFilter({ author: value === any ? undefined : value })}
+          >
+            <SelectItem value={any}>{t`Any author`}</SelectItem>
+            {/* An author the address names who is not among the project's
+                members: a project token, or a member whose grant is gone. */}
+            {search.author && !memberIds.includes(search.author) ? (
+              <SelectItem value={search.author}>{search.author}</SelectItem>
+            ) : null}
+            {(members.data ?? []).map((member) => (
+              <SelectItem key={member.member} value={member.member}>
+                {member.display_name}
+              </SelectItem>
+            ))}
+          </Select>
+        </Field>
+      )}
     </div>
   );
 }
@@ -205,6 +235,9 @@ function ChangeRequestPages({
   const missing = useMissingPermissionReason("change_request.approve");
   const me = useQuery(meQuery);
   const member = me.data?.member?.id;
+  // A caller who is not a member, such as an instance admin acting
+  // without one, has written no change request.
+  const authorless = search.tab === "mine" && me.isSuccess && member === undefined;
   const page = useQuery({
     ...changeRequestsQuery(project, search, member),
     // The caller's own are asked for by the caller's identifier, known
@@ -227,6 +260,14 @@ function ChangeRequestPages({
         icon={<LockIcon />}
         title={<Trans>No change request awaits your decision.</Trans>}
         description={missing}
+      />
+    );
+  }
+  if (authorless) {
+    return (
+      <EmptyState
+        icon={<GitPullRequestArrowIcon />}
+        title={<Trans>You have proposed no change request here.</Trans>}
       />
     );
   }

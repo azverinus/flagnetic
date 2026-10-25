@@ -110,12 +110,17 @@ function useChangeRequestWrite(project: string, changeRequest: ChangeRequest) {
     onError: async (error) => {
       // A change request whose base moved is written superseded by the
       // refusal itself, and a newer version is someone else's write:
-      // either way the page reads it again.
+      // either way the page reads it again, with the lists that show it
+      // and, since a moved base is a newer configuration, the flag's.
       if (
         !(error instanceof ApiError) ||
         (error.code !== "version_mismatch" && error.code !== "base_moved")
       ) {
         return;
+      }
+      void queryClient.invalidateQueries({ queryKey: changeRequestsQueryKey(project) });
+      if (error.code === "base_moved") {
+        void queryClient.invalidateQueries({ queryKey: flagsQueryKey(project) });
       }
       await queryClient.invalidateQueries({ queryKey: detail.queryKey });
     },
@@ -471,7 +476,9 @@ function CopyDialog({
     <ConfirmDialog
       open={open}
       onOpenChange={(next) => {
-        if (next) copy.reset();
+        // The dialog is opened from outside, so a refusal is forgotten as
+        // it closes, not as it opens: opened again, it starts afresh.
+        if (!next) copy.reset();
         onOpenChange(next);
       }}
       title={t`Copy the change request`}

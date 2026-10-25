@@ -590,6 +590,10 @@ msgid "Any"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Any author"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Any environment"
 msgstr ""
 

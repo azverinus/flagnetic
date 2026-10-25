@@ -63,6 +63,8 @@ export type ChangeRequestsSearch = {
   environment?: string;
   kind?: ChangeRequestKind;
   state?: ChangeRequestState;
+  /** The member or project token who wrote them. */
+  author?: string;
   cursor?: string;
 };
 
@@ -75,7 +77,7 @@ export function validateChangeRequestsSearch(
 ): ChangeRequestsSearch {
   const out: ChangeRequestsSearch = {};
   if (search.tab === "awaiting" || search.tab === "mine") out.tab = search.tab;
-  for (const name of ["flag", "environment", "cursor"] as const) {
+  for (const name of ["flag", "environment", "author", "cursor"] as const) {
     const value = text(search[name]);
     if (value !== undefined) out[name] = value;
   }
@@ -142,12 +144,11 @@ export function changeRequestOffers(changeRequest: ChangeRequest, caller: Caller
   const canApprove = caller.permissions.has("change_request.approve");
   const needs = (permission: Permission, held: boolean): ActionRefusal | undefined =>
     held ? undefined : { kind: "permission", permission };
-  // The author's own writes need the permission to propose; another's,
-  // the permission to decide.
+  // Applying and cancelling need the permission to propose, whoever takes
+  // them; on another's change request, the permission to decide as well.
   const byAuthorOrDecider = (author: boolean): ActionRefusal | undefined =>
-    author
-      ? needs("change_request.propose", canPropose)
-      : needs("change_request.approve", canApprove);
+    needs("change_request.propose", canPropose) ??
+    (author ? undefined : needs("change_request.approve", canApprove));
 
   const offers: ActionOffer[] = [];
   const offer = (action: ChangeRequestAction, refusal: ActionRefusal | undefined) =>
