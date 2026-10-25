@@ -199,9 +199,9 @@ describe("the mask, reason by reason", () => {
 
   test("names no rule, prerequisite or bucket on any flag", () => {
     for (const served of Object.values(doc?.flags ?? {})) {
-      expect(Object.keys(served).sort()).toEqual(
-        expect.not.arrayContaining(["rule_id", "prerequisite", "bucket"]),
-      );
+      for (const field of ["rule_id", "prerequisite", "bucket"]) {
+        expect(Object.keys(served)).not.toContain(field);
+      }
     }
     const json = JSON.stringify(doc);
     expect(json).not.toContain("r-roll");
