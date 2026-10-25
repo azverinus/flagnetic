@@ -458,14 +458,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.DiscoveredAttributes(discoveries, edge.Logger()),
 			worker.RemoteEvaluationCounts(remoteCounts, edge.Logger()),
 			worker.SDKInventory(inventory, edge.Logger(), reg),
-			worker.SDKInventoryRetention(appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention)),
 			worker.RollupStream(worker.ExposureRollupName, events.StreamExposures,
 				appevents.NewRollUpExposures(tx, eventStore, d.Clock), rollupMetrics),
 			worker.RollupStream(worker.SummaryRollupName, events.StreamEvaluationSummaries,
 				appevents.NewRollUpSummaries(tx, eventStore, d.Clock), rollupMetrics),
-			worker.EventPartitions(func(ctx context.Context) error {
-				return eventStore.CreateEventPartitions(ctx, d.Clock.Now(), o.EventsPartitionsAhead)
-			}),
+			worker.EventRetention(
+				appevents.NewRunRetention(tx, eventStore, d.Clock, d.IDs, o.EventsRetention, o.EventsPartitionsAhead),
+				appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention), edge.Logger(), reg),
 		},
 		Listeners: []Listener{
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},

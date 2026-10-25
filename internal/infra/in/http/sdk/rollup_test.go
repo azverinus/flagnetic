@@ -143,9 +143,6 @@ func TestAUnitsFirstExposureIsItsEarliestByOccurrenceNotByArrival(t *testing.T) 
 	base := f.clock.Now()
 	at := func(m int) time.Time { return base.Add(time.Duration(m) * time.Minute) }
 
-	if x := f.exposures(t); x.AsOf != nil {
-		t.Errorf("as_of = %v before any exposure is rolled up, want null", x.AsOf)
-	}
 	f.post(t, f.exposure("u", "true", at(1)))
 	f.post(t, f.exposure("u", "true", at(2)))
 	f.rollUp(t)
@@ -153,8 +150,10 @@ func TestAUnitsFirstExposureIsItsEarliestByOccurrenceNotByArrival(t *testing.T) 
 	if v := byVariation(x)["true"]; v.FirstExposures != 1 || v.Exposures != 2 || x.Conflicts.Total != 0 {
 		t.Fatalf("after two exposures of one variation = %+v, want one first exposure of true and no conflict", x)
 	}
-	if x.AsOf == nil {
-		t.Error("as_of is null after the rollup moved")
+	// The exposure rollup's cursor is one for the whole package, which
+	// earlier tests may have moved, at other times than this test's clock.
+	if x.AsOf == nil || !x.AsOf.Equal(f.clock.Now()) {
+		t.Errorf("as_of = %v after the rollup moved, want %s", x.AsOf, f.clock.Now())
 	}
 
 	f.post(t, f.exposure("u", "false", at(3)))

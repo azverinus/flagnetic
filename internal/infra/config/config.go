@@ -464,7 +464,7 @@ func Settings() []Setting {
 			Default: "30",
 			Unit:    "days",
 			Description: "The window of the raw events SDKs post. An event whose ID was received within it is recognised as a retry and stored once; " +
-				"an event whose time is older is rejected `out_of_window`.",
+				"an event whose time is older is rejected `out_of_window`. Raw events are kept as long: each day is dropped once it is wholly older.",
 			Example: "30",
 			apply:   wholeNumber(func(c *Config, n int) { c.EventsRetentionDays = n }),
 		},

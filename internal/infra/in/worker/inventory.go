@@ -11,11 +11,9 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
 )
 
-// Names of the SDK inventory's workers in logs, metrics and Tick.
-const (
-	SDKInventoryName          = "sdk_inventory"
-	SDKInventoryRetentionName = "sdk_inventory_retention"
-)
+// SDKInventoryName names the worker writing the SDK inventory in logs,
+// metrics and Tick.
+const SDKInventoryName = "sdk_inventory"
 
 // SDKInventory returns the worker writing the SDKs the replica saw making
 // requests, once a minute: a row is written at most that often anyway, and
@@ -43,10 +41,4 @@ func SDKInventory(i *appdelivery.SDKInventory, log *slog.Logger, reg prometheus.
 		}
 		return err
 	}}
-}
-
-// SDKInventoryRetention returns the worker forgetting the SDKs not seen for
-// the retention, every hour: a row past it by an hour more costs nothing.
-func SDKInventoryRetention(p *appdelivery.PurgeSDKInventory) Worker {
-	return Worker{Name: SDKInventoryRetentionName, Interval: time.Hour, Timeout: 5 * time.Minute, Round: p.Handle}
 }

@@ -213,7 +213,7 @@ func (s *Store) CreateEventPartitions(ctx context.Context, from time.Time, ahead
 		day := start.AddDate(0, 0, i)
 		days = append(days, day.Format(time.DateOnly))
 		for _, table := range eventTables {
-			partition := pgx.Identifier{table + "_p" + day.Format("20060102")}.Sanitize()
+			partition := pgx.Identifier{partitionName(table, day)}.Sanitize()
 			_, err = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS `+partition+` PARTITION OF `+pgx.Identifier{table}.Sanitize()+
 				` FOR VALUES FROM ('`+day.Format(time.RFC3339)+`') TO ('`+day.AddDate(0, 0, 1).Format(time.RFC3339)+`')`)
 			if err != nil {

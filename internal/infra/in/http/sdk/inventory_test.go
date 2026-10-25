@@ -155,7 +155,7 @@ func TestTheInventoryForgetsSDKsNotSeenForTheRetention(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.Advance(61 * 24 * time.Hour)
-	if err := srv.Tick(t, worker.SDKInventoryRetentionName); err != nil {
+	if err := srv.Tick(t, worker.EventRetentionName); err != nil {
 		t.Fatal(err)
 	}
 	got := inventory(t, p.admin, p, "production")

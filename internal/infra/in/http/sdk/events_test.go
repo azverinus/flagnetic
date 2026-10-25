@@ -15,6 +15,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/sdk"
+	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -387,7 +388,7 @@ func TestThePartitionWorkerKeepsPartitionsAheadOfTheClock(t *testing.T) {
 	p := newProject(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	c.Advance(10 * 24 * time.Hour)
-	if err := srv.Tick(t, "event_partitions"); err != nil {
+	if err := srv.Tick(t, worker.EventRetentionName); err != nil {
 		t.Fatal(err)
 	}
 	// Received 3 days after the worker's round: its partition was created
