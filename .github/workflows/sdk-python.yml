@@ -2,8 +2,10 @@ name: sdk-python
 
 # The Python SDK in sdks/python: lint and types, tests on the oldest and the
 # newest supported Python (the evaluator's conformance suite and the speed
-# guarantee among them), Unicode tables regenerated from Go and compared, and
-# the wheel and the sdist built and checked. ci.yml calls it behind a path
+# guarantee among them) with and without the openfeature extra, the OpenFeature
+# provider on the oldest OpenFeature SDK the extra accepts, Unicode tables
+# regenerated from Go and compared, and the wheel and the sdist built and
+# checked. ci.yml calls it behind a path
 # condition and ci-ok needs it.
 on:
   workflow_call:
@@ -23,7 +25,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Install
-        run: uv sync --locked
+        run: uv sync --locked --extra openfeature
       - name: ruff
         run: uv run ruff check .
       - name: ruff format
@@ -66,10 +68,18 @@ jobs:
       - name: Install with the interpreter that was set up
         run: |
           echo "UV_PYTHON=$(command -v python)" >> "$GITHUB_ENV"
-          uv sync --locked
+          uv sync --locked --extra openfeature
       - name: Test
         # Includes the p99 guarantee, which writes its figures to the job summary.
         run: uv run pytest
+      - name: Test the provider on the oldest OpenFeature SDK the extra accepts
+        run: uv run --with openfeature-sdk==0.9.0 pytest tests/test_openfeature.py
+      - name: Test without the extra
+        # uv sync removes what the lock's chosen extras leave out, so nothing
+        # here can import the OpenFeature SDK; its tests skip.
+        run: |
+          uv sync --locked
+          uv run pytest
 
   package:
     name: python wheel and sdist

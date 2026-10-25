@@ -72,10 +72,62 @@ client.recorder.exposures()  # what it would have reported
 `local_override`; without the option `set` raises `LocalOverridesNotAllowed`, and a protected environment refuses and
 drops every local override.
 
+## OpenFeature
+
+```bash
+pip install 'flagnetic[openfeature]'
+```
+
+The extra installs `openfeature-sdk` 0.9 or later and the provider in `flagnetic.openfeature`. It takes the client's
+arguments and options and builds the client itself:
+
+```python
+from openfeature import api
+from openfeature.evaluation_context import EvaluationContext
+from openfeature.track import TrackingEventDetails
+from flagnetic.openfeature import Provider
+
+provider = Provider("<server SDK key>", "https://flags.example.com", unit_type="user")
+api.set_provider_and_wait(provider)  # api.set_provider before openfeature-sdk 0.10
+client = api.get_client()
+
+context = EvaluationContext("u-1001", {"plan": "pro", "units": {"account": "a-17"}})
+price = client.get_string_value("pricing", "Built-in price", context)
+client.track("exposure", context, TrackingEventDetails().add("flag", "pricing"))
+client.track(
+    "alias",
+    tracking_event_details=TrackingEventDetails()
+    .add("fromUnitType", "anonymous")
+    .add("fromUnitId", "d-8f1c")
+    .add("toUnitType", "user")
+    .add("toUnitId", "u-1001"),
+)
+```
+
+The targeting key is the unit ID of `unit_type`; the `units` attribute adds further units by unit type; every other
+attribute is an attribute of the context. Reasons map as in every Flagnetic provider:
+
+| Flagnetic | OpenFeature |
+|---|---|
+| `rule`, `prerequisite_failed`, `override`, `targeting_match` | `TARGETING_MATCH` |
+| `rollout`, `experiment` | `SPLIT` |
+| `fallthrough` | `DEFAULT` |
+| `off` | `DISABLED` |
+| `local_override` | `STATIC` |
+| `error` | `ERROR` |
+| `fallback` | `ERROR`, with `FLAG_NOT_FOUND`, `TYPE_MISMATCH` or `GENERAL` |
+
+The flag metadata carries the Flagnetic reason as `flagnetic_reason`, with `stage`, `ruleset_version`, `variation`,
+`overridden` and, for an experiment, its `experiment_*` fields. The provider emits `PROVIDER_CONFIGURATION_CHANGED`
+with the changed flag keys, `PROVIDER_STALE` while the client serves its last good ruleset, `PROVIDER_READY` once it
+is fresh again and `PROVIDER_ERROR` when the SDK key is revoked. Initialization waits up to `ready_timeout` seconds
+(default 10) for the first fetch and never fails. `provider.client` is the wrapped client, for local overrides,
+`flush` and the recorder of an offline provider (`Provider("", "", offline=document)`).
+
 ## Development
 
 ```bash
-uv sync
+uv sync --extra openfeature
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run pytest
 ```
