@@ -1,12 +1,14 @@
 import { type Experiment, updateExperiment } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ConflictBanner } from "@/components/conflict-banner";
+import { ExperimentAssignmentLookup } from "@/components/experiment-assignment";
+import { ExperimentExposuresSection } from "@/components/experiment-exposures";
 import { ExperimentFields } from "@/components/experiment-fields";
 import { ExperimentOverview, ExperimentTransitions } from "@/components/experiment-transitions";
 import { FormRefusal } from "@/components/ui/form-page";
@@ -19,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UnsavedChangesBar } from "@/components/ui/unsaved-changes-bar";
 import { useCan, useMissingPermissionReason } from "@/lib/access";
 import { ApiError, unwrap } from "@/lib/errors";
+import { validateExperimentSearch } from "@/lib/experiment-health";
 import {
   experimentFieldPointer,
   experimentIssues,
@@ -37,6 +40,7 @@ import { useKnownMembers } from "@/lib/use-known-members";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/experiments/$experiment")({
   staticData: { crumb: { param: "experiment" } },
+  validateSearch: validateExperimentSearch,
   component: ExperimentDetail,
 });
 
@@ -103,7 +107,8 @@ function ExperimentNotFound({ project }: { project: string }) {
 }
 
 /**
- * One experiment: its transitions, its overview and its form, saved
+ * One experiment: its transitions, its overview, its exposures per
+ * environment, the assignment lookup and its form, saved
  * under the version the form was filled from; fields its status locks are shown with the reason, and a
  * save that meets a newer version shows who saved it and what changed.
  */
@@ -120,6 +125,8 @@ function ExperimentPage({
 }) {
   const { i18n, t } = useLingui();
   const queryClient = useQueryClient();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const canEdit = useCan("experiment.edit");
   const missing = useMissingPermissionReason("experiment.edit");
   const { projectMembers, names } = useKnownMembers(project);
@@ -225,6 +232,18 @@ function ExperimentPage({
         editing={dirty}
         onChanged={restart}
       />
+      <ExperimentExposuresSection
+        project={project}
+        experiment={base}
+        environment={search.environment}
+        onEnvironment={(environment) =>
+          void navigate({ search: (prev) => ({ ...prev, environment }), replace: true })
+        }
+      />
+      <ExperimentAssignmentLookup project={project} experiment={base} />
+      <h2 className="text-lg font-semibold">
+        <Trans>Definition</Trans>
+      </h2>
       {canEdit ? null : (
         <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">
           {missing}

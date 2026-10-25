@@ -3,11 +3,13 @@ import {
   createGrant,
   type ExperimentCreate,
   getExperiment,
+  getExperimentAssignment,
   listMembers,
   updateExperiment,
 } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
+import { expectNoSeriousViolations } from "../support/axe";
 import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
 import {
   choose,
@@ -17,6 +19,7 @@ import {
   writeConfiguration,
 } from "../support/flags";
 import { admin, viewer } from "../support/instance";
+import { postExposures, seedSdkKey } from "../support/sdk";
 
 /** Signs in and opens a project's experiments. */
 async function openExperiments(page: Page, project: string, who: Credentials = admin) {
@@ -291,6 +294,105 @@ test.describe("experiments", () => {
     expect(clone).toMatchObject({ status: "draft", name: "cta_copy", decision: null });
     expect(clone.inclusion_salt).not.toBe(source.inclusion_salt);
     expect(clone.variation_salt).not.toBe(source.variation_salt);
+  });
+
+  test("shows exposures per variation and day, conflicts and an assignment once the rollup has counted them", async ({
+    page,
+  }) => {
+    const project = await seedProject("exp-health");
+    const flag = "checkout_cta";
+    await seedFlag(project, stringFlag(flag));
+    await seedExperiment(project, experimentOn(flag, "cta_copy", { traffic_allocation: 10_000 }));
+    // Staging serves the experiment, so its exposures open first.
+    await writeConfiguration(project, flag, "staging", () => ({
+      rules: [
+        {
+          description: "",
+          conditions: [],
+          serve: { kind: "experiment" as const, experiment: "cta_copy" },
+        },
+      ],
+    }));
+    const key = await seedSdkKey(project, "staging", { kind: "server", name: "Checkout" });
+    const now = Date.now();
+    const exposure = (unitId: string, variation: string, minutesAgo: number) => ({
+      experiment: "cta_copy",
+      flag,
+      variation,
+      unitType: "user",
+      unitId,
+      at: new Date(now - minutesAgo * 60_000),
+    });
+    const result = await postExposures(key, [
+      exposure("user-1", "control", 10),
+      exposure("user-2", "control", 9),
+      exposure("user-3", "treatment", 8),
+      // user-3 met control after its first exposure to treatment: a conflict.
+      exposure("user-3", "control", 2),
+      exposure("user-4", "ghost", 1),
+    ]);
+    expect(result.accepted).toBe(4);
+    expect(result.rejected.map(({ code }) => code)).toEqual(["unknown_variation"]);
+
+    await signIn(page, admin);
+    await page.goto(`/projects/${project}/experiments/cta_copy`);
+    const exposures = page.getByRole("region", { name: "Exposures" });
+    await expect(exposures.getByRole("tab", { name: "Staging" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    // The rollup counts what was committed about every 10 seconds; the page
+    // shows its counts once it has.
+    const perVariation = exposures.getByRole("table", { name: "Per variation" });
+    await expect(async () => {
+      await page.reload();
+      await expect(perVariation.getByRole("row", { name: /^control/ })).toHaveText(
+        /control\s*2\s*66\.7%\s*50\.0%\s*3\s*0/,
+        { timeout: 5_000 },
+      );
+    }).toPass({ timeout: 45_000 });
+    await expect(perVariation.getByRole("row", { name: /^treatment/ })).toHaveText(
+      /treatment\s*1\s*33\.3%\s*50\.0%\s*1\s*0/,
+    );
+    await expect(exposures.getByText("3 units first exposed, counted up to")).toBeVisible();
+    await expect(exposures.getByRole("list", { name: "Refused exposures" })).toHaveText(
+      /unknown_variation\s*1/,
+    );
+    const perDay = exposures.getByRole("table", { name: /Units first exposed per day/ });
+    await expect(perDay.getByRole("img").first()).toHaveAccessibleName(/^Shares: control/);
+    await expect(
+      exposures.getByText(/^1 unit was exposed to a variation other than its first/),
+    ).toBeVisible();
+    await expect(
+      exposures
+        .getByRole("table", { name: /Conflicting units/ })
+        .getByRole("row", { name: /user-3/ }),
+    ).toHaveText(/user-3\s*user\s*treatment\s*control/);
+    await expectNoSeriousViolations(page, "an experiment's exposures");
+
+    // Development holds no exposure of it.
+    await exposures.getByRole("tab", { name: "Development" }).click();
+    await expect(page).toHaveURL(/environment=development/);
+    await expect(
+      exposures.getByText("No exposure has been received in this environment yet."),
+    ).toBeVisible();
+
+    // The lookup answers as the API does, with its query to copy.
+    const expected = must(
+      "looking up user-1",
+      await getExperimentAssignment({
+        client: managementClient(),
+        path: { project, experiment: "cta_copy" },
+        query: { unit_id: "user-1" },
+      }),
+    );
+    const lookup = page.getByRole("region", { name: "Assignment lookup" });
+    await lookup.getByLabel("Unit ID (user)").fill("user-1");
+    await lookup.getByRole("button", { name: "Look up" }).click();
+    await expect(lookup.getByRole("status").first()).toHaveText(
+      `user-1 gets ${expected.variation}.`,
+    );
+    await expect(lookup.getByLabel("ClickHouse query")).toHaveText(expected.sql);
   });
 
   test("tells a viewer which roles may create and edit experiments", async ({ page }) => {
