@@ -17,9 +17,9 @@ for (const field of ["dependencies", "optionalDependencies", "bundleDependencies
   assert.equal(pkg[field], undefined, `package.json must not declare ${field}`);
 }
 
-// Three peer dependencies, all optional: flagnetic/react needs react,
-// flagnetic/openfeature needs both OpenFeature SDKs, every other entry point
-// loads without any of them.
+// Three peer dependencies, all optional: flagnetic/react needs react, the
+// providers of flagnetic/openfeature serve one OpenFeature SDK each, every
+// other entry point loads without any of them.
 assert.deepEqual(Object.keys(pkg.peerDependencies).sort(), ["@openfeature/server-sdk", "@openfeature/web-sdk", "react"]);
 for (const name of Object.keys(pkg.peerDependencies)) {
   assert.equal(pkg.peerDependenciesMeta[name].optional, true, `${name} must be an optional peer`);
@@ -41,9 +41,10 @@ const resolvable = (name) => {
 
 // The optional peers each entry point may import. With one of them absent
 // that entry point is not expected to load, every other one still is.
+// flagnetic/openfeature imports only the OpenFeature SDKs' types, so it
+// loads without either: a browser application installs the web SDK alone.
 const peersOf = {
   "./react": ["react"],
-  "./openfeature": ["@openfeature/server-sdk", "@openfeature/web-sdk"],
 };
 
 let loaded = 0;
@@ -109,12 +110,15 @@ for (const name of ["index", "client", "server", "openfeature"]) {
   }
 }
 
-// Only flagnetic/openfeature reaches for the OpenFeature SDKs, and it never
-// bundles them.
-for (const name of ["index", "client", "server", "react"]) {
+// No entry point loads an OpenFeature SDK at run time, nor bundles one:
+// flagnetic/openfeature names them in its type declarations alone.
+for (const name of ["index", "client", "server", "react", "openfeature"]) {
   for (const file of [`dist/${name}.js`, `dist/${name}.cjs`]) {
     assert.ok(!read(file).includes("@openfeature/"), `${file} pulls in an OpenFeature SDK, which is only flagnetic/openfeature's optional peer`);
   }
+}
+for (const file of ["dist/openfeature.d.ts", "dist/openfeature.d.cts"]) {
+  assert.ok(read(file).includes("@openfeature/server-sdk") && read(file).includes("@openfeature/web-sdk"), `${file} does not type the providers by the OpenFeature SDKs`);
 }
 
 const react = resolvable("react") ? "react installed" : "react absent";
