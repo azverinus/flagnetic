@@ -198,7 +198,7 @@ func (c *changeStream) stillReads() bool {
 		&access.ProjectAccess{Project: in.project.ID, Permissions: in.permissions}) == nil
 }
 
-// notice is the data of a change event.
+// notice is the data of a change notice's frame.
 type notice struct {
 	Kind        string  `json:"kind"`
 	Key         string  `json:"key"`
@@ -227,7 +227,7 @@ func (e *eventWriter) flush() {
 	}
 }
 
-// send writes a refetch when refetch is set, then a change event per
+// send writes a refetch when refetch is set, then a change frame per
 // notice.
 func (e *eventWriter) send(notices []governance.ChangeNotice, refetch bool) {
 	if refetch {

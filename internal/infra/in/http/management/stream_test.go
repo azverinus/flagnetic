@@ -15,7 +15,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
-// changeNotice is the data of a change stream's change event.
+// changeNotice is the data of a change stream's change notice.
 type changeNotice struct {
 	Kind        string           `json:"kind"`
 	Key         string           `json:"key"`
@@ -49,12 +49,12 @@ func changesRequest(t *testing.T, srv *testkit.Server, project, lastEventID stri
 }
 
 // nextChange returns the id and notice of the next frame, failing unless
-// it is a change event.
+// it is a change notice.
 func nextChange(t *testing.T, s *testkit.EventStream) (string, changeNotice) {
 	t.Helper()
 	f := s.Next(t)
 	if f["event"] != "change" || f["id"] == "" {
-		t.Fatalf("frame = %v, want a change event", f)
+		t.Fatalf("frame = %v, want a change notice", f)
 	}
 	var n changeNotice
 	if err := json.Unmarshal([]byte(f["data"]), &n); err != nil {
@@ -368,8 +368,8 @@ func TestChangeStreamsPerCallerAreBoundedAndCounted(t *testing.T) {
 		t.Errorf("%s = %v, want 10", open, got)
 	}
 	s := openChanges(t, srv, first, p.Key, "")
-	if s.Response.Header.Get("Retry-After") == "" {
-		t.Error("429 without Retry-After")
+	if got := s.Response.Header.Get("Retry-After"); got != "1" {
+		t.Errorf("Retry-After = %q, want 1", got)
 	}
 	assertStreamRefused(t, "eleventh stream", s, http.StatusTooManyRequests, "too_many_streams")
 	if got := metric(refused); got != 1 {

@@ -37,6 +37,10 @@ func OpenEventStream(t testing.TB, c *http.Client, req *http.Request) *EventStre
 		cancel()
 		t.Fatal(err)
 	}
+	// The body is closed when the test ends whatever the status, so a
+	// refused stream's body a test leaves unread does not hold its
+	// connection.
+	t.Cleanup(func() { _ = res.Body.Close() })
 	s := &EventStream{Response: res, frames: make(chan Frame, 64), cancel: cancel}
 	if res.StatusCode != http.StatusOK {
 		close(s.frames)
@@ -51,7 +55,13 @@ func OpenEventStream(t testing.TB, c *http.Client, req *http.Request) *EventStre
 			line := sc.Text()
 			if line == "" {
 				if len(f) > 0 {
-					s.frames <- f
+					// A test that stopped reading must not hold the
+					// reader once it ends.
+					select {
+					case s.frames <- f:
+					case <-ctx.Done():
+						return
+					}
 				}
 				f = Frame{}
 				continue

@@ -105,3 +105,39 @@ func TestAVersionIsFoundInTheBeforeOrAfterOfItsEntityInOneEnvironment(t *testing
 		}
 	}
 }
+
+func TestNoticesAfterAnEntryAreReplayedUpToTheLimitAndNoFurther(t *testing.T) {
+	ids := testkit.IDs(testkit.Clock())
+	log := pggovernance.NewAuditLog(testkit.FreshPool(t))
+	system := governance.Request{Actor: governance.Actor{Kind: governance.ActorSystem, ID: "system", Name: "system"}}
+	project := id.New[workspace.Project](ids)
+	entries := make([]governance.Entry, 5)
+	for i := range entries {
+		e, err := governance.NewEntry(id.New[governance.Entry](ids), testkit.Start, system, governance.Record{
+			Project: project, Action: "flag.updated",
+			Entity: governance.Entity{Kind: "flag", ID: id.New[governance.Entry](ids).String(), Key: "flag"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := log.Append(t.Context(), e); err != nil {
+			t.Fatal(err)
+		}
+		entries[i] = e
+	}
+	first, last := entries[0].ID, entries[len(entries)-1].ID
+
+	notices, ok, err := log.NoticesAfter(t.Context(), project, first, 4)
+	if err != nil || !ok || len(notices) != 4 || notices[0].Entry != entries[1].ID || notices[3].Entry != last {
+		t.Errorf("4 after the first, limit 4 = %d notices, %v, %v; want the four, oldest first", len(notices), ok, err)
+	}
+	if notices, ok, err := log.NoticesAfter(t.Context(), project, first, 3); err != nil || ok || notices != nil {
+		t.Errorf("4 after the first, limit 3 = %d notices, %v, %v; want none and a refetch", len(notices), ok, err)
+	}
+	if notices, ok, err := log.NoticesAfter(t.Context(), project, last, 3); err != nil || !ok || len(notices) != 0 {
+		t.Errorf("after the last = %d notices, %v, %v; want none to replay", len(notices), ok, err)
+	}
+	if _, ok, err := log.NoticesAfter(t.Context(), id.New[workspace.Project](ids), first, 3); err != nil || ok {
+		t.Errorf("after an entry of another project = %v, %v; want a refetch", ok, err)
+	}
+}
