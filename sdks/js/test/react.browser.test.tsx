@@ -302,6 +302,43 @@ describe("a client the application owns", () => {
     expect(client.getBool("checkout", false)).toBe(true);
     await client.close();
   });
+
+  test("is followed when it changes, and let go when it is taken away", async () => {
+    const options = { context: user, store: false as const, logger: () => undefined };
+    const first = createClient(key, baseUrl, { ...options, bootstrap: valuesFor({ checkout: true }) });
+    const second = createClient(key, baseUrl, { ...options, bootstrap: valuesFor({ checkout: false }) });
+    let held: FlagneticClient | undefined;
+    function Held(): ReactElement {
+      held = useFlagnetic();
+      return <></>;
+    }
+    const tree = (client: FlagneticClient | undefined): ReactElement => (
+      <FlagneticProvider {...(client && { client })} bootstrap={valuesFor({ checkout: true })}>
+        <Checkout />
+        <Held />
+      </FlagneticProvider>
+    );
+    root = createRoot(container);
+    await step(() => { root?.render(tree(first)); });
+    expect(text("checkout")).toBe("true");
+    expect(held).toBe(first);
+
+    await step(() => { root?.render(tree(second)); });
+    expect(text("checkout")).toBe("false");
+    expect(held).toBe(second);
+
+    // Without a client the hooks fall back to the bootstrap document, never
+    // to a client the provider no longer holds.
+    await step(() => { root?.render(tree(undefined)); });
+    expect(text("checkout")).toBe("true");
+    expect(held).toBeUndefined();
+
+    // Neither client was closed by the provider.
+    expect(first.getBool("checkout", false)).toBe(true);
+    expect(second.getBool("checkout", false)).toBe(false);
+    await first.close();
+    await second.close();
+  });
 });
 
 describe("unmounting", () => {

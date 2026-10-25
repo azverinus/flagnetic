@@ -16,8 +16,10 @@ import { SourceContext } from "./provider.js";
 import type { FlagneticSource } from "./source.js";
 
 /**
- * The client the provider holds, or undefined while a page is rendered on a
- * server and hydrated in the browser. Reach for it to call `setContext`,
+ * The client the provider holds. A client the provider builds itself exists
+ * only after hydration, so this is undefined while a page is rendered on a
+ * server and hydrated in the browser; a client passed to the provider is
+ * returned from the first render on. Reach for it to call `setContext`,
  * `exposure`, `alias`, `flush` or the local overrides.
  */
 export function useFlagnetic(): FlagneticClient | undefined {
@@ -98,8 +100,8 @@ function useServed<T>(
     const version = source.flagVersion(key);
     const metadata = source.metadata();
     const last = held.current;
-    // An evaluation is counted and an auto-exposure flag records its
-    // exposure, so the flag is read once per change, not once per render.
+    // An evaluation is counted and a flag with automatic exposure records
+    // its exposure, so the flag is read once per change, not once per render.
     if (last && last.version === version && last.metadata === metadata && last.key === key && jsonEquals(last.def, defaultValue)) {
       return last.served;
     }

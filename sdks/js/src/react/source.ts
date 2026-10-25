@@ -70,7 +70,13 @@ export class FlagneticSource {
     return () => {
       offChange();
       offStage();
-      if (this.attached === client) this.attached = undefined;
+      if (this.attached !== client) return;
+      // The readers were serving this client: they go back to the bootstrap
+      // document, or to the next client, and none keeps a snapshot of one
+      // the provider no longer holds.
+      this.attached = undefined;
+      this.stageChanged();
+      for (const notify of [...this.clientListeners]) notify();
     };
   }
 
