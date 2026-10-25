@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+# The Rails integration's own bundle: the flagnetic gem itself carries no
+# Rails dependency, so Rails, Puma and the test app live only here.
+# RAILS_VERSION picks the Rails major the CI matrix runs against.
+
+source "https://rubygems.org"
+
+rails = ENV.fetch("RAILS_VERSION", "8.1")
+
+gem "actionpack", "~> #{rails}.0"
+gem "flagnetic", path: ".."
+gem "minitest", "~> 5.25"
+gem "puma", ">= 6.4"
+gem "rackup", "~> 2.1"
+gem "railties", "~> #{rails}.0"
+gem "rake", "~> 13.0"
+gem "rspec-core", "~> 3.13"
+gem "rspec-expectations", "~> 3.13"

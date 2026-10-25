@@ -17,6 +17,7 @@ Style/StringLiteralsInInterpolation:
 Metrics:
   Exclude:
     - "test/**/*"
+    - "rails/test/**/*"
 
 Metrics/MethodLength:
   Max: 30

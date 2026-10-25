@@ -97,6 +97,7 @@ Log events have stable names (`Flagnetic::EVENTS`); alert on the name, never on 
 | `exposure_skipped` | debug | `flag`, `cause` (`no_experiment`, `no_detail`, `repeat`) |
 | `exposures_disabled` | warn | |
 | `ingest_failed` | warn | `kind`, `events`, `retry_in`, `status`, `error` |
+| `client_not_configured` | warn | `rails_env`: the Rails integration found no SDK key and base URL and serves built-in defaults |
 | `queue_dropped` | warn | `kind` (`exposure_or_alias`, `evaluation_summary`), `cause` (`queue_full`, `client_error`, `refused_by_the_platform`, `window_older_than_one_hour`) and what was dropped |
 
 A ruleset from a newer server may hold constructs this SDK does not know. The client logs `rule_unsupported` once per flag and ruleset version, and the flag serves its default with the error code `inconsistent_ruleset`.
@@ -104,6 +105,36 @@ A ruleset from a newer server may hold constructs this SDK does not know. The cl
 ## Flagnetic.client
 
 `Flagnetic.client` is the process-wide client: assign one with `Flagnetic.client = ...`, or set `Flagnetic.client_builder` to a callable that builds it on first use, once. It raises `Flagnetic::NotConfigured` until either is set.
+
+## Rails
+
+Under Rails the gem loads a railtie (nothing of it loads without Rails) that sets `Flagnetic.client` up without an initializer. The SDK key and base URL come from the first of `config.flagnetic.sdk_key` and `config.flagnetic.base_url`, the `FLAGNETIC_SDK_KEY` and `FLAGNETIC_BASE_URL` environment variables, and credentials (`flagnetic.sdk_key`, `flagnetic.base_url`). Without both, the client serves built-in defaults and logs `client_not_configured`.
+
+A server or job process builds the client at boot and waits up to `ready_timeout` seconds for the ruleset; `rails console`, `rails runner` and rake build it on first use, so a task that never asks for a flag makes no request. Every forked child (Puma cluster mode, Unicorn) starts its own background thread at once, and every process closes its client at exit, which flushes what it queued. Local overrides are allowed in every environment but production, where no setting enables them.
+
+| `config.flagnetic.` | |
+|---|---|
+| `sdk_key`, `base_url` | See above. |
+| `offline_file` | A ruleset document to serve instead; no request is made. |
+| `start` | `nil` (default): at boot in a server or job process, on first use in console, runner and rake. `true`: at boot everywhere. `false`: on first use. |
+| `ready_timeout`, `close_timeout` | Seconds the boot waits for the ruleset and the exit flush may take (default 5 each). |
+| `allow_overrides` | `false` disables local overrides outside production too. |
+| `logger` | The client's `logger:` (default `Rails.logger`). |
+| `client_options` | Any other `Flagnetic::Client.new` option, as a `Hash`. |
+| `platform`, `app_version` | Attributes of every request context, and the client's `platform:` and `app_version:`. |
+| `user_unit_type`, `user_id` | The signed-in user's unit type, and a callable receiving the controller that returns the ID (default `current_user&.id`, else `session[:user_id]`). |
+| `anonymous_unit_type`, `anonymous_cookie` | The unit type of a random ID kept in a cookie (default name `flagnetic_anonymous_id`). |
+| `attributes` | A callable receiving the controller and returning more attributes. |
+
+Controllers and views get `flagnetic_context`, the current request's context, and `flagnetic_anonymous_id`, the visitor's anonymous ID (set in an HTTP-only cookie on the first request). No unit type is set by default. Signing in keeps the anonymous ID beside the user's, so an experiment spanning sign-up keeps its variation; call `Flagnetic.client.alias` at sign-up to link the two.
+
+```ruby
+config.flagnetic.user_unit_type = "user"
+config.flagnetic.anonymous_unit_type = "anonymous"
+
+# in a controller or view
+Flagnetic.client.bool("new_checkout", default: false, context: flagnetic_context)
+```
 
 ## Testing
 
@@ -191,4 +222,5 @@ go run ./sdks/ruby/script/_unicode_tables > sdks/ruby/lib/flagnetic/eval/unicode
 bundle install
 bundle exec rake test   # unit tests, every conformance fixture, the protocol scenarios, the RSpec helpers and the p99 test
 bundle exec rubocop
+(cd rails && bundle install && bundle exec rake test)  # the Rails integration; RAILS_VERSION=8.0 for the older major
 ```

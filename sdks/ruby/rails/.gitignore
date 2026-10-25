@@ -1,0 +1,5 @@
+/Gemfile.lock
+/test/app/log/
+/test/app/tmp/
+/.bundle/
+/vendor/

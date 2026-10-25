@@ -22,11 +22,13 @@ require_relative "flagnetic/worker"
 require_relative "flagnetic/fallback_chain"
 require_relative "flagnetic/client"
 require_relative "flagnetic/global"
+require_relative "flagnetic/railtie" if defined?(Rails::Railtie)
 
 # Flagnetic is the Ruby SDK for Flagnetic feature flags and experiments:
 # server mode, local evaluation from a ruleset held in memory. Start with
 # Flagnetic::Client, or Flagnetic.client for the process-wide one; tests
-# use Flagnetic::Testing (require "flagnetic/testing"). The gem depends on
-# nothing outside the standard library.
+# use Flagnetic::Testing (require "flagnetic/testing"). In a Rails app the
+# railtie builds Flagnetic.client from configuration; the gem itself
+# depends on nothing outside the standard library, Rails included.
 module Flagnetic
 end
