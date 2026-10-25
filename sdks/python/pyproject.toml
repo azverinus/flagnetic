@@ -18,6 +18,10 @@ classifiers = [
   "Typing :: Typed",
 ]
 
+[project.optional-dependencies]
+# The OpenFeature provider, flagnetic.openfeature; 0.9 is the first release with tracking.
+openfeature = ["openfeature-sdk>=0.9"]
+
 [project.urls]
 Homepage = "https://github.com/azverinus/flagnetic"
 Source = "https://github.com/azverinus/flagnetic/tree/main/sdks/python"

@@ -11,7 +11,12 @@ import zipfile
 from email.parser import Parser
 from pathlib import Path
 
-WHEEL_FILES = ("flagnetic/__init__.py", "flagnetic/py.typed", "flagnetic/_eval/_re2/unicode_tables.py")
+WHEEL_FILES = (
+    "flagnetic/__init__.py",
+    "flagnetic/py.typed",
+    "flagnetic/openfeature.py",
+    "flagnetic/_eval/_re2/unicode_tables.py",
+)
 SDIST_FILES = (
     "pyproject.toml",
     "README.md",
@@ -44,6 +49,8 @@ def check_wheel(path: Path) -> None:
     for requirement in metadata.get_all("Requires-Dist") or []:
         if "extra ==" not in requirement:
             fail(f"the wheel requires {requirement} outside an extra")
+    if "openfeature-sdk>=0.9; extra == 'openfeature'" not in (metadata.get_all("Requires-Dist") or []):
+        fail("the openfeature extra does not require openfeature-sdk>=0.9")
     if "Typing :: Typed" not in (metadata.get_all("Classifier") or []):
         fail("the wheel is not classified Typing :: Typed")
 
