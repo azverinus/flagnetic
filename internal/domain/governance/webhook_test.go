@@ -60,6 +60,8 @@ func TestAMalformedSubscriptionNamesEveryFieldAtOnce(t *testing.T) {
 		"a blank name":           {governance.WebhookInput{Name: " ", URL: "https://r.example", Events: []string{"ping"}}, []string{"/name"}},
 		"no events":              {governance.WebhookInput{Name: "a", URL: "https://r.example"}, []string{"/events"}},
 		"an unknown environment": {governance.WebhookInput{Name: "a", URL: "https://r.example", Events: []string{"ping"}, Environments: []string{"staging"}}, []string{"/environments/0"}},
+		"an unknown environment after a repeat": {governance.WebhookInput{Name: "a", URL: "https://r.example", Events: []string{"ping"},
+			Environments: []string{"production", "production", "staging", "staging"}}, []string{"/environments/2"}},
 		"not a URL":              {governance.WebhookInput{Name: "a", URL: "not a url", Events: []string{"ping"}}, []string{"/url"}},
 		"another scheme":         {governance.WebhookInput{Name: "a", URL: "ftp://r.example/hook", Events: []string{"ping"}}, []string{"/url"}},
 		"credentials in the URL": {governance.WebhookInput{Name: "a", URL: "https://u:p@r.example/hook", Events: []string{"ping"}}, []string{"/url"}},
@@ -80,6 +82,13 @@ func TestAnEventTypeOutsideTheCatalogueIsRefused(t *testing.T) {
 	_, err := checked(t, in, governance.TargetPolicy{})
 	if code, pointers := problemOf(t, err); code != "unknown_event_type" || !slices.Equal(pointers, []string{"/events/1"}) {
 		t.Errorf("%s at %v, want unknown_event_type at /events/1", code, pointers)
+	}
+	// The pointer names the element as the request wrote it, repeats
+	// included.
+	in.Events = []string{"ping", "ping", "flag.exploded"}
+	_, err = checked(t, in, governance.TargetPolicy{})
+	if code, pointers := problemOf(t, err); code != "unknown_event_type" || !slices.Equal(pointers, []string{"/events/2"}) {
+		t.Errorf("after a repeat: %s at %v, want unknown_event_type at /events/2", code, pointers)
 	}
 }
 

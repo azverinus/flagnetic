@@ -225,16 +225,17 @@ func CheckWebhook(in WebhookInput, environments []string, policy TargetPolicy) (
 	if len(in.Events) == 0 {
 		add("/events", "required", "a subscription names at least one event type", nil)
 	}
-	in.Environments = distinct(in.Environments)
+	// Pointers index the list as the request wrote it, so they are judged
+	// before repeats are dropped.
 	for i, e := range in.Environments {
-		if !slices.Contains(environments, e) {
+		if !slices.Contains(environments, e) && !slices.Contains(in.Environments[:i], e) {
 			add(fmt.Sprintf("/environments/%d", i), "not_found", "the project has no environment with this key", nil)
 		}
 	}
+	in.Environments = distinct(in.Environments)
 	if len(violations) > 0 {
 		return in, apperrors.Invalid("invalid_webhook", "the webhook subscription is not valid", violations...)
 	}
-	in.Events = distinct(in.Events)
 	for i, e := range in.Events {
 		if e != EventAll && !knownEventType(e) {
 			return in, apperrors.Invalid("unknown_event_type", "an event type is not in the catalogue", apperrors.Violation{
@@ -243,6 +244,7 @@ func CheckWebhook(in WebhookInput, environments []string, policy TargetPolicy) (
 			})
 		}
 	}
+	in.Events = distinct(in.Events)
 	if target.Scheme == "http" && !policy.AllowHTTP {
 		return in, errInsecureURL
 	}
