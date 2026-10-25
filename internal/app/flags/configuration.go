@@ -29,6 +29,12 @@ type ConfigurationWriter interface {
 	UpdateConfiguration(ctx context.Context, c flags.Configuration) error
 }
 
+// configurationUpdater stores a flag's changed configuration in one
+// environment.
+type configurationUpdater interface {
+	UpdateConfiguration(ctx context.Context, c flags.Configuration) error
+}
+
 // ConfigurationDeps are what a write of one configuration runs on.
 type ConfigurationDeps struct {
 	Tx       Transactor
@@ -91,25 +97,36 @@ func writeConfiguration(ctx context.Context, d ConfigurationDeps, cmd Configurat
 			return err
 		}
 		out = flags.EnvironmentConfiguration{Environment: before.Environment, Configuration: ch.after}
-		if !ch.changed.Any {
-			return nil
-		}
-		if err = d.Store.UpdateConfiguration(ctx, ch.after); err != nil {
-			return err
-		}
-		if ch.changed.Ruleset {
-			if err = d.Rulesets.Environment(ctx, ch.after.Environment); err != nil {
-				return err
-			}
-		}
-		after := configurationValues(ch.after)
-		maps.Copy(after, ch.extra)
-		return d.Recorder.record(ctx, now, cmd.Request, governance.Record{
-			Project: cmd.Project, Environment: ch.after.Environment, Action: ch.action, Entity: flagEntity(f),
-			Before: configurationValues(before.Configuration), After: after, KillSwitch: ch.killSwitch,
-		})
+		return storeConfiguration(ctx, d.Store, d.Rulesets, d.Recorder, cmd.Project, f, before.Configuration, ch, now, cmd.Request)
 	})
 	return out, err
+}
+
+// storeConfiguration stores ch, made to f's configuration before at now in
+// req, in the unit of work ctx carries: a change that changes nothing stores
+// and records nothing, a change to what a ruleset carries moves the
+// environment's ruleset on, and the audit entry records the whole
+// configuration before and after, which is what a revert restores.
+func storeConfiguration(ctx context.Context, store configurationUpdater, rulesets Rulesets, rec Recorder, project workspace.ProjectID, f flags.Flag, before flags.Configuration,
+	ch configurationChange, now time.Time, req governance.Request,
+) error {
+	if !ch.changed.Any {
+		return nil
+	}
+	if err := store.UpdateConfiguration(ctx, ch.after); err != nil {
+		return err
+	}
+	if ch.changed.Ruleset {
+		if err := rulesets.Environment(ctx, ch.after.Environment); err != nil {
+			return err
+		}
+	}
+	after := configurationValues(ch.after)
+	maps.Copy(after, ch.extra)
+	return rec.record(ctx, now, req, governance.Record{
+		Project: project, Environment: ch.after.Environment, Action: ch.action, Entity: flagEntity(f),
+		Before: configurationValues(before), After: after, KillSwitch: ch.killSwitch,
+	})
 }
 
 // configurationOf returns project's flag keyed flag and its configuration in
@@ -151,4 +168,62 @@ func (h *GetFlagConfiguration) Handle(ctx context.Context, project workspace.Pro
 		return err
 	})
 	return ec, err
+}
+
+// ExperimentRuleStore reads and rewrites the configurations of a flag.
+type ExperimentRuleStore interface {
+	FlagByKey(ctx context.Context, project workspace.ProjectID, key string) (flags.Flag, error)
+	// Configurations returns flag's configuration in every environment.
+	Configurations(ctx context.Context, flag flags.FlagID) ([]flags.EnvironmentConfiguration, error)
+	UpdateConfiguration(ctx context.Context, c flags.Configuration) error
+}
+
+// ApplyExperimentDecisionDeps are what ApplyExperimentDecision runs on.
+type ApplyExperimentDecisionDeps struct {
+	Store    ExperimentRuleStore
+	Rulesets Rulesets
+	Recorder Recorder
+}
+
+// ApplyExperimentDecision rewrites the rules serving an experiment as its
+// stop decided.
+type ApplyExperimentDecision struct{ d ApplyExperimentDecisionDeps }
+
+// NewApplyExperimentDecision returns the handler.
+func NewApplyExperimentDecision(d ApplyExperimentDecisionDeps) *ApplyExperimentDecision {
+	return &ApplyExperimentDecision{d: d}
+}
+
+// ApplyDecision makes every rule of project's flag keyed flag serving the
+// experiment keyed experiment serve the variation winner, or deletes it when
+// winner is "", in every environment, as the member by (nil for a project
+// token) at now in req. An experiment's rules are all its flag's, since a
+// rule serving another flag's experiment is refused.
+//
+// Each configuration it changes is a configuration write of its own, at its
+// next version, recorded as flag.configuration_updated with the experiment
+// its stop decided, so a revert finds the version and later readers of the audit
+// log see the write as any other; the environment's ruleset moves on with
+// it. It runs in the unit of work ctx carries, under the project's lock its
+// caller took, so the stop and every rewrite commit together.
+func (h *ApplyExperimentDecision) ApplyDecision(ctx context.Context, project workspace.ProjectID, flag, experiment,
+	winner string, by *access.MemberID, now time.Time, req governance.Request,
+) error {
+	f, err := h.d.Store.FlagByKey(ctx, project, flag)
+	if err != nil {
+		return err
+	}
+	configurations, err := h.d.Store.Configurations(ctx, f.ID)
+	if err != nil {
+		return err
+	}
+	for _, ec := range configurations {
+		after, changed := ec.Configuration.ApplyDecision(experiment, winner, flags.Write{By: by, Now: now})
+		ch := configurationChange{after: after, changed: changed, action: "flag.configuration_updated",
+			extra: map[string]any{"experiment_stopped": experiment}}
+		if err := storeConfiguration(ctx, h.d.Store, h.d.Rulesets, h.d.Recorder, project, f, ec.Configuration, ch, now, req); err != nil {
+			return err
+		}
+	}
+	return nil
 }
