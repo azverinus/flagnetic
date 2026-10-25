@@ -72,7 +72,7 @@ describe("the experiment form's fields by status", () => {
     expect(screen.getByRole("combobox", { name: "Unit type" })).toBeDisabled();
     expect(screen.getByLabelText("Weight of variation 1 (%)")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Split evenly" })).toBeDisabled();
-    expect(screen.getByRole("status")).toHaveTextContent("Grow allocation");
+    expect(screen.getByRole("status")).toHaveTextContent("Grow traffic allocation");
     expect(screen.getByLabelText("Traffic allocation (%)")).toBeDisabled();
     expect(screen.getByLabelText("Name")).toBeEnabled();
     expect(screen.getByLabelText("Expected end")).toBeEnabled();

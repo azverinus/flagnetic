@@ -2012,11 +2012,11 @@ msgid "Grants"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
-msgid "Grow allocation"
+msgid "Grow the traffic allocation of {key}"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
-msgid "Grow the traffic allocation of {key}"
+msgid "Grow traffic allocation"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -4124,7 +4124,7 @@ msgid "The experiment is not ready to start."
 msgstr ""
 
 #: src/lib/experiments.ts
-msgid "The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid. Its traffic allocation only grows, through Grow allocation above, so no included unit ever leaves."
+msgid "The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid. Its traffic allocation only grows, through Grow traffic allocation above, so no included unit ever leaves."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx

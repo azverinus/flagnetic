@@ -181,7 +181,7 @@ export function lockReason(i18n: I18n, status: ExperimentStatus): string | undef
       return undefined;
     case "running":
       return i18n._(
-        msg`The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid. Its traffic allocation only grows, through Grow allocation above, so no included unit ever leaves.`,
+        msg`The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid. Its traffic allocation only grows, through Grow traffic allocation above, so no included unit ever leaves.`,
       );
     case "stopped":
       return i18n._(

@@ -232,15 +232,15 @@ test.describe("experiments", () => {
 
     // The traffic allocation only grows, through its own confirmation.
     await expect(page.getByLabel("Traffic allocation (%)")).toBeDisabled();
-    await page.getByRole("button", { name: "Grow allocation" }).click();
+    await page.getByRole("button", { name: "Grow traffic allocation" }).click();
     dialog = page.getByRole("dialog", { name: "Grow the traffic allocation of cta_copy" });
     await dialog.getByLabel("New traffic allocation (%)").fill("20");
-    await dialog.getByRole("button", { name: "Grow allocation" }).click();
+    await dialog.getByRole("button", { name: "Grow traffic allocation" }).click();
     await expect(
       dialog.getByText("Enter more than 25.00 %: the traffic allocation only grows."),
     ).toBeVisible();
     await dialog.getByLabel("New traffic allocation (%)").fill("50");
-    await dialog.getByRole("button", { name: "Grow allocation" }).click();
+    await dialog.getByRole("button", { name: "Grow traffic allocation" }).click();
     await expect(page.getByText("The traffic allocation of cta_copy grew.")).toBeVisible();
     expect((await readExperiment(project, "cta_copy")).traffic_allocation).toBe(5000);
 

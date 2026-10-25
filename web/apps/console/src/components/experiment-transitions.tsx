@@ -251,7 +251,7 @@ export function ExperimentTransitions({
 
   return (
     <>
-      {action("grow", <Trans>Grow allocation</Trans>)}
+      {action("grow", <Trans>Grow traffic allocation</Trans>)}
       {action("clone", <Trans>Clone</Trans>)}
       {action("archive", <Trans>Archive</Trans>)}
       {action("delete", <Trans>Delete</Trans>, "destructive")}
@@ -489,7 +489,7 @@ function GrowForm({
     <DialogForm
       onSubmit={submit}
       onCancel={onCancel}
-      submitLabel={<Trans>Grow allocation</Trans>}
+      submitLabel={<Trans>Grow traffic allocation</Trans>}
       pending={pending}
     >
       <Field
