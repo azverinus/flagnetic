@@ -315,10 +315,11 @@ func TestApprovingRecordsTheDeciderAndAnOptionalComment(t *testing.T) {
 		!reflect.DeepEqual(approved.Approval, want) || approved.Rejection != nil {
 		t.Errorf("approved = %+v, %v", approved, err)
 	}
-	if approved, err := cr.Approve(byDecider, " ", 3, later); err != nil || approved.Approval == nil || approved.Approval.Comment != "" {
-		t.Errorf("approved without a comment = %+v, %v", approved.Approval, err)
+	silent, err := cr.Approve(byDecider, " ", 3, later)
+	if err != nil || silent.Approval == nil || silent.Approval.Comment != "" {
+		t.Errorf("approved without a comment = %+v, %v", silent.Approval, err)
 	}
-	if _, err := cr.Approve(byDecider, strings.Repeat("é", 2_000), 3, later); err != nil {
+	if _, err = cr.Approve(byDecider, strings.Repeat("é", 2_000), 3, later); err != nil {
 		t.Errorf("a comment at the limit = %v", err)
 	}
 	_, err = cr.Approve(byDecider, strings.Repeat("é", 2_001), 3, later)

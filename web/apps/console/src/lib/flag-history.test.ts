@@ -15,6 +15,7 @@ function entry(over: Partial<AuditEntry>): AuditEntry {
     before: null,
     after: null,
     request_id: null,
+    change_request_id: null,
     kill_switch: false,
     ...over,
   } as AuditEntry;
