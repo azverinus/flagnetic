@@ -378,6 +378,12 @@ func TestApplyingRecordsWhoAppliedAndWhen(t *testing.T) {
 	if _, err := cr.Apply(byBob, 3, later); codeOf(err) != "not_author" {
 		t.Errorf("applied by another member = %v", err)
 	}
+	// Whoever approved it applies it, even once they may no longer decide.
+	approvedByBob := cr
+	approvedByBob.Approval = &governance.Decision{Member: bob, At: now}
+	if applied, err := approvedByBob.Apply(byBob, 3, later); err != nil || applied.State != governance.StateApplied {
+		t.Errorf("applied by its approver = %v", err)
+	}
 }
 
 // Approving or applying a change request whose base moved would decide or

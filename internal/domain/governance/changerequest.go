@@ -274,8 +274,8 @@ const (
 	// approval is always a second person, and never a project token, so a
 	// pipeline proposes and a human decides.
 	byDecider
-	// byAuthorDeciderOrSystem: the author, whoever may decide, or the
-	// system applying at the scheduled time.
+	// byAuthorDeciderOrSystem: the author, the member who approved it,
+	// whoever may decide, or the system applying at the scheduled time.
 	byAuthorDeciderOrSystem
 	// bySystem: the system alone.
 	bySystem
@@ -319,7 +319,7 @@ func (cr ChangeRequest) Next(t Transition, by Taker) (ChangeRequestState, error)
 	if !ok {
 		return "", errSystemOnly
 	}
-	if err := rule.who.allows(cr.Author, by); err != nil {
+	if err := rule.who.allows(cr, by); err != nil {
 		return "", err
 	}
 	if !slices.Contains(rule.from, cr.State) {
@@ -332,8 +332,8 @@ func (cr ChangeRequest) Next(t Transition, by Taker) (ChangeRequestState, error)
 	return rule.to, nil
 }
 
-func (w who) allows(author Author, by Taker) error {
-	isAuthor := !by.System && author.Is(by.As)
+func (w who) allows(cr ChangeRequest, by Taker) error {
+	isAuthor := !by.System && cr.Author.Is(by.As)
 	switch w {
 	case byAuthor:
 		if !isAuthor {
@@ -355,7 +355,10 @@ func (w who) allows(author Author, by Taker) error {
 			return errCannotDecide
 		}
 	case byAuthorDeciderOrSystem:
-		if !isAuthor && !by.System && !by.MayDecide {
+		// The member who approved it applies what they approved, even
+		// once they may no longer decide others.
+		isApprover := !by.System && cr.Approval != nil && by.As.Member != nil && *by.As.Member == cr.Approval.Member
+		if !isAuthor && !isApprover && !by.System && !by.MayDecide {
 			return errNotYours
 		}
 	case bySystem:
