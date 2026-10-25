@@ -1591,7 +1591,7 @@ msgid "Enter JSON other than null."
 msgstr "Введите JSON, отличный от null."
 
 #: src/lib/experiment-transitions.ts
-msgid "Enter more than {from} %: the allocation only grows."
+msgid "Enter more than {from} %: the traffic allocation only grows."
 msgstr "Введите больше {from} %: охват только растёт."
 
 #: src/lib/flag-detail.ts
@@ -2016,7 +2016,7 @@ msgid "Grow allocation"
 msgstr "Увеличить охват"
 
 #: src/components/experiment-transitions.tsx
-msgid "Grow the allocation of {key}"
+msgid "Grow the traffic allocation of {key}"
 msgstr "Увеличить охват {key}"
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -4059,8 +4059,8 @@ msgid "The draft {key} is created."
 msgstr "Черновик {key} создан."
 
 #: src/components/experiment-transitions.tsx
-msgid "The draft is deleted. This cannot be taken back; its audit entries stay. Refused while a rule of its flag serves it."
-msgstr "Черновик будет удалён. Это нельзя отменить; записи аудита остаются. Невозможно, пока его отдаёт правило флага."
+msgid "The draft is deleted. This cannot be taken back; its audit entries stay."
+msgstr "Черновик будет удалён. Это нельзя отменить; записи аудита остаются."
 
 #: src/components/experiment-transitions.tsx
 msgid "The draft never starts and nothing about it changes any more; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."

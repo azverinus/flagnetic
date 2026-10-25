@@ -1,3 +1,4 @@
+import type { I18n } from "@lingui/core";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { CircleAlertIcon } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
@@ -18,6 +19,8 @@ export type ConfirmDialogProps = {
   pending?: boolean;
   /** A refusal, shown here, keeping the dialog open. */
   refusal?: unknown;
+  /** Explains the refusal where the general message would mislead, as for an archived experiment. */
+  refusalMessage?: (i18n: I18n, error: ApiError) => string;
   /** What the member must type out before the action is offered. */
   typeToConfirm?: string;
   onConfirm: () => void;
@@ -44,6 +47,7 @@ function Confirmation({
   destructive = false,
   pending = false,
   refusal,
+  refusalMessage = problemMessage,
   typeToConfirm,
   onConfirm,
   onCancel,
@@ -74,7 +78,7 @@ function Confirmation({
       {error ? (
         <p role="alert" className="flex items-start gap-2 text-sm">
           <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
-          {problemMessage(i18n, error)}
+          {refusalMessage(i18n, error)}
         </p>
       ) : null}
       <DialogActions>

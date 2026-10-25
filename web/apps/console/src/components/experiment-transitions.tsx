@@ -20,6 +20,7 @@ import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/can";
+import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogActions } from "@/components/ui/dialog";
@@ -110,10 +111,17 @@ function useExperimentWrite(
     },
     meta: { toast: false },
     onSuccess: async (saved, write) => {
-      void queryClient.invalidateQueries({ queryKey: experimentsQueryKey(project) });
+      const deleted = write.action === "delete" || saved === undefined;
+      void queryClient.invalidateQueries({
+        queryKey: experimentsQueryKey(project),
+        // The page still shows a deleted experiment until it navigates away;
+        // reading it again would only meet a 404 and flash the not-found state.
+        predicate: (query) =>
+          !deleted || !detailKey.every((part, index) => query.queryKey[index] === part),
+      });
       void queryClient.invalidateQueries({ queryKey: flagsQueryKey(project) });
       void queryClient.invalidateQueries({ queryKey: auditQueryKey });
-      if (write.action === "delete" || saved === undefined) {
+      if (deleted) {
         toast.success(t`The experiment ${key} is deleted.`);
         await navigate({ to: "/projects/$project/experiments", params: { project } });
         queryClient.removeQueries({ queryKey: detailKey });
@@ -220,6 +228,9 @@ export function ExperimentTransitions({
   const close = () => setAsking(undefined);
   const send = (next: ExperimentWrite) => write.mutate(next, { onSuccess: close });
   const holders = flag.data ? holdingEnvironments(flag.data, key).map(environmentName) : undefined;
+  const flagFailure: FlagFailure | undefined = flag.isError
+    ? { error: flag.error, retry: () => void flag.refetch() }
+    : undefined;
 
   const action = (
     name: ExperimentAction,
@@ -254,6 +265,7 @@ export function ExperimentTransitions({
             flag={flag.data}
             unitTypes={unitTypes}
             holders={holders}
+            flagFailure={flagFailure}
             pending={write.isPending}
             refusal={write.error}
             onCancel={close}
@@ -261,11 +273,12 @@ export function ExperimentTransitions({
           />
         ) : null}
       </Dialog>
-      <Dialog {...dialog("grow")} title={t`Grow the allocation of ${key}`}>
+      <Dialog {...dialog("grow")} title={t`Grow the traffic allocation of ${key}`}>
         {asking === "grow" ? (
           <GrowForm
             experiment={experiment}
             holders={holders}
+            flagFailure={flagFailure}
             pending={write.isPending}
             refusal={write.error}
             onCancel={close}
@@ -277,6 +290,7 @@ export function ExperimentTransitions({
         {...dialog("stop")}
         experiment={experiment}
         flag={flag.data}
+        flagFailure={flagFailure}
         environmentName={environmentName}
         pending={write.isPending}
         refusal={write.error}
@@ -288,6 +302,7 @@ export function ExperimentTransitions({
         confirmLabel={<Trans>Archive experiment</Trans>}
         pending={write.isPending}
         refusal={write.error}
+        refusalMessage={experimentRefusalMessage}
         onConfirm={() => send({ action: "archive" })}
       >
         <p>
@@ -311,13 +326,11 @@ export function ExperimentTransitions({
         destructive
         pending={write.isPending}
         refusal={write.error}
+        refusalMessage={experimentRefusalMessage}
         onConfirm={() => send({ action: "delete" })}
       >
         <p>
-          <Trans>
-            The draft is deleted. This cannot be taken back; its audit entries stay. Refused while a
-            rule of its flag serves it.
-          </Trans>
+          <Trans>The draft is deleted. This cannot be taken back; its audit entries stay.</Trans>
         </p>
       </ConfirmDialog>
       <CloneDialog {...dialog("clone")} project={project} experiment={experiment} />
@@ -325,17 +338,28 @@ export function ExperimentTransitions({
   );
 }
 
+/**
+ * A failed read of the experiment's flag: which environments hold the
+ * experiment and which rules serve it are unknown until it is read again.
+ */
+type FlagFailure = { error: unknown; retry: () => void };
+
 /** The environments a write changes the rulesets of, or a warning that it changes none. */
 function HolderList({
   holders,
+  flagFailure,
   some,
   none,
 }: {
   holders: readonly string[] | undefined;
+  flagFailure: FlagFailure | undefined;
   some: ReactNode;
   none: ReactNode;
 }) {
   const { t } = useLingui();
+  if (holders === undefined && flagFailure) {
+    return <QueryError error={flagFailure.error} onRetry={flagFailure.retry} />;
+  }
   if (holders === undefined) {
     return (
       <p>
@@ -368,6 +392,7 @@ function StartConfirmation({
   flag,
   unitTypes,
   holders,
+  flagFailure,
   pending,
   refusal,
   onCancel,
@@ -377,6 +402,7 @@ function StartConfirmation({
   flag: Flag | undefined;
   unitTypes: readonly { key: string }[];
   holders: readonly string[] | undefined;
+  flagFailure: FlagFailure | undefined;
   pending: boolean;
   refusal: unknown;
   onCancel: () => void;
@@ -401,6 +427,7 @@ function StartConfirmation({
         ) : null}
         <HolderList
           holders={holders}
+          flagFailure={flagFailure}
           some={
             <Trans>
               Starting puts it into the ruleset of each of these environments at once, and its flag,
@@ -431,6 +458,7 @@ function StartConfirmation({
 function GrowForm({
   experiment,
   holders,
+  flagFailure,
   pending,
   refusal,
   onCancel,
@@ -438,6 +466,7 @@ function GrowForm({
 }: {
   experiment: Experiment;
   holders: readonly string[] | undefined;
+  flagFailure: FlagFailure | undefined;
   pending: boolean;
   refusal: unknown;
   onCancel: () => void;
@@ -476,6 +505,7 @@ function GrowForm({
       <div className="flex flex-col gap-2 text-sm text-muted-foreground">
         <HolderList
           holders={holders}
+          flagFailure={flagFailure}
           some={<Trans>The ruleset of each of these environments changes at once:</Trans>}
           none={<Trans>No rule serves it: no ruleset changes.</Trans>}
         />
@@ -491,6 +521,8 @@ export type StopDialogProps = {
   experiment: Experiment;
   /** The experiment's flag with its configurations, once read: its rules are what a stop rewrites. */
   flag: Flag | undefined;
+  /** Set when the flag could not be read, so the rules a stop rewrites are unknown. */
+  flagFailure?: FlagFailure;
   environmentName: (key: string) => string;
   pending: boolean;
   refusal: unknown;
@@ -518,6 +550,7 @@ export function StopDialog({ open, onOpenChange, experiment, ...rest }: StopDial
 function StopForm({
   experiment,
   flag,
+  flagFailure,
   environmentName,
   pending,
   refusal,
@@ -607,7 +640,9 @@ function StopForm({
         />
       </Field>
       <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-        {rules === undefined ? (
+        {rules === undefined && flagFailure ? (
+          <QueryError error={flagFailure.error} onRetry={flagFailure.retry} />
+        ) : rules === undefined ? (
           <p>
             <Trans>Reading which rules serve it…</Trans>
           </p>
@@ -901,7 +936,7 @@ export function ExperimentOverview({
               )}
               {experiment.status === "stopped" ? (
                 <span>
-                  <Can permission="experiment.edit" whenMissing="hide">
+                  <Can permission="experiment.edit" whenMissing="disable">
                     <Button
                       variant="outline"
                       size="sm"

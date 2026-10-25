@@ -120,8 +120,12 @@ describe("what keeps a draft from starting", () => {
 describe("a new traffic allocation", () => {
   it("must be a percentage above the current one", () => {
     expect(growIssue(i18n, "50", 2500)).toBeUndefined();
-    expect(growIssue(i18n, "25", 2500)).toBe("Enter more than 25.00 %: the allocation only grows.");
-    expect(growIssue(i18n, "10", 2500)).toBe("Enter more than 25.00 %: the allocation only grows.");
+    expect(growIssue(i18n, "25", 2500)).toBe(
+      "Enter more than 25.00 %: the traffic allocation only grows.",
+    );
+    expect(growIssue(i18n, "10", 2500)).toBe(
+      "Enter more than 25.00 %: the traffic allocation only grows.",
+    );
     expect(growIssue(i18n, "abc", 2500)).toBe(
       "Enter a percentage from 0 to 100, at most two decimals.",
     );

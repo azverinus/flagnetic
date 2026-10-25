@@ -1591,7 +1591,7 @@ msgid "Enter JSON other than null."
 msgstr ""
 
 #: src/lib/experiment-transitions.ts
-msgid "Enter more than {from} %: the allocation only grows."
+msgid "Enter more than {from} %: the traffic allocation only grows."
 msgstr ""
 
 #: src/lib/flag-detail.ts
@@ -2016,7 +2016,7 @@ msgid "Grow allocation"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
-msgid "Grow the allocation of {key}"
+msgid "Grow the traffic allocation of {key}"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -4059,7 +4059,7 @@ msgid "The draft {key} is created."
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
-msgid "The draft is deleted. This cannot be taken back; its audit entries stay. Refused while a rule of its flag serves it."
+msgid "The draft is deleted. This cannot be taken back; its audit entries stay."
 msgstr ""
 
 #: src/components/experiment-transitions.tsx

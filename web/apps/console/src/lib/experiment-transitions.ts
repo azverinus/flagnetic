@@ -93,7 +93,7 @@ export function growIssue(i18n: I18n, text: string, current: number): string | u
   }
   if (points <= current) {
     const from = percentText(i18n, current);
-    return i18n._(msg`Enter more than ${from} %: the allocation only grows.`);
+    return i18n._(msg`Enter more than ${from} %: the traffic allocation only grows.`);
   }
   return undefined;
 }

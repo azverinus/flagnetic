@@ -1,8 +1,9 @@
 import type { Experiment, ExperimentStop, Flag } from "@flagnetic/api";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "@/lib/errors";
 import { activateForTests, renderWithProviders } from "@/test/render";
 
 import { StopDialog } from "./experiment-transitions";
@@ -48,13 +49,17 @@ const flag = {
 
 const names: Record<string, string> = { development: "Development", production: "Production" };
 
-function renderStop(onStop: (body: ExperimentStop) => void, over: { flag?: Flag } = {}) {
+function renderStop(
+  onStop: (body: ExperimentStop) => void,
+  over: { flag?: Flag; flagFailure?: { error: unknown; retry: () => void } } = {},
+) {
   renderWithProviders(
     <StopDialog
       open
       onOpenChange={() => {}}
       experiment={experiment}
       flag={"flag" in over ? over.flag : flag}
+      flagFailure={over.flagFailure}
       environmentName={(key) => names[key] ?? key}
       pending={false}
       refusal={undefined}
@@ -119,5 +124,17 @@ describe("the stop dialog", () => {
     expect(
       within(dialog).getByText("No rule serves it: no configuration or ruleset changes."),
     ).toBeVisible();
+  });
+
+  it("says the flag could not be read instead of waiting for it, and reads it again", async () => {
+    const retry = vi.fn();
+    const dialog = renderStop(() => {}, {
+      flag: undefined,
+      flagFailure: { error: new ApiError(500, {}), retry },
+    });
+    expect(within(dialog).queryByText("Reading which rules serve it…")).toBeNull();
+    expect(within(dialog).getByRole("alert")).toBeVisible();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
+    expect(retry).toHaveBeenCalledOnce();
   });
 });

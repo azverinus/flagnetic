@@ -76,4 +76,22 @@ describe("a confirmation", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("explains a refusal in the words its caller gives", () => {
+    renderWithProviders(
+      <ConfirmDialog
+        open
+        onOpenChange={vi.fn()}
+        title="Archive?"
+        confirmLabel="Archive"
+        refusal={new ApiError(409, { code: "archived" })}
+        refusalMessage={(_, error) => `Refused: ${error.code}`}
+        onConfirm={vi.fn()}
+      >
+        Nothing changes any more.
+      </ConfirmDialog>,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Refused: archived");
+  });
 });
