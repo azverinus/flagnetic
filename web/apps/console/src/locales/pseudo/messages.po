@@ -15,12 +15,20 @@ msgstr ""
 msgid "{allocation}% of {unitType} units included"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "{authorName} (project token)"
+msgstr ""
+
 #: src/lib/device.ts
 msgid "{browser} on {os}"
 msgstr ""
 
 #: src/components/tester-panel.tsx
 msgid "{bucket} of {total}"
+msgstr ""
+
+#: src/components/navigation.tsx
+msgid "{count, plural, one {# change request awaits your decision} other {# change requests await your decision}}"
 msgstr ""
 
 #: src/components/duration-input.tsx
@@ -231,6 +239,14 @@ msgstr ""
 msgid "A chain of prerequisites has at most 5 steps."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "A change request proposes a change for review; once a member who did not write it approves it, it can be applied."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "A change to a protected environment is proposed as a change request from the flag's configuration."
+msgstr ""
+
 #: src/components/rule-editor.tsx
 msgid "A configuration has at most {maxRulesText} rules."
 msgstr ""
@@ -256,6 +272,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/[-].new.tsx
 msgid "A named set of attribute conditions that rules of every flag can target by name."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "A new draft of yours proposes the same configuration, based on the configuration as it is now. This change request stays as it is."
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -292,6 +312,10 @@ msgstr ""
 
 #: src/components/token-create-form.tsx
 msgid "A project token does what its role allows in this project, narrowed to its scopes, and never manages who has access. Every write scope includes read."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "A project token never approves or rejects change requests."
 msgstr ""
 
 #: src/components/sdk-keys.tsx
@@ -483,6 +507,10 @@ msgstr ""
 msgid "Add variation"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
+msgid "Added — {where}: {value}"
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "Added by"
 msgstr ""
@@ -497,6 +525,10 @@ msgstr ""
 
 #: src/components/audit-entry-sheet.tsx
 msgid "After"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "All"
 msgstr ""
 
 #: src/components/project-switcher.tsx
@@ -557,12 +589,21 @@ msgstr ""
 msgid "Any"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Any environment"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any environments"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Any flag"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Any kind"
 msgstr ""
 
 #: src/components/sdk-keys.tsx
@@ -574,6 +615,7 @@ msgstr ""
 msgid "Any owner"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Any state"
 msgstr ""
@@ -614,16 +656,45 @@ msgstr ""
 msgid "Appearance"
 msgstr ""
 
+#: src/lib/change-requests.ts
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Applied"
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 msgid "Applies to the flag in every environment."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Apply"
 msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "Apply filters"
 msgstr ""
 
+#: src/components/change-request-actions.tsx
+msgid "Apply the change request"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Approve"
+msgstr ""
+
 #: src/lib/access-names.ts
 msgid "approve and reject change requests"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Approve the change request"
+msgstr ""
+
+#: src/lib/change-requests.ts
+msgid "Approved"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Approved by {name}"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -664,6 +735,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Archived."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "at its scheduled time"
 msgstr ""
 
 #: src/components/invitation-acceptance.tsx
@@ -759,6 +834,11 @@ msgstr ""
 msgid "Authentication settings updated"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Author"
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 msgid "Automatic exposure"
 msgstr ""
@@ -769,6 +849,14 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Automatic exposure switched on."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Awaiting my decision"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Based on"
 msgstr ""
 
 #: src/components/audit-entry-sheet.tsx
@@ -804,6 +892,18 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
+#: src/components/change-request-actions.tsx
+msgid "Cancel change request"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Cancel the change request"
+msgstr ""
+
+#: src/lib/change-requests.ts
+msgid "Cancelled"
+msgstr ""
+
 #: src/lib/personal-tokens.ts
 msgid "Change experiments."
 msgstr ""
@@ -822,6 +922,8 @@ msgstr ""
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Change request"
 msgstr ""
 
@@ -841,6 +943,10 @@ msgstr ""
 msgid "Change request edited"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Change request not found"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Change request opened"
 msgstr ""
@@ -849,14 +955,30 @@ msgstr ""
 msgid "Change request rebased"
 msgstr ""
 
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/route.tsx
+msgid "Change requests"
+msgstr ""
+
+#: src/components/waiting-change-requests.tsx
+msgid "Change requests waiting here: {open} open, {approved} approved"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
 msgid "changed"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
+msgid "Changed — {where}: {value}"
+msgstr ""
+
 #: src/components/audit-entry-sheet.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Changes"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "Changes to the configuration"
 msgstr ""
@@ -1032,6 +1154,7 @@ msgid "Chosen tags"
 msgstr ""
 
 #: src/components/audit-log.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
@@ -1071,6 +1194,10 @@ msgstr ""
 #. A kind of actor in the audit log.
 #: src/lib/audit.ts
 msgid "Command line"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Comment"
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -1155,6 +1282,7 @@ msgstr ""
 msgid "Copied to the clipboard."
 msgstr ""
 
+#: src/components/change-request-actions.tsx
 #: src/components/ui/reveal-secret.tsx
 msgid "Copy"
 msgstr ""
@@ -1169,6 +1297,10 @@ msgstr ""
 
 #: src/components/compare-environments.tsx
 msgid "Copy configuration"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Copy the change request"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -1218,6 +1350,7 @@ msgstr ""
 #: src/components/experiment-transitions.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Created"
 msgstr ""
 
@@ -1260,6 +1393,7 @@ msgid "Deactivation ends every session and API token of yours at once, this one 
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 msgid "Decision"
 msgstr ""
 
@@ -1285,6 +1419,10 @@ msgstr ""
 
 #: src/components/discovered-attributes.tsx
 msgid "Declaring {key} makes it usable in rules. Its type is fixed once declared."
+msgstr ""
+
+#: src/lib/change-requests.ts
+msgid "Definition"
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -1338,11 +1476,13 @@ msgstr ""
 msgid "deleted"
 msgstr ""
 
+#: src/components/change-request-actions.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/segment-fields.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
@@ -1424,6 +1564,7 @@ msgstr ""
 msgid "Download ruleset"
 msgstr ""
 
+#: src/lib/change-requests.ts
 #: src/lib/experiments.ts
 msgid "Draft"
 msgstr ""
@@ -1444,6 +1585,7 @@ msgstr ""
 msgid "Each variation's share of the units the traffic allocation includes; the shares sum to 100.00 %."
 msgstr ""
 
+#: src/components/change-request-actions.tsx
 #: src/components/member-actions.tsx
 msgid "Edit"
 msgstr ""
@@ -1484,6 +1626,10 @@ msgstr ""
 
 #: src/lib/access-names.ts
 msgid "edit segments"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Edit the change request"
 msgstr ""
 
 #: src/lib/access-names.ts
@@ -1562,6 +1708,10 @@ msgstr ""
 msgid "Enter a scheme, a host and an optional port, such as https://app.example.com."
 msgstr ""
 
+#: src/components/change-request-actions.tsx
+msgid "Enter a title."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "Enter a valid email address."
 msgstr ""
@@ -1624,6 +1774,8 @@ msgstr ""
 #: src/components/project-audit.tsx
 #: src/lib/audit.ts
 #: src/routes/_signed-in/projects/$project/audit.$entry.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Environment"
 msgstr ""
@@ -1784,6 +1936,7 @@ msgid "Expected removal changed from {before} to {after}."
 msgstr ""
 
 #: src/components/rule-editor.tsx
+#: src/lib/change-requests.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Experiment"
 msgstr ""
@@ -1841,6 +1994,7 @@ msgstr ""
 msgid "Fallthrough"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/compare-environments.tsx
 #: src/components/configuration-editor.tsx
 msgid "Fallthrough variation"
@@ -1856,6 +2010,10 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "Filter the audit log"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Filter the change requests"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -1894,6 +2052,8 @@ msgstr ""
 #: src/components/experiment-fields.tsx
 #: src/lib/audit.ts
 #: src/lib/experiment-transitions.ts
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Flag"
@@ -1913,6 +2073,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Flag changed from <0>{before}</0> to <1>{after}</1>."
+msgstr ""
+
+#: src/lib/change-requests.ts
+msgid "Flag configuration"
 msgstr ""
 
 #: src/lib/audit.ts
@@ -1960,6 +2124,10 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "From"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Go to the change requests"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments/$environment.tsx
@@ -2308,6 +2476,7 @@ msgid "Kill switch: {flagKey} in {name}"
 msgstr ""
 
 #: src/components/sdk-keys.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Kind"
 msgstr ""
 
@@ -2543,12 +2712,24 @@ msgstr ""
 msgid "Members of the project"
 msgstr ""
 
+#: src/components/change-request-actions.tsx
+msgid "Members who may approve change requests can then approve or reject it. Its proposal can still be edited while it is open."
+msgstr ""
+
 #: src/components/condition-row.tsx
 msgid "Membership (condition {position})"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Mine"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "Missing to start"
+msgstr ""
+
+#: src/components/navigation.tsx
+msgid "More than {awaitingCountLimit} change requests await your decision"
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -2667,6 +2848,7 @@ msgid "Newest entries"
 msgstr ""
 
 #: src/components/flag-history.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Next"
@@ -2674,6 +2856,14 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "No"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "No change request awaits your decision."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "No change request matches these filters."
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -2842,6 +3032,10 @@ msgstr ""
 msgid "Nothing about the experiment changes any more, its decision note included; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."
 msgstr ""
 
+#: src/components/change-request-diff.tsx
+msgid "Nothing changes."
+msgstr ""
+
 #: src/components/audit-log.tsx
 msgid "Nothing has been recorded yet."
 msgstr ""
@@ -2884,6 +3078,7 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/compare-environments.tsx
 #: src/components/configuration-editor.tsx
 msgid "Off variation"
@@ -2955,12 +3150,36 @@ msgstr ""
 msgid "Only an invited member has an invitation to replace."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Only the change request's author may do this."
+msgstr ""
+
+#: src/lib/change-requests.ts
+msgid "Open"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Open for review"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Open the change request for review"
+msgstr ""
+
 #: src/components/condition-row.tsx
 msgid "Operator (condition {position})"
 msgstr ""
 
+#: src/components/change-request-actions.tsx
+msgid "Optional; the author and the audit log see it."
+msgstr ""
+
 #: src/components/tester-panel.tsx
 msgid "Override"
+msgstr ""
+
+#: src/components/change-request-diff.tsx
+msgid "Override {position}"
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
@@ -3018,6 +3237,10 @@ msgstr ""
 
 #: src/components/not-found.tsx
 msgid "Page not found"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Pages of change requests"
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -3081,6 +3304,7 @@ msgstr ""
 msgid "Prerequisite"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/prerequisites-section.tsx
 msgid "Prerequisite {position}"
 msgstr ""
@@ -3117,6 +3341,7 @@ msgid "Press Enter after each value."
 msgstr ""
 
 #: src/components/flag-history.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Previous"
@@ -3227,6 +3452,14 @@ msgstr ""
 msgid "Reason"
 msgstr ""
 
+#: src/components/change-request-actions.tsx
+msgid "Rebase"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Rebase the change request"
+msgstr ""
+
 #: src/components/project-audit.tsx
 msgid "Recent activity"
 msgstr ""
@@ -3250,6 +3483,22 @@ msgstr ""
 
 #: src/components/configuration-editor.tsx
 msgid "Regenerate the salt?"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Reject"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Reject the change request"
+msgstr ""
+
+#: src/lib/change-requests.ts
+msgid "Rejected"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Rejected by {name}"
 msgstr ""
 
 #: src/components/conflict-banner.tsx
@@ -3312,6 +3561,10 @@ msgstr ""
 msgid "Remove: its rules are deleted, the flag's other rules decide"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
+msgid "Removed — {where}"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 msgid "Removed: its rules were deleted."
 msgstr ""
@@ -3339,6 +3592,10 @@ msgstr ""
 
 #: src/components/prerequisites-section.tsx
 msgid "Required variation (prerequisite {position})"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Required; the author and the audit log see it."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -3484,6 +3741,7 @@ msgstr ""
 msgid "Rule {from} moved to position {to}."
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/compare-environments.tsx
 #: src/components/rule-editor.tsx
 #: src/components/tester-panel.tsx
@@ -3555,6 +3813,7 @@ msgid "Salt <0>{salt}</0>"
 msgstr ""
 
 #: src/components/auth-settings-form.tsx
+#: src/components/change-request-actions.tsx
 #: src/components/member-actions.tsx
 #: src/components/profile-form.tsx
 #: src/components/sdk-keys.tsx
@@ -3584,6 +3843,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Save with usages?"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Say why, so the author knows what to change."
 msgstr ""
 
 #: src/components/token-create-form.tsx
@@ -3865,6 +4128,7 @@ msgid "starts with"
 msgstr ""
 
 #: src/components/token-list.tsx
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "State"
 msgstr ""
@@ -3903,6 +4167,14 @@ msgstr ""
 msgid "String"
 msgstr ""
 
+#: src/lib/change-requests.ts
+msgid "Superseded"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Superseded: what this change request was based on changed, so it can no longer be applied. Copy it to propose it again on the current configuration."
+msgstr ""
+
 #: src/lib/access-names.ts
 msgid "switch flags off with the kill switch"
 msgstr ""
@@ -3915,6 +4187,7 @@ msgstr ""
 msgid "Switched off"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "Switched off."
 msgstr ""
@@ -3923,6 +4196,7 @@ msgstr ""
 msgid "Switched on"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "Switched on."
 msgstr ""
@@ -3962,6 +4236,10 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Tags"
+msgstr ""
+
+#: src/components/change-request-diff.tsx
+msgid "Targeting"
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
@@ -4010,6 +4288,62 @@ msgstr ""
 msgid "The browser refused the clipboard. Select the value and copy it by hand."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "The change request is applied at its scheduled time, not by hand."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The change request is applied."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The change request is approved."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The change request is based on the configuration as it is now; its diff is computed again from it."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The change request is based on the current configuration."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The change request is cancelled."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The change request is open for review."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The change request is rejected."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The change request is saved."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The change request leaves the queue and is never applied. It can still be copied into a new draft."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The change request's state no longer allows this."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "The configuration changed after this change request was based on it; it can no longer be approved or applied. Copy it to propose it again."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "The configuration changed after this change request was based on it. Rebase it onto the current configuration before opening it."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The configuration changed after this change request was based on it. Rebase or copy it onto the current one."
+msgstr ""
+
 #: src/components/tester-panel.tsx
 msgid "The configuration has no unsaved changes."
 msgstr ""
@@ -4040,6 +4374,10 @@ msgstr ""
 
 #: src/components/profile-form.tsx
 msgid "The console's language on every device you sign in on. Following the browser uses the first of its languages the console offers."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The copy is a new draft."
 msgstr ""
 
 #: src/components/experiment-fields.tsx
@@ -4088,6 +4426,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "The environment already has 10 active keys of this kind. Revoke one, or wait for a rotated one to end, first."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "The environment is protected: this change goes live only through an approved change request."
 msgstr ""
 
 #: src/components/compare-environments.tsx
@@ -4339,6 +4681,10 @@ msgstr ""
 msgid "The project has no segment with this key. It may have been deleted."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "The project has no such change request. It goes when the flag or the environment it proposes for is deleted."
+msgstr ""
+
 #: src/lib/flag-detail.ts
 msgid "The project has no such experiment."
 msgstr ""
@@ -4364,6 +4710,10 @@ msgstr ""
 
 #: src/components/navigation.tsx
 msgid "The project's screens could not be read."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "The proposed configuration is written to the environment now, and its SDKs receive it."
 msgstr ""
 
 #: src/components/sdk-keys.tsx
@@ -4649,6 +4999,10 @@ msgstr ""
 msgid "This project has no attribute yet."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "This project has no change request yet."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "This project has no experiment yet."
 msgstr ""
@@ -4696,6 +5050,10 @@ msgstr ""
 
 #: src/components/discovered-attributes.tsx
 msgid "Times seen"
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Title"
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -4857,6 +5215,7 @@ msgstr ""
 msgid "Unsaved changes"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Updated"
 msgstr ""
@@ -4954,6 +5313,10 @@ msgstr ""
 msgid "Version"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "Version {baseVersion}"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/index.tsx
 msgid "View all environments"
 msgstr ""
@@ -4969,6 +5332,10 @@ msgstr ""
 #. The name of a built-in role.
 #: src/lib/access-names.ts
 msgid "Viewer"
+msgstr ""
+
+#: src/components/waiting-change-requests.tsx
+msgid "Waiting change requests"
 msgstr ""
 
 #. A kind of entity in the audit log.
@@ -5044,6 +5411,10 @@ msgstr ""
 msgid "Where the project serves from. A key is fixed once created; the name can change."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "Which change requests"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
 msgstr ""
@@ -5054,6 +5425,10 @@ msgstr ""
 
 #: src/components/experiment-fields.tsx
 msgid "Whose units are split: users, accounts, devices."
+msgstr ""
+
+#: src/components/change-request-actions.tsx
+msgid "Why the change is needed, for whoever reviews it. Optional."
 msgstr ""
 
 #: src/components/overrides-section.tsx
@@ -5096,6 +5471,11 @@ msgstr ""
 msgid "You can grant further roles to the members of this project. An instance admin grants a first role to anyone else."
 msgstr ""
 
+#: src/components/change-request-actions.tsx
+#: src/lib/problem-messages.ts
+msgid "You cannot approve or reject your own change request."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/route.tsx
 msgid "You cannot open this project"
 msgstr ""
@@ -5110,6 +5490,10 @@ msgstr ""
 
 #: src/components/token-list.tsx
 msgid "You have no API token yet."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/index.tsx
+msgid "You have proposed no change request here."
 msgstr ""
 
 #: src/components/ui/unsaved-changes-bar.tsx

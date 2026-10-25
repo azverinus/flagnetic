@@ -1,4 +1,8 @@
 import {
+  getChangeRequest,
+  listChangeRequests,
+  type ChangeRequest,
+  type ChangeRequestList,
   getAuthMethods,
   listMySessions,
   listMyTokens,
@@ -64,6 +68,7 @@ import {
 import { keepPreviousData, queryOptions } from "@tanstack/react-query";
 
 import { type AuditSearch, auditQueryOf } from "./audit";
+import { type ChangeRequestsSearch, listChangeRequestsQueryOf } from "./change-requests";
 import { unwrap } from "./errors";
 import { type ExperimentsSearch, listExperimentsQueryOf } from "./experiments";
 import { type FlagsSearch, listFlagsQueryOf } from "./flags";
@@ -274,6 +279,82 @@ export function experimentQuery(project: string, experiment: string) {
   return queryOptions<Experiment>({
     queryKey: [...experimentsQueryKey(project), "detail", experiment],
     queryFn: () => unwrap(getExperiment({ path: { project, experiment } })),
+    retry: false,
+  });
+}
+
+/** What every read of a project's change requests is cached under. */
+export function changeRequestsQueryKey(project: string) {
+  return ["projects", project, "change-requests"] as const;
+}
+
+/**
+ * One page of a project's change requests for a search, by the caller's
+ * member identifier for the caller's own. The page shown stays while the
+ * next one loads, so paging and filtering do not blank the table.
+ */
+export function changeRequestsQuery(
+  project: string,
+  search: ChangeRequestsSearch,
+  member: string | undefined,
+) {
+  return queryOptions<ChangeRequestList>({
+    queryKey: [...changeRequestsQueryKey(project), "list", search, member],
+    queryFn: () =>
+      unwrap(
+        listChangeRequests({
+          path: { project },
+          query: listChangeRequestsQueryOf(search, member),
+        }),
+      ),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** How many change requests the navigation counts before it says "and more". */
+export const awaitingCountLimit = 99;
+
+/**
+ * The open change requests awaiting the caller's decision, at most one
+ * more than the navigation counts, so it knows when there are more. Read
+ * again every minute, so a new request is noticed without reloading.
+ */
+export function awaitingDecisionQuery(project: string) {
+  return queryOptions<ChangeRequestList>({
+    queryKey: [...changeRequestsQueryKey(project), "awaiting"],
+    queryFn: () =>
+      unwrap(
+        listChangeRequests({
+          path: { project },
+          query: { awaiting_my_decision: true, limit: awaitingCountLimit + 1 },
+        }),
+      ),
+    refetchInterval: 60_000,
+  });
+}
+
+/**
+ * The open and approved change requests of one flag in every
+ * environment: what waits on its configurations.
+ */
+export function flagWaitingQuery(project: string, flag: string) {
+  return queryOptions<ChangeRequest[]>({
+    queryKey: [...changeRequestsQueryKey(project), "flag", flag],
+    queryFn: async () => {
+      const pages = await Promise.all(
+        (["open", "approved"] as const).map((state) =>
+          unwrap(listChangeRequests({ path: { project }, query: { flag, state, limit: 200 } })),
+        ),
+      );
+      return pages.flatMap((page) => page.items);
+    },
+  });
+}
+
+export function changeRequestQuery(project: string, changeRequest: string) {
+  return queryOptions<ChangeRequest>({
+    queryKey: [...changeRequestsQueryKey(project), "detail", changeRequest],
+    queryFn: () => unwrap(getChangeRequest({ path: { project, change_request: changeRequest } })),
     retry: false,
   });
 }

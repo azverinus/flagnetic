@@ -115,6 +115,24 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       return i18n._(msg`Only a stopped experiment has a decision note.`);
     case "experiment_not_ready":
       return i18n._(msg`The experiment is not ready to start.`);
+    case "change_request_required":
+      return i18n._(
+        msg`The environment is protected: this change goes live only through an approved change request.`,
+      );
+    case "base_moved":
+      return i18n._(
+        msg`The configuration changed after this change request was based on it. Rebase or copy it onto the current one.`,
+      );
+    case "invalid_state":
+      return i18n._(msg`The change request's state no longer allows this.`);
+    case "not_author":
+      return i18n._(msg`Only the change request's author may do this.`);
+    case "author_cannot_approve":
+      return i18n._(msg`You cannot approve or reject your own change request.`);
+    case "token_cannot_approve":
+      return i18n._(msg`A project token never approves or rejects change requests.`);
+    case "scheduled":
+      return i18n._(msg`The change request is applied at its scheduled time, not by hand.`);
     case "not_a_rollout":
       return i18n._(msg`Only a rule serving a rollout has a salt.`);
     case "key_immutable":
