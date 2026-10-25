@@ -76,7 +76,7 @@ void main() {
     expect(await store.get(clientKeys.events), isNull);
   });
 
-  test('a client picks up the queue an earlier run left behind', () async {
+  test('a store that throws on every call never reaches the caller', () async {
     final client = Flagnetic.client(
       clientKey,
       context: testContext,
@@ -133,5 +133,14 @@ void main() {
       Stage.lastGood,
     );
     expect(client.getBool('checkout', false), isTrue);
+  });
+
+  test('concurrent writes of one document leave one of them whole', () async {
+    final key = clientKeys.lastGood(testContext.units);
+    final first = jsonEncode(valuesDocument({'checkout': true}));
+    final second = jsonEncode(valuesDocument({'banner': 'Try free'}));
+    await Future.wait([store.set(key, first), store.set(key, second)]);
+    expect(await store.get(key), anyOf(first, second));
+    expect(Directory('${directory.path}/flagnetic').listSync(), hasLength(1));
   });
 }

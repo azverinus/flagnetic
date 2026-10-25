@@ -58,7 +58,7 @@ Navigator.push(context, MaterialPageRoute(
 ));
 ```
 
-- **`FlagneticDevTools`** edits the client's local overrides and persists them in the store under the SDK key's own entry, so a tester's overrides survive a restart. `hasOverrides` is a `ValueListenable<bool>` for a badge. In a release build `set`, `remove` and `clear` are refused, logging `override_refused` with cause `release_build`, and a persisted override is never restored, whatever `allowOverrides` says: an override cannot ship. An environment marked protected refuses overrides too.
+- **`FlagneticDevTools`** edits the client's local overrides and persists them in the store under the SDK key's own entry, so a tester's overrides survive a restart. `hasOverrides` is a `ValueListenable<bool>` for a badge. In a release build `set` and `remove` are refused, logging `override_refused` with cause `release_build`, `clear` does nothing, and a persisted override is never restored, whatever `allowOverrides` says: an override cannot ship. An environment marked protected refuses overrides too.
 - **`FlagneticDevToolsScreen`** lists every flag the client holds with its value, reason and stage. A boolean flag toggles inline; every other type opens a dialog parsed by the flag's type; an overridden flag shows a button removing its override, and the app bar clears them all.
 
 ## Checks

@@ -113,27 +113,28 @@ class _FlagRow extends StatelessWidget {
       subtitle: Text(
         '${flag.value} · ${flag.reason} · ${devTools.client.stage.wireName}',
       ),
-      trailing: isBoolean
-          ? Switch(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (flag.overridden)
+            IconButton(
+              icon: const Icon(Icons.undo),
+              tooltip: 'Remove override',
+              onPressed: () => devTools.remove(flag.key),
+            ),
+          if (isBoolean)
+            Switch(
               value: flag.value == true,
               onChanged: (value) => devTools.set(flag.key, value),
             )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (flag.overridden)
-                  IconButton(
-                    icon: const Icon(Icons.undo),
-                    tooltip: 'Remove override',
-                    onPressed: () => devTools.remove(flag.key),
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  tooltip: 'Override',
-                  onPressed: () => _edit(context),
-                ),
-              ],
+          else
+            IconButton(
+              icon: const Icon(Icons.edit),
+              tooltip: 'Override',
+              onPressed: () => _edit(context),
             ),
+        ],
+      ),
       onTap: isBoolean ? null : () => _edit(context),
     );
   }

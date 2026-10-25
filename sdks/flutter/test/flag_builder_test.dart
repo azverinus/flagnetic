@@ -179,6 +179,21 @@ void main() {
       stage.dispose();
     });
   });
+  testWidgets('a double default reads a whole number as a double', (
+    tester,
+  ) async {
+    final client = offlineClient({'discount': 10});
+    addTearDown(client.close);
+    await tester.pumpWidget(
+      FlagBuilder<double>(
+        client: client,
+        flagKey: 'discount',
+        defaultValue: 0.5,
+        builder: (context, value, detail) => _text('$value'),
+      ),
+    );
+    expect(find.text(10.0.toString()), findsOne);
+  });
 }
 
 Widget _text(String value) =>

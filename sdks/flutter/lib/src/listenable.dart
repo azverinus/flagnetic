@@ -38,7 +38,13 @@ final class FlagListenable<T> extends ChangeNotifier
   late final void Function() _removeStage;
 
   @override
-  T get value => _detail.value as T;
+  T get value {
+    final value = _detail.value;
+    // JSON has one number type: a whole number arrives as an `int` on the
+    // Dart VM, which a `double` default could not hold.
+    if (defaultValue is double && value is num) return value.toDouble() as T;
+    return value as T;
+  }
 
   /// Why the current value was served: reason, variation, ruleset version
   /// and the stage of the fallback chain.

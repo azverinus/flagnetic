@@ -161,6 +161,28 @@ void main() {
     expect(find.byTooltip('Remove override'), findsNothing);
   });
 
+  testWidgets('an overridden boolean flag shows an undo button too', (
+    tester,
+  ) async {
+    final client = offlineClient({'checkout': false}, allowOverrides: true);
+    addTearDown(client.close);
+    final devTools = FlagneticDevTools(client: client, store: InMemoryStore());
+    addTearDown(devTools.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(home: FlagneticDevToolsScreen(devTools: devTools)),
+    );
+    expect(find.byTooltip('Remove override'), findsNothing);
+
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Remove override'));
+    await tester.pump();
+
+    expect(find.text('false · fallthrough · fresh'), findsOne);
+    expect(devTools.list(), isEmpty);
+  });
+
   testWidgets('clear all clears every override', (tester) async {
     final client = offlineClient({
       'checkout': false,

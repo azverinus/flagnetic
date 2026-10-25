@@ -39,7 +39,9 @@ final class FlagneticDevTools {
        _keys = StoreKeys(client.sdkKey),
        _logger = logger,
        _releaseMode = releaseMode,
-       _hasOverrides = ValueNotifier(client.overrides.list().isNotEmpty) {
+       _local = releaseMode ? null : _localOverridesOf(client),
+       _hasOverrides = ValueNotifier(false) {
+    _hasOverrides.value = list().isNotEmpty;
     _restore();
     _removeChange = client.onChange((_) => _sync());
   }
@@ -51,6 +53,10 @@ final class FlagneticDevTools {
   final StoreKeys _keys;
   final Logger? _logger;
   final bool _releaseMode;
+
+  /// The client's overrides, or null in a release build or when the client
+  /// was built without `allowOverrides`, where every mutation is refused.
+  final LocalOverrides? _local;
   final ValueNotifier<bool> _hasOverrides;
   late final void Function() _removeChange;
   String? _persisted;
@@ -63,32 +69,33 @@ final class FlagneticDevTools {
   bool get isReleaseBuild => _releaseMode;
 
   /// The local overrides by flag key.
-  Map<String, Object?> list() => client.overrides.list();
+  Map<String, Object?> list() => _local?.list() ?? const {};
 
   /// Substitutes [value] for the flag [key]. Refused in a release build,
   /// logging `override_refused` with cause `release_build`: see
   /// [FlagneticClient.overrides] for every other refusal.
   bool set(String key, Object? value) {
-    if (_releaseMode) {
+    final local = _local;
+    if (local == null) {
       _refused(key);
       return false;
     }
-    return client.overrides.set(key, value);
+    return local.set(key, value);
   }
 
   /// Drops the override of [key]. A no-op in a release build.
   void remove(String key) {
-    if (_releaseMode) {
+    final local = _local;
+    if (local == null) {
       _refused(key);
       return;
     }
-    client.overrides.remove(key);
+    local.remove(key);
   }
 
   /// Drops every override. A no-op in a release build.
   void clear() {
-    if (_releaseMode) return;
-    client.overrides.clear();
+    _local?.clear();
   }
 
   /// Stops following [client] and releases [hasOverrides].
@@ -101,14 +108,26 @@ final class FlagneticDevTools {
     _logger,
     LogLevel.warn,
     LogEvents.overrideRefused,
-    {'flag': key, 'cause': 'release_build'},
+    {'flag': key, 'cause': _releaseMode ? 'release_build' : 'not_allowed'},
   );
+
+  /// The overrides of [client], or null when it was built without
+  /// `allowOverrides`: asking for them then throws, and this helper must
+  /// neither fail to construct nor throw from inside the client's change
+  /// listeners. Asking logs the client's own `override_refused` once.
+  static LocalOverrides? _localOverridesOf(FlagneticClient client) {
+    try {
+      return client.overrides;
+    } on StateError {
+      return null;
+    }
+  }
 
   /// Reads what an earlier run persisted and applies it, so overrides
   /// survive a restart. A store that fails or holds nothing leaves the
   /// client with none, same as any other store failure in this SDK.
   void _restore() {
-    if (_releaseMode) return;
+    if (_local == null) return;
     try {
       final entry = _store.get(_keys.overrides);
       if (entry is Future<String?>) {
@@ -125,25 +144,27 @@ final class FlagneticDevTools {
   }
 
   void _apply(String? raw) {
-    if (raw == null) return;
+    final local = _local;
+    if (raw == null || local == null) return;
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, Object?>) return;
       for (final MapEntry(:key, :value) in decoded.entries) {
-        client.overrides.set(key, value);
+        local.set(key, value);
       }
     } on Object {
       // A torn entry is not worth keeping; the client still serves.
     }
     _persisted = raw;
-    _hasOverrides.value = client.overrides.list().isNotEmpty;
+    _hasOverrides.value = local.list().isNotEmpty;
   }
 
   /// Re-persists the overrides whenever they change; every other change
   /// (a new ruleset, a stage transition) costs one cheap comparison and no
   /// write.
   void _sync() {
-    final overrides = client.overrides.list();
+    if (_local == null) return;
+    final overrides = list();
     _hasOverrides.value = overrides.isNotEmpty;
     final encoded = overrides.isEmpty ? null : jsonEncode(overrides);
     if (encoded == _persisted) return;

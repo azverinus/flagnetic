@@ -155,4 +155,59 @@ void main() {
       );
     });
   });
+
+  group('a client built without allowOverrides', () {
+    testWidgets('constructs, refuses every mutation and persists nothing', (
+      tester,
+    ) async {
+      final logs = LogRecorder();
+      final store = InMemoryStore();
+      final client = offlineClient({'checkout': false});
+      addTearDown(client.close);
+      final devTools = FlagneticDevTools(
+        client: client,
+        store: store,
+        logger: logs.call,
+      );
+      addTearDown(devTools.dispose);
+
+      expect(devTools.list(), isEmpty);
+      expect(devTools.hasOverrides.value, isFalse);
+      expect(devTools.set('checkout', true), isFalse);
+      devTools
+        ..remove('checkout')
+        ..clear();
+      // A change of the client's values reaches the helper's listener,
+      // which must not throw from inside the client.
+      client.offline!.set('checkout', true);
+      expect(client.getBool('checkout', false), isTrue);
+      expect(store.entries, isEmpty);
+      expect(
+        logs.fieldsOf(LogEvents.overrideRefused),
+        everyElement(containsPair('cause', 'not_allowed')),
+      );
+      expect(logs.count(LogEvents.overrideRefused), 2, reason: 'set, remove');
+    });
+
+    testWidgets('in a release build, never asks the client for overrides', (
+      tester,
+    ) async {
+      final logs = LogRecorder();
+      final client = offlineClient({'checkout': false}, logger: logs.call);
+      addTearDown(client.close);
+      final devTools = FlagneticDevTools(
+        client: client,
+        store: InMemoryStore(),
+        releaseMode: true,
+      );
+      addTearDown(devTools.dispose);
+
+      expect(devTools.list(), isEmpty);
+      expect(
+        logs.count(LogEvents.overrideRefused),
+        0,
+        reason: 'a release build with overrides off logs nothing on start',
+      );
+    });
+  });
 }
