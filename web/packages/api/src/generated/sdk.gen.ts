@@ -6,6 +6,9 @@ import type {
   AcceptInvitationData,
   AcceptInvitationErrors,
   AcceptInvitationResponses,
+  AcknowledgeExperimentAlertData,
+  AcknowledgeExperimentAlertErrors,
+  AcknowledgeExperimentAlertResponses,
   ApplyChangeRequestData,
   ApplyChangeRequestErrors,
   ApplyChangeRequestResponses,
@@ -210,6 +213,9 @@ import type {
   ListEnvironmentsData,
   ListEnvironmentsErrors,
   ListEnvironmentsResponses,
+  ListExperimentAlertsData,
+  ListExperimentAlertsErrors,
+  ListExperimentAlertsResponses,
   ListExperimentsData,
   ListExperimentsErrors,
   ListExperimentsResponses,
@@ -2592,6 +2598,22 @@ export const checkHashUniformity = <ThrowOnError extends boolean = false>(
  * counts the exposures of the experiment refused in the environment,
  * by reason.
  *
+ * `sample_ratio` is the latest sample-ratio check of the experiment in
+ * the environment, null before the first. Every 10 minutes, and once
+ * more at its stop, each running experiment is checked in each
+ * environment holding its rule: with `N` its first exposures over the
+ * variations it weighs, `O` a variation's first exposures and
+ * `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
+ * freedom fewer than variations, and `p_value` is its chi-square upper
+ * tail. Below 1,000 first exposures (`below_minimum_sample`) or with a
+ * variation expecting fewer than 5 (`expected_below_5`) the check is
+ * skipped and leaves any alert as it is. An `srm` alert is raised at
+ * `p_value` below 0.001 and cleared above 0.01; between the two it
+ * stays as it is. A stopped experiment keeps the check its stop took,
+ * `checked_at` its stop, and is never checked again. For example,
+ * weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
+ * `p_value` about 0.000063: an alert.
+ *
  */
 export const getExperimentExposures = <ThrowOnError extends boolean = false>(
   options: Options<GetExperimentExposuresData, ThrowOnError>,
@@ -2676,6 +2698,76 @@ export const getExperimentConflicts = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/experiments/{experiment}/conflicts",
+    ...options,
+  });
+
+/**
+ * An experiment's alerts
+ *
+ * Every alert the experiment has had, in every environment, the most
+ * recently raised first. An alert is active from `raised_at` until
+ * `cleared_at`; an acknowledgement hides it until then, and a condition
+ * returning after it cleared raises a new alert. At most one alert of a
+ * kind is active per environment.
+ *
+ * `srm` is raised by the sample-ratio check in an environment holding
+ * the experiment's rule, at a p-value below 0.001, and cleared above
+ * 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
+ * the audit log as `experiment.alert_raised` and
+ * `experiment.alert_cleared` by the system.
+ *
+ */
+export const listExperimentAlerts = <ThrowOnError extends boolean = false>(
+  options: Options<ListExperimentAlertsData, ThrowOnError>,
+): RequestResult<ListExperimentAlertsResponses, ListExperimentAlertsErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    ListExperimentAlertsResponses,
+    ListExperimentAlertsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/alerts",
+    ...options,
+  });
+
+/**
+ * Acknowledge an experiment's alert
+ *
+ * Sets `acknowledged_at`, which hides the alert until it clears, and
+ * records `experiment.alert_acknowledged`. An alert already acknowledged
+ * is answered as it is and nothing is recorded. An alert carries no
+ * version, so no `If-Match` is asked for. An alert of another
+ * experiment is `not_found`.
+ *
+ */
+export const acknowledgeExperimentAlert = <ThrowOnError extends boolean = false>(
+  options: Options<AcknowledgeExperimentAlertData, ThrowOnError>,
+): RequestResult<
+  AcknowledgeExperimentAlertResponses,
+  AcknowledgeExperimentAlertErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    AcknowledgeExperimentAlertResponses,
+    AcknowledgeExperimentAlertErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge",
     ...options,
   });
 

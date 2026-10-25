@@ -1237,6 +1237,101 @@ export type ExperimentExposures = {
    * When the exposure rollup last moved; null before it first did.
    */
   as_of: string | null;
+  /**
+   * The latest sample-ratio check in the environment; null before the first.
+   */
+  sample_ratio: SampleRatioCheck | null;
+};
+
+export type SampleRatioCheck = {
+  /**
+   * The first exposures of the variations the experiment weighs.
+   */
+  n: number;
+  /**
+   * `X²`; null when the check was skipped.
+   */
+  chi_square: number | null;
+  /**
+   * The chi-square upper tail of `X²`; null when the check was skipped.
+   */
+  p_value: number | null;
+  /**
+   * Why the check computed no statistic; null when it did.
+   */
+  skipped_reason: SampleRatioSkippedReason | null;
+  /**
+   * An `srm` alert is active in the environment, acknowledged or not.
+   */
+  active: boolean;
+  /**
+   * When the check ran; a stopped experiment's is its stop.
+   */
+  checked_at: string;
+};
+
+/**
+ * `below_minimum_sample`: fewer than 1,000 first exposures. `expected_below_5`: a variation expects fewer than 5.
+ */
+export type SampleRatioSkippedReason = "below_minimum_sample" | "expected_below_5";
+
+export type ExperimentAlertList = {
+  items: Array<ExperimentAlert>;
+};
+
+/**
+ * `srm`: the sample-ratio check found first exposures out of line with the weights.
+ */
+export type ExperimentAlertKind = "srm";
+
+export type ExperimentAlert = {
+  id: string;
+  kind: ExperimentAlertKind;
+  /**
+   * The key of the environment the alert is about; null for one about the experiment as a whole.
+   */
+  environment: string | null;
+  raised_at: string;
+  /**
+   * When the condition cleared; null while the alert is active.
+   */
+  cleared_at: string | null;
+  /**
+   * When it was first acknowledged; null otherwise.
+   */
+  acknowledged_at: string | null;
+  details: ExperimentAlertDetails;
+};
+
+/**
+ * What the check found when it raised the alert; the block of the alert's kind is set, every other one is null.
+ */
+export type ExperimentAlertDetails = {
+  sample_ratio: SampleRatioAlertDetails | null;
+};
+
+export type SampleRatioAlertDetails = {
+  n: number;
+  chi_square: number;
+  p_value: number;
+  /**
+   * The variations the experiment weighs, in its order.
+   */
+  variations: Array<SampleRatioVariation>;
+};
+
+export type SampleRatioVariation = {
+  variation: string;
+  /**
+   * The variation's first exposures.
+   */
+  observed: number;
+  /**
+   * `N × weight / 10000`.
+   */
+  expected: number;
+  observed_share: number;
+  expected_share: number;
 };
 
 export type ConflictTotals = {
@@ -7759,6 +7854,137 @@ export type GetExperimentConflictsResponses = {
 
 export type GetExperimentConflictsResponse =
   GetExperimentConflictsResponses[keyof GetExperimentConflictsResponses];
+
+export type ListExperimentAlertsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+  };
+  query?: {
+    /**
+     * `true` lists only active alerts, `false` only cleared ones; every alert when absent.
+     */
+    active?: boolean;
+  };
+  url: "/projects/{project}/experiments/{experiment}/alerts";
+};
+
+export type ListExperimentAlertsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListExperimentAlertsError =
+  ListExperimentAlertsErrors[keyof ListExperimentAlertsErrors];
+
+export type ListExperimentAlertsResponses = {
+  /**
+   * The experiment's alerts.
+   */
+  200: ExperimentAlertList;
+};
+
+export type ListExperimentAlertsResponse =
+  ListExperimentAlertsResponses[keyof ListExperimentAlertsResponses];
+
+export type AcknowledgeExperimentAlertData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The experiment's key.
+     */
+    experiment: string;
+    /**
+     * The alert's identifier.
+     */
+    alert: string;
+  };
+  query?: never;
+  url: "/projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge";
+};
+
+export type AcknowledgeExperimentAlertErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type AcknowledgeExperimentAlertError =
+  AcknowledgeExperimentAlertErrors[keyof AcknowledgeExperimentAlertErrors];
+
+export type AcknowledgeExperimentAlertResponses = {
+  /**
+   * The alert, acknowledged.
+   */
+  200: ExperimentAlert;
+};
+
+export type AcknowledgeExperimentAlertResponse =
+  AcknowledgeExperimentAlertResponses[keyof AcknowledgeExperimentAlertResponses];
 
 export type ListChangeRequestsData = {
   body?: never;

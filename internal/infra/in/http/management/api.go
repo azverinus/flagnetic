@@ -129,6 +129,9 @@ type Handlers struct {
 	RegenerateExperimentSalts *appexperiments.RegenerateSalts
 	CloneExperiment           *appexperiments.CloneExperiment
 	GetExperimentAssignment   *appexperiments.GetAssignment
+	ListExperimentAlerts       *appexperiments.ListAlerts
+	AcknowledgeExperimentAlert *appexperiments.AcknowledgeAlert
+	GetSampleRatio             *appexperiments.GetSampleRatio
 	CheckHashUniformity       *appexperiments.CheckUniformity
 	StartExperiment           *appexperiments.StartExperiment
 	StopExperiment            *appexperiments.StopExperiment

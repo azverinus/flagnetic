@@ -432,6 +432,32 @@ func (s *Store) ExposureCounts(ctx context.Context, environment workspace.Enviro
 	return out, nil
 }
 
+// FirstExposureCounts returns experiment's first exposures in environment,
+// summed over every day, by variation: what the sample-ratio check compares
+// with the weights.
+func (s *Store) FirstExposureCounts(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID,
+) (map[string]int64, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT variation_key, sum(first_exposures)::bigint FROM exposure_counts_daily
+		WHERE experiment_id = $1 AND environment_id = $2
+		GROUP BY variation_key`, experiment.Bytes(), environment.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("reading first exposures: %w", err)
+	}
+	out := map[string]int64{}
+	var (
+		variation string
+		n         int64
+	)
+	_, err = pgx.ForEachRow(rows, []any{&variation, &n}, func() error {
+		out[variation] = n
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading first exposures: %w", err)
+	}
+	return out, nil
+}
+
 // ExposureTimeline returns experiment's exposure counts in environment per
 // UTC day and variation, by day then variation key, from the day from to the
 // day to, both included; nil leaves that end open.

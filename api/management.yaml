@@ -2899,6 +2899,22 @@ paths:
         exposure named, by key, which expects no share. `rejections`
         counts the exposures of the experiment refused in the environment,
         by reason.
+
+        `sample_ratio` is the latest sample-ratio check of the experiment in
+        the environment, null before the first. Every 10 minutes, and once
+        more at its stop, each running experiment is checked in each
+        environment holding its rule: with `N` its first exposures over the
+        variations it weighs, `O` a variation's first exposures and
+        `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
+        freedom fewer than variations, and `p_value` is its chi-square upper
+        tail. Below 1,000 first exposures (`below_minimum_sample`) or with a
+        variation expecting fewer than 5 (`expected_below_5`) the check is
+        skipped and leaves any alert as it is. An `srm` alert is raised at
+        `p_value` below 0.001 and cleared above 0.01; between the two it
+        stays as it is. A stopped experiment keeps the check its stop took,
+        `checked_at` its stop, and is never checked again. For example,
+        weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
+        `p_value` about 0.000063: an alert.
       x-permission: project.read
       tags: [experiments]
       responses:
@@ -2985,6 +3001,85 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ExposureConflicts"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/experiments/{experiment}/alerts:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+    get:
+      operationId: listExperimentAlerts
+      summary: An experiment's alerts
+      description: |
+        Every alert the experiment has had, in every environment, the most
+        recently raised first. An alert is active from `raised_at` until
+        `cleared_at`; an acknowledgement hides it until then, and a condition
+        returning after it cleared raises a new alert. At most one alert of a
+        kind is active per environment.
+
+        `srm` is raised by the sample-ratio check in an environment holding
+        the experiment's rule, at a p-value below 0.001, and cleared above
+        0.01 (see `GET .../exposures`). Raising and clearing are recorded in
+        the audit log as `experiment.alert_raised` and
+        `experiment.alert_cleared` by the system.
+      x-permission: project.read
+      tags: [experiments]
+      parameters:
+        - name: active
+          in: query
+          description: "`true` lists only active alerts, `false` only cleared ones; every alert when absent."
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: The experiment's alerts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentAlertList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+      - name: alert
+        in: path
+        required: true
+        description: The alert's identifier.
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: acknowledgeExperimentAlert
+      summary: Acknowledge an experiment's alert
+      description: |
+        Sets `acknowledged_at`, which hides the alert until it clears, and
+        records `experiment.alert_acknowledged`. An alert already acknowledged
+        is answered as it is and nothing is recorded. An alert carries no
+        version, so no `If-Match` is asked for. An alert of another
+        experiment is `not_found`.
+      x-permission: experiment.edit
+      tags: [experiments]
+      responses:
+        "200":
+          description: The alert, acknowledged.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentAlert"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -6422,7 +6517,7 @@ components:
             one bin under one of the salts.
     ExperimentExposures:
       type: object
-      required: [variations, conflicts, rejections, as_of]
+      required: [variations, conflicts, rejections, as_of, sample_ratio]
       properties:
         variations:
           type: array
@@ -6440,6 +6535,132 @@ components:
           format: date-time
           nullable: true
           description: When the exposure rollup last moved; null before it first did.
+        sample_ratio:
+          allOf:
+            - $ref: "#/components/schemas/SampleRatioCheck"
+          nullable: true
+          description: The latest sample-ratio check in the environment; null before the first.
+    SampleRatioCheck:
+      type: object
+      required: [n, chi_square, p_value, skipped_reason, active, checked_at]
+      properties:
+        n:
+          type: integer
+          format: int64
+          description: The first exposures of the variations the experiment weighs.
+        chi_square:
+          type: number
+          format: double
+          nullable: true
+          description: "`X²`; null when the check was skipped."
+        p_value:
+          type: number
+          format: double
+          nullable: true
+          description: The chi-square upper tail of `X²`; null when the check was skipped.
+        skipped_reason:
+          allOf:
+            - $ref: "#/components/schemas/SampleRatioSkippedReason"
+          nullable: true
+          description: Why the check computed no statistic; null when it did.
+        active:
+          type: boolean
+          description: An `srm` alert is active in the environment, acknowledged or not.
+        checked_at:
+          type: string
+          format: date-time
+          description: When the check ran; a stopped experiment's is its stop.
+    SampleRatioSkippedReason:
+      type: string
+      enum: [below_minimum_sample, expected_below_5]
+      description: "`below_minimum_sample`: fewer than 1,000 first exposures. `expected_below_5`: a variation expects fewer than 5."
+    ExperimentAlertList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExperimentAlert"
+    ExperimentAlertKind:
+      type: string
+      enum: [srm]
+      description: "`srm`: the sample-ratio check found first exposures out of line with the weights."
+    ExperimentAlert:
+      type: object
+      required: [id, kind, environment, raised_at, cleared_at, acknowledged_at, details]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: "#/components/schemas/ExperimentAlertKind"
+        environment:
+          type: string
+          nullable: true
+          description: The key of the environment the alert is about; null for one about the experiment as a whole.
+        raised_at:
+          type: string
+          format: date-time
+        cleared_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the condition cleared; null while the alert is active.
+        acknowledged_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When it was first acknowledged; null otherwise.
+        details:
+          $ref: "#/components/schemas/ExperimentAlertDetails"
+    ExperimentAlertDetails:
+      type: object
+      description: What the check found when it raised the alert; the block of the alert's kind is set, every other one is null.
+      required: [sample_ratio]
+      properties:
+        sample_ratio:
+          allOf:
+            - $ref: "#/components/schemas/SampleRatioAlertDetails"
+          nullable: true
+    SampleRatioAlertDetails:
+      type: object
+      required: [n, chi_square, p_value, variations]
+      properties:
+        n:
+          type: integer
+          format: int64
+        chi_square:
+          type: number
+          format: double
+        p_value:
+          type: number
+          format: double
+        variations:
+          type: array
+          description: The variations the experiment weighs, in its order.
+          items:
+            $ref: "#/components/schemas/SampleRatioVariation"
+    SampleRatioVariation:
+      type: object
+      required: [variation, observed, expected, observed_share, expected_share]
+      properties:
+        variation:
+          type: string
+        observed:
+          type: integer
+          format: int64
+          description: The variation's first exposures.
+        expected:
+          type: number
+          format: double
+          description: "`N × weight / 10000`."
+        observed_share:
+          type: number
+          format: double
+        expected_share:
+          type: number
+          format: double
     ConflictTotals:
       type: object
       required: [total, units]

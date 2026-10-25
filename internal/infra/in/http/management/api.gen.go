@@ -241,6 +241,21 @@ func (e EventType) Valid() bool {
 	}
 }
 
+// Defines values for ExperimentAlertKind.
+const (
+	ExperimentAlertKindSrm ExperimentAlertKind = "srm"
+)
+
+// Valid indicates whether the value is a known member of the ExperimentAlertKind enum.
+func (e ExperimentAlertKind) Valid() bool {
+	switch e {
+	case ExperimentAlertKindSrm:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ExperimentOutcome.
 const (
 	ExperimentOutcomeRemoved ExperimentOutcome = "removed"
@@ -439,6 +454,24 @@ func (e RoleName) Valid() bool {
 	case RoleNameOwner:
 		return true
 	case RoleNameViewer:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SampleRatioSkippedReason.
+const (
+	SampleRatioSkippedReasonBelowMinimumSample SampleRatioSkippedReason = "below_minimum_sample"
+	SampleRatioSkippedReasonExpectedBelow5     SampleRatioSkippedReason = "expected_below_5"
+)
+
+// Valid indicates whether the value is a known member of the SampleRatioSkippedReason enum.
+func (e SampleRatioSkippedReason) Valid() bool {
+	switch e {
+	case SampleRatioSkippedReasonBelowMinimumSample:
+		return true
+	case SampleRatioSkippedReasonExpectedBelow5:
 		return true
 	default:
 		return false
@@ -1349,6 +1382,39 @@ type Experiment struct {
 	Version Version `json:"version"`
 }
 
+// ExperimentAlert defines model for ExperimentAlert.
+type ExperimentAlert struct {
+	// AcknowledgedAt When it was first acknowledged; null otherwise.
+	AcknowledgedAt *time.Time `json:"acknowledged_at"`
+
+	// ClearedAt When the condition cleared; null while the alert is active.
+	ClearedAt *time.Time `json:"cleared_at"`
+
+	// Details What the check found when it raised the alert; the block of the alert's kind is set, every other one is null.
+	Details ExperimentAlertDetails `json:"details"`
+
+	// Environment The key of the environment the alert is about; null for one about the experiment as a whole.
+	Environment *string            `json:"environment"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// Kind `srm`: the sample-ratio check found first exposures out of line with the weights.
+	Kind     ExperimentAlertKind `json:"kind"`
+	RaisedAt time.Time           `json:"raised_at"`
+}
+
+// ExperimentAlertDetails What the check found when it raised the alert; the block of the alert's kind is set, every other one is null.
+type ExperimentAlertDetails struct {
+	SampleRatio *SampleRatioAlertDetails `json:"sample_ratio"`
+}
+
+// ExperimentAlertKind `srm`: the sample-ratio check found first exposures out of line with the weights.
+type ExperimentAlertKind string
+
+// ExperimentAlertList defines model for ExperimentAlertList.
+type ExperimentAlertList struct {
+	Items []ExperimentAlert `json:"items"`
+}
+
 // ExperimentAssignment defines model for ExperimentAssignment.
 type ExperimentAssignment struct {
 	// Experiment The experiment's key.
@@ -1437,7 +1503,10 @@ type ExperimentExposures struct {
 
 	// Rejections The exposures refused, by reason, those with a count only.
 	Rejections []ExposureRejections `json:"rejections"`
-	Variations []VariationExposures `json:"variations"`
+
+	// SampleRatio The latest sample-ratio check in the environment; null before the first.
+	SampleRatio *SampleRatioCheck    `json:"sample_ratio"`
+	Variations  []VariationExposures `json:"variations"`
 }
 
 // ExperimentList defines model for ExperimentList.
@@ -2370,6 +2439,52 @@ type RuleInput struct {
 	// receive; while it runs they carry its unit type, salts, traffic
 	// allocation and weights.
 	Serve Serve `json:"serve"`
+}
+
+// SampleRatioAlertDetails defines model for SampleRatioAlertDetails.
+type SampleRatioAlertDetails struct {
+	ChiSquare float64 `json:"chi_square"`
+	N         int64   `json:"n"`
+	PValue    float64 `json:"p_value"`
+
+	// Variations The variations the experiment weighs, in its order.
+	Variations []SampleRatioVariation `json:"variations"`
+}
+
+// SampleRatioCheck defines model for SampleRatioCheck.
+type SampleRatioCheck struct {
+	// Active An `srm` alert is active in the environment, acknowledged or not.
+	Active bool `json:"active"`
+
+	// CheckedAt When the check ran; a stopped experiment's is its stop.
+	CheckedAt time.Time `json:"checked_at"`
+
+	// ChiSquare `X²`; null when the check was skipped.
+	ChiSquare *float64 `json:"chi_square"`
+
+	// N The first exposures of the variations the experiment weighs.
+	N int64 `json:"n"`
+
+	// PValue The chi-square upper tail of `X²`; null when the check was skipped.
+	PValue *float64 `json:"p_value"`
+
+	// SkippedReason Why the check computed no statistic; null when it did.
+	SkippedReason *SampleRatioSkippedReason `json:"skipped_reason"`
+}
+
+// SampleRatioSkippedReason `below_minimum_sample`: fewer than 1,000 first exposures. `expected_below_5`: a variation expects fewer than 5.
+type SampleRatioSkippedReason string
+
+// SampleRatioVariation defines model for SampleRatioVariation.
+type SampleRatioVariation struct {
+	// Expected `N × weight / 10000`.
+	Expected      float64 `json:"expected"`
+	ExpectedShare float64 `json:"expected_share"`
+
+	// Observed The variation's first exposures.
+	Observed      int64   `json:"observed"`
+	ObservedShare float64 `json:"observed_share"`
+	Variation     string  `json:"variation"`
 }
 
 // Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
@@ -3358,6 +3473,12 @@ type UpdateExperimentParams struct {
 	// the current one `412 version_mismatch`, both judged after the request
 	// is validated.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListExperimentAlertsParams defines parameters for ListExperimentAlerts.
+type ListExperimentAlertsParams struct {
+	// Active `true` lists only active alerts, `false` only cleared ones; every alert when absent.
+	Active *bool `form:"active,omitempty" json:"active,omitempty"`
 }
 
 // ArchiveExperimentParams defines parameters for ArchiveExperiment.
@@ -5009,6 +5130,34 @@ type ClientInterface interface {
 	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
 	UpdateExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListExperimentAlerts An experiment's alerts
+	//
+	// Every alert the experiment has had, in every environment, the most
+	// recently raised first. An alert is active from `raised_at` until
+	// `cleared_at`; an acknowledgement hides it until then, and a condition
+	// returning after it cleared raises a new alert. At most one alert of a
+	// kind is active per environment.
+	//
+	// `srm` is raised by the sample-ratio check in an environment holding
+	// the experiment's rule, at a p-value below 0.001, and cleared above
+	// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
+	// the audit log as `experiment.alert_raised` and
+	// `experiment.alert_cleared` by the system.
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/alerts (the `ListExperimentAlerts` operationId).
+	ListExperimentAlerts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *ListExperimentAlertsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AcknowledgeExperimentAlert Acknowledge an experiment's alert
+	//
+	// Sets `acknowledged_at`, which hides the alert until it clears, and
+	// records `experiment.alert_acknowledged`. An alert already acknowledged
+	// is answered as it is and nothing is recorded. An alert carries no
+	// version, so no `If-Match` is asked for. An alert of another
+	// experiment is `not_found`.
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge (the `AcknowledgeExperimentAlert` operationId).
+	AcknowledgeExperimentAlert(ctx context.Context, project ProjectKey, experiment ExperimentKey, alert openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ArchiveExperiment Archive a draft or stopped experiment
 	//
 	// Archives the experiment: it is hidden from the list unless asked for
@@ -5123,6 +5272,22 @@ type ClientInterface interface {
 	// exposure named, by key, which expects no share. `rejections`
 	// counts the exposures of the experiment refused in the environment,
 	// by reason.
+	//
+	// `sample_ratio` is the latest sample-ratio check of the experiment in
+	// the environment, null before the first. Every 10 minutes, and once
+	// more at its stop, each running experiment is checked in each
+	// environment holding its rule: with `N` its first exposures over the
+	// variations it weighs, `O` a variation's first exposures and
+	// `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
+	// freedom fewer than variations, and `p_value` is its chi-square upper
+	// tail. Below 1,000 first exposures (`below_minimum_sample`) or with a
+	// variation expecting fewer than 5 (`expected_below_5`) the check is
+	// skipped and leaves any alert as it is. An `srm` alert is raised at
+	// `p_value` below 0.001 and cleared above 0.01; between the two it
+	// stays as it is. A stopped experiment keeps the check its stop took,
+	// `checked_at` its stop, and is never checked again. For example,
+	// weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
+	// `p_value` about 0.000063: an alert.
 	//
 	// Corresponds with GET /projects/{project}/experiments/{experiment}/exposures (the `GetExperimentExposures` operationId).
 	GetExperimentExposures(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposuresParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8117,6 +8282,54 @@ func (c *Client) UpdateExperiment(ctx context.Context, project ProjectKey, exper
 	return c.Client.Do(req)
 }
 
+// ListExperimentAlerts An experiment's alerts
+//
+// Every alert the experiment has had, in every environment, the most
+// recently raised first. An alert is active from `raised_at` until
+// `cleared_at`; an acknowledgement hides it until then, and a condition
+// returning after it cleared raises a new alert. At most one alert of a
+// kind is active per environment.
+//
+// `srm` is raised by the sample-ratio check in an environment holding
+// the experiment's rule, at a p-value below 0.001, and cleared above
+// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
+// the audit log as `experiment.alert_raised` and
+// `experiment.alert_cleared` by the system.
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/alerts (the `ListExperimentAlerts` operationId).
+func (c *Client) ListExperimentAlerts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *ListExperimentAlertsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListExperimentAlertsRequest(c.Server, project, experiment, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AcknowledgeExperimentAlert Acknowledge an experiment's alert
+//
+// Sets `acknowledged_at`, which hides the alert until it clears, and
+// records `experiment.alert_acknowledged`. An alert already acknowledged
+// is answered as it is and nothing is recorded. An alert carries no
+// version, so no `If-Match` is asked for. An alert of another
+// experiment is `not_found`.
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge (the `AcknowledgeExperimentAlert` operationId).
+func (c *Client) AcknowledgeExperimentAlert(ctx context.Context, project ProjectKey, experiment ExperimentKey, alert openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAcknowledgeExperimentAlertRequest(c.Server, project, experiment, alert)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ArchiveExperiment Archive a draft or stopped experiment
 //
 // Archives the experiment: it is hidden from the list unless asked for
@@ -8301,6 +8514,22 @@ func (c *Client) SetExperimentDecisionNote(ctx context.Context, project ProjectK
 // exposure named, by key, which expects no share. `rejections`
 // counts the exposures of the experiment refused in the environment,
 // by reason.
+//
+// `sample_ratio` is the latest sample-ratio check of the experiment in
+// the environment, null before the first. Every 10 minutes, and once
+// more at its stop, each running experiment is checked in each
+// environment holding its rule: with `N` its first exposures over the
+// variations it weighs, `O` a variation's first exposures and
+// `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
+// freedom fewer than variations, and `p_value` is its chi-square upper
+// tail. Below 1,000 first exposures (`below_minimum_sample`) or with a
+// variation expecting fewer than 5 (`expected_below_5`) the check is
+// skipped and leaves any alert as it is. An `srm` alert is raised at
+// `p_value` below 0.001 and cleared above 0.01; between the two it
+// stays as it is. A stopped experiment keeps the check its stop took,
+// `checked_at` its stop, and is never checked again. For example,
+// weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
+// `p_value` about 0.000063: an alert.
 //
 // Corresponds with GET /projects/{project}/experiments/{experiment}/exposures (the `GetExperimentExposures` operationId).
 func (c *Client) GetExperimentExposures(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentExposuresParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13658,6 +13887,122 @@ func NewUpdateExperimentRequestWithBody(server string, project ProjectKey, exper
 	return req, nil
 }
 
+// NewListExperimentAlertsRequest constructs an http.Request for the ListExperimentAlerts method
+func NewListExperimentAlertsRequest(server string, project ProjectKey, experiment ExperimentKey, params *ListExperimentAlertsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/alerts", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Active != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "active", *params.Active, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewAcknowledgeExperimentAlertRequest constructs an http.Request for the AcknowledgeExperimentAlert method
+func NewAcknowledgeExperimentAlertRequest(server string, project ProjectKey, experiment ExperimentKey, alert openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "alert", alert, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/alerts/%s/acknowledge", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewArchiveExperimentRequest constructs an http.Request for the ArchiveExperiment method
 func NewArchiveExperimentRequest(server string, project ProjectKey, experiment ExperimentKey, params *ArchiveExperimentParams) (*http.Request, error) {
 	var err error
@@ -18084,6 +18429,38 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
 	UpdateExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateExperimentResponse, error)
 
+	// ListExperimentAlertsWithResponse An experiment's alerts
+	//
+	// Every alert the experiment has had, in every environment, the most
+	// recently raised first. An alert is active from `raised_at` until
+	// `cleared_at`; an acknowledgement hides it until then, and a condition
+	// returning after it cleared raises a new alert. At most one alert of a
+	// kind is active per environment.
+	//
+	// `srm` is raised by the sample-ratio check in an environment holding
+	// the experiment's rule, at a p-value below 0.001, and cleared above
+	// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
+	// the audit log as `experiment.alert_raised` and
+	// `experiment.alert_cleared` by the system.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/experiments/{experiment}/alerts (the `ListExperimentAlerts` operationId).
+	ListExperimentAlertsWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *ListExperimentAlertsParams, reqEditors ...RequestEditorFn) (*ListExperimentAlertsResponse, error)
+
+	// AcknowledgeExperimentAlertWithResponse Acknowledge an experiment's alert
+	//
+	// Sets `acknowledged_at`, which hides the alert until it clears, and
+	// records `experiment.alert_acknowledged`. An alert already acknowledged
+	// is answered as it is and nothing is recorded. An alert carries no
+	// version, so no `If-Match` is asked for. An alert of another
+	// experiment is `not_found`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge (the `AcknowledgeExperimentAlert` operationId).
+	AcknowledgeExperimentAlertWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, alert openapi_types.UUID, reqEditors ...RequestEditorFn) (*AcknowledgeExperimentAlertResponse, error)
+
 	// ArchiveExperimentWithResponse Archive a draft or stopped experiment
 	//
 	// Archives the experiment: it is hidden from the list unless asked for
@@ -18204,6 +18581,22 @@ type ClientWithResponsesInterface interface {
 	// exposure named, by key, which expects no share. `rejections`
 	// counts the exposures of the experiment refused in the environment,
 	// by reason.
+	//
+	// `sample_ratio` is the latest sample-ratio check of the experiment in
+	// the environment, null before the first. Every 10 minutes, and once
+	// more at its stop, each running experiment is checked in each
+	// environment holding its rule: with `N` its first exposures over the
+	// variations it weighs, `O` a variation's first exposures and
+	// `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
+	// freedom fewer than variations, and `p_value` is its chi-square upper
+	// tail. Below 1,000 first exposures (`below_minimum_sample`) or with a
+	// variation expecting fewer than 5 (`expected_below_5`) the check is
+	// skipped and leaves any alert as it is. An `srm` alert is raised at
+	// `p_value` below 0.001 and cleared above 0.01; between the two it
+	// stays as it is. A stopped experiment keeps the check its stop took,
+	// `checked_at` its stop, and is never checked again. For example,
+	// weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
+	// `p_value` about 0.000063: an alert.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -25046,6 +25439,158 @@ func (r UpdateExperimentResponse) ContentType() string {
 	return ""
 }
 
+// ListExperimentAlertsResponse401Headers the declared response headers of an HTTP 401 response for ListExperimentAlerts
+type ListExperimentAlertsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListExperimentAlertsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExperimentAlertList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListExperimentAlertsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListExperimentAlertsResponse) GetJSON200() *ExperimentAlertList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListExperimentAlertsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListExperimentAlertsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListExperimentAlertsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListExperimentAlertsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListExperimentAlertsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListExperimentAlertsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListExperimentAlertsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListExperimentAlertsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// AcknowledgeExperimentAlertResponse401Headers the declared response headers of an HTTP 401 response for AcknowledgeExperimentAlert
+type AcknowledgeExperimentAlertResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type AcknowledgeExperimentAlertResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ExperimentAlert
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *AcknowledgeExperimentAlertResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r AcknowledgeExperimentAlertResponse) GetJSON200() *ExperimentAlert {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r AcknowledgeExperimentAlertResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r AcknowledgeExperimentAlertResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r AcknowledgeExperimentAlertResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r AcknowledgeExperimentAlertResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r AcknowledgeExperimentAlertResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r AcknowledgeExperimentAlertResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AcknowledgeExperimentAlertResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AcknowledgeExperimentAlertResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ArchiveExperimentResponse200Headers the declared response headers of an HTTP 200 response for ArchiveExperiment
 type ArchiveExperimentResponse200Headers struct {
 	ETag *string
@@ -31566,6 +32111,50 @@ func (c *ClientWithResponses) UpdateExperimentWithResponse(ctx context.Context, 
 	return ParseUpdateExperimentResponse(rsp)
 }
 
+// ListExperimentAlertsWithResponse An experiment's alerts
+//
+// Every alert the experiment has had, in every environment, the most
+// recently raised first. An alert is active from `raised_at` until
+// `cleared_at`; an acknowledgement hides it until then, and a condition
+// returning after it cleared raises a new alert. At most one alert of a
+// kind is active per environment.
+//
+// `srm` is raised by the sample-ratio check in an environment holding
+// the experiment's rule, at a p-value below 0.001, and cleared above
+// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
+// the audit log as `experiment.alert_raised` and
+// `experiment.alert_cleared` by the system.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/experiments/{experiment}/alerts (the `ListExperimentAlerts` operationId).
+func (c *ClientWithResponses) ListExperimentAlertsWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *ListExperimentAlertsParams, reqEditors ...RequestEditorFn) (*ListExperimentAlertsResponse, error) {
+	rsp, err := c.ListExperimentAlerts(ctx, project, experiment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListExperimentAlertsResponse(rsp)
+}
+
+// AcknowledgeExperimentAlertWithResponse Acknowledge an experiment's alert
+//
+// Sets `acknowledged_at`, which hides the alert until it clears, and
+// records `experiment.alert_acknowledged`. An alert already acknowledged
+// is answered as it is and nothing is recorded. An alert carries no
+// version, so no `If-Match` is asked for. An alert of another
+// experiment is `not_found`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge (the `AcknowledgeExperimentAlert` operationId).
+func (c *ClientWithResponses) AcknowledgeExperimentAlertWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, alert openapi_types.UUID, reqEditors ...RequestEditorFn) (*AcknowledgeExperimentAlertResponse, error) {
+	rsp, err := c.AcknowledgeExperimentAlert(ctx, project, experiment, alert, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAcknowledgeExperimentAlertResponse(rsp)
+}
+
 // ArchiveExperimentWithResponse Archive a draft or stopped experiment
 //
 // Archives the experiment: it is hidden from the list unless asked for
@@ -31728,6 +32317,22 @@ func (c *ClientWithResponses) SetExperimentDecisionNoteWithResponse(ctx context.
 // exposure named, by key, which expects no share. `rejections`
 // counts the exposures of the experiment refused in the environment,
 // by reason.
+//
+// `sample_ratio` is the latest sample-ratio check of the experiment in
+// the environment, null before the first. Every 10 minutes, and once
+// more at its stop, each running experiment is checked in each
+// environment holding its rule: with `N` its first exposures over the
+// variations it weighs, `O` a variation's first exposures and
+// `E = N × weight / 10000`, `X² = Σ (O − E)² / E` at one degree of
+// freedom fewer than variations, and `p_value` is its chi-square upper
+// tail. Below 1,000 first exposures (`below_minimum_sample`) or with a
+// variation expecting fewer than 5 (`expected_below_5`) the check is
+// skipped and leaves any alert as it is. An `srm` alert is raised at
+// `p_value` below 0.001 and cleared above 0.01; between the two it
+// stays as it is. A stopped experiment keeps the check its stop took,
+// `checked_at` its stop, and is never checked again. For example,
+// weights 5,000/5,000 and 5,200/4,800 first exposures give `X²` 16 and
+// `p_value` about 0.000063: an alert.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -38455,6 +39060,140 @@ func ParseUpdateExperimentResponse(rsp *http.Response) (*UpdateExperimentRespons
 	return response, nil
 }
 
+// ParseListExperimentAlertsResponse parses an HTTP response from a ListExperimentAlertsWithResponse call
+func ParseListExperimentAlertsResponse(rsp *http.Response) (*ListExperimentAlertsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListExperimentAlertsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExperimentAlertList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListExperimentAlertsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseAcknowledgeExperimentAlertResponse parses an HTTP response from a AcknowledgeExperimentAlertWithResponse call
+func ParseAcknowledgeExperimentAlertResponse(rsp *http.Response) (*AcknowledgeExperimentAlertResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AcknowledgeExperimentAlertResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExperimentAlert
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers AcknowledgeExperimentAlertResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseArchiveExperimentResponse parses an HTTP response from a ArchiveExperimentWithResponse call
 func ParseArchiveExperimentResponse(rsp *http.Response) (*ArchiveExperimentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -42960,6 +43699,12 @@ type ServerInterface interface {
 	// UpdateExperiment Change an experiment
 	// (PATCH /projects/{project}/experiments/{experiment})
 	UpdateExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params UpdateExperimentParams)
+	// ListExperimentAlerts An experiment's alerts
+	// (GET /projects/{project}/experiments/{experiment}/alerts)
+	ListExperimentAlerts(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params ListExperimentAlertsParams)
+	// AcknowledgeExperimentAlert Acknowledge an experiment's alert
+	// (POST /projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge)
+	AcknowledgeExperimentAlert(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, alert openapi_types.UUID)
 	// ArchiveExperiment Archive a draft or stopped experiment
 	// (POST /projects/{project}/experiments/{experiment}/archive)
 	ArchiveExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params ArchiveExperimentParams)
@@ -46137,6 +46882,101 @@ func (siw *ServerInterfaceWrapper) UpdateExperiment(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListExperimentAlerts operation middleware
+func (siw *ServerInterfaceWrapper) ListExperimentAlerts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListExperimentAlertsParams
+
+	// ------------- Optional query parameter "active" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "active", r.URL.Query(), &params.Active, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "active"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "active", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListExperimentAlerts(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AcknowledgeExperimentAlert operation middleware
+func (siw *ServerInterfaceWrapper) AcknowledgeExperimentAlert(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "alert" -------------
+	var alert openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "alert", r.PathValue("alert"), &alert, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "alert", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AcknowledgeExperimentAlert(w, r, project, experiment, alert)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ArchiveExperiment operation middleware
 func (siw *ServerInterfaceWrapper) ArchiveExperiment(w http.ResponseWriter, r *http.Request) {
 
@@ -48998,6 +49838,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/exposures", wrapper.GetExperimentExposures)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/exposures/timeline", wrapper.GetExperimentExposureTimeline)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/conflicts", wrapper.GetExperimentConflicts)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/alerts", wrapper.ListExperimentAlerts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge", wrapper.AcknowledgeExperimentAlert)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.ListChangeRequests)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/change-requests", wrapper.CreateChangeRequest)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/change-requests/{change_request}", wrapper.GetChangeRequest)
@@ -56321,6 +57163,188 @@ func (response UpdateExperiment428ApplicationProblemPlusJSONResponse) VisitUpdat
 	return err
 }
 
+type ListExperimentAlertsRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     ListExperimentAlertsParams
+}
+
+type ListExperimentAlertsResponseObject interface {
+	VisitListExperimentAlertsResponse(w http.ResponseWriter) error
+}
+
+type ListExperimentAlerts200JSONResponse ExperimentAlertList
+
+func (response ListExperimentAlerts200JSONResponse) VisitListExperimentAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExperimentAlerts400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListExperimentAlerts400ApplicationProblemPlusJSONResponse) VisitListExperimentAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExperimentAlerts401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListExperimentAlerts401ApplicationProblemPlusJSONResponse) VisitListExperimentAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExperimentAlerts403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListExperimentAlerts403ApplicationProblemPlusJSONResponse) VisitListExperimentAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListExperimentAlerts404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListExperimentAlerts404ApplicationProblemPlusJSONResponse) VisitListExperimentAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcknowledgeExperimentAlertRequestObject struct {
+	Project    ProjectKey         `json:"project"`
+	Experiment ExperimentKey      `json:"experiment"`
+	Alert      openapi_types.UUID `json:"alert"`
+}
+
+type AcknowledgeExperimentAlertResponseObject interface {
+	VisitAcknowledgeExperimentAlertResponse(w http.ResponseWriter) error
+}
+
+type AcknowledgeExperimentAlert200JSONResponse ExperimentAlert
+
+func (response AcknowledgeExperimentAlert200JSONResponse) VisitAcknowledgeExperimentAlertResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcknowledgeExperimentAlert400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response AcknowledgeExperimentAlert400ApplicationProblemPlusJSONResponse) VisitAcknowledgeExperimentAlertResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcknowledgeExperimentAlert401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response AcknowledgeExperimentAlert401ApplicationProblemPlusJSONResponse) VisitAcknowledgeExperimentAlertResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcknowledgeExperimentAlert403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response AcknowledgeExperimentAlert403ApplicationProblemPlusJSONResponse) VisitAcknowledgeExperimentAlertResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AcknowledgeExperimentAlert404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response AcknowledgeExperimentAlert404ApplicationProblemPlusJSONResponse) VisitAcknowledgeExperimentAlertResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ArchiveExperimentRequestObject struct {
 	Project    ProjectKey    `json:"project"`
 	Experiment ExperimentKey `json:"experiment"`
@@ -62560,6 +63584,12 @@ type StrictServerInterface interface {
 	// UpdateExperiment Change an experiment
 	// (PATCH /projects/{project}/experiments/{experiment})
 	UpdateExperiment(ctx context.Context, request UpdateExperimentRequestObject) (UpdateExperimentResponseObject, error)
+	// ListExperimentAlerts An experiment's alerts
+	// (GET /projects/{project}/experiments/{experiment}/alerts)
+	ListExperimentAlerts(ctx context.Context, request ListExperimentAlertsRequestObject) (ListExperimentAlertsResponseObject, error)
+	// AcknowledgeExperimentAlert Acknowledge an experiment's alert
+	// (POST /projects/{project}/experiments/{experiment}/alerts/{alert}/acknowledge)
+	AcknowledgeExperimentAlert(ctx context.Context, request AcknowledgeExperimentAlertRequestObject) (AcknowledgeExperimentAlertResponseObject, error)
 	// ArchiveExperiment Archive a draft or stopped experiment
 	// (POST /projects/{project}/experiments/{experiment}/archive)
 	ArchiveExperiment(ctx context.Context, request ArchiveExperimentRequestObject) (ArchiveExperimentResponseObject, error)
@@ -64867,6 +65897,62 @@ func (sh *strictHandler) UpdateExperiment(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateExperimentResponseObject); ok {
 		if err := validResponse.VisitUpdateExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListExperimentAlerts operation middleware
+func (sh *strictHandler) ListExperimentAlerts(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params ListExperimentAlertsParams) {
+	var request ListExperimentAlertsRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListExperimentAlerts(ctx, request.(ListExperimentAlertsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListExperimentAlerts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListExperimentAlertsResponseObject); ok {
+		if err := validResponse.VisitListExperimentAlertsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AcknowledgeExperimentAlert operation middleware
+func (sh *strictHandler) AcknowledgeExperimentAlert(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, alert openapi_types.UUID) {
+	var request AcknowledgeExperimentAlertRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Alert = alert
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AcknowledgeExperimentAlert(ctx, request.(AcknowledgeExperimentAlertRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AcknowledgeExperimentAlert")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AcknowledgeExperimentAlertResponseObject); ok {
+		if err := validResponse.VisitAcknowledgeExperimentAlertResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
