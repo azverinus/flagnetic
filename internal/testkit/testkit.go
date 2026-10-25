@@ -14,7 +14,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/pkg/pgtest"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -61,3 +63,9 @@ func Clock() *clock.Fake { return clock.NewFake(Start) }
 
 // IDs returns a deterministic identifier source reading c.
 func IDs(c clock.Clock) *id.Source { return id.NewDeterministicSource(c) }
+
+// Record returns the governance service every context records its audit
+// entries through, on pool, as the server wires it.
+func Record(pool *pgxpool.Pool) *appgovernance.Record {
+	return appgovernance.NewRecord(pggovernance.NewAuditLog(pool), pggovernance.NewChangeRequests(pool), id.NewSource(clock.System{}))
+}

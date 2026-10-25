@@ -9,7 +9,9 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
+	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
 )
 
@@ -288,31 +290,46 @@ func TestAMaintainerAppliesAnothersChangeRequest(t *testing.T) {
 // Approving or applying a change request whose configuration was written
 // since it was based on it would decide or write what nobody reviewed: it
 // is superseded and refused, and the configuration stays as it is.
+// A write through the API supersedes the change requests waiting on what it
+// changed, so only a base moved behind the API, as restoring a backup moves
+// it, is found moved at approval or application. The change request is then
+// superseded with no write to name.
 func TestApprovingOrApplyingOnAMovedBaseSupersedesTheChangeRequest(t *testing.T) {
 	f := startChangeRequests(t)
 	key := f.project.Key
 	maintainer, _ := grantedSession(t, f.srv, f.project, access.RoleMaintainer)
-	move := func() management.FlagConfiguration {
+	staging := id.FromBytes[workspace.Environment](environmentID(t, f.admin, key, "staging"))
+	// move returns a function moving the configuration in staging back to
+	// what it is now, behind the API, once a change request is based on
+	// its next version.
+	move := func() func() management.FlagConfiguration {
+		restorePoint := testkit.TakeRestorePoint(t, testkit.Pool(t), staging)
 		c := getConfiguration(t, f.admin, key, "checkout_title", "staging")
 		put := asPut(c)
 		put.Fallthrough = map[string]string{"a": "c", "b": "c", "c": "a"}[c.Fallthrough]
-		return mustPut(t, f.admin, key, "checkout_title", "staging", c.Version, put)
+		mustPut(t, f.admin, key, "checkout_title", "staging", c.Version, put)
+		return func() management.FlagConfiguration {
+			restorePoint.Restore(t, f.srv)
+			return getConfiguration(t, f.admin, key, "checkout_title", "staging")
+		}
 	}
 
+	restore := move()
 	toApprove := openedIn(t, f.dev.ClientWithResponses, key, "staging", proposedOn())
-	move()
+	restore()
 	res := approveChangeRequest(t, maintainer.ClientWithResponses, key, toApprove, nil)
 	assertProblem(t, "approving on a moved base", res.StatusCode(), res.Body, http.StatusConflict, "base_moved")
 	if got := getChangeRequest(t, f.dev.ClientWithResponses, key, toApprove); got.State != management.ChangeRequestStateSuperseded ||
-		got.Approval != nil || got.Version != toApprove.Version+1 {
+		got.Approval != nil || got.Version != toApprove.Version+1 || got.SupersededBy != nil {
 		t.Errorf("after approving on a moved base: %+v, want superseded and not approved", got)
 	}
 	if actions := changeRequestActions(t, f.srv, toApprove); !slices.Equal(actions, []string{"change_request.superseded", "change_request.opened"}) {
 		t.Errorf("audit = %v", actions)
 	}
 
+	restore = move()
 	toApply := mustApprove(t, maintainer.ClientWithResponses, key, openedIn(t, f.dev.ClientWithResponses, key, "staging", proposedOn()))
-	before := move()
+	before := restore()
 	res2 := applyChangeRequest(t, f.dev.ClientWithResponses, key, toApply)
 	assertProblem(t, "applying on a moved base", res2.StatusCode(), res2.Body, http.StatusConflict, "base_moved")
 	if got := getChangeRequest(t, f.dev.ClientWithResponses, key, toApply); got.State != management.ChangeRequestStateSuperseded ||

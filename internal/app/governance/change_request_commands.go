@@ -287,6 +287,31 @@ func (h *GetChangeRequest) Handle(ctx context.Context, project workspace.Project
 	return changeRequestOf(ctx, h.store, project, changeRequest)
 }
 
+// WaitingCounter counts the change requests waiting on a configuration.
+type WaitingCounter interface {
+	// WaitingOn returns how many of the change requests on flag's
+	// configuration in environment are open and how many approved.
+	WaitingOn(ctx context.Context, flag flags.FlagID, environment workspace.EnvironmentID) (governance.Waiting, error)
+}
+
+// CountWaitingChangeRequests counts the change requests waiting on a flag's
+// configuration in one environment, which a member reads with the
+// configuration before writing it.
+type CountWaitingChangeRequests struct{ store WaitingCounter }
+
+// NewCountWaitingChangeRequests returns the handler.
+func NewCountWaitingChangeRequests(store WaitingCounter) *CountWaitingChangeRequests {
+	return &CountWaitingChangeRequests{store: store}
+}
+
+// Handle returns the change requests waiting on flag's configuration in
+// environment. No change request carries a time to be applied at yet, so
+// none is named.
+func (h *CountWaitingChangeRequests) Handle(ctx context.Context, flag flags.FlagID, environment workspace.EnvironmentID,
+) (governance.Waiting, error) {
+	return h.store.WaitingOn(ctx, flag, environment)
+}
+
 // ChangeRequestFilter selects a project's change requests; every field set
 // narrows the selection.
 type ChangeRequestFilter struct {

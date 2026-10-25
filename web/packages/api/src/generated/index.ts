@@ -962,6 +962,7 @@ export type {
   VariationValue,
   Version,
   Violation,
+  WaitingChangeRequests,
   Webhook,
   WebhookCreate,
   WebhookCreator,

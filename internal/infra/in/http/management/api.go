@@ -152,6 +152,7 @@ type Handlers struct {
 	RejectChangeRequest  *appgovernance.RejectChangeRequest
 	ApplyChangeRequest   *appgovernance.ApplyChangeRequest
 	CopyChangeRequest    *appgovernance.CopyChangeRequest
+	CountWaiting         *appgovernance.CountWaitingChangeRequests
 
 	ListWebhookEventTypes *appgovernance.ListWebhookEventTypes
 	ListWebhooks          *appgovernance.ListWebhooks

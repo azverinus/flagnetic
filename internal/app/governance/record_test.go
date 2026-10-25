@@ -37,8 +37,9 @@ func entry(t *testing.T, ids *id.Source) governance.Entry {
 func TestAnEntryRecordedInACommittedWriteIsKept(t *testing.T) {
 	pool := testkit.FreshPool(t)
 	log := pggovernance.NewAuditLog(pool)
-	record := appgovernance.NewRecord(log)
-	e := entry(t, testkit.IDs(testkit.Clock()))
+	ids := testkit.IDs(testkit.Clock())
+	record := appgovernance.NewRecord(log, pggovernance.NewChangeRequests(pool), ids)
+	e := entry(t, ids)
 
 	err := postgres.NewTransactor(pool).Within(t.Context(), func(ctx context.Context) error {
 		return record.Record(ctx, e)
@@ -58,8 +59,9 @@ func TestAnEntryRecordedInACommittedWriteIsKept(t *testing.T) {
 func TestAnEntryRecordedInARolledBackWriteIsNotKept(t *testing.T) {
 	pool := testkit.FreshPool(t)
 	log := pggovernance.NewAuditLog(pool)
-	record := appgovernance.NewRecord(log)
-	e := entry(t, testkit.IDs(testkit.Clock()))
+	ids := testkit.IDs(testkit.Clock())
+	record := appgovernance.NewRecord(log, pggovernance.NewChangeRequests(pool), ids)
+	e := entry(t, ids)
 	refused := errors.New("the write failed after its entry was recorded")
 
 	err := postgres.NewTransactor(pool).Within(t.Context(), func(ctx context.Context) error {

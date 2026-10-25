@@ -51,12 +51,16 @@ func (h *DeleteFlag) Handle(ctx context.Context, cmd FlagCommand) error {
 		if err != nil {
 			return err
 		}
-		if err = h.d.Store.DeleteFlag(ctx, f.ID); err != nil {
-			return err
-		}
-		return h.d.Recorder.record(ctx, now, cmd.Request, governance.Record{
+		// The deletion is recorded before the rows go, so what it ends
+		// elsewhere, such as the change requests proposed for the flag, is
+		// found and closed with an entry of its own before the cascade
+		// removes it.
+		if err = h.d.Recorder.record(ctx, now, cmd.Request, governance.Record{
 			Project: cmd.Project, Action: "flag.deleted", Entity: flagEntity(f),
 			Before: flagValues(FlagView{Flag: f, Configurations: configs}),
-		})
+		}); err != nil {
+			return err
+		}
+		return h.d.Store.DeleteFlag(ctx, f.ID)
 	})
 }

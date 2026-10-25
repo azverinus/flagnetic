@@ -17,7 +17,6 @@ import (
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	appexperiments "github.com/azverinus/flagnetic/internal/app/experiments"
 	appflags "github.com/azverinus/flagnetic/internal/app/flags"
-	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
@@ -27,7 +26,6 @@ import (
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
 	pgexperiments "github.com/azverinus/flagnetic/internal/infra/out/postgres/experiments"
 	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
-	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -56,7 +54,7 @@ func TestAStartInACallersUnitOfWorkCommitsAndRollsBackWithIt(t *testing.T) {
 	start := appexperiments.NewStartExperiment(appexperiments.StartExperimentDeps{
 		Tx: tx, Projects: store, Store: store, Flags: flagStore, UnitTypes: pgworkspace.NewStore(pool),
 		Holders: flagStore, Rulesets: appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool), c),
-		Recorder: appexperiments.NewRecorder(appgovernance.NewRecord(pggovernance.NewAuditLog(pool)), c, ids),
+		Recorder: appexperiments.NewRecorder(testkit.Record(pool), c, ids),
 	})
 	cmd := appexperiments.ExperimentCommand{
 		Project: id.FromBytes[workspace.Project](project.Id), Key: "title_test", Expected: precondition.On(1),
@@ -128,7 +126,7 @@ func TestAStartWaitsForAConfigurationWriteAddingARuleServingIt(t *testing.T) {
 	replace := appflags.NewReplaceConfiguration(appflags.ReplaceConfigurationDeps{
 		Tx: tx, Projects: flagStore, Declarations: pgworkspace.NewStore(pool), Store: flagStore,
 		Rulesets: appdelivery.NewBumpRulesets(pgdelivery.NewStore(pool), c),
-		Recorder: appflags.NewRecorder(appgovernance.NewRecord(pggovernance.NewAuditLog(pool)), c, ids),
+		Recorder: appflags.NewRecorder(testkit.Record(pool), c, ids),
 	})
 
 	written := make(chan struct{})

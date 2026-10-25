@@ -62,7 +62,21 @@ Approval is always a second person: a member holding `change_request.approve` ap
 
 The author, whoever approved it, or any member holding `change_request.approve` applies an approved change request (`403 not_author` for anyone else, project tokens included). Applying writes the configuration as one write, the same refusals as replacing it, in a [protected environment](governance.md#protected-environments) too: the approval covers the change request's environment. The rules keep the identifiers and the rollouts the salts `proposed` shows, so the units the reviewers saw fall in a rollout are the ones that do, and the member applying becomes the author of the overrides it changes, as with a direct write. `applied_at` and `applied_by` (`kind` `member`, `token` or `system`, with `id` and `name`) record who applied it.
 
-When the configuration was written after the change request was based on it, approving or applying it is refused `409 base_moved` and the change request becomes `superseded`: what would be approved or written is no longer what was reviewed. Copy it to propose it again on the current configuration. When the configuration `proposed` no longer validates, because a flag or segment it names was archived or deleted since, applying is refused with the same `422` a direct write gets, its fields under `/proposed`; nothing is written and the change request stays approved.
+When the configuration moved without a write superseding the change request, as restoring a database backup moves it, approving or applying it is refused `409 base_moved` and the change request becomes `superseded`, with no `superseded_by`: what would be approved or written is no longer what was reviewed. Copy it to propose it again on the current configuration. When the configuration `proposed` no longer validates, because a flag or segment it names was archived or deleted since, applying is refused with the same `422` a direct write gets, its fields under `/proposed`; nothing is written and the change request stays approved.
+
+## Superseded
+
+An open or approved change request is superseded the moment any other write moves what it was based on, so applying it never writes over someone's later change:
+
+- a write to its configuration: a direct write in an environment that is not protected, an override set or removed, the kill switch, a rollout's salt regenerated, a copy from another environment, a revert, a stop of an experiment rewriting its rules, or another change request's application;
+- archiving or deleting its flag;
+- deleting its environment.
+
+The write and the supersede commit together. `superseded_by` names the audit entry of the write, and each change request it supersedes gets a `change_request.superseded` entry of its own, made by the writer in the same request, naming that entry in its `superseded_by`. A change request is never superseded by its own application, and a draft is never superseded: it opens only on the current configuration, after a rebase. Deleting an environment records the change requests it ends before they go with it, so their entries remain in the audit log.
+
+Every read and write of a configuration (`GET`, `PUT`, overrides, salts, the kill switch, revert and copy) answers `change_requests`, the change requests waiting on it: how many are `open`, how many `approved`, and `next_apply_at`, the earliest time one of them is scheduled to be applied, null when none is. A member about to write it sees what the write will supersede. A flag's detail does not count them.
+
+## The audit log
 
 Every transition is recorded in the audit log as `change_request.drafted`, `opened`, `updated`, `rebased`, `cancelled`, `copied`, `approved`, `rejected`, `applied` or `superseded`. The entries an application writes, the configuration's and `change_request.applied`, carry the change request's identifier as `change_request_id`, and the audit log's `change_request` filter lists them, so a change to production traces back to its approval.
 
