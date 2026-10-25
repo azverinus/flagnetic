@@ -121,10 +121,12 @@ func TestAStoppedExperimentChangesItsDescriptionAndItsNoteAlone(t *testing.T) {
 		noted.Version != e.Version+1 {
 		t.Errorf("SetDecisionNote = %+v, %v, %v", noted.Decision, changed, err)
 	}
-	if again, changed, err := noted.SetDecisionNote("Short titles won by 3 %.", later); err != nil || changed || again.Version != noted.Version {
+	again, changed, err := noted.SetDecisionNote("Short titles won by 3 %.", later)
+	if err != nil || changed || again.Version != noted.Version {
 		t.Errorf("the same note = changed %v, %v", changed, err)
 	}
-	if cleared, _, err := noted.SetDecisionNote("", later); err != nil || cleared.Decision.Note != "" {
+	cleared, _, err := noted.SetDecisionNote("", later)
+	if err != nil || cleared.Decision.Note != "" {
 		t.Errorf("clearing the note = %+v, %v", cleared.Decision, err)
 	}
 	_, _, err = noted.SetDecisionNote(strings.Repeat("x", 2001), later)
