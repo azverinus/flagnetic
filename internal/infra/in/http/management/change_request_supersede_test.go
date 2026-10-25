@@ -216,6 +216,29 @@ func TestArchivingAFlagSupersedesItsChangeRequestsInEveryEnvironment(t *testing.
 	}
 }
 
+func TestStoppingAnExperimentSupersedesTheChangeRequestsOnTheConfigurationsItRewrites(t *testing.T) {
+	f := startChangeRequests(t)
+	key := f.project.Key
+	createExperiment(t, f.admin, key, startableExperiment("title_test"))
+	mustPut(t, f.admin, key, "checkout_title", "staging", 1, holding("title_test"))
+	e := mustStart(t, f.admin, key, "title_test", 1)
+	proposed := holding("title_test")
+	proposed.Fallthrough = "b"
+	staging := openedOn(t, f.dev.ClientWithResponses, key, "checkout_title", "staging", proposed)
+	production := openedIn(t, f.dev.ClientWithResponses, key, "production", proposedOn())
+
+	mustStop(t, f.admin, key, "title_test", e.Version, winner("b"))
+	flag := getFlag(t, f.admin, key, "checkout_title")
+	rewritten := lastEntryOf(t, f.srv, flag.Id)
+	if rewritten.Action != "flag.configuration_updated" || rewritten.EnvironmentId == nil {
+		t.Fatalf("the flag's last entry = %s in %v, want flag.configuration_updated in staging", rewritten.Action, rewritten.EnvironmentId)
+	}
+	assertSupersededBy(t, f, staging, rewritten)
+	if got := getChangeRequest(t, f.dev.ClientWithResponses, key, production); got.State != management.ChangeRequestStateOpen {
+		t.Errorf("production's, not holding the experiment: %s, want open", got.State)
+	}
+}
+
 func TestDeletingAnEnvironmentSupersedesItsChangeRequestsWithEntriesThatOutliveThem(t *testing.T) {
 	f := startChangeRequests(t)
 	key := f.project.Key
