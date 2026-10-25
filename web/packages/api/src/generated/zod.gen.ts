@@ -1063,10 +1063,46 @@ export const zKill = z.object({
 });
 
 /**
+ * Who counted the evaluations: an SDK reporting those it made (`sdk`),
+ * or the server counting every flag of every remote evaluation it
+ * answered (`remote_evaluation`).
+ *
+ */
+export const zEvaluationSource = z.enum(["sdk", "remote_evaluation"]);
+
+export const zFlagEvaluationDay = z.object({
+  day: z.iso.date(),
+  source: zEvaluationSource,
+  variation: z.string().nullable(),
+  reason: z.string(),
+  evaluations: z.coerce
+    .bigint()
+    .gte(BigInt(0))
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zFlagEvaluations = z.object({
+  items: z.array(zFlagEvaluationDay),
+});
+
+/**
+ * When an SDK last evaluated the flag in the environment, by the end of
+ * the interval its evaluation summary covers or the time of an
+ * exposure it recorded, never later than the server received them;
+ * null when none ever did. Remote evaluations the server answered
+ * never move it.
+ *
+ */
+export const zLastEvaluatedAt = z.iso.datetime().nullable();
+
+/**
  * What a flag's configuration in one environment serves at a glance.
  */
 export const zFlagState = z.object({
   environment: zKey,
+  last_evaluated_at: zLastEvaluatedAt,
   on: z.boolean(),
   has_rules: z.boolean(),
   has_rollout: z.boolean(),
@@ -1085,6 +1121,11 @@ export const zFlagListItem = zFlagDefinition.and(
 export const zFlagList = z.object({
   items: z.array(zFlagListItem),
   next_cursor: z.string().nullable(),
+});
+
+export const zFlagLastEvaluated = z.object({
+  environment: zKey,
+  last_evaluated_at: zLastEvaluatedAt,
 });
 
 export const zFlagCreate = z.object({
@@ -1159,11 +1200,15 @@ export const zFlagConfiguration = z.object({
 });
 
 /**
- * A flag's definition with its configuration in every environment, by the environments' order.
+ * A flag's definition with its configuration in every environment, and
+ * when an SDK last evaluated it in each, both by the environments'
+ * order.
+ *
  */
 export const zFlag = zFlagDefinition.and(
   z.object({
     environments: z.array(zFlagConfiguration),
+    last_evaluated: z.array(zFlagLastEvaluated),
   }),
 );
 
@@ -2190,6 +2235,22 @@ export const zRegenerateRolloutSaltPath = z.object({
  * The configuration as it is now.
  */
 export const zRegenerateRolloutSaltResponse = zFlagConfiguration;
+
+export const zGetFlagEvaluationsPath = z.object({
+  project: z.string(),
+  flag: z.string(),
+  environment: z.string(),
+});
+
+export const zGetFlagEvaluationsQuery = z.object({
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
+});
+
+/**
+ * The evaluations per day.
+ */
+export const zGetFlagEvaluationsResponse = zFlagEvaluations;
 
 export const zListExperimentsPath = z.object({
   project: z.string(),

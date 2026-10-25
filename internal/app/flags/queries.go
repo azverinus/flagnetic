@@ -11,13 +11,14 @@ import (
 
 // GetFlag reads a flag with its configuration in every environment.
 type GetFlag struct {
-	snapshots Snapshotter
-	store     FlagReader
+	snapshots   Snapshotter
+	store       FlagReader
+	evaluations LastEvaluations
 }
 
 // NewGetFlag returns the handler.
-func NewGetFlag(snapshots Snapshotter, store FlagReader) *GetFlag {
-	return &GetFlag{snapshots: snapshots, store: store}
+func NewGetFlag(snapshots Snapshotter, store FlagReader, evaluations LastEvaluations) *GetFlag {
+	return &GetFlag{snapshots: snapshots, store: store, evaluations: evaluations}
 }
 
 // Handle returns project's flag with key, or not_found. The definition and
@@ -31,7 +32,11 @@ func (h *GetFlag) Handle(ctx context.Context, project workspace.ProjectID, key s
 			return flagNotFound(err)
 		}
 		configs, err := h.store.Configurations(ctx, f.ID)
+		if err != nil {
+			return err
+		}
 		v = FlagView{Flag: f, Configurations: configs}
+		v.LastEvaluated, err = lastEvaluated(ctx, h.evaluations, f.ID)
 		return err
 	})
 	return v, err
@@ -109,6 +114,9 @@ type FlagState struct {
 	HasRollout  bool
 	// HasExperiment is true when a rule serves an experiment.
 	HasExperiment bool
+	// LastEvaluatedAt is when an SDK last evaluated the flag in the
+	// environment, nil when none ever did.
+	LastEvaluatedAt *time.Time
 }
 
 // ListedFlag is a flag's definition with its flag state in every
@@ -158,12 +166,13 @@ type ListFlags struct {
 	snapshots    Snapshotter
 	environments Environments
 	store        FlagLister
+	evaluations  LastEvaluations
 }
 
 // NewListFlags returns the handler, which finds the environments a page
 // names in environments.
-func NewListFlags(snapshots Snapshotter, environments Environments, store FlagLister) *ListFlags {
-	return &ListFlags{snapshots: snapshots, environments: environments, store: store}
+func NewListFlags(snapshots Snapshotter, environments Environments, store FlagLister, evaluations LastEvaluations) *ListFlags {
+	return &ListFlags{snapshots: snapshots, environments: environments, store: store, evaluations: evaluations}
 }
 
 // Handle returns one page of project's flags and the cursor of the next,
@@ -172,7 +181,8 @@ func NewListFlags(snapshots Snapshotter, environments Environments, store FlagLi
 // read in one snapshot, at most two queries whatever the page's size; a
 // comparison reads past the page's end in the same query, skipping the
 // flags whose configurations carry the same ruleset in both environments,
-// since only the domain judges that.
+// since only the domain judges that. When each flag was last evaluated is
+// read in one more query.
 func (h *ListFlags) Handle(ctx context.Context, project workspace.ProjectID, p FlagPage) ([]ListedFlag, *FlagCursor, error) {
 	q := FlagQuery{
 		Project: project, Text: p.Text, Type: p.Type, Tag: p.Tag, Owner: p.Owner, Archived: p.Archived,
@@ -188,12 +198,16 @@ func (h *ListFlags) Handle(ctx context.Context, project workspace.ProjectID, p F
 		if q.Compared != nil {
 			q.Limit = 0
 		}
-		return h.store.Flags(ctx, q, func(f QueriedFlag) bool {
+		err := h.store.Flags(ctx, q, func(f QueriedFlag) bool {
 			if q.Compared == nil || !f.Compared[0].SameRuleset(f.Compared[1]) {
 				page = append(page, f.ListedFlag)
 			}
 			return len(page) <= p.Limit
 		})
+		if err != nil {
+			return err
+		}
+		return h.addLastEvaluated(ctx, page[:min(len(page), p.Limit)])
 	})
 	if err != nil || len(page) <= p.Limit {
 		return page, nil, err
@@ -201,6 +215,27 @@ func (h *ListFlags) Handle(ctx context.Context, project workspace.ProjectID, p F
 	page = page[:p.Limit]
 	next := cursorAfter(page[len(page)-1].Flag)
 	return page, &next, nil
+}
+
+// addLastEvaluated sets in the states of page when each flag was last
+// evaluated.
+func (h *ListFlags) addLastEvaluated(ctx context.Context, page []ListedFlag) error {
+	ids := make([]flags.FlagID, len(page))
+	for i, f := range page {
+		ids[i] = f.Flag.ID
+	}
+	last, err := h.evaluations.LastEvaluated(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for _, f := range page {
+		for i, s := range f.States {
+			if at, ok := last[f.Flag.ID][s.Environment]; ok {
+				f.States[i].LastEvaluatedAt = &at
+			}
+		}
+	}
+	return nil
 }
 
 // findEnvironments sets in q the environments p names by key, or answers

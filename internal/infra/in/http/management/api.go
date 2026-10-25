@@ -135,6 +135,7 @@ type Handlers struct {
 	GetExperimentExposures *appevents.GetExperimentExposures
 	GetExposureTimeline    *appevents.GetExposureTimeline
 	GetConflicts           *appevents.GetConflicts
+	GetFlagEvaluations     *appevents.GetFlagEvaluations
 
 	ListChangeRequests  *appgovernance.ListChangeRequests
 	CreateChangeRequest *appgovernance.CreateChangeRequest

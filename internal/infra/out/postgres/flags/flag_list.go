@@ -184,7 +184,9 @@ func scanQueriedFlag(row pgx.Row, compared bool) (appflags.QueriedFlag, error) {
 	}
 	out.States = make([]appflags.FlagState, len(docs))
 	for i, d := range docs {
-		out.States[i] = appflags.FlagState(d)
+		out.States[i] = appflags.FlagState{
+			Environment: d.Environment, On: d.On, HasRules: d.HasRules, HasRollout: d.HasRollout, HasExperiment: d.HasExperiment,
+		}
 	}
 	if compared {
 		if err := fromDoc(docA, &out.Compared[0]); err != nil {

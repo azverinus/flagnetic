@@ -232,20 +232,23 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		UpdateAttribute: appworkspace.NewUpdateAttribute(tx, ws, rec),
 		DeleteAttribute: appworkspace.NewDeleteAttribute(tx, ws, declarationGuard, rulesets, rec),
 
-		ListFlags: appflags.NewListFlags(tx, ws, flagStore),
+		// Flags show when SDKs last evaluated them, which the events
+		// context keeps.
+		ListFlags: appflags.NewListFlags(tx, ws, flagStore, eventStore),
 		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
 			Tx: tx, Projects: flagStore, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		GetFlag: appflags.NewGetFlag(tx, flagStore),
+		GetFlag: appflags.NewGetFlag(tx, flagStore, eventStore),
 		UpdateFlag: appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
+			Evaluations: eventStore,
 		}),
 
 		ArchiveFlag: appflags.NewArchiveFlag(appflags.ArchiveFlagDeps{
-			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec, Evaluations: eventStore,
 		}),
 		RestoreFlag: appflags.NewRestoreFlag(appflags.ArchivalDeps{
-			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec, Evaluations: eventStore,
 		}),
 		DeleteFlag: appflags.NewDeleteFlag(appflags.DeleteFlagDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Recorder: flagRec,
@@ -327,6 +330,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetExperimentExposures: appevents.NewGetExperimentExposures(tx, eventStore),
 		GetExposureTimeline:    appevents.NewGetExposureTimeline(tx, eventStore),
 		GetConflicts:           appevents.NewGetConflicts(tx, eventStore),
+		GetFlagEvaluations:     appevents.NewGetFlagEvaluations(tx, eventStore, d.Clock),
 
 		ListChangeRequests:  appgovernance.NewListChangeRequests(changeRequestStore),
 		CreateChangeRequest: appgovernance.NewCreateChangeRequest(changeRequests),
@@ -366,6 +370,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// Every replica gathers the SDKs its requests come from and writes them
 	// in rounds.
 	inventory := appdelivery.NewSDKInventory(tx, deliveryStore, d.Clock)
+	rollupMetrics := worker.NewRollupMetrics(reg)
 	var ingestTx appevents.Transactor = tx
 	if o.IngestHold != nil {
 		ingestTx = o.IngestHold.Wrap(tx, d.Pool)
@@ -388,7 +393,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.SDKInventory(inventory, edge.Logger(), reg),
 			worker.SDKInventoryRetention(appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention)),
 			worker.RollupStream(worker.ExposureRollupName, events.StreamExposures,
-				appevents.NewRollUpExposures(tx, eventStore, d.Clock), worker.NewRollupMetrics(reg)),
+				appevents.NewRollUpExposures(tx, eventStore, d.Clock), rollupMetrics),
+			worker.RollupStream(worker.SummaryRollupName, events.StreamEvaluationSummaries,
+				appevents.NewRollUpSummaries(tx, eventStore, d.Clock), rollupMetrics),
 			worker.EventPartitions(func(ctx context.Context) error {
 				return eventStore.CreateEventPartitions(ctx, d.Clock.Now(), o.EventsPartitionsAhead)
 			}),

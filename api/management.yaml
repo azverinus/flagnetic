@@ -2168,6 +2168,55 @@ paths:
           $ref: "#/components/responses/VersionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/flags/{flag}/environments/{environment}/evaluations:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/FlagKey"
+      - $ref: "#/components/parameters/EnvironmentKey"
+    get:
+      operationId: getFlagEvaluations
+      summary: A flag's evaluations per day in one environment
+      description: |
+        The flag's evaluations per UTC day the summaries were received, by
+        day, source, variation key and reason; a day without an evaluation
+        is left out. Evaluations SDKs reported (`sdk`) and the remote
+        evaluations the server answered (`remote_evaluation`) are separate
+        series and are never added together: a client SDK is sent every
+        flag whether its application reads it or not, and counts again
+        those it reads. A range from after `to`, or of more than 90 days,
+        is `invalid_request`. The counts lag the SDKs by the summary
+        rollup's round, ten seconds, besides the time a long transaction
+        holds it back.
+      x-permission: project.read
+      tags: [flags]
+      parameters:
+        - name: from
+          in: query
+          description: The first UTC day, included; 29 days before `to` when absent.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: The last UTC day, included; today when absent.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: The evaluations per day.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlagEvaluations"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/experiments:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -5854,16 +5903,23 @@ components:
         version:
           $ref: "#/components/schemas/Version"
     Flag:
-      description: A flag's definition with its configuration in every environment, by the environments' order.
+      description: |
+        A flag's definition with its configuration in every environment, and
+        when an SDK last evaluated it in each, both by the environments'
+        order.
       allOf:
         - $ref: "#/components/schemas/FlagDefinition"
         - type: object
-          required: [environments]
+          required: [environments, last_evaluated]
           properties:
             environments:
               type: array
               items:
                 $ref: "#/components/schemas/FlagConfiguration"
+            last_evaluated:
+              type: array
+              items:
+                $ref: "#/components/schemas/FlagLastEvaluated"
     FlagConfiguration:
       type: object
       description: What the flag serves in one environment.
@@ -6288,10 +6344,12 @@ components:
     FlagState:
       type: object
       description: What a flag's configuration in one environment serves at a glance.
-      required: [environment, "on", has_rules, has_rollout, has_experiment]
+      required: [environment, "on", has_rules, has_rollout, has_experiment, last_evaluated_at]
       properties:
         environment:
           $ref: "#/components/schemas/Key"
+        last_evaluated_at:
+          $ref: "#/components/schemas/LastEvaluatedAt"
         "on":
           type: boolean
         has_rules:
@@ -6303,6 +6361,61 @@ components:
         has_experiment:
           type: boolean
           description: A rule of the configuration serves an experiment.
+    FlagEvaluations:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FlagEvaluationDay"
+    FlagEvaluationDay:
+      type: object
+      required: [day, source, variation, reason, evaluations]
+      properties:
+        day:
+          type: string
+          format: date
+          description: The UTC day the evaluations were received.
+        source:
+          $ref: "#/components/schemas/EvaluationSource"
+        variation:
+          type: string
+          nullable: true
+          description: The variation served; null when none was.
+        reason:
+          type: string
+          description: The evaluation reason; what an SDK reports with a client key is masked to `targeting_match`.
+        evaluations:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Stops at the largest int64 rather than overflow.
+    EvaluationSource:
+      type: string
+      description: |
+        Who counted the evaluations: an SDK reporting those it made (`sdk`),
+        or the server counting every flag of every remote evaluation it
+        answered (`remote_evaluation`).
+      enum: [sdk, remote_evaluation]
+    FlagLastEvaluated:
+      type: object
+      required: [environment, last_evaluated_at]
+      properties:
+        environment:
+          $ref: "#/components/schemas/Key"
+        last_evaluated_at:
+          $ref: "#/components/schemas/LastEvaluatedAt"
+    LastEvaluatedAt:
+      type: string
+      format: date-time
+      nullable: true
+      description: |
+        When an SDK last evaluated the flag in the environment, by the end of
+        the interval its evaluation summary covers or the time of an
+        exposure it recorded, never later than the server received them;
+        null when none ever did. Remote evaluations the server answered
+        never move it.
     FlagCreate:
       type: object
       required: [key, type, name]

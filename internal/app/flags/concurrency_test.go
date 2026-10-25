@@ -18,6 +18,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
 	pgaccess "github.com/azverinus/flagnetic/internal/infra/out/postgres/access"
 	pgdelivery "github.com/azverinus/flagnetic/internal/infra/out/postgres/delivery"
+	pgevents "github.com/azverinus/flagnetic/internal/infra/out/postgres/events"
 	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
@@ -64,6 +65,7 @@ func newApp(t *testing.T) *app {
 		}),
 		update: appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
 			Tx: tx, Projects: store, Store: store, Owners: owners, Rulesets: rulesets, Recorder: rec,
+			Evaluations: pgevents.NewStore(pool),
 		}),
 		replace: appflags.NewReplaceConfiguration(appflags.ReplaceConfigurationDeps{
 			Tx: tx, Projects: store, Declarations: ws, Store: store, Rulesets: rulesets, Recorder: rec,

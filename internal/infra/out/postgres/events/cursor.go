@@ -23,10 +23,11 @@ type Batch struct {
 	Rows int
 }
 
-// where is the condition selecting the batch's rows, its arguments numbered
-// from $1.
-func (b Batch) where() (string, []any) {
-	return `(xid, seq) > ($1::text::xid8, $2) AND (xid, seq) <= ($3::text::xid8, $4)`,
+// where is the condition selecting the batch's rows of the table aliased
+// alias, its arguments numbered from $1.
+func (b Batch) where(alias string) (string, []any) {
+	c := alias + ".xid, " + alias + ".seq"
+	return `(` + c + `) > ($1::text::xid8, $2) AND (` + c + `) <= ($3::text::xid8, $4)`,
 		[]any{xidText(b.From), b.From.Seq, xidText(b.To), b.To.Seq}
 }
 
@@ -130,7 +131,8 @@ func (s *Store) CursorMovedAt(ctx context.Context, stream events.Stream) (at tim
 
 // streamTables are the raw event tables each stream reads.
 var streamTables = map[events.Stream]string{
-	events.StreamExposures: "exposure_events",
+	events.StreamExposures:           "exposure_events",
+	events.StreamEvaluationSummaries: "evaluation_summary_events",
 }
 
 // OldestUnread returns when the first row past stream's cursor was received,

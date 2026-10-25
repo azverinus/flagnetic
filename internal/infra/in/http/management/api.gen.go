@@ -181,6 +181,24 @@ func (e CredentialMethod) Valid() bool {
 	}
 }
 
+// Defines values for EvaluationSource.
+const (
+	EvaluationSourceRemoteEvaluation EvaluationSource = "remote_evaluation"
+	EvaluationSourceSdk              EvaluationSource = "sdk"
+)
+
+// Valid indicates whether the value is a known member of the EvaluationSource enum.
+func (e EvaluationSource) Valid() bool {
+	switch e {
+	case EvaluationSourceRemoteEvaluation:
+		return true
+	case EvaluationSourceSdk:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ExperimentStatus.
 const (
 	ExperimentStatusArchived ExperimentStatus = "archived"
@@ -1056,6 +1074,11 @@ type EvaluationResult struct {
 	Variation *string `json:"variation,omitempty"`
 }
 
+// EvaluationSource Who counted the evaluations: an SDK reporting those it made (`sdk`),
+// or the server counting every flag of every remote evaluation it
+// answered (`remote_evaluation`).
+type EvaluationSource string
+
 // Experiment defines model for Experiment.
 type Experiment struct {
 	ArchivedAt *time.Time `json:"archived_at"`
@@ -1258,7 +1281,9 @@ type ExposureTimeline struct {
 	Items []ExposureDay `json:"items"`
 }
 
-// Flag A flag's definition with its configuration in every environment, by the environments' order.
+// Flag A flag's definition with its configuration in every environment, and
+// when an SDK last evaluated it in each, both by the environments'
+// order.
 type Flag struct {
 	// ArchivedAt When the flag was archived, hidden from SDKs; null while it is not.
 	ArchivedAt *time.Time `json:"archived_at"`
@@ -1277,7 +1302,8 @@ type Flag struct {
 	Id                openapi_types.UUID `json:"id"`
 
 	// Key Names the flag in code, such as `checkout.newFlow`; unique, case sensitively, in the project, and never changes.
-	Key string `json:"key"`
+	Key           string              `json:"key"`
+	LastEvaluated []FlagLastEvaluated `json:"last_evaluated"`
 
 	// Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
 	Lifetime Lifetime `json:"lifetime"`
@@ -1405,6 +1431,44 @@ type FlagDefinition struct {
 	Version Version `json:"version"`
 }
 
+// FlagEvaluationDay defines model for FlagEvaluationDay.
+type FlagEvaluationDay struct {
+	// Day The UTC day the evaluations were received.
+	Day openapi_types.Date `json:"day"`
+
+	// Evaluations Stops at the largest int64 rather than overflow.
+	Evaluations int64 `json:"evaluations"`
+
+	// Reason The evaluation reason; what an SDK reports with a client key is masked to `targeting_match`.
+	Reason string `json:"reason"`
+
+	// Source Who counted the evaluations: an SDK reporting those it made (`sdk`),
+	// or the server counting every flag of every remote evaluation it
+	// answered (`remote_evaluation`).
+	Source EvaluationSource `json:"source"`
+
+	// Variation The variation served; null when none was.
+	Variation *string `json:"variation"`
+}
+
+// FlagEvaluations defines model for FlagEvaluations.
+type FlagEvaluations struct {
+	Items []FlagEvaluationDay `json:"items"`
+}
+
+// FlagLastEvaluated defines model for FlagLastEvaluated.
+type FlagLastEvaluated struct {
+	// Environment Names the entity in URLs, SDK calls and rules, and never changes.
+	Environment Key `json:"environment"`
+
+	// LastEvaluatedAt When an SDK last evaluated the flag in the environment, by the end of
+	// the interval its evaluation summary covers or the time of an
+	// exposure it recorded, never later than the server received them;
+	// null when none ever did. Remote evaluations the server answered
+	// never move it.
+	LastEvaluatedAt *LastEvaluatedAt `json:"last_evaluated_at"`
+}
+
 // FlagList defines model for FlagList.
 type FlagList struct {
 	Items []FlagListItem `json:"items"`
@@ -1488,7 +1552,14 @@ type FlagState struct {
 
 	// HasRules The configuration has at least one rule, whether the flag is on or off.
 	HasRules bool `json:"has_rules"`
-	On       bool `json:"on"`
+
+	// LastEvaluatedAt When an SDK last evaluated the flag in the environment, by the end of
+	// the interval its evaluation summary covers or the time of an
+	// exposure it recorded, never later than the server received them;
+	// null when none ever did. Remote evaluations the server answered
+	// never move it.
+	LastEvaluatedAt *LastEvaluatedAt `json:"last_evaluated_at"`
+	On              bool             `json:"on"`
 }
 
 // FlagType defines model for FlagType.
@@ -1628,6 +1699,13 @@ type KillResult struct {
 	// Configuration What the flag serves in one environment.
 	Configuration FlagConfiguration `json:"configuration"`
 }
+
+// LastEvaluatedAt When an SDK last evaluated the flag in the environment, by the end of
+// the interval its evaluation summary covers or the time of an
+// exposure it recorded, never later than the server received them;
+// null when none ever did. Remote evaluations the server answered
+// never move it.
+type LastEvaluatedAt = time.Time
 
 // Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
 type Lifetime string
@@ -2929,6 +3007,15 @@ type CopyFlagConfigurationParams struct {
 	// the current one `412 version_mismatch`, both judged after the request
 	// is validated.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// GetFlagEvaluationsParams defines parameters for GetFlagEvaluations.
+type GetFlagEvaluationsParams struct {
+	// From The first UTC day, included; 29 days before `to` when absent.
+	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
+
+	// To The last UTC day, included; today when absent.
+	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
 }
 
 // RevertFlagConfigurationParams defines parameters for RevertFlagConfiguration.
@@ -4553,6 +4640,22 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
 	CopyFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, body CopyFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetFlagEvaluations A flag's evaluations per day in one environment
+	//
+	// The flag's evaluations per UTC day the summaries were received, by
+	// day, source, variation key and reason; a day without an evaluation
+	// is left out. Evaluations SDKs reported (`sdk`) and the remote
+	// evaluations the server answered (`remote_evaluation`) are separate
+	// series and are never added together: a client SDK is sent every
+	// flag whether its application reads it or not, and counts again
+	// those it reads. A range from after `to`, or of more than 90 days,
+	// is `invalid_request`. The counts lag the SDKs by the summary
+	// rollup's round, ten seconds, besides the time a long transaction
+	// holds it back.
+	//
+	// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment}/evaluations (the `GetFlagEvaluations` operationId).
+	GetFlagEvaluations(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *GetFlagEvaluationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// KillFlagWithBody Switch a flag off in one environment at once
 	//
@@ -7470,6 +7573,32 @@ func (c *Client) CopyFlagConfigurationWithBody(ctx context.Context, project Proj
 // Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
 func (c *Client) CopyFlagConfiguration(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, body CopyFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCopyFlagConfigurationRequest(c.Server, project, flag, environment, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetFlagEvaluations A flag's evaluations per day in one environment
+//
+// The flag's evaluations per UTC day the summaries were received, by
+// day, source, variation key and reason; a day without an evaluation
+// is left out. Evaluations SDKs reported (`sdk`) and the remote
+// evaluations the server answered (`remote_evaluation`) are separate
+// series and are never added together: a client SDK is sent every
+// flag whether its application reads it or not, and counts again
+// those it reads. A range from after `to`, or of more than 90 days,
+// is `invalid_request`. The counts lag the SDKs by the summary
+// rollup's round, ten seconds, besides the time a long transaction
+// holds it back.
+//
+// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment}/evaluations (the `GetFlagEvaluations` operationId).
+func (c *Client) GetFlagEvaluations(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *GetFlagEvaluationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetFlagEvaluationsRequest(c.Server, project, flag, environment, params)
 	if err != nil {
 		return nil, err
 	}
@@ -12899,6 +13028,93 @@ func NewCopyFlagConfigurationRequestWithBody(server string, project ProjectKey, 
 	return req, nil
 }
 
+// NewGetFlagEvaluationsRequest constructs an http.Request for the GetFlagEvaluations method
+func NewGetFlagEvaluationsRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *GetFlagEvaluationsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "flag", flag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "environment", environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/flags/%s/environments/%s/evaluations", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.From != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", *params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.To != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", *params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewKillFlagRequest calls the generic KillFlag builder with application/json body
 func NewKillFlagRequest(server string, project ProjectKey, flag FlagKey, environment EnvironmentKey, body KillFlagJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -15743,6 +15959,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/flags/{flag}/environments/{environment}/copy (the `CopyFlagConfiguration` operationId).
 	CopyFlagConfigurationWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *CopyFlagConfigurationParams, body CopyFlagConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*CopyFlagConfigurationResponse, error)
+
+	// GetFlagEvaluationsWithResponse A flag's evaluations per day in one environment
+	//
+	// The flag's evaluations per UTC day the summaries were received, by
+	// day, source, variation key and reason; a day without an evaluation
+	// is left out. Evaluations SDKs reported (`sdk`) and the remote
+	// evaluations the server answered (`remote_evaluation`) are separate
+	// series and are never added together: a client SDK is sent every
+	// flag whether its application reads it or not, and counts again
+	// those it reads. A range from after `to`, or of more than 90 days,
+	// is `invalid_request`. The counts lag the SDKs by the summary
+	// rollup's round, ten seconds, besides the time a long transaction
+	// holds it back.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment}/evaluations (the `GetFlagEvaluations` operationId).
+	GetFlagEvaluationsWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *GetFlagEvaluationsParams, reqEditors ...RequestEditorFn) (*GetFlagEvaluationsResponse, error)
 
 	// KillFlagWithBodyWithResponse Switch a flag off in one environment at once
 	//
@@ -23189,6 +23423,82 @@ func (r CopyFlagConfigurationResponse) ContentType() string {
 	return ""
 }
 
+// GetFlagEvaluationsResponse401Headers the declared response headers of an HTTP 401 response for GetFlagEvaluations
+type GetFlagEvaluationsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetFlagEvaluationsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FlagEvaluations
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetFlagEvaluationsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetFlagEvaluationsResponse) GetJSON200() *FlagEvaluations {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetFlagEvaluationsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetFlagEvaluationsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetFlagEvaluationsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetFlagEvaluationsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetFlagEvaluationsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetFlagEvaluationsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetFlagEvaluationsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetFlagEvaluationsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // KillFlagResponse200Headers the declared response headers of an HTTP 200 response for KillFlag
 type KillFlagResponse200Headers struct {
 	ETag *string
@@ -27564,6 +27874,30 @@ func (c *ClientWithResponses) CopyFlagConfigurationWithResponse(ctx context.Cont
 		return nil, err
 	}
 	return ParseCopyFlagConfigurationResponse(rsp)
+}
+
+// GetFlagEvaluationsWithResponse A flag's evaluations per day in one environment
+//
+// The flag's evaluations per UTC day the summaries were received, by
+// day, source, variation key and reason; a day without an evaluation
+// is left out. Evaluations SDKs reported (`sdk`) and the remote
+// evaluations the server answered (`remote_evaluation`) are separate
+// series and are never added together: a client SDK is sent every
+// flag whether its application reads it or not, and counts again
+// those it reads. A range from after `to`, or of more than 90 days,
+// is `invalid_request`. The counts lag the SDKs by the summary
+// rollup's round, ten seconds, besides the time a long transaction
+// holds it back.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/flags/{flag}/environments/{environment}/evaluations (the `GetFlagEvaluations` operationId).
+func (c *ClientWithResponses) GetFlagEvaluationsWithResponse(ctx context.Context, project ProjectKey, flag FlagKey, environment EnvironmentKey, params *GetFlagEvaluationsParams, reqEditors ...RequestEditorFn) (*GetFlagEvaluationsResponse, error) {
+	rsp, err := c.GetFlagEvaluations(ctx, project, flag, environment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetFlagEvaluationsResponse(rsp)
 }
 
 // KillFlagWithBodyWithResponse Switch a flag off in one environment at once
@@ -34632,6 +34966,73 @@ func ParseCopyFlagConfigurationResponse(rsp *http.Response) (*CopyFlagConfigurat
 	return response, nil
 }
 
+// ParseGetFlagEvaluationsResponse parses an HTTP response from a GetFlagEvaluationsWithResponse call
+func ParseGetFlagEvaluationsResponse(rsp *http.Response) (*GetFlagEvaluationsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetFlagEvaluationsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FlagEvaluations
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetFlagEvaluationsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseKillFlagResponse parses an HTTP response from a KillFlagWithResponse call
 func ParseKillFlagResponse(rsp *http.Response) (*KillFlagResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -36907,6 +37308,9 @@ type ServerInterface interface {
 	// CopyFlagConfiguration Copy a flag's configuration from another environment
 	// (POST /projects/{project}/flags/{flag}/environments/{environment}/copy)
 	CopyFlagConfiguration(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params CopyFlagConfigurationParams)
+	// GetFlagEvaluations A flag's evaluations per day in one environment
+	// (GET /projects/{project}/flags/{flag}/environments/{environment}/evaluations)
+	GetFlagEvaluations(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params GetFlagEvaluationsParams)
 	// KillFlag Switch a flag off in one environment at once
 	// (POST /projects/{project}/flags/{flag}/environments/{environment}/kill)
 	KillFlag(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey)
@@ -40702,6 +41106,79 @@ func (siw *ServerInterfaceWrapper) CopyFlagConfiguration(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// GetFlagEvaluations operation middleware
+func (siw *ServerInterfaceWrapper) GetFlagEvaluations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "flag" -------------
+	var flag FlagKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "flag", r.PathValue("flag"), &flag, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "flag", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "environment" -------------
+	var environment EnvironmentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environment", r.PathValue("environment"), &environment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetFlagEvaluationsParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFlagEvaluations(w, r, project, flag, environment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // KillFlag operation middleware
 func (siw *ServerInterfaceWrapper) KillFlag(w http.ResponseWriter, r *http.Request) {
 
@@ -41967,6 +42444,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}", wrapper.DeleteOverride)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}", wrapper.PutOverride)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt", wrapper.RegenerateRolloutSalt)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/evaluations", wrapper.GetFlagEvaluations)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.ListExperiments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.CreateExperiment)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.DeleteExperiment)
@@ -50705,6 +51183,98 @@ func (response CopyFlagConfiguration428ApplicationProblemPlusJSONResponse) Visit
 	return err
 }
 
+type GetFlagEvaluationsRequestObject struct {
+	Project     ProjectKey     `json:"project"`
+	Flag        FlagKey        `json:"flag"`
+	Environment EnvironmentKey `json:"environment"`
+	Params      GetFlagEvaluationsParams
+}
+
+type GetFlagEvaluationsResponseObject interface {
+	VisitGetFlagEvaluationsResponse(w http.ResponseWriter) error
+}
+
+type GetFlagEvaluations200JSONResponse FlagEvaluations
+
+func (response GetFlagEvaluations200JSONResponse) VisitGetFlagEvaluationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagEvaluations400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagEvaluations400ApplicationProblemPlusJSONResponse) VisitGetFlagEvaluationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagEvaluations401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagEvaluations401ApplicationProblemPlusJSONResponse) VisitGetFlagEvaluationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagEvaluations403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagEvaluations403ApplicationProblemPlusJSONResponse) VisitGetFlagEvaluationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFlagEvaluations404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetFlagEvaluations404ApplicationProblemPlusJSONResponse) VisitGetFlagEvaluationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type KillFlagRequestObject struct {
 	Project     ProjectKey     `json:"project"`
 	Flag        FlagKey        `json:"flag"`
@@ -53742,6 +54312,9 @@ type StrictServerInterface interface {
 	// CopyFlagConfiguration Copy a flag's configuration from another environment
 	// (POST /projects/{project}/flags/{flag}/environments/{environment}/copy)
 	CopyFlagConfiguration(ctx context.Context, request CopyFlagConfigurationRequestObject) (CopyFlagConfigurationResponseObject, error)
+	// GetFlagEvaluations A flag's evaluations per day in one environment
+	// (GET /projects/{project}/flags/{flag}/environments/{environment}/evaluations)
+	GetFlagEvaluations(ctx context.Context, request GetFlagEvaluationsRequestObject) (GetFlagEvaluationsResponseObject, error)
 	// KillFlag Switch a flag off in one environment at once
 	// (POST /projects/{project}/flags/{flag}/environments/{environment}/kill)
 	KillFlag(ctx context.Context, request KillFlagRequestObject) (KillFlagResponseObject, error)
@@ -56320,6 +56893,35 @@ func (sh *strictHandler) CopyFlagConfiguration(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CopyFlagConfigurationResponseObject); ok {
 		if err := validResponse.VisitCopyFlagConfigurationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFlagEvaluations operation middleware
+func (sh *strictHandler) GetFlagEvaluations(w http.ResponseWriter, r *http.Request, project ProjectKey, flag FlagKey, environment EnvironmentKey, params GetFlagEvaluationsParams) {
+	var request GetFlagEvaluationsRequestObject
+
+	request.Project = project
+	request.Flag = flag
+	request.Environment = environment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFlagEvaluations(ctx, request.(GetFlagEvaluationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFlagEvaluations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFlagEvaluationsResponseObject); ok {
+		if err := validResponse.VisitGetFlagEvaluationsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
