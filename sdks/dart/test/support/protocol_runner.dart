@@ -27,6 +27,7 @@ final class Harness {
     required this.startServer,
     required this.fixtures,
     this.latency = const Duration(milliseconds: 150),
+    this.page,
   });
 
   /// Starts a mock server.
@@ -37,12 +38,32 @@ final class Harness {
 
   /// Scheduling latency allowed above a window's upper bound.
   final Duration latency;
+
+  /// The page the client runs in, in a browser; null elsewhere.
+  final Page? page;
+}
+
+/// The page a browser client runs in, which the scenarios' page calls
+/// drive: the client hears them as the browser's own events.
+abstract interface class Page {
+  /// The page became hidden (`visibilitychange`).
+  void hide();
+
+  /// The page became visible (`visibilitychange`).
+  void show();
+
+  /// The page is being unloaded or put in the back-forward cache.
+  void pageHide();
+
+  /// The network came back.
+  void online();
 }
 
 /// The cases and scenarios a client-mode runner plays.
 final class ProtocolSuite {
-  /// The suite of conformance/protocol, read from [fixtures].
-  factory ProtocolSuite.read(Fixtures fixtures) {
+  /// The suite of conformance/protocol, read from [fixtures]; [inPage]
+  /// adds the scenarios of a browser page.
+  factory ProtocolSuite.read(Fixtures fixtures, {bool inPage = false}) {
     final cases =
         fixtures.json('degradation/cases.json')! as Map<String, Object?>;
     final all = (cases['cases']! as List<Object?>).cast<Map<String, Object?>>();
@@ -52,7 +73,7 @@ final class ProtocolSuite {
     final scenarios = (doc['scenarios']! as List<Object?>)
         .cast<Map<String, Object?>>();
     final answers = doc['answers']! as Map<String, Object?>;
-    for (final name in scenarioLists) {
+    for (final name in [...scenarioLists, if (inPage) pageScenarioList]) {
       final extra = fixtures.json(name)! as Map<String, Object?>;
       scenarios.addAll((extra['scenarios']! as List<Object?>).cast());
       answers.addAll((extra['answers'] as Map<String, Object?>?) ?? const {});
@@ -78,6 +99,10 @@ final class ProtocolSuite {
     'experiment-scenarios.json',
     'foreground-scenarios.json',
   ];
+
+  /// The list appended in a browser only: it describes a page, not a
+  /// device.
+  static const pageScenarioList = 'page-scenarios.json';
 
   /// The context of the degradation cases.
   final FlagneticContext caseContext;
@@ -492,6 +517,16 @@ Future<void> _runScenario(
       final waited = exchange.arrivedAt.difference(stepEnd);
       expect(exchange.method, request['method'], reason: label);
       expect(exchange.path, request['path'], reason: label);
+      (request['query'] as Map<String, Object?>? ?? const {}).forEach((
+        name,
+        value,
+      ) {
+        expect(
+          exchange.query[name],
+          (value! as String).replaceAll('<sdk key>', sdkKey),
+          reason: '$label: query $name',
+        );
+      });
       (request['headers'] as Map<String, Object?>? ?? const {}).forEach((
         name,
         value,
@@ -579,9 +614,12 @@ Future<void> _runScenario(
         lastRefused = !sdk.setOverride(call['flag']! as String, call['value']);
       } else {
         for (var n = 0; n < ((call['times'] as int?) ?? 1); n++) {
-          lastResult = makeCall(sdk, call, label);
+          lastResult = makeCall(sdk, call, label, page: harness.page);
         }
       }
+      // What the SDK does in answer to the call counts from it: a page
+      // shown again refetches at once, however long it was hidden.
+      stepEnd = DateTime.now();
     }
     if (step['stream_send'] case final String bytes) {
       await (stream ?? fail('$label: no stream is open')).send(bytes);
@@ -610,6 +648,11 @@ Future<void> _runScenario(
     if (step['no_request'] case final Map<String, Object?> none) {
       final path = none['path'] as String?;
       final before = await server.countReceived(path: path);
+      // The time passes in the scenario's seconds too: a page hidden for
+      // longer than the minimum refetch gap refetches when shown.
+      scenarioNow = scenarioNow.add(
+        Duration(milliseconds: none['for_ms']! as int),
+      );
       await Future<void>.delayed(scaled(none['for_ms']));
       expect(
         await server.countReceived(path: path),
@@ -654,9 +697,15 @@ Future<void> _runScenario(
   expect(await server.unansweredAt(stepEnd), 0);
 }
 
-/// Performs one step's call on the SDK's API, answering with the detail an
-/// `evaluate` call served.
-Detail? makeCall(Sdk sdk, Map<String, Object?> call, String label) {
+/// Performs one step's call on the SDK's API, or on the [page] it runs in,
+/// answering with the detail an `evaluate` call served.
+Detail? makeCall(
+  Sdk sdk,
+  Map<String, Object?> call,
+  String label, {
+  Page? page,
+}) {
+  Page inPage() => page ?? fail('$label: ${call['op']} needs a browser page');
   switch (call['op']) {
     case 'evaluate':
       // One getter per call: calling the typed one too would count the
@@ -670,6 +719,14 @@ Detail? makeCall(Sdk sdk, Map<String, Object?> call, String label) {
       sdk.background();
     case 'foreground':
       sdk.foreground();
+    case 'visibility_hidden':
+      inPage().hide();
+    case 'visibility_visible':
+      inPage().show();
+    case 'pagehide':
+      inPage().pageHide();
+    case 'online':
+      inPage().online();
     case 'flush':
       // Not awaited: the batch it posts is answered by a later step, so
       // waiting here would deadlock the runner against its own script.

@@ -7,41 +7,13 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:js_interop';
 
 import 'package:flagnetic/flagnetic.dart';
 import 'package:test/test.dart';
 
+import 'support/page.dart';
 import 'support/remote_server.dart';
 import 'support/scripted.dart';
-
-@JS('Object.defineProperty')
-external void _defineProperty(JSObject target, String name, JSAny descriptor);
-
-@JS('document')
-external _Target get _document;
-
-@JS('window')
-external _Target get _window;
-
-extension type _Target._(JSObject _) implements JSObject {
-  external bool dispatchEvent(_Event event);
-}
-
-@JS('Event')
-extension type _Event._(JSObject _) implements JSObject {
-  external factory _Event(String type);
-}
-
-/// Makes the page [state] (`visible` or `hidden`) and tells it so.
-void showPage(String state) {
-  _defineProperty(
-    _document,
-    'visibilityState',
-    {'value': state, 'configurable': true}.jsify()!,
-  );
-  _document.dispatchEvent(_Event('visibilitychange'));
-}
 
 const _context = FlagneticContext(units: {'anonymous': 'd-8f1c'});
 
@@ -165,7 +137,7 @@ void main() {
       toUnitType: 'user',
       toUnitId: 'u-1001',
     );
-    _window.dispatchEvent(_Event('pagehide'));
+    firePageHide();
     final beacon = await server.next(path: '/sdk/v1/events');
     expect(beacon.query['sdk_key'], clientKey);
     final envelope = jsonDecode(utf8.decode(beacon.rawBody)) as Map;
@@ -185,7 +157,7 @@ void main() {
       toUnitType: 'user',
       toUnitId: 'u-1001',
     );
-    _window.dispatchEvent(_Event('pagehide'));
+    firePageHide();
     final beacon = await server.next(path: '/sdk/v1/events');
     expect(beacon.query['sdk_key'], clientKey);
     expect([for (final e in eventsOf(beacon)) e['type']], ['alias']);
@@ -270,7 +242,7 @@ void main() {
     final (client, server) = await started();
     await fresh(client, server);
     showPage('hidden');
-    _window.dispatchEvent(_Event('online'));
+    fireOnline();
     await Future<void>.delayed(const Duration(milliseconds: 100));
     expect(await server.countReceived(path: evaluatePath), 1);
 
@@ -278,7 +250,7 @@ void main() {
     await (await server.next(
       path: evaluatePath,
     )).respondJson(experimentValues());
-    _window.dispatchEvent(_Event('online'));
+    fireOnline();
     await (await server.next(
       path: evaluatePath,
     )).respondJson(experimentValues(rulesetVersion: 44));
