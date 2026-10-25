@@ -964,6 +964,15 @@ export const zFlagDefinition = z.object({
   version: zVersion,
 });
 
+/**
+ * The change requests waiting on the configuration, which any write to it supersedes. Answered by the configuration's own operations; a flag's detail and the audit log leave it out.
+ */
+export const zWaitingChangeRequests = z.object({
+  open: z.int(),
+  approved: z.int(),
+  next_apply_at: z.iso.datetime().nullable(),
+});
+
 export const zPrerequisite = z.object({
   flag: z.string(),
   variation: z.string(),
@@ -1288,6 +1297,7 @@ export const zFlagConfiguration = z.object({
   updated_at: z.iso.datetime(),
   updated_by: z.uuid().nullable(),
   version: zVersion,
+  change_requests: zWaitingChangeRequests.optional(),
 });
 
 /**
@@ -1357,6 +1367,7 @@ export const zChangeRequest = z.object({
   rejection: zChangeRequestDecision.nullable(),
   applied_at: z.iso.datetime().nullable(),
   applied_by: zChangeRequestApplier.nullable(),
+  superseded_by: z.uuid().nullable(),
   created_at: z.iso.datetime(),
   updated_at: z.iso.datetime(),
   version: zVersion,

@@ -109,21 +109,10 @@ func (d ChangeRequestDeps) now() time.Time { return d.Clock.Now().UTC().Truncate
 func (d ChangeRequestDeps) record(ctx context.Context, now time.Time, req governance.Request, action string,
 	before *governance.ChangeRequest, after governance.ChangeRequest, extra map[string]any,
 ) error {
-	r := governance.Record{
-		Project: after.Project, Action: action,
-		Entity: governance.Entity{Kind: "change_request", ID: after.ID.String(), Key: after.Title},
-	}
-	if after.Environment != nil {
-		r.Environment = after.Environment.ID
-	}
-	if before != nil {
-		r.Before = changeRequestValues(*before)
-	}
-	values := changeRequestValues(after)
+	r := changeRequestRecord(action, before, after)
 	for k, v := range extra {
-		values[k] = v
+		r.After.(map[string]any)[k] = v
 	}
-	r.After = values
 	entry, err := governance.NewEntry(id.New[governance.Entry](d.IDs), now, req, r)
 	if err != nil {
 		return err
@@ -260,6 +249,22 @@ func subjectOf(f flags.Flag, saved flags.EnvironmentConfiguration) (governance.S
 	}, nil
 }
 
+// changeRequestRecord is the record of action on cr, before and after it.
+func changeRequestRecord(action string, before *governance.ChangeRequest, after governance.ChangeRequest) governance.Record {
+	r := governance.Record{
+		Project: after.Project, Action: action,
+		Entity: governance.Entity{Kind: "change_request", ID: after.ID.String(), Key: after.Title},
+		After:  changeRequestValues(after),
+	}
+	if after.Environment != nil {
+		r.Environment = after.Environment.ID
+	}
+	if before != nil {
+		r.Before = changeRequestValues(*before)
+	}
+	return r
+}
+
 // changeRequestValues are what an audit entry records of a change request:
 // everything a read answers but the author's name, which is read from the
 // actor.
@@ -283,6 +288,9 @@ func changeRequestValues(cr governance.ChangeRequest) map[string]any {
 	}
 	if cr.Environment != nil {
 		out["environment"] = cr.Environment.Key
+	}
+	if !cr.SupersededBy.IsZero() {
+		out["superseded_by"] = cr.SupersededBy.String()
 	}
 	return out
 }

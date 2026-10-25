@@ -59,12 +59,16 @@ func (h *DeleteEnvironment) Handle(ctx context.Context, cmd DeleteEnvironmentCom
 		if err := workspace.CanDeleteEnvironment(count); err != nil {
 			return err
 		}
-		if err := h.store.DeleteEnvironment(ctx, e.ID); err != nil {
-			return err
-		}
-		return h.rec.record(ctx, now, cmd.Request, governance.Record{
+		// The deletion is recorded before the rows go, so what it ends
+		// elsewhere, such as the change requests proposed for the
+		// environment, is found and closed with an entry of its own before
+		// the cascade removes it.
+		if err := h.rec.record(ctx, now, cmd.Request, governance.Record{
 			Project: e.Project, Environment: e.ID, Action: "environment.deleted", Entity: environmentEntity(e),
 			Before: environmentValues(e),
-		})
+		}); err != nil {
+			return err
+		}
+		return h.store.DeleteEnvironment(ctx, e.ID)
 	})
 }

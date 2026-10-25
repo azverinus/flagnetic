@@ -107,6 +107,7 @@ func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.
 	var (
 		decision, decidedBy, decidedAt, comment     any
 		appliedAt, appliedKind, appliedBy, appliedT any
+		supersededBy                                any
 	)
 	if d, kind := decisionOf(cr); d != nil {
 		decision, decidedBy, decidedAt, comment = kind, d.Member.Bytes(), d.At, d.Comment
@@ -122,14 +123,18 @@ func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.
 			appliedKind, appliedBy = "member", a.By.Member.Bytes()
 		}
 	}
+	if !cr.SupersededBy.IsZero() {
+		supersededBy = cr.SupersededBy.Bytes()
+	}
 	tag, err := s.db(ctx).Exec(ctx, `
 		UPDATE change_requests
 		SET state = $3, title = $4, description = $5, base = $6, base_version = $7, proposed = $8, diff = $9,
 		    updated_at = $10, version = $11, decision = $12, decided_by = $13, decided_at = $14, decision_comment = $15,
-		    applied_at = $16, applied_by_kind = $17, applied_by = $18, applied_by_token = $19
+		    applied_at = $16, applied_by_kind = $17, applied_by = $18, applied_by_token = $19, superseded_by = $20
 		WHERE project_id = $1 AND id = $2`,
 		cr.Project.Bytes(), cr.ID.Bytes(), string(cr.State), cr.Title, cr.Description, base, cr.BaseVersion, proposed, diff,
-		cr.UpdatedAt, cr.Version, decision, decidedBy, decidedAt, comment, appliedAt, appliedKind, appliedBy, appliedT)
+		cr.UpdatedAt, cr.Version, decision, decidedBy, decidedAt, comment, appliedAt, appliedKind, appliedBy, appliedT,
+		supersededBy)
 	if err != nil {
 		return fmt.Errorf("updating a change request: %w", err)
 	}
@@ -157,7 +162,7 @@ const changeRequestColumns = `cr.id, cr.project_id, cr.kind, cr.flag_id, f.key, 
 	cr.description, cr.base, cr.base_version, cr.proposed, cr.diff, cr.author_id, cr.author_token_id,
 	coalesce(m.display_name, t.name, ''), cr.decision, cr.decided_by, coalesce(dm.display_name, ''), cr.decided_at,
 	cr.decision_comment, cr.applied_at, cr.applied_by_kind, cr.applied_by, cr.applied_by_token,
-	coalesce(am.display_name, ap.name, ''), cr.created_at, cr.updated_at, cr.version`
+	coalesce(am.display_name, ap.name, ''), cr.superseded_by, cr.created_at, cr.updated_at, cr.version`
 
 const changeRequestFrom = ` FROM change_requests cr
 	LEFT JOIN flags f ON f.id = cr.flag_id
@@ -178,12 +183,13 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 		base, proposed, diff           []byte
 		decision, comment, appliedKind *string
 		decidedBy, appliedBy, appliedT *[16]byte
+		supersededBy                   *[16]byte
 		deciderName, applierName       string
 		decidedAt, appliedAt           *time.Time
 	)
 	if err := row.Scan(&crk, &pk, &kind, &fk, &flagKey, &ek, &environmentKey, &state, &cr.Title, &cr.Description, &base,
 		&cr.BaseVersion, &proposed, &diff, &member, &token, &cr.Author.Name, &decision, &decidedBy, &deciderName, &decidedAt,
-		&comment, &appliedAt, &appliedKind, &appliedBy, &appliedT, &applierName, &cr.CreatedAt, &cr.UpdatedAt,
+		&comment, &appliedAt, &appliedKind, &appliedBy, &appliedT, &applierName, &supersededBy, &cr.CreatedAt, &cr.UpdatedAt,
 		&cr.Version); err != nil {
 		return cr, err
 	}
@@ -208,6 +214,9 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 			a.By = governance.Author{Token: &t, Name: applierName}
 		}
 		cr.Applied = a
+	}
+	if supersededBy != nil {
+		cr.SupersededBy = id.FromBytes[governance.Entry](*supersededBy)
 	}
 	cr.ID, cr.Project = id.FromBytes[governance.ChangeRequest](crk), id.FromBytes[workspace.Project](pk)
 	cr.Kind, cr.State = governance.ChangeRequestKind(kind), governance.ChangeRequestState(state)
@@ -296,4 +305,53 @@ func (s *ChangeRequests) ChangeRequests(ctx context.Context, f appgovernance.Cha
 		out = append(out, cr)
 	}
 	return out, rows.Err()
+}
+
+// Waiting returns project's open and approved change requests naming what
+// moved names. It reads under the project's row lock the writing
+// transaction holds, so none is approved or applied meanwhile.
+func (s *ChangeRequests) Waiting(ctx context.Context, project workspace.ProjectID, moved governance.Moved,
+) ([]governance.ChangeRequest, error) {
+	var flag, environment any
+	if !moved.Flag.IsZero() {
+		flag = moved.Flag.Bytes()
+	}
+	if !moved.Environment.IsZero() {
+		environment = moved.Environment.Bytes()
+	}
+	rows, err := s.db(ctx).Query(ctx, `SELECT `+changeRequestColumns+changeRequestFrom+`
+		WHERE cr.project_id = $1 AND cr.state IN ('open', 'approved')
+		  AND ($2::uuid IS NULL OR cr.flag_id = $2)
+		  AND ($3::uuid IS NULL OR cr.environment_id = $3)
+		ORDER BY cr.id`,
+		project.Bytes(), flag, environment)
+	if err != nil {
+		return nil, fmt.Errorf("reading the waiting change requests: %w", err)
+	}
+	defer rows.Close()
+	var out []governance.ChangeRequest
+	for rows.Next() {
+		cr, err := scanChangeRequest(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, cr)
+	}
+	return out, rows.Err()
+}
+
+// WaitingOn returns how many of the change requests on flag's
+// configuration in environment are open and how many approved.
+func (s *ChangeRequests) WaitingOn(ctx context.Context, flag flags.FlagID, environment workspace.EnvironmentID,
+) (governance.Waiting, error) {
+	var w governance.Waiting
+	err := s.db(ctx).QueryRow(ctx, `
+		SELECT count(*) FILTER (WHERE state = 'open'), count(*) FILTER (WHERE state = 'approved')
+		FROM change_requests
+		WHERE flag_id = $1 AND environment_id = $2 AND state IN ('open', 'approved')`,
+		flag.Bytes(), environment.Bytes()).Scan(&w.Open, &w.Approved)
+	if err != nil {
+		return w, fmt.Errorf("counting the waiting change requests: %w", err)
+	}
+	return w, nil
 }

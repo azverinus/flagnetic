@@ -889,9 +889,12 @@ type ChangeRequest struct {
 	// State `draft` (its author prepares it), `open` (offered for review),
 	// `approved`, `rejected`, `applied`, `cancelled`, `superseded` (what
 	// it was based on moved). The last four are final.
-	State     ChangeRequestState `json:"state"`
-	Title     string             `json:"title"`
-	UpdatedAt time.Time          `json:"updated_at"`
+	State ChangeRequestState `json:"state"`
+
+	// SupersededBy The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, or deleting its environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
+	SupersededBy *openapi_types.UUID `json:"superseded_by"`
+	Title        string              `json:"title"`
+	UpdatedAt    time.Time           `json:"updated_at"`
 
 	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
 	Version Version `json:"version"`
@@ -1583,6 +1586,9 @@ type Flag struct {
 
 // FlagConfiguration What the flag serves in one environment.
 type FlagConfiguration struct {
+	// ChangeRequests The change requests waiting on the configuration, which any write to it supersedes. Answered by the configuration's own operations; a flag's detail and the audit log leave it out.
+	ChangeRequests *WaitingChangeRequests `json:"change_requests,omitempty"`
+
 	// Environment Names the entity in URLs, SDK calls and rules, and never changes.
 	Environment Key `json:"environment"`
 
@@ -2742,6 +2748,18 @@ type Violation struct {
 
 	// Pointer JSON Pointer into the request body.
 	Pointer string `json:"pointer"`
+}
+
+// WaitingChangeRequests The change requests waiting on the configuration, which any write to it supersedes. Answered by the configuration's own operations; a flag's detail and the audit log leave it out.
+type WaitingChangeRequests struct {
+	// Approved How many are approved, awaiting application.
+	Approved int `json:"approved"`
+
+	// NextApplyAt The earliest time one of them is scheduled to be applied at; null when none is scheduled.
+	NextApplyAt *time.Time `json:"next_apply_at"`
+
+	// Open How many are open, awaiting a decision.
+	Open int `json:"open"`
 }
 
 // Webhook defines model for Webhook.

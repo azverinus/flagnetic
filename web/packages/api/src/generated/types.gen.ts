@@ -1392,6 +1392,25 @@ export type FlagConfiguration = {
    */
   updated_by: string | null;
   version: Version;
+  change_requests?: WaitingChangeRequests;
+};
+
+/**
+ * The change requests waiting on the configuration, which any write to it supersedes. Answered by the configuration's own operations; a flag's detail and the audit log leave it out.
+ */
+export type WaitingChangeRequests = {
+  /**
+   * How many are open, awaiting a decision.
+   */
+  open: number;
+  /**
+   * How many are approved, awaiting application.
+   */
+  approved: number;
+  /**
+   * The earliest time one of them is scheduled to be applied at; null when none is scheduled.
+   */
+  next_apply_at: string | null;
 };
 
 export type Prerequisite = {
@@ -1666,6 +1685,10 @@ export type ChangeRequest = {
    * Who applied the change request; null until it is applied.
    */
   applied_by: ChangeRequestApplier | null;
+  /**
+   * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, or deleting its environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
+   */
+  superseded_by: string | null;
   created_at: string;
   updated_at: string;
   version: Version;

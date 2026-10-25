@@ -17,8 +17,12 @@ func (a *api) GetFlagConfiguration(ctx context.Context, req GetFlagConfiguration
 	if err != nil {
 		return nil, err
 	}
+	body, err := a.configurationWithWaiting(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
 	return GetFlagConfiguration200JSONResponse{
-		Body: configurationOut(ec), Headers: GetFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+		Body: body, Headers: GetFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
 }
 
@@ -32,8 +36,12 @@ func (a *api) PutFlagConfiguration(ctx context.Context, req PutFlagConfiguration
 	if err != nil {
 		return nil, err
 	}
+	body, err := a.configurationWithWaiting(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
 	return PutFlagConfiguration200JSONResponse{
-		Body: configurationOut(ec), Headers: PutFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+		Body: body, Headers: PutFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
 }
 
@@ -51,8 +59,12 @@ func (a *api) KillFlag(ctx context.Context, req KillFlagRequestObject) (KillFlag
 	if err != nil {
 		return nil, err
 	}
+	body, err := a.configurationWithWaiting(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
 	return KillFlag200JSONResponse{
-		Body:    KillResult{Changed: killed, Configuration: configurationOut(ec)},
+		Body:    KillResult{Changed: killed, Configuration: body},
 		Headers: KillFlag200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
 }
@@ -69,8 +81,12 @@ func (a *api) PutOverride(ctx context.Context, req PutOverrideRequestObject) (Pu
 	if err != nil {
 		return nil, err
 	}
+	body, err := a.configurationWithWaiting(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
 	return PutOverride200JSONResponse{
-		Body: configurationOut(ec), Headers: PutOverride200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+		Body: body, Headers: PutOverride200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
 }
 
@@ -84,8 +100,12 @@ func (a *api) DeleteOverride(ctx context.Context, req DeleteOverrideRequestObjec
 	if err != nil {
 		return nil, err
 	}
+	body, err := a.configurationWithWaiting(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
 	return DeleteOverride200JSONResponse{
-		Body: configurationOut(ec), Headers: DeleteOverride200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+		Body: body, Headers: DeleteOverride200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
 }
 
@@ -104,8 +124,12 @@ func (a *api) RegenerateRolloutSalt(ctx context.Context, req RegenerateRolloutSa
 	if err != nil {
 		return nil, err
 	}
+	body, err := a.configurationWithWaiting(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
 	return RegenerateRolloutSalt200JSONResponse{
-		Body: configurationOut(ec), Headers: RegenerateRolloutSalt200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+		Body: body, Headers: RegenerateRolloutSalt200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
 }
 
@@ -120,8 +144,12 @@ func (a *api) RevertFlagConfiguration(ctx context.Context, req RevertFlagConfigu
 	if err != nil {
 		return nil, err
 	}
+	body, err := a.configurationWithWaiting(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
 	return RevertFlagConfiguration200JSONResponse{
-		Body: configurationOut(ec), Headers: RevertFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+		Body: body, Headers: RevertFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
 }
 
@@ -138,8 +166,12 @@ func (a *api) CopyFlagConfiguration(ctx context.Context, req CopyFlagConfigurati
 	if err != nil {
 		return nil, err
 	}
+	body, err := a.configurationWithWaiting(ctx, ec)
+	if err != nil {
+		return nil, err
+	}
 	return CopyFlagConfiguration200JSONResponse{
-		Body: configurationOut(ec), Headers: CopyFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
+		Body: body, Headers: CopyFlagConfiguration200ResponseHeaders{ETag: etag(ec.Configuration.Version)},
 	}, nil
 }
 
@@ -183,6 +215,19 @@ func ruleIn(r RuleInput) flags.RuleInput {
 		out.ID = &ruleID
 	}
 	return out
+}
+
+// configurationWithWaiting returns ec as the configuration's own operations
+// answer it: with the change requests waiting on it, which whoever reads or
+// writes it should know any write supersedes.
+func (a *api) configurationWithWaiting(ctx context.Context, ec flags.EnvironmentConfiguration) (FlagConfiguration, error) {
+	out := configurationOut(ec)
+	w, err := a.h.CountWaiting.Handle(ctx, ec.Configuration.Flag, ec.Configuration.Environment)
+	if err != nil {
+		return out, err
+	}
+	out.ChangeRequests = &WaitingChangeRequests{Open: w.Open, Approved: w.Approved, NextApplyAt: w.NextApplyAt}
+	return out, nil
 }
 
 func configurationOut(ec flags.EnvironmentConfiguration) FlagConfiguration {

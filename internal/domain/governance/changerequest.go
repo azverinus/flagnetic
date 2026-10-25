@@ -142,9 +142,13 @@ type ChangeRequest struct {
 	Approval  *Decision
 	Rejection *Decision
 	Applied   *Application
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Version   int64
+	// SupersededBy is the audit entry of the write that moved what the
+	// change request was based on and so superseded it; zero when no write
+	// did, as when it was found moved only on approval or application.
+	SupersededBy EntryID
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Version      int64
 }
 
 // Decision is an approval or a rejection: the member who took it, when, and
@@ -545,4 +549,13 @@ func (cr ChangeRequest) changedTo(out ChangeRequest, now time.Time) (ChangeReque
 	}
 	out.UpdatedAt, out.Version = now, cr.Version+1
 	return out, true, nil
+}
+
+// Waiting is how many change requests wait on one configuration: open, under
+// review, and approved, ready to be applied; and the earliest time one of
+// them is scheduled to be applied, nil when none is.
+type Waiting struct {
+	Open        int
+	Approved    int
+	NextApplyAt *time.Time
 }

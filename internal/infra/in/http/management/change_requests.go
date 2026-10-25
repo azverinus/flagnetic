@@ -328,6 +328,10 @@ func changeRequestOut(cr governance.ChangeRequest) (ChangeRequest, error) {
 			out.AppliedBy.Kind, out.AppliedBy.Id = ChangeRequestApplierKindMember, &applier
 		}
 	}
+	if !cr.SupersededBy.IsZero() {
+		entry := openapi_types.UUID(cr.SupersededBy.Bytes())
+		out.SupersededBy = &entry
+	}
 	if cr.Flag != nil {
 		out.Flag = &cr.Flag.Key
 	}

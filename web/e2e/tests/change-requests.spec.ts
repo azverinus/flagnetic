@@ -127,16 +127,8 @@ test.describe("change requests", () => {
     await expect(rosa.page.getByText("Approved by Rosa Reviewer")).toBeVisible();
     await expect(rosa.page.getByText("Looks right.")).toBeVisible();
 
-    await rosa.page.getByRole("button", { name: "Apply", exact: true }).click();
-    const applyDialog = rosa.page.getByRole("dialog", { name: "Apply the change request" });
-    await applyDialog.getByRole("button", { name: "Apply" }).click();
-    await expect(applyDialog).toHaveCount(0);
-    await expect(rosa.page.getByText("Applied", { exact: true }).first()).toBeVisible();
-    const production = await readConfiguration(project, "checkout_copy", "production");
-    expect(production.on).toBe(true);
-    expect(production.fallthrough).toBe("treatment");
-
-    // The second is rejected, with the reason its author needs.
+    // The second is rejected before the first is applied, which would
+    // supersede it, with the reason its author needs.
     await rosa.page.goto(`/projects/${project}/change-requests/${second.id}`);
     await rosa.page.getByRole("button", { name: "Reject", exact: true }).click();
     const rejectDialog = rosa.page.getByRole("dialog", { name: "Reject the change request" });
@@ -149,6 +141,17 @@ test.describe("change requests", () => {
     await expect(rejectDialog).toHaveCount(0);
     await expect(rosa.page.getByText("Rejected by Rosa Reviewer")).toBeVisible();
     await expect(nav.getByText(/await your decision/)).toHaveCount(0);
+
+    // The first is applied.
+    await rosa.page.goto(`/projects/${project}/change-requests/${first.id}`);
+    await rosa.page.getByRole("button", { name: "Apply", exact: true }).click();
+    const applyDialog = rosa.page.getByRole("dialog", { name: "Apply the change request" });
+    await applyDialog.getByRole("button", { name: "Apply" }).click();
+    await expect(applyDialog).toHaveCount(0);
+    await expect(rosa.page.getByText("Applied", { exact: true }).first()).toBeVisible();
+    const production = await readConfiguration(project, "checkout_copy", "production");
+    expect(production.on).toBe(true);
+    expect(production.fallthrough).toBe("treatment");
 
     // Every state the author's list shows, final ones included.
     await page.goto(`/projects/${project}/change-requests?tab=mine`);

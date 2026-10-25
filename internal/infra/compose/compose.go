@@ -124,8 +124,10 @@ type Listener struct {
 func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Options) Background {
 	tx, auditLog, outbox := postgres.NewTransactor(d.Pool), pggovernance.NewAuditLog(d.Pool), pggovernance.NewOutbox(d.Pool)
 	// Every context records its audit entries through the governance
-	// context, which writes the catalogue events they cause to the outbox.
-	audit := appgovernance.NewRecord(auditLog, appgovernance.WithOutbox(outbox, d.IDs))
+	// context, which supersedes the change requests they move and writes
+	// the catalogue events they cause to the outbox.
+	changeRequestStore := pggovernance.NewChangeRequests(d.Pool)
+	audit := appgovernance.NewRecord(auditLog, changeRequestStore, d.IDs, appgovernance.WithOutbox(outbox, d.IDs))
 	rec := appworkspace.NewRecorder(audit, d.Clock, d.IDs)
 	accessStore, ws := pgaccess.NewStore(d.Pool), pgworkspace.NewStore(d.Pool)
 	flagStore, flagRec := pgflags.NewStore(d.Pool), appflags.NewRecorder(audit, d.Clock, d.IDs)
@@ -180,7 +182,6 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// A change request proposes a configuration the flags context checks as
 	// it would check writing it, and writes it when the change request is
 	// applied.
-	changeRequestStore := pggovernance.NewChangeRequests(d.Pool)
 	changeRequests := appgovernance.ChangeRequestDeps{
 		Tx: tx, Projects: changeRequestStore, Store: changeRequestStore,
 		Configurations: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
@@ -399,6 +400,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RebaseChangeRequest:  appgovernance.NewRebaseChangeRequest(changeRequests),
 		CancelChangeRequest:  appgovernance.NewCancelChangeRequest(changeRequests),
 		ApproveChangeRequest: appgovernance.NewApproveChangeRequest(changeRequests),
+		CountWaiting:         appgovernance.NewCountWaitingChangeRequests(changeRequestStore),
 		RejectChangeRequest:  appgovernance.NewRejectChangeRequest(changeRequests),
 		ApplyChangeRequest:   appgovernance.NewApplyChangeRequest(changeRequests),
 		CopyChangeRequest:    appgovernance.NewCopyChangeRequest(changeRequests),
@@ -543,6 +545,6 @@ func Console(edge *flaghttp.Server, defaultLocale string) (bool, error) {
 // record returns the audit port of a use case run from the command line,
 // recording through the governance context like every other.
 func record(d Deps) *appgovernance.Record {
-	return appgovernance.NewRecord(pggovernance.NewAuditLog(d.Pool),
+	return appgovernance.NewRecord(pggovernance.NewAuditLog(d.Pool), pggovernance.NewChangeRequests(d.Pool), d.IDs,
 		appgovernance.WithOutbox(pggovernance.NewOutbox(d.Pool), d.IDs))
 }
