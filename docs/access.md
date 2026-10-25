@@ -25,10 +25,11 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `sdk_key.manage` | creating, renaming, rotating and revoking an environment's SDK keys and changing their allowed origins | `project:admin` | |
 | `experiment.edit` | creating, changing and cloning experiments, and regenerating a draft's salts | `experiments:write` | |
 | `experiment.delete` | deleting draft experiments | `experiments:write` | |
-| `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening and cancelling one's own, copying any | `flags:write` | |
+| `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening, cancelling and applying one's own, copying any | `flags:write` | |
+| `change_request.approve` | deciding change requests: approving and rejecting another's, and cancelling or applying another's | `flags:write` | ✓ |
 | `webhook.manage` | creating, reading, editing and deleting a project's webhook subscriptions | `project:admin` | |
 
-A permission marked members only changes who has access to a project or whose review a change needs, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)): a pipeline cannot unprotect an environment, write it and protect it again.
+A permission marked members only changes who has access to a project or whose review a change needs, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)): a pipeline cannot unprotect an environment, write it and protect it again, nor approve the change it proposed. A project token whose role holds `change_request.approve` is refused deciding a change request with `403 token_cannot_approve`, which says why more plainly than the permission it lacks.
 
 A refusal for a missing permission answers `403 forbidden` and names the permission in the problem's `permission` member, so a script can ask for exactly that. An unknown project answers `404 not_found` before any permission is judged.
 
@@ -71,6 +72,7 @@ A role is a fixed list of permissions. The four built-in roles are the same on e
 | `experiment.edit` | | ✓ | ✓ | ✓ |
 | `experiment.delete` | | | ✓ | ✓ |
 | `change_request.propose` | | ✓ | ✓ | ✓ |
+| `change_request.approve` | | | ✓ | ✓ |
 | `webhook.manage` | | | ✓ | ✓ |
 
 `GET /roles` lists every role with its permissions, so a client can explain which roles hold a permission a caller lacks. Later releases add permissions as features arrive and write them into the built-in roles.
@@ -98,7 +100,7 @@ A personal access token (`fn_pat_…`) acts for the member who created it, with 
 
 ### Project tokens
 
-A project token (`fn_prj_…`) belongs to a project rather than to a person, for a pipeline. An owner creates it holding one built-in role in the project, fixed for its life (`/projects/{project}/tokens`). Its permissions are its role's narrowed by its scopes, minus `grant.manage`, `project_token.manage` and `environment.protect`: whatever its role, a project token never changes who has access to the project nor which environments are protected. It reaches its own project and `GET /me` alone (`403 forbidden` anywhere else, the project list included), never carries `instance:admin`, and keeps working when the member who created it leaves. The console's project tokens screen, shown to an owner, lists them with their role, scopes, expiry, creator and last use, creates one showing its value once, and revokes one.
+A project token (`fn_prj_…`) belongs to a project rather than to a person, for a pipeline. An owner creates it holding one built-in role in the project, fixed for its life (`/projects/{project}/tokens`). Its permissions are its role's narrowed by its scopes, minus `grant.manage`, `project_token.manage`, `environment.protect` and `change_request.approve`: whatever its role, a project token never changes who has access to the project, which environments are protected, nor decides a change request. It reaches its own project and `GET /me` alone (`403 forbidden` anywhere else, the project list included), never carries `instance:admin`, and keeps working when the member who created it leaves. The console's project tokens screen, shown to an owner, lists them with their role, scopes, expiry, creator and last use, creates one showing its value once, and revokes one.
 
 ### Only a session creates a credential
 
@@ -122,7 +124,7 @@ Every change is recorded as an audit entry inside the transaction that makes it,
 
 - `GET /projects/{project}/audit` lists a project's entries for anyone holding `project.read` there, and `GET /projects/{project}/audit/{entry}` reads one.
 - `GET /audit` lists every entry of the instance for an instance admin, with a `project` filter taking a project's identifier.
-- Filters: `actor` (a member's identifier: their own changes and those of their personal access tokens), `actor_kind`, `action`, `entity_kind`, `entity_id` (which follows an entity whatever key it had), `environment`, `kill_switch` (`true` for the uses of the [kill switch](flags.md#switching-on-and-off-the-kill-switch) alone, `false` for every other entry), `from` and `to` (both included), and `q`, text found in the action, the entity's key or the actor's name, whatever its case.
+- Filters: `actor` (a member's identifier: their own changes and those of their personal access tokens), `actor_kind`, `action`, `entity_kind`, `entity_id` (which follows an entity whatever key it had), `environment`, `kill_switch` (`true` for the uses of the [kill switch](flags.md#switching-on-and-off-the-kill-switch) alone, `false` for every other entry), `change_request` (a change request's identifier: the entries its [application](change-requests.md#approving-and-applying) wrote, which carry it as `change_request_id`), `from` and `to` (both included), and `q`, text found in the action, the entity's key or the actor's name, whatever its case.
 - Newest first, 50 entries a page unless `limit` asks for up to 200; the answer's `next_cursor` fetches the next page.
 
 The console shows both logs, the project's under **Audit log** in the project navigation and the instance's under **Audit log** in the instance navigation, with these filters and each entry's values before and after.

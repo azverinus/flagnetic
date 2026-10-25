@@ -660,3 +660,60 @@ func TestAProposalKeepsOnlyTheRuleIdentifiersAndSaltsTheConfigurationHolds(t *te
 		t.Error("the input given was changed")
 	}
 }
+
+// Applying a proposal writes it as it was reviewed: its new rules keep the
+// identifiers and its new rollouts the salts the proposal was given, so the
+// units the reviewers saw fall in a rollout are the ones that do.
+func TestApplyingAProposalKeepsTheIdentifiersAndSaltsItWasGiven(t *testing.T) {
+	in := base()
+	in.Rules = []flags.RuleInput{{Serve: rollout("user", "b", 1000)}}
+	live := mustReplace(t, initial(), in)
+	kept := live.Rules[0]
+
+	in.Rules = []flags.RuleInput{{ID: &kept.ID, Serve: rollout("user", "b", 2000)}, {Serve: rollout("user", "c", 500)}}
+	in.Rules[0].Serve.Salt = kept.Serve.Salt
+	proposed, err := live.Propose(copyFlag, in, nil, referents(nil), mint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	added := proposed.Rules[1]
+
+	at := now.Add(2 * time.Hour)
+	applied, changed, err := live.Apply(copyFlag, proposed.Input(), referents(nil), mint, flags.Write{By: &bob, Now: at})
+	if err != nil || !changed.Any || !changed.Ruleset {
+		t.Fatalf("apply = %v, %+v", err, changed)
+	}
+	if len(applied.Rules) != 2 || applied.Rules[0].ID != kept.ID || applied.Rules[0].Serve.Salt != kept.Serve.Salt ||
+		applied.Rules[0].Serve.Percentage != 2000 || applied.Rules[1].ID != added.ID || applied.Rules[1].Serve.Salt != added.Serve.Salt {
+		t.Errorf("applied rules = %+v, want the kept rule grown and the proposal's new rule as it was given", applied.Rules)
+	}
+	if applied.Version != live.Version+1 || applied.UpdatedBy == nil || *applied.UpdatedBy != bob || !applied.UpdatedAt.Equal(at) {
+		t.Errorf("applied = version %d by %v at %v", applied.Version, applied.UpdatedBy, applied.UpdatedAt)
+	}
+
+	// A proposal is checked again as it is applied: what it names may have
+	// gone since it was approved.
+	gone := proposed.Input()
+	gone.Fallthrough = "z"
+	if _, _, err := live.Apply(copyFlag, gone, referents(nil), mint, flags.Write{By: &bob, Now: at}); !slices.Contains(
+		configurationViolations(t, err), "/fallthrough unknown_variation") {
+		t.Errorf("an invalid proposal applied = %v", err)
+	}
+}
+
+func TestApplyingAProposalKeepsTheSaltItGaveARuleItMadeARollout(t *testing.T) {
+	in := base()
+	in.Rules = []flags.RuleInput{{Serve: serveVariation("b")}}
+	live := mustReplace(t, initial(), in)
+	ruleID := live.Rules[0].ID
+
+	in.Rules = []flags.RuleInput{{ID: &ruleID, Serve: rollout("user", "b", 1000)}}
+	proposed, err := live.Propose(copyFlag, in, nil, referents(nil), mint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	applied, _, err := live.Apply(copyFlag, proposed.Input(), referents(nil), mint, flags.Write{By: &bob, Now: now})
+	if err != nil || applied.Rules[0].ID != ruleID || applied.Rules[0].Serve.Salt != proposed.Rules[0].Serve.Salt {
+		t.Errorf("applied = %+v, %v; want the rule with the salt it was proposed with %q", applied.Rules, err, proposed.Rules[0].Serve.Salt)
+	}
+}

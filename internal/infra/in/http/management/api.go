@@ -140,14 +140,17 @@ type Handlers struct {
 	GetConflicts           *appevents.GetConflicts
 	GetFlagEvaluations     *appevents.GetFlagEvaluations
 
-	ListChangeRequests  *appgovernance.ListChangeRequests
-	CreateChangeRequest *appgovernance.CreateChangeRequest
-	GetChangeRequest    *appgovernance.GetChangeRequest
-	UpdateChangeRequest *appgovernance.UpdateChangeRequest
-	OpenChangeRequest   *appgovernance.OpenChangeRequest
-	RebaseChangeRequest *appgovernance.RebaseChangeRequest
-	CancelChangeRequest *appgovernance.CancelChangeRequest
-	CopyChangeRequest   *appgovernance.CopyChangeRequest
+	ListChangeRequests   *appgovernance.ListChangeRequests
+	CreateChangeRequest  *appgovernance.CreateChangeRequest
+	GetChangeRequest     *appgovernance.GetChangeRequest
+	UpdateChangeRequest  *appgovernance.UpdateChangeRequest
+	OpenChangeRequest    *appgovernance.OpenChangeRequest
+	RebaseChangeRequest  *appgovernance.RebaseChangeRequest
+	CancelChangeRequest  *appgovernance.CancelChangeRequest
+	ApproveChangeRequest *appgovernance.ApproveChangeRequest
+	RejectChangeRequest  *appgovernance.RejectChangeRequest
+	ApplyChangeRequest   *appgovernance.ApplyChangeRequest
+	CopyChangeRequest    *appgovernance.CopyChangeRequest
 
 	ListWebhookEventTypes *appgovernance.ListWebhookEventTypes
 	ListWebhooks          *appgovernance.ListWebhooks

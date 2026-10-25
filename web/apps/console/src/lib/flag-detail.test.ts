@@ -52,6 +52,7 @@ function entry(over: Partial<AuditEntry> = {}): AuditEntry {
     after: { version: 4 },
     kill_switch: false,
     request_id: null,
+    change_request_id: null,
     ...over,
   };
 }

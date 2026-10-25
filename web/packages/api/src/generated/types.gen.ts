@@ -850,6 +850,10 @@ export type AuditEntry = {
    * The request that made the change; null outside a request, such as for the command line.
    */
   request_id: string | null;
+  /**
+   * The change request whose application made the change; null for any other change.
+   */
+  change_request_id: string | null;
 };
 
 export type Actor = {
@@ -1537,6 +1541,55 @@ export type ChangeRequestAuthor = {
 };
 
 /**
+ * An approval or a rejection of a change request.
+ */
+export type ChangeRequestDecision = {
+  member: ChangeRequestMember;
+  at: string;
+  /**
+   * What the member said, empty when an approval said nothing.
+   */
+  comment: string;
+};
+
+export type ChangeRequestMember = {
+  id: string;
+  /**
+   * The member's display name, as it is now.
+   */
+  name: string;
+};
+
+/**
+ * The member or the project token that applied a change request, or the system at its scheduled time.
+ */
+export type ChangeRequestApplier = {
+  kind: "member" | "token" | "system";
+  /**
+   * The member's or the token's identifier; null for the system.
+   */
+  id: string | null;
+  /**
+   * The member's display name or the token's name, as it is now; empty for the system.
+   */
+  name: string;
+};
+
+export type ChangeRequestApprove = {
+  /**
+   * Optional, at most 2,000 characters.
+   */
+  comment?: string;
+};
+
+export type ChangeRequestReject = {
+  /**
+   * Why the change request is rejected, at most 2,000 characters.
+   */
+  comment: string;
+};
+
+/**
  * One operation of an RFC 6902 JSON Patch; `value` is absent from a `remove`.
  */
 export type PatchOperation = {
@@ -1597,6 +1650,22 @@ export type ChangeRequest = {
    */
   diff: Array<PatchOperation>;
   author: ChangeRequestAuthor;
+  /**
+   * Who approved the change request, when and why; null unless it was approved.
+   */
+  approval: ChangeRequestDecision | null;
+  /**
+   * Who rejected the change request, when and why; null unless it was rejected.
+   */
+  rejection: ChangeRequestDecision | null;
+  /**
+   * When the change request was applied; null until it is.
+   */
+  applied_at: string | null;
+  /**
+   * Who applied the change request; null until it is applied.
+   */
+  applied_by: ChangeRequestApplier | null;
   created_at: string;
   updated_at: string;
   version: Version;
@@ -2205,6 +2274,11 @@ export type AuditTo = string;
  * Lists only the entries of kill switches when true, only the others when false.
  */
 export type AuditKillSwitch = boolean;
+
+/**
+ * A change request's identifier; lists the entries its application wrote.
+ */
+export type AuditChangeRequest = string;
 
 /**
  * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
@@ -8095,6 +8169,256 @@ export type CopyChangeRequestResponses = {
 export type CopyChangeRequestResponse =
   CopyChangeRequestResponses[keyof CopyChangeRequestResponses];
 
+export type ApproveChangeRequestData = {
+  body: ChangeRequestApprove;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The change request's identifier.
+     */
+    change_request: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests/{change_request}/approve";
+};
+
+export type ApproveChangeRequestErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type ApproveChangeRequestError =
+  ApproveChangeRequestErrors[keyof ApproveChangeRequestErrors];
+
+export type ApproveChangeRequestResponses = {
+  /**
+   * The change request as it is now.
+   */
+  200: ChangeRequest;
+};
+
+export type ApproveChangeRequestResponse =
+  ApproveChangeRequestResponses[keyof ApproveChangeRequestResponses];
+
+export type RejectChangeRequestData = {
+  body: ChangeRequestReject;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The change request's identifier.
+     */
+    change_request: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests/{change_request}/reject";
+};
+
+export type RejectChangeRequestErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type RejectChangeRequestError = RejectChangeRequestErrors[keyof RejectChangeRequestErrors];
+
+export type RejectChangeRequestResponses = {
+  /**
+   * The change request as it is now.
+   */
+  200: ChangeRequest;
+};
+
+export type RejectChangeRequestResponse =
+  RejectChangeRequestResponses[keyof RejectChangeRequestResponses];
+
+export type ApplyChangeRequestData = {
+  body?: never;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The change request's identifier.
+     */
+    change_request: string;
+  };
+  query?: never;
+  url: "/projects/{project}/change-requests/{change_request}/apply";
+};
+
+export type ApplyChangeRequestErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type ApplyChangeRequestError = ApplyChangeRequestErrors[keyof ApplyChangeRequestErrors];
+
+export type ApplyChangeRequestResponses = {
+  /**
+   * The change request as it is now.
+   */
+  200: ChangeRequest;
+};
+
+export type ApplyChangeRequestResponse =
+  ApplyChangeRequestResponses[keyof ApplyChangeRequestResponses];
+
 export type ListSegmentsData = {
   body?: never;
   path: {
@@ -8911,6 +9235,10 @@ export type ListProjectAuditEntriesData = {
      * Lists only the entries of kill switches when true, only the others when false.
      */
     kill_switch?: boolean;
+    /**
+     * A change request's identifier; lists the entries its application wrote.
+     */
+    change_request?: string;
     /**
      * The `next_cursor` of the previous page.
      */
@@ -9748,6 +10076,10 @@ export type ListAuditEntriesData = {
      * Lists only the entries of kill switches when true, only the others when false.
      */
     kill_switch?: boolean;
+    /**
+     * A change request's identifier; lists the entries its application wrote.
+     */
+    change_request?: string;
     /**
      * The `next_cursor` of the previous page.
      */

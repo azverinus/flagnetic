@@ -549,6 +549,7 @@ export const zAuditEntry = z.object({
   after: z.unknown(),
   kill_switch: z.boolean(),
   request_id: z.string().nullable(),
+  change_request_id: z.uuid().nullable(),
 });
 
 export const zAuditEntryList = z.object({
@@ -1056,6 +1057,37 @@ export const zChangeRequestAuthor = z.object({
   name: z.string(),
 });
 
+export const zChangeRequestMember = z.object({
+  id: z.uuid(),
+  name: z.string(),
+});
+
+/**
+ * An approval or a rejection of a change request.
+ */
+export const zChangeRequestDecision = z.object({
+  member: zChangeRequestMember,
+  at: z.iso.datetime(),
+  comment: z.string(),
+});
+
+/**
+ * The member or the project token that applied a change request, or the system at its scheduled time.
+ */
+export const zChangeRequestApplier = z.object({
+  kind: z.enum(["member", "token", "system"]),
+  id: z.uuid().nullable(),
+  name: z.string(),
+});
+
+export const zChangeRequestApprove = z.object({
+  comment: z.string().optional(),
+});
+
+export const zChangeRequestReject = z.object({
+  comment: z.string(),
+});
+
 /**
  * One operation of an RFC 6902 JSON Patch; `value` is absent from a `remove`.
  */
@@ -1286,6 +1318,10 @@ export const zChangeRequest = z.object({
   proposed: zProposedConfiguration,
   diff: z.array(zPatchOperation),
   author: zChangeRequestAuthor,
+  approval: zChangeRequestDecision.nullable(),
+  rejection: zChangeRequestDecision.nullable(),
+  applied_at: z.iso.datetime().nullable(),
+  applied_by: zChangeRequestApplier.nullable(),
   created_at: z.iso.datetime(),
   updated_at: z.iso.datetime(),
   version: zVersion,
@@ -1590,6 +1626,11 @@ export const zAuditTo = z.iso.datetime();
  * Lists only the entries of kill switches when true, only the others when false.
  */
 export const zAuditKillSwitch = z.boolean();
+
+/**
+ * A change request's identifier; lists the entries its application wrote.
+ */
+export const zAuditChangeRequest = z.uuid();
 
 /**
  * Text found, whatever its case, in the action, the entity's key or the actor's name. `%` and `_` match themselves.
@@ -2729,6 +2770,52 @@ export const zCopyChangeRequestPath = z.object({
  */
 export const zCopyChangeRequestResponse = zChangeRequest;
 
+export const zApproveChangeRequestBody = zChangeRequestApprove;
+
+export const zApproveChangeRequestHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zApproveChangeRequestPath = z.object({
+  project: z.string(),
+  change_request: z.uuid(),
+});
+
+/**
+ * The change request as it is now.
+ */
+export const zApproveChangeRequestResponse = zChangeRequest;
+
+export const zRejectChangeRequestBody = zChangeRequestReject;
+
+export const zRejectChangeRequestHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zRejectChangeRequestPath = z.object({
+  project: z.string(),
+  change_request: z.uuid(),
+});
+
+/**
+ * The change request as it is now.
+ */
+export const zRejectChangeRequestResponse = zChangeRequest;
+
+export const zApplyChangeRequestHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zApplyChangeRequestPath = z.object({
+  project: z.string(),
+  change_request: z.uuid(),
+});
+
+/**
+ * The change request as it is now.
+ */
+export const zApplyChangeRequestResponse = zChangeRequest;
+
 export const zListSegmentsPath = z.object({
   project: z.string(),
 });
@@ -2883,6 +2970,7 @@ export const zListProjectAuditEntriesQuery = z.object({
   to: z.iso.datetime().optional(),
   q: z.string().optional(),
   kill_switch: z.boolean().optional(),
+  change_request: z.uuid().optional(),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });
@@ -3027,6 +3115,7 @@ export const zListAuditEntriesQuery = z.object({
   to: z.iso.datetime().optional(),
   q: z.string().optional(),
   kill_switch: z.boolean().optional(),
+  change_request: z.uuid().optional(),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });

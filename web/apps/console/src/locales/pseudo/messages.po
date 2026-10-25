@@ -622,6 +622,10 @@ msgstr ""
 msgid "Apply filters"
 msgstr ""
 
+#: src/lib/access-names.ts
+msgid "approve and reject change requests"
+msgstr ""
+
 #: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archive"

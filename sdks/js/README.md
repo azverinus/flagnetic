@@ -107,6 +107,34 @@ Exposures, aliases and evaluation summaries are queued in `localStorage` under t
 
 A change made in Flagnetic reaches a browser client at the latest after the 300-second poll while the tab is visible, at once when the tab becomes visible again or the network returns, and within seconds with the stream on.
 
+## React
+
+```tsx
+import { FlagneticProvider, useFlag, useFlagDetail, useStage, useFlagnetic } from "flagnetic/react";
+
+function App({ bootstrap }: { bootstrap?: object }) {
+  return (
+    <FlagneticProvider sdkKey="fn_cli_…" baseUrl="https://flags.example.com"
+                       options={{ context: { units: { user: "u-1001" } } }}
+                       bootstrap={bootstrap}>
+      <Checkout />
+    </FlagneticProvider>
+  );
+}
+
+function Checkout() {
+  const enabled = useFlag("new_checkout", false);  // re-renders when this flag's value changes
+  const detail = useFlagDetail("banner_text", "Welcome"); // value, reason, stage, experiment
+  const stage = useStage();                         // "built_in", "last_good" or "fresh"
+  const client = useFlagnetic();                    // setContext, exposure, alias; undefined until mounted
+  // ...
+}
+```
+
+The provider takes a client the application built with `createClient`, which it never closes, or `sdkKey`, `baseUrl`, `options` and `bootstrap` to build and own one. Those four are read once, when the provider mounts, so an object literal in JSX does not rebuild the client; give the provider a `key` to start over. The hooks subscribe through `useSyncExternalStore`: a change re-renders the components that read the changed flag and nothing else, and a hook outside a provider throws.
+
+To render on the server, pass the document `values(context)` of `flagnetic/server` produced as `bootstrap`, and write the same document into the page for the browser. The hooks serve it while the page renders on the server and while it hydrates, so the first render in the browser matches the HTML; the provider builds its client after hydration, from the same document, and the first remote evaluation happens then. Nothing is fetched while a page renders on the server. A `bootstrap` of `undefined`, what `values()` gives before the server mode has a ruleset, renders built-in defaults at stage `built_in` on both sides.
+
 ## Evaluator
 
 ```ts
@@ -125,7 +153,7 @@ pnpm install
 pnpm lint && pnpm typecheck
 pnpm test            # the shared conformance suite and unit tests, in Node
 pnpm test:browser    # the same suite in Chromium (pnpm exec playwright install chromium once)
-pnpm test:browsers   # the browser client cross-origin in Chromium, Firefox and WebKit (FLAGNETIC_BROWSERS=webkit for one)
+pnpm test:browsers   # the browser client cross-origin and the React bindings in Chromium, Firefox and WebKit (FLAGNETIC_BROWSERS=webkit for one)
 pnpm test:p99        # 1,000 flags evaluate under 1 ms at p99
 pnpm build && pnpm check:package && pnpm check:size
 ```

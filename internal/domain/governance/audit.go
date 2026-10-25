@@ -91,6 +91,9 @@ type Entry struct {
 	Actor      Actor
 	RequestID  string
 	Record
+	// ChangeRequest is the change request whose application made the
+	// change; zero for any other change.
+	ChangeRequest ChangeRequestID
 }
 
 // The refusals of NewEntry carry no error kind on purpose: every entry point

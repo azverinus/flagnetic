@@ -133,6 +133,7 @@ function entryBy(actor: AuditEntry["actor"]): AuditEntry {
     after: null,
     kill_switch: false,
     request_id: null,
+    change_request_id: null,
   };
 }
 

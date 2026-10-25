@@ -5,10 +5,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
+	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -170,6 +172,53 @@ func (a *api) CancelChangeRequest(ctx context.Context, req CancelChangeRequestRe
 	return CancelChangeRequest200JSONResponse{Body: cr.out, Headers: CancelChangeRequest200ResponseHeaders{ETag: cr.etag}}, nil
 }
 
+// ApproveChangeRequest approves an open change request.
+func (a *api) ApproveChangeRequest(ctx context.Context, req ApproveChangeRequestRequestObject) (ApproveChangeRequestResponseObject, error) {
+	cmd, err := changeRequestCommand(ctx, req.ChangeRequest, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	cr, err := a.h.ApproveChangeRequest.Handle(ctx, appgovernance.DecideChangeRequestCommand{
+		ChangeRequestCommand: cmd, Comment: valueOf(req.Body.Comment),
+	})
+	if err != nil {
+		return nil, err
+	}
+	out, err := changeRequestOut(cr)
+	if err != nil {
+		return nil, err
+	}
+	return ApproveChangeRequest200JSONResponse{Body: out, Headers: ApproveChangeRequest200ResponseHeaders{ETag: etag(cr.Version)}}, nil
+}
+
+// RejectChangeRequest rejects an open change request.
+func (a *api) RejectChangeRequest(ctx context.Context, req RejectChangeRequestRequestObject) (RejectChangeRequestResponseObject, error) {
+	cmd, err := changeRequestCommand(ctx, req.ChangeRequest, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	cr, err := a.h.RejectChangeRequest.Handle(ctx, appgovernance.DecideChangeRequestCommand{
+		ChangeRequestCommand: cmd, Comment: req.Body.Comment,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out, err := changeRequestOut(cr)
+	if err != nil {
+		return nil, err
+	}
+	return RejectChangeRequest200JSONResponse{Body: out, Headers: RejectChangeRequest200ResponseHeaders{ETag: etag(cr.Version)}}, nil
+}
+
+// ApplyChangeRequest applies an approved change request.
+func (a *api) ApplyChangeRequest(ctx context.Context, req ApplyChangeRequestRequestObject) (ApplyChangeRequestResponseObject, error) {
+	cr, err := a.changeRequestTransition(ctx, req.ChangeRequest, req.Params.IfMatch, a.h.ApplyChangeRequest.Handle)
+	if err != nil {
+		return nil, err
+	}
+	return ApplyChangeRequest200JSONResponse{Body: cr.out, Headers: ApplyChangeRequest200ResponseHeaders{ETag: cr.etag}}, nil
+}
+
 // CopyChangeRequest copies a change request into a new draft of the
 // caller's.
 func (a *api) CopyChangeRequest(ctx context.Context, req CopyChangeRequestRequestObject) (CopyChangeRequestResponseObject, error) {
@@ -215,9 +264,12 @@ func changeRequestCommand(ctx context.Context, changeRequest ChangeRequestID, he
 	if err != nil {
 		return appgovernance.ChangeRequestCommand{}, err
 	}
+	// Whoever may decide change requests may also cancel or apply
+	// another's; a project token never holds the permission.
+	mayDecide := slices.Contains(projectOf(ctx).permissions, access.PermChangeRequestApprove)
 	return appgovernance.ChangeRequestCommand{
 		Project: projectID(ctx), ChangeRequest: id.FromBytes[governance.ChangeRequest](changeRequest), Expected: expected,
-		By: governance.Taker{As: authorOf(ctx)}, Request: requestOf(ctx),
+		By: governance.Taker{As: authorOf(ctx), MayDecide: mayDecide}, Request: requestOf(ctx),
 	}, nil
 }
 
@@ -234,6 +286,16 @@ func authorOf(ctx context.Context) governance.Author {
 	return governance.Author{}
 }
 
+// decisionOut returns d as the API answers it, nil for none.
+func decisionOut(d *governance.Decision) *ChangeRequestDecision {
+	if d == nil {
+		return nil
+	}
+	return &ChangeRequestDecision{
+		Member: ChangeRequestMember{Id: openapi_types.UUID(d.Member.Bytes()), Name: d.Name}, At: d.At, Comment: d.Comment,
+	}
+}
+
 func changeRequestOut(cr governance.ChangeRequest) (ChangeRequest, error) {
 	out := ChangeRequest{
 		Id: openapi_types.UUID(cr.ID.Bytes()), Kind: ChangeRequestKind(cr.Kind), State: ChangeRequestState(cr.State),
@@ -246,6 +308,18 @@ func changeRequestOut(cr governance.ChangeRequest) (ChangeRequest, error) {
 		out.Author.Kind, out.Author.Id = ChangeRequestAuthorKindToken, openapi_types.UUID(cr.Author.Token.Bytes())
 	case cr.Author.Member != nil:
 		out.Author.Id = openapi_types.UUID(cr.Author.Member.Bytes())
+	}
+	out.Approval, out.Rejection = decisionOut(cr.Approval), decisionOut(cr.Rejection)
+	if a := cr.Applied; a != nil {
+		out.AppliedAt, out.AppliedBy = &a.At, &ChangeRequestApplier{Kind: ChangeRequestApplierKindSystem, Name: a.By.Name}
+		switch {
+		case a.By.Token != nil:
+			applier := openapi_types.UUID(a.By.Token.Bytes())
+			out.AppliedBy.Kind, out.AppliedBy.Id = ChangeRequestApplierKindToken, &applier
+		case a.By.Member != nil:
+			applier := openapi_types.UUID(a.By.Member.Bytes())
+			out.AppliedBy.Kind, out.AppliedBy.Id = ChangeRequestApplierKindMember, &applier
+		}
 	}
 	if cr.Flag != nil {
 		out.Flag = &cr.Flag.Key

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -96,20 +97,39 @@ func (s *ChangeRequests) CreateChangeRequest(ctx context.Context, cr governance.
 }
 
 // UpdateChangeRequest stores what a transition changes of cr: its state,
-// texts, base, proposal and diff. The entity it names and its author never
-// change.
+// texts, base, proposal and diff, the decision taken on it and its
+// application. The entity it names and its author never change.
 func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.ChangeRequest) error {
 	base, proposed, diff, err := documents(cr)
 	if err != nil {
 		return fmt.Errorf("encoding a change request: %w", err)
 	}
+	var (
+		decision, decidedBy, decidedAt, comment     any
+		appliedAt, appliedKind, appliedBy, appliedT any
+	)
+	if d, kind := decisionOf(cr); d != nil {
+		decision, decidedBy, decidedAt, comment = kind, d.Member.Bytes(), d.At, d.Comment
+	}
+	if a := cr.Applied; a != nil {
+		appliedAt = a.At
+		switch {
+		case a.System:
+			appliedKind = "system"
+		case a.By.Token != nil:
+			appliedKind, appliedT = "token", a.By.Token.Bytes()
+		case a.By.Member != nil:
+			appliedKind, appliedBy = "member", a.By.Member.Bytes()
+		}
+	}
 	tag, err := s.db(ctx).Exec(ctx, `
 		UPDATE change_requests
 		SET state = $3, title = $4, description = $5, base = $6, base_version = $7, proposed = $8, diff = $9,
-		    updated_at = $10, version = $11
+		    updated_at = $10, version = $11, decision = $12, decided_by = $13, decided_at = $14, decision_comment = $15,
+		    applied_at = $16, applied_by_kind = $17, applied_by = $18, applied_by_token = $19
 		WHERE project_id = $1 AND id = $2`,
 		cr.Project.Bytes(), cr.ID.Bytes(), string(cr.State), cr.Title, cr.Description, base, cr.BaseVersion, proposed, diff,
-		cr.UpdatedAt, cr.Version)
+		cr.UpdatedAt, cr.Version, decision, decidedBy, decidedAt, comment, appliedAt, appliedKind, appliedBy, appliedT)
 	if err != nil {
 		return fmt.Errorf("updating a change request: %w", err)
 	}
@@ -119,31 +139,75 @@ func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.
 	return nil
 }
 
+// decisionOf returns the decision taken on cr and its kind, or nil.
+func decisionOf(cr governance.ChangeRequest) (*governance.Decision, string) {
+	switch {
+	case cr.Approval != nil:
+		return cr.Approval, "approved"
+	case cr.Rejection != nil:
+		return cr.Rejection, "rejected"
+	}
+	return nil, ""
+}
+
 // changeRequestColumns are a change request's with the keys of the flag and
-// environment it names and its author's name as they are now.
+// environment it names and the names of its author, of the member who
+// decided it and of whoever applied it as they are now.
 const changeRequestColumns = `cr.id, cr.project_id, cr.kind, cr.flag_id, f.key, cr.environment_id, e.key, cr.state, cr.title,
 	cr.description, cr.base, cr.base_version, cr.proposed, cr.diff, cr.author_id, cr.author_token_id,
-	coalesce(m.display_name, t.name, ''), cr.created_at, cr.updated_at, cr.version`
+	coalesce(m.display_name, t.name, ''), cr.decision, cr.decided_by, coalesce(dm.display_name, ''), cr.decided_at,
+	cr.decision_comment, cr.applied_at, cr.applied_by_kind, cr.applied_by, cr.applied_by_token,
+	coalesce(am.display_name, ap.name, ''), cr.created_at, cr.updated_at, cr.version`
 
 const changeRequestFrom = ` FROM change_requests cr
 	LEFT JOIN flags f ON f.id = cr.flag_id
 	LEFT JOIN environments e ON e.id = cr.environment_id
 	LEFT JOIN members m ON m.id = cr.author_id
-	LEFT JOIN api_tokens t ON t.id = cr.author_token_id`
+	LEFT JOIN api_tokens t ON t.id = cr.author_token_id
+	LEFT JOIN members dm ON dm.id = cr.decided_by
+	LEFT JOIN members am ON am.id = cr.applied_by
+	LEFT JOIN api_tokens ap ON ap.id = cr.applied_by_token`
 
 func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 	var (
-		cr                      governance.ChangeRequest
-		crk, pk                 [16]byte
-		fk, ek, member, token   *[16]byte
-		flagKey, environmentKey *string
-		kind, state             string
-		base, proposed, diff    []byte
+		cr                             governance.ChangeRequest
+		crk, pk                        [16]byte
+		fk, ek, member, token          *[16]byte
+		flagKey, environmentKey        *string
+		kind, state                    string
+		base, proposed, diff           []byte
+		decision, comment, appliedKind *string
+		decidedBy, appliedBy, appliedT *[16]byte
+		deciderName, applierName       string
+		decidedAt, appliedAt           *time.Time
 	)
 	if err := row.Scan(&crk, &pk, &kind, &fk, &flagKey, &ek, &environmentKey, &state, &cr.Title, &cr.Description, &base,
-		&cr.BaseVersion, &proposed, &diff, &member, &token, &cr.Author.Name, &cr.CreatedAt, &cr.UpdatedAt,
+		&cr.BaseVersion, &proposed, &diff, &member, &token, &cr.Author.Name, &decision, &decidedBy, &deciderName, &decidedAt,
+		&comment, &appliedAt, &appliedKind, &appliedBy, &appliedT, &applierName, &cr.CreatedAt, &cr.UpdatedAt,
 		&cr.Version); err != nil {
 		return cr, err
+	}
+	if decision != nil {
+		d := &governance.Decision{
+			Member: id.FromBytes[access.Member](*decidedBy), Name: deciderName, At: decidedAt.UTC(), Comment: *comment,
+		}
+		if *decision == "approved" {
+			cr.Approval = d
+		} else {
+			cr.Rejection = d
+		}
+	}
+	if appliedAt != nil {
+		a := &governance.Application{At: appliedAt.UTC(), System: *appliedKind == "system"}
+		switch {
+		case appliedBy != nil:
+			m := id.FromBytes[access.Member](*appliedBy)
+			a.By = governance.Author{Member: &m, Name: applierName}
+		case appliedT != nil:
+			t := id.FromBytes[access.APIToken](*appliedT)
+			a.By = governance.Author{Token: &t, Name: applierName}
+		}
+		cr.Applied = a
 	}
 	cr.ID, cr.Project = id.FromBytes[governance.ChangeRequest](crk), id.FromBytes[workspace.Project](pk)
 	cr.Kind, cr.State = governance.ChangeRequestKind(kind), governance.ChangeRequestState(state)

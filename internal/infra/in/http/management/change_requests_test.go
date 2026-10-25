@@ -281,7 +281,7 @@ func TestACopyIsANewDraftOfTheCallersOnTheCurrentBase(t *testing.T) {
 	}
 }
 
-func TestOnlyTheAuthorEditsOpensRebasesAndCancels(t *testing.T) {
+func TestOnlyTheAuthorEditsOpensAndRebasesAndADeveloperCancelsOnlyTheirOwn(t *testing.T) {
 	f := startChangeRequests(t)
 	cr := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("Turn it on", proposedOn()))
 	other, _ := grantedSession(t, f.srv, f.project, access.RoleDeveloper)
@@ -294,9 +294,11 @@ func TestOnlyTheAuthorEditsOpensRebasesAndCancels(t *testing.T) {
 		assertProblem(t, name+" opening", opened.StatusCode(), opened.Body, http.StatusForbidden, "not_author")
 		rebased := rebaseChangeRequest(t, c, f.project.Key, cr)
 		assertProblem(t, name+" rebasing", rebased.StatusCode(), rebased.Body, http.StatusForbidden, "not_author")
-		cancelled := cancelChangeRequest(t, c, f.project.Key, cr)
-		assertProblem(t, name+" cancelling", cancelled.StatusCode(), cancelled.Body, http.StatusForbidden, "not_author")
 	}
+	// Cancelling another's needs the permission to decide change requests,
+	// which a maintainer holds and a developer does not.
+	refused := cancelChangeRequest(t, other.ClientWithResponses, f.project.Key, cr)
+	assertProblem(t, "another developer cancelling", refused.StatusCode(), refused.Body, http.StatusForbidden, "not_author")
 
 	cancelled := cancelChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr)
 	if cancelled.JSON200 == nil {

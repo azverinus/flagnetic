@@ -177,11 +177,16 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	experimentStore := pgexperiments.NewStore(d.Pool)
 	experimentRec := appexperiments.NewRecorder(audit, d.Clock, d.IDs)
 	// A change request proposes a configuration the flags context checks as
-	// it would check writing it.
+	// it would check writing it, and writes it when the change request is
+	// applied.
 	changeRequestStore := pggovernance.NewChangeRequests(d.Pool)
 	changeRequests := appgovernance.ChangeRequestDeps{
 		Tx: tx, Projects: changeRequestStore, Store: changeRequestStore,
-		Configurations: appflags.NewDraftConfiguration(ws, flagStore, d.IDs), Audit: audit, Clock: d.Clock, IDs: d.IDs,
+		Configurations: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
+		Proposals: appflags.NewApplyProposal(appflags.ReplaceConfigurationDeps{
+			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+		Audit: audit, Clock: d.Clock, IDs: d.IDs,
 	}
 	// Deleting a unit type or attribute asks the flags context what still
 	// names it.
@@ -384,14 +389,17 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetConflicts:           appevents.NewGetConflicts(tx, eventStore),
 		GetFlagEvaluations:     appevents.NewGetFlagEvaluations(tx, eventStore, d.Clock),
 
-		ListChangeRequests:  appgovernance.NewListChangeRequests(changeRequestStore),
-		CreateChangeRequest: appgovernance.NewCreateChangeRequest(changeRequests),
-		GetChangeRequest:    appgovernance.NewGetChangeRequest(changeRequestStore),
-		UpdateChangeRequest: appgovernance.NewUpdateChangeRequest(changeRequests),
-		OpenChangeRequest:   appgovernance.NewOpenChangeRequest(changeRequests),
-		RebaseChangeRequest: appgovernance.NewRebaseChangeRequest(changeRequests),
-		CancelChangeRequest: appgovernance.NewCancelChangeRequest(changeRequests),
-		CopyChangeRequest:   appgovernance.NewCopyChangeRequest(changeRequests),
+		ListChangeRequests:   appgovernance.NewListChangeRequests(changeRequestStore),
+		CreateChangeRequest:  appgovernance.NewCreateChangeRequest(changeRequests),
+		GetChangeRequest:     appgovernance.NewGetChangeRequest(changeRequestStore),
+		UpdateChangeRequest:  appgovernance.NewUpdateChangeRequest(changeRequests),
+		OpenChangeRequest:    appgovernance.NewOpenChangeRequest(changeRequests),
+		RebaseChangeRequest:  appgovernance.NewRebaseChangeRequest(changeRequests),
+		CancelChangeRequest:  appgovernance.NewCancelChangeRequest(changeRequests),
+		ApproveChangeRequest: appgovernance.NewApproveChangeRequest(changeRequests),
+		RejectChangeRequest:  appgovernance.NewRejectChangeRequest(changeRequests),
+		ApplyChangeRequest:   appgovernance.NewApplyChangeRequest(changeRequests),
+		CopyChangeRequest:    appgovernance.NewCopyChangeRequest(changeRequests),
 
 		ListWebhookEventTypes: appgovernance.NewListWebhookEventTypes(),
 		ListWebhooks:          appgovernance.NewListWebhooks(webhookStore),
