@@ -77,18 +77,13 @@ func (r *Record) supersede(ctx context.Context, e governance.Entry) error {
 	if err != nil {
 		return err
 	}
-	for _, before := range governance.Supersedes(e, candidates) {
-		after, err := before.Supersede(e.ID, e.OccurredAt)
-		if err != nil {
+	for _, s := range governance.Supersedes(e, candidates) {
+		if err = r.changeRequests.UpdateChangeRequest(ctx, s.After); err != nil {
 			return err
 		}
-		if err = r.changeRequests.UpdateChangeRequest(ctx, after); err != nil {
-			return err
-		}
-		entry, err := governance.NewEntry(id.New[governance.Entry](r.ids), e.OccurredAt,
-			governance.Request{Actor: e.Actor, ID: e.RequestID}, changeRequestRecord("change_request.superseded", &before, after))
-		if err != nil {
-			return err
+		entry := governance.Entry{
+			ID: id.New[governance.Entry](r.ids), OccurredAt: e.OccurredAt, Actor: e.Actor, RequestID: e.RequestID,
+			Record: changeRequestRecord("change_request.superseded", &s.Before, s.After),
 		}
 		if err = r.keep(ctx, entry); err != nil {
 			return err

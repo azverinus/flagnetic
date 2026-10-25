@@ -38,10 +38,13 @@ func flagEntry(action string, flag flags.FlagID, environment workspace.Environme
 	}}
 }
 
-func idsOf(crs []governance.ChangeRequest) []governance.ChangeRequestID {
+func idsOf(superseded []governance.Superseded) []governance.ChangeRequestID {
 	out := []governance.ChangeRequestID{}
-	for _, cr := range crs {
-		out = append(out, cr.ID)
+	for _, s := range superseded {
+		if s.After.ID != s.Before.ID || s.After.State != governance.StateSuperseded || s.After.SupersededBy != moving {
+			panic("a change request superseded by another entry")
+		}
+		out = append(out, s.Before.ID)
 	}
 	return out
 }
@@ -107,8 +110,8 @@ func TestOnlyOpenAndApprovedChangeRequestsAreSuperseded(t *testing.T) {
 	}
 	got := governance.Supersedes(flagEntry("flag.killed", checkout, production), candidates)
 	var states []governance.ChangeRequestState
-	for _, cr := range got {
-		states = append(states, cr.State)
+	for _, s := range got {
+		states = append(states, s.Before.State)
 	}
 	if want := []governance.ChangeRequestState{governance.StateOpen, governance.StateApproved}; !slices.Equal(states, want) {
 		t.Errorf("superseded states = %v, want %v", states, want)

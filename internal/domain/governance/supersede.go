@@ -52,18 +52,27 @@ func MovedBy(e Entry) (Moved, bool) {
 	return Moved{}, false
 }
 
-// Supersedes returns those of candidates e supersedes: open or approved,
-// naming what e moves, and not the change request whose application wrote
+// Superseded is a change request before and after a write superseded it.
+type Superseded struct {
+	Before, After ChangeRequest
+}
+
+// Supersedes returns those of candidates e supersedes, superseded by e at
+// its instant: naming what e moves, in a state a supersede is taken from
+// (open or approved), and not the change request whose application wrote
 // e, which is applied by that write rather than overtaken by it.
-func Supersedes(e Entry, candidates []ChangeRequest) []ChangeRequest {
+func Supersedes(e Entry, candidates []ChangeRequest) []Superseded {
 	moved, ok := MovedBy(e)
 	if !ok {
 		return nil
 	}
-	var out []ChangeRequest
+	var out []Superseded
 	for _, cr := range candidates {
-		if moved.moves(cr) && cr.ID != e.ChangeRequest && (cr.State == StateOpen || cr.State == StateApproved) {
-			out = append(out, cr)
+		if !moved.moves(cr) || cr.ID == e.ChangeRequest {
+			continue
+		}
+		if after, err := cr.Supersede(e.ID, e.OccurredAt); err == nil {
+			out = append(out, Superseded{Before: cr, After: after})
 		}
 	}
 	return out
