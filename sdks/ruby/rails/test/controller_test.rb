@@ -44,6 +44,13 @@ class ControllerTest < ActionDispatch::IntegrationTest
     assert_equal({ "anonymous" => anonymous, "user" => "1001" }, response.parsed_body["units"])
   end
 
+  def test_views_get_the_same_helpers
+    get "/context_view"
+    anonymous, units = response.body.split(" ", 2)
+    assert_match(/\A\h{8}-/, anonymous)
+    assert_equal({ "anonymous" => anonymous }, JSON.parse(units))
+  end
+
   def test_a_malformed_anonymous_cookie_is_replaced
     cookies["flagnetic_anonymous_id"] = "x" * 200
     get "/context"

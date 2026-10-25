@@ -35,6 +35,11 @@ class RailtieTest < Minitest::Test
     assert_equal "Bearer fn_srv_test", @server.fetches.first["authorization"]
   end
 
+  def test_the_configuration_wins_over_the_environment_variables
+    ruby_app(REPORT, FLAGNETIC_TEST_CONFIG_SDK_KEY: "fn_srv_from_config")
+    assert_equal "Bearer fn_srv_from_config", @server.fetches.first["authorization"]
+  end
+
   def test_without_a_key_the_client_serves_built_in_defaults_and_says_so
     out = ruby_app(REPORT, FLAGNETIC_SDK_KEY: nil, FLAGNETIC_BASE_URL: nil)
     assert_equal({ "stage" => "fresh", "value" => false, "reason" => "fallback" }, JSON.parse(out))

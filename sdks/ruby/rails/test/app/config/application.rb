@@ -26,6 +26,7 @@ class TestApp < Rails::Application
   config.flagnetic.attributes = ->(controller) { { "plan" => controller.request.headers["X-Plan"] }.compact }
 
   config.flagnetic.start = true if ENV["FLAGNETIC_TEST_START"]
+  config.flagnetic.sdk_key = ENV.fetch("FLAGNETIC_TEST_CONFIG_SDK_KEY", nil)
   config.flagnetic.client_options = { allow_overrides: true } if ENV["FLAGNETIC_TEST_CLIENT_ALLOWS_OVERRIDES"]
 
   if (credentials = ENV.fetch("FLAGNETIC_TEST_CREDENTIALS", nil))

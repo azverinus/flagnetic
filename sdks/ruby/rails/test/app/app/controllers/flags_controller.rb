@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # FlagsController serves what the test suite asserts on: a flag's detail
-# for the request's context, an exposure, and the context itself.
+# for the request's context, an exposure, and the context itself, also as a view sees it.
 class FlagsController < ApplicationController
   def show
     detail = Flagnetic.client.detail(params[:key], default: false, context: flagnetic_context)
@@ -16,5 +16,9 @@ class FlagsController < ApplicationController
 
   def context
     render json: flagnetic_context
+  end
+
+  def context_view
+    render inline: "<%= flagnetic_anonymous_id %> <%== flagnetic_context[:units].to_json %>"
   end
 end
