@@ -110,9 +110,14 @@ func TestADropOfRowsARollupHadNotReadRecordsAGapAndMovesItsCursorPast(t *testing
 	f.post(t, f.summary(day1.Add(-time.Minute), counted("checkout", "true", "rule", 10), counted("banner", "true", "rule", 1)))
 	f.clock.Advance(time.Hour)
 	f.post(t, f.summary(f.clock.Now().Add(-time.Minute), counted("checkout", "false", "fallthrough", 4)))
+	// Two days later, a row of a partition retention keeps, which the rollup
+	// has not read either.
+	f.clock.Advance(48 * time.Hour)
+	kept := f.clock.Now().Add(-time.Minute)
+	f.post(t, f.summary(kept, counted("checkout", "true", "rule", 7)))
 	before := gaps(t)
 
-	f.clock.Advance(retention + 24*time.Hour)
+	f.clock.Advance(retention - 24*time.Hour)
 	f.retain(t)
 
 	got := gapsSince(t, before)
@@ -137,7 +142,7 @@ func TestADropOfRowsARollupHadNotReadRecordsAGapAndMovesItsCursorPast(t *testing
 	f.post(t, f.summary(today, counted("checkout", "true", "rule", 2)))
 	f.rollUp(t)
 	from := day1.Add(-24 * time.Hour)
-	want := []string{today.Format(time.DateOnly) + " sdk true rule 2"}
+	want := []string{kept.Format(time.DateOnly) + " sdk true rule 7", today.Format(time.DateOnly) + " sdk true rule 2"}
 	if got := rows(f.evaluations(t, "checkout", &from, &today)); !slices.Equal(got, want) {
 		t.Errorf("evaluations = %v, want only %v", got, want)
 	}

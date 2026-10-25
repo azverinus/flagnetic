@@ -21,14 +21,6 @@ var rawTables = map[events.EventType]string{
 	events.EventExposure:          "exposure_events",
 }
 
-func rawTable(typ events.EventType) (string, error) {
-	table, ok := rawTables[typ]
-	if !ok {
-		return "", fmt.Errorf("no raw table stores events of type %q", typ)
-	}
-	return table, nil
-}
-
 // partitionName is the name of table's partition of the UTC day of day.
 func partitionName(table string, day time.Time) string {
 	return table + "_p" + day.UTC().Format("20060102")
@@ -49,10 +41,7 @@ func (s *Store) LockRetention(ctx context.Context, typ events.EventType) error {
 // Partitions returns the UTC days of the partitions of typ's raw table,
 // oldest first.
 func (s *Store) Partitions(ctx context.Context, typ events.EventType) ([]time.Time, error) {
-	table, err := rawTable(typ)
-	if err != nil {
-		return nil, err
-	}
+	table := rawTables[typ]
 	rows, err := s.db(ctx).Query(ctx, `SELECT c.relname FROM pg_inherits i JOIN pg_class c ON c.oid = i.inhrelid
 		WHERE i.inhparent = $1::regclass`, pgx.Identifier{table}.Sanitize())
 	if err != nil {
@@ -64,15 +53,12 @@ func (s *Store) Partitions(ctx context.Context, typ events.EventType) ([]time.Ti
 	}
 	days := make([]time.Time, 0, len(names))
 	for _, name := range names {
+		// A partition named otherwise was not made by this server, and is
+		// left alone.
 		suffix, ok := strings.CutPrefix(name, table+"_p")
-		if !ok {
-			continue
+		if day, parseErr := time.Parse("20060102", suffix); ok && parseErr == nil {
+			days = append(days, day)
 		}
-		day, err := time.Parse("20060102", suffix)
-		if err != nil {
-			continue
-		}
-		days = append(days, day)
 	}
 	slices.SortFunc(days, time.Time.Compare)
 	return days, nil
@@ -88,18 +74,15 @@ const lockTimeout = "5s"
 // the partitions of days exclusively until the unit of work ends, giving up
 // after lockTimeout.
 func (s *Store) LockPartitions(ctx context.Context, typ events.EventType, days []time.Time) error {
-	table, err := rawTable(typ)
-	if err != nil {
-		return err
-	}
-	if _, err = s.db(ctx).Exec(ctx, `SET LOCAL lock_timeout = '`+lockTimeout+`'`); err != nil {
+	table := rawTables[typ]
+	if _, err := s.db(ctx).Exec(ctx, `SET LOCAL lock_timeout = '`+lockTimeout+`'`); err != nil {
 		return fmt.Errorf("locking the partitions of %s: %w", table, err)
 	}
 	names := []string{"ONLY " + pgx.Identifier{table}.Sanitize()}
 	for _, d := range days {
 		names = append(names, "ONLY "+pgx.Identifier{partitionName(table, d)}.Sanitize())
 	}
-	if _, err = s.db(ctx).Exec(ctx, `LOCK TABLE `+strings.Join(names, ", ")+` IN ACCESS EXCLUSIVE MODE`); err != nil {
+	if _, err := s.db(ctx).Exec(ctx, `LOCK TABLE `+strings.Join(names, ", ")+` IN ACCESS EXCLUSIVE MODE`); err != nil {
 		return fmt.Errorf("locking the partitions of %s due to go: %w", table, err)
 	}
 	return nil
@@ -112,23 +95,20 @@ func end(days []time.Time) time.Time { return slices.MaxFunc(days, time.Time.Com
 
 // Lost returns what the partitions of days of typ's raw table hold past from.
 func (s *Store) Lost(ctx context.Context, typ events.EventType, days []time.Time, from events.Cursor) (events.Lost, error) {
-	table, err := rawTable(typ)
-	if err != nil {
-		return events.Lost{}, err
-	}
+	table := rawTables[typ]
 	var (
 		lost                   events.Lost
-		firstXID, lastXID      *string
+		firstXID, lastXID      *uint64
 		firstSeq, lastSeq      *int64
 		periodStart, periodEnd *time.Time
 	)
-	err = s.db(ctx).QueryRow(ctx, `
+	err := s.db(ctx).QueryRow(ctx, `
 		WITH l AS (
 			SELECT xid, seq, received_at FROM `+pgx.Identifier{table}.Sanitize()+`
 			WHERE received_at < $3 AND (xid, seq) > ($1::text::xid8, $2))
 		SELECT count(*), min(received_at), max(received_at),
-			(SELECT xid::text FROM l ORDER BY xid, seq LIMIT 1), (SELECT seq FROM l ORDER BY xid, seq LIMIT 1),
-			(SELECT xid::text FROM l ORDER BY xid DESC, seq DESC LIMIT 1), (SELECT seq FROM l ORDER BY xid DESC, seq DESC LIMIT 1)
+			(SELECT xid::text::bigint FROM l ORDER BY xid, seq LIMIT 1), (SELECT seq FROM l ORDER BY xid, seq LIMIT 1),
+			(SELECT xid::text::bigint FROM l ORDER BY xid DESC, seq DESC LIMIT 1), (SELECT seq FROM l ORDER BY xid DESC, seq DESC LIMIT 1)
 		FROM l`, xidText(from), from.Seq, end(days)).
 		Scan(&lost.Rows, &periodStart, &periodEnd, &firstXID, &firstSeq, &lastXID, &lastSeq)
 	if err != nil {
@@ -137,12 +117,8 @@ func (s *Store) Lost(ctx context.Context, typ events.EventType, days []time.Time
 	if lost.Rows == 0 {
 		return events.Lost{}, nil
 	}
-	if lost.First, err = cursorOf(*firstXID, *firstSeq); err != nil {
-		return events.Lost{}, err
-	}
-	if lost.Last, err = cursorOf(*lastXID, *lastSeq); err != nil {
-		return events.Lost{}, err
-	}
+	lost.First = events.Cursor{XID: *firstXID, Seq: *firstSeq}
+	lost.Last = events.Cursor{XID: *lastXID, Seq: *lastSeq}
 	lost.PeriodStart, lost.PeriodEnd = periodStart.UTC(), periodEnd.UTC()
 	return lost, nil
 }
@@ -151,15 +127,12 @@ func (s *Store) Lost(ctx context.Context, typ events.EventType, days []time.Time
 // the partitions of days, nil when there is none.
 func (s *Store) FirstStoredAfter(ctx context.Context, typ events.EventType, days []time.Time, from events.Cursor,
 ) (*events.Cursor, error) {
-	table, err := rawTable(typ)
-	if err != nil {
-		return nil, err
-	}
+	table := rawTables[typ]
 	var (
-		xid string
+		xid uint64
 		seq int64
 	)
-	err = s.db(ctx).QueryRow(ctx, `SELECT xid::text, seq FROM `+pgx.Identifier{table}.Sanitize()+`
+	err := s.db(ctx).QueryRow(ctx, `SELECT xid::text::bigint, seq FROM `+pgx.Identifier{table}.Sanitize()+`
 		WHERE received_at >= $3 AND (xid, seq) > ($1::text::xid8, $2) ORDER BY xid, seq LIMIT 1`,
 		xidText(from), from.Seq, end(days)).Scan(&xid, &seq)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -168,24 +141,16 @@ func (s *Store) FirstStoredAfter(ctx context.Context, typ events.EventType, days
 	if err != nil {
 		return nil, fmt.Errorf("reading the first row of %s kept: %w", table, err)
 	}
-	c, err := cursorOf(xid, seq)
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
+	return &events.Cursor{XID: xid, Seq: seq}, nil
 }
 
 // Horizon returns the ID of the oldest transaction still running.
 func (s *Store) Horizon(ctx context.Context) (uint64, error) {
-	var x string
-	if err := s.db(ctx).QueryRow(ctx, `SELECT pg_snapshot_xmin(pg_current_snapshot())::text`).Scan(&x); err != nil {
+	var x uint64
+	if err := s.db(ctx).QueryRow(ctx, `SELECT pg_snapshot_xmin(pg_current_snapshot())::text::bigint`).Scan(&x); err != nil {
 		return 0, fmt.Errorf("reading the snapshot horizon: %w", err)
 	}
-	c, err := cursorOf(x, 0)
-	if err != nil {
-		return 0, err
-	}
-	return c.XID, nil
+	return x, nil
 }
 
 // SaveGap records gap.
@@ -204,7 +169,7 @@ func (s *Store) SaveGap(ctx context.Context, gap events.Gap) error {
 // Gaps returns the gaps whose rows were received from from to to, in the
 // order they were received.
 func (s *Store) Gaps(ctx context.Context, from, to time.Time) ([]events.Gap, error) {
-	rows, err := s.db(ctx).Query(ctx, `SELECT id, stream, event_type, from_xid::text, from_seq, to_xid::text, to_seq,
+	rows, err := s.db(ctx).Query(ctx, `SELECT id, stream, event_type, from_xid::text::bigint, from_seq, to_xid::text::bigint, to_seq,
 			period_start, period_end, rows, dropped_at
 		FROM event_gaps WHERE period_start <= $2 AND period_end >= $1 ORDER BY period_start, id`, from, to)
 	if err != nil {
@@ -215,21 +180,14 @@ func (s *Store) Gaps(ctx context.Context, from, to time.Time) ([]events.Gap, err
 			g              events.Gap
 			gapID          [16]byte
 			stream, typ    string
-			fromXID, toXID string
-			fromSeq, toSeq int64
+			fromXID, toXID uint64
 		)
-		if scanErr := row.Scan(&gapID, &stream, &typ, &fromXID, &fromSeq, &toXID, &toSeq, &g.PeriodStart, &g.PeriodEnd, &g.Rows,
+		if scanErr := row.Scan(&gapID, &stream, &typ, &fromXID, &g.From.Seq, &toXID, &g.To.Seq, &g.PeriodStart, &g.PeriodEnd, &g.Rows,
 			&g.DroppedAt); scanErr != nil {
 			return g, scanErr
 		}
 		g.ID, g.Stream, g.EventType = id.FromBytes[events.Gap](gapID), events.Stream(stream), events.EventType(typ)
-		var cursorErr error
-		if g.From, cursorErr = cursorOf(fromXID, fromSeq); cursorErr != nil {
-			return g, cursorErr
-		}
-		if g.To, cursorErr = cursorOf(toXID, toSeq); cursorErr != nil {
-			return g, cursorErr
-		}
+		g.From.XID, g.To.XID = fromXID, toXID
 		g.PeriodStart, g.PeriodEnd, g.DroppedAt = g.PeriodStart.UTC(), g.PeriodEnd.UTC(), g.DroppedAt.UTC()
 		return g, nil
 	})
@@ -242,15 +200,12 @@ func (s *Store) Gaps(ctx context.Context, from, to time.Time) ([]events.Gap, err
 // DropPartitions drops the partitions of days of typ's raw table, never
 // deleting a row: a dropped partition leaves no dead rows to vacuum.
 func (s *Store) DropPartitions(ctx context.Context, typ events.EventType, days []time.Time) error {
-	table, err := rawTable(typ)
-	if err != nil {
-		return err
-	}
+	table := rawTables[typ]
 	names := make([]string, len(days))
 	for i, d := range days {
 		names[i] = pgx.Identifier{partitionName(table, d)}.Sanitize()
 	}
-	if _, err = s.db(ctx).Exec(ctx, `DROP TABLE `+strings.Join(names, ", ")); err != nil {
+	if _, err := s.db(ctx).Exec(ctx, `DROP TABLE `+strings.Join(names, ", ")); err != nil {
 		return fmt.Errorf("dropping partitions of %s: %w", table, err)
 	}
 	for _, d := range days {
