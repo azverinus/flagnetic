@@ -416,12 +416,19 @@ func TestTheStopTakesAFinalCheckThatStays(t *testing.T) {
 
 // Growing the allocation keeps every included unit in its variation, since the
 // variation bucket is independent of inclusion, so the split stays in line
-// with the weights across the growth.
+// with the weights across the growth. The salts are drawn anew on every run,
+// so each phase exposes as many units of one variation as of the other: a
+// split left to chance would fall below the alert's significance in about one
+// run in a hundred, and the test would fail with nothing wrong.
 func TestGrowingTheTrafficAllocationRaisesNoFalseAlert(t *testing.T) {
 	srv, c := startSampleRatioServer(t)
 	f := startSampleRatio(t, srv, c, 5000, 5000, 7000)
-	exposeIncluded := func(from, to int) {
-		var all []any
+	// exposeIncluded exposes, among the first 3,000 units, those whose
+	// inclusion bucket lies in [from, to), each in the variation its
+	// variation bucket assigns, as many of one variation as of the other,
+	// and returns how many it exposed.
+	exposeIncluded := func(from, to int) int {
+		byVariation := map[string][]any{}
 		for i := range 3000 {
 			unit := "u_" + strconv.Itoa(i)
 			if b := eval.Bucket(f.exp.InclusionSalt, unit); b < from || b >= to {
@@ -431,12 +438,14 @@ func TestGrowingTheTrafficAllocationRaisesNoFalseAlert(t *testing.T) {
 			if eval.Bucket(f.exp.VariationSalt, unit) < 5000 {
 				variation = "true"
 			}
-			all = append(all, f.exposure(unit, variation))
+			byVariation[variation] = append(byVariation[variation], f.exposure(unit, variation))
 		}
-		f.send(t, "staging", all)
+		n := min(len(byVariation["true"]), len(byVariation["false"]))
+		f.send(t, "staging", append(byVariation["true"][:n], byVariation["false"][:n]...))
+		return 2 * n
 	}
 
-	exposeIncluded(0, 7000)
+	first := exposeIncluded(0, 7000)
 	check(t, srv)
 	before := f.sampleRatio(t, "staging")
 	grown := do(f.p.admin.UpdateExperimentWithResponse(t.Context(), f.p.key, "checkout_test",
@@ -446,7 +455,7 @@ func TestGrowingTheTrafficAllocationRaisesNoFalseAlert(t *testing.T) {
 		t.Fatalf("PATCH = %d: %s", grown.StatusCode(), grown.Body)
 	}
 	c.Advance(10 * time.Minute)
-	exposeIncluded(7000, 10000)
+	second := exposeIncluded(7000, 10000)
 	check(t, srv)
 	after := f.sampleRatio(t, "staging")
 
@@ -455,8 +464,8 @@ func TestGrowingTheTrafficAllocationRaisesNoFalseAlert(t *testing.T) {
 			t.Errorf("%s = %+v, want a check that ran and raised nothing", name, srm)
 		}
 	}
-	if before.N >= after.N || after.N != 3000 {
-		t.Errorf("N %d at 70 %% and %d at 100 %%, want growth to 3,000", before.N, after.N)
+	if second == 0 || before.N != int64(first) || after.N != int64(first+second) {
+		t.Errorf("N %d at 70 %% and %d at 100 %%, want %d and %d", before.N, after.N, first, first+second)
 	}
 	if alerts := f.alerts(t, nil); len(alerts) != 0 {
 		t.Errorf("alerts = %+v, want none", alerts)
