@@ -44,14 +44,15 @@ type Outbox interface {
 // the change it records is. Being the one place every audited write passes,
 // it is where what an entry sets in motion beyond the log belongs, without
 // any other context knowing of it: it supersedes the change requests the
-// entry's write moved, and writes the catalogue events each entry causes to
-// the outbox in the same transaction, so a change that rolls back notifies
-// nobody.
+// entry's write moved, writes the catalogue events each entry causes to the
+// outbox and announces each entry to the management change streams, all in
+// the same transaction, so a change that rolls back notifies nobody.
 type Record struct {
 	log            AuditAppender
 	changeRequests WaitingChangeRequests
 	outbox         Outbox
 	ids            *id.Source
+	announcer      ChangeAnnouncer
 }
 
 // RecordOption configures a Record.
@@ -61,6 +62,12 @@ type RecordOption func(*Record)
 // identified from ids. Without it, recording writes no event.
 func WithOutbox(outbox Outbox, ids *id.Source) RecordOption {
 	return func(r *Record) { r.outbox, r.ids = outbox, ids }
+}
+
+// WithChangeStream announces each entry of a project through announcer to
+// the management change streams. Without it, recording announces nothing.
+func WithChangeStream(announcer ChangeAnnouncer) RecordOption {
+	return func(r *Record) { r.announcer = announcer }
 }
 
 // NewRecord returns the service appending to log and superseding the change
@@ -90,12 +97,20 @@ func (r *Record) Record(ctx context.Context, e governance.Entry) error {
 }
 
 // keep appends e, recorded or set in motion by another entry, to the log,
-// and the events it causes to the outbox.
+// writes the events it causes to the outbox and announces it to the change
+// streams of its project. An entry of no project is not announced: no
+// project's stream shows it.
 func (r *Record) keep(ctx context.Context, e governance.Entry) error {
 	if err := r.log.Append(ctx, e); err != nil {
 		return err
 	}
-	return r.emit(ctx, e)
+	if err := r.emit(ctx, e); err != nil {
+		return err
+	}
+	if r.announcer == nil || e.Project.IsZero() {
+		return nil
+	}
+	return r.announcer.Announce(ctx, e)
 }
 
 // supersede supersedes the change requests e moves, each recorded as

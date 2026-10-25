@@ -3750,6 +3750,12 @@ type UpdateSegmentParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// StreamProjectChangesParams defines parameters for StreamProjectChanges.
+type StreamProjectChangesParams struct {
+	// LastEventID The id of the last notice the client heard.
+	LastEventID *string `json:"Last-Event-ID,omitempty"`
+}
+
 // DeleteUnitTypeParams defines parameters for DeleteUnitType.
 type DeleteUnitTypeParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
@@ -5968,6 +5974,42 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 	ListSegmentUsages(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StreamProjectChanges The project's change stream
+	//
+	// A server-sent event stream with one notice per audit entry the
+	// project records, from whichever replica made the change, so a client
+	// refetches what it shows of the entity named. A notice never carries
+	// the change itself.
+	//
+	// The first frame is `retry: 3000`. Each notice is a frame
+	// `event: change`, `id: <audit entry id>`, `data:
+	// {"kind", "key", "environment", "version", "actor"}`: the entity's
+	// kind and key as the entry names them, the key of the environment
+	// the change addressed (null for none, or once that environment is
+	// gone), the entity's version after the change (before it for a
+	// deletion; null for an entity without one) and the actor as the
+	// audit log names it. Notices not yet sent are coalesced per entity:
+	// a later change of an entity replaces the one waiting.
+	//
+	// `event: refetch` with `data: {}` tells the client to refetch
+	// everything it shows of the project: after the replica may have
+	// missed a notice, when more than 1,000 notices wait unsent, and when
+	// `Last-Event-ID` names no entry of the project. With a known
+	// `Last-Event-ID`, the entries after it are sent first, up to 1,000;
+	// more than that is a refetch.
+	//
+	// A comment `: hb` every 15 seconds tells a quiet stream from a dead
+	// one. The caller's access to the project is resolved again at every
+	// notice and heartbeat, and the stream ends once it no longer holds
+	// `project.read` or the project is gone. The server closes a stream
+	// after about an hour (60 minutes plus up to 5 of jitter) and when it
+	// shuts down; the client reconnects with `Last-Event-ID`. A caller (a
+	// member, or a project token) holds at most 10 streams open on one
+	// replica.
+	//
+	// Corresponds with GET /projects/{project}/stream (the `StreamProjectChanges` operationId).
+	StreamProjectChanges(ctx context.Context, project ProjectKey, params *StreamProjectChangesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListProjectTokens The tokens of a project
 	//
@@ -9680,6 +9722,52 @@ func (c *Client) UpdateSegment(ctx context.Context, project ProjectKey, segment 
 // Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 func (c *Client) ListSegmentUsages(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListSegmentUsagesRequest(c.Server, project, segment)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StreamProjectChanges The project's change stream
+//
+// A server-sent event stream with one notice per audit entry the
+// project records, from whichever replica made the change, so a client
+// refetches what it shows of the entity named. A notice never carries
+// the change itself.
+//
+// The first frame is `retry: 3000`. Each notice is a frame
+// `event: change`, `id: <audit entry id>`, `data:
+// {"kind", "key", "environment", "version", "actor"}`: the entity's
+// kind and key as the entry names them, the key of the environment
+// the change addressed (null for none, or once that environment is
+// gone), the entity's version after the change (before it for a
+// deletion; null for an entity without one) and the actor as the
+// audit log names it. Notices not yet sent are coalesced per entity:
+// a later change of an entity replaces the one waiting.
+//
+// `event: refetch` with `data: {}` tells the client to refetch
+// everything it shows of the project: after the replica may have
+// missed a notice, when more than 1,000 notices wait unsent, and when
+// `Last-Event-ID` names no entry of the project. With a known
+// `Last-Event-ID`, the entries after it are sent first, up to 1,000;
+// more than that is a refetch.
+//
+// A comment `: hb` every 15 seconds tells a quiet stream from a dead
+// one. The caller's access to the project is resolved again at every
+// notice and heartbeat, and the stream ends once it no longer holds
+// `project.read` or the project is gone. The server closes a stream
+// after about an hour (60 minutes plus up to 5 of jitter) and when it
+// shuts down; the client reconnects with `Last-Event-ID`. A caller (a
+// member, or a project token) holds at most 10 streams open on one
+// replica.
+//
+// Corresponds with GET /projects/{project}/stream (the `StreamProjectChanges` operationId).
+func (c *Client) StreamProjectChanges(ctx context.Context, project ProjectKey, params *StreamProjectChangesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStreamProjectChangesRequest(c.Server, project, params)
 	if err != nil {
 		return nil, err
 	}
@@ -16430,6 +16518,55 @@ func NewListSegmentUsagesRequest(server string, project ProjectKey, segment Segm
 	return req, nil
 }
 
+// NewStreamProjectChangesRequest constructs an http.Request for the StreamProjectChanges method
+func NewStreamProjectChangesRequest(server string, project ProjectKey, params *StreamProjectChangesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/stream", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.LastEventID != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Last-Event-ID", *params.LastEventID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Last-Event-ID", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewListProjectTokensRequest constructs an http.Request for the ListProjectTokens method
 func NewListProjectTokensRequest(server string, project ProjectKey) (*http.Request, error) {
 	var err error
@@ -19418,6 +19555,44 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 	ListSegmentUsagesWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*ListSegmentUsagesResponse, error)
+
+	// StreamProjectChangesWithResponse The project's change stream
+	//
+	// A server-sent event stream with one notice per audit entry the
+	// project records, from whichever replica made the change, so a client
+	// refetches what it shows of the entity named. A notice never carries
+	// the change itself.
+	//
+	// The first frame is `retry: 3000`. Each notice is a frame
+	// `event: change`, `id: <audit entry id>`, `data:
+	// {"kind", "key", "environment", "version", "actor"}`: the entity's
+	// kind and key as the entry names them, the key of the environment
+	// the change addressed (null for none, or once that environment is
+	// gone), the entity's version after the change (before it for a
+	// deletion; null for an entity without one) and the actor as the
+	// audit log names it. Notices not yet sent are coalesced per entity:
+	// a later change of an entity replaces the one waiting.
+	//
+	// `event: refetch` with `data: {}` tells the client to refetch
+	// everything it shows of the project: after the replica may have
+	// missed a notice, when more than 1,000 notices wait unsent, and when
+	// `Last-Event-ID` names no entry of the project. With a known
+	// `Last-Event-ID`, the entries after it are sent first, up to 1,000;
+	// more than that is a refetch.
+	//
+	// A comment `: hb` every 15 seconds tells a quiet stream from a dead
+	// one. The caller's access to the project is resolved again at every
+	// notice and heartbeat, and the stream ends once it no longer holds
+	// `project.read` or the project is gone. The server closes a stream
+	// after about an hour (60 minutes plus up to 5 of jitter) and when it
+	// shuts down; the client reconnects with `Last-Event-ID`. A caller (a
+	// member, or a project token) holds at most 10 streams open on one
+	// replica.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/stream (the `StreamProjectChanges` operationId).
+	StreamProjectChangesWithResponse(ctx context.Context, project ProjectKey, params *StreamProjectChangesParams, reqEditors ...RequestEditorFn) (*StreamProjectChangesResponse, error)
 
 	// ListProjectTokensWithResponse The tokens of a project
 	//
@@ -29191,6 +29366,90 @@ func (r ListSegmentUsagesResponse) ContentType() string {
 	return ""
 }
 
+// StreamProjectChangesResponse200Headers the declared response headers of an HTTP 200 response for StreamProjectChanges
+type StreamProjectChangesResponse200Headers struct {
+	CacheControl    *string
+	XAccelBuffering *string
+}
+
+// StreamProjectChangesResponse401Headers the declared response headers of an HTTP 401 response for StreamProjectChanges
+type StreamProjectChangesResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+// StreamProjectChangesResponse429Headers the declared response headers of an HTTP 429 response for StreamProjectChanges
+type StreamProjectChangesResponse429Headers struct {
+	RetryAfter *int
+}
+
+type StreamProjectChangesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *Problem
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *StreamProjectChangesResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *StreamProjectChangesResponse401Headers
+	// Headers429 the parsed response headers for an HTTP 429 response
+	Headers429 *StreamProjectChangesResponse429Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r StreamProjectChangesResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r StreamProjectChangesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r StreamProjectChangesResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r StreamProjectChangesResponse) GetApplicationproblemJSON429() *Problem {
+	return r.ApplicationproblemJSON429
+}
+
+// GetBody returns the raw response body bytes
+func (r StreamProjectChangesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StreamProjectChangesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StreamProjectChangesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StreamProjectChangesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListProjectTokensResponse401Headers the declared response headers of an HTTP 401 response for ListProjectTokens
 type ListProjectTokensResponse401Headers struct {
 	WWWAuthenticate *string
@@ -33533,6 +33792,50 @@ func (c *ClientWithResponses) ListSegmentUsagesWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseListSegmentUsagesResponse(rsp)
+}
+
+// StreamProjectChangesWithResponse The project's change stream
+//
+// A server-sent event stream with one notice per audit entry the
+// project records, from whichever replica made the change, so a client
+// refetches what it shows of the entity named. A notice never carries
+// the change itself.
+//
+// The first frame is `retry: 3000`. Each notice is a frame
+// `event: change`, `id: <audit entry id>`, `data:
+// {"kind", "key", "environment", "version", "actor"}`: the entity's
+// kind and key as the entry names them, the key of the environment
+// the change addressed (null for none, or once that environment is
+// gone), the entity's version after the change (before it for a
+// deletion; null for an entity without one) and the actor as the
+// audit log names it. Notices not yet sent are coalesced per entity:
+// a later change of an entity replaces the one waiting.
+//
+// `event: refetch` with `data: {}` tells the client to refetch
+// everything it shows of the project: after the replica may have
+// missed a notice, when more than 1,000 notices wait unsent, and when
+// `Last-Event-ID` names no entry of the project. With a known
+// `Last-Event-ID`, the entries after it are sent first, up to 1,000;
+// more than that is a refetch.
+//
+// A comment `: hb` every 15 seconds tells a quiet stream from a dead
+// one. The caller's access to the project is resolved again at every
+// notice and heartbeat, and the stream ends once it no longer holds
+// `project.read` or the project is gone. The server closes a stream
+// after about an hour (60 minutes plus up to 5 of jitter) and when it
+// shuts down; the client reconnects with `Last-Event-ID`. A caller (a
+// member, or a project token) holds at most 10 streams open on one
+// replica.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/stream (the `StreamProjectChanges` operationId).
+func (c *ClientWithResponses) StreamProjectChangesWithResponse(ctx context.Context, project ProjectKey, params *StreamProjectChangesParams, reqEditors ...RequestEditorFn) (*StreamProjectChangesResponse, error) {
+	rsp, err := c.StreamProjectChanges(ctx, project, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStreamProjectChangesResponse(rsp)
 }
 
 // ListProjectTokensWithResponse The tokens of a project
@@ -42631,6 +42934,93 @@ func ParseListSegmentUsagesResponse(rsp *http.Response) (*ListSegmentUsagesRespo
 	return response, nil
 }
 
+// ParseStreamProjectChangesResponse parses an HTTP response from a StreamProjectChangesWithResponse call
+func ParseStreamProjectChangesResponse(rsp *http.Response) (*StreamProjectChangesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StreamProjectChangesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers StreamProjectChangesResponse200Headers
+		if values := rsp.Header.Values("Cache-Control"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Cache-Control", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("X-Accel-Buffering"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Accel-Buffering", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XAccelBuffering = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers StreamProjectChangesResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	case rsp.StatusCode == 429:
+		var headers StreamProjectChangesResponse429Headers
+		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.RetryAfter = &value
+		}
+		response.Headers429 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListProjectTokensResponse parses an HTTP response from a ListProjectTokensWithResponse call
 func ParseListProjectTokensResponse(rsp *http.Response) (*ListProjectTokensResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -44155,6 +44545,9 @@ type ServerInterface interface {
 	// ListSegmentUsages Where a segment is used
 	// (GET /projects/{project}/segments/{segment}/usages)
 	ListSegmentUsages(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey)
+	// StreamProjectChanges The project's change stream
+	// (GET /projects/{project}/stream)
+	StreamProjectChanges(w http.ResponseWriter, r *http.Request, project ProjectKey, params StreamProjectChangesParams)
 	// ListProjectTokens The tokens of a project
 	// (GET /projects/{project}/tokens)
 	ListProjectTokens(w http.ResponseWriter, r *http.Request, project ProjectKey)
@@ -49363,6 +49756,56 @@ func (siw *ServerInterfaceWrapper) ListSegmentUsages(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// StreamProjectChanges operation middleware
+func (siw *ServerInterfaceWrapper) StreamProjectChanges(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StreamProjectChangesParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Last-Event-ID" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Last-Event-ID")]; found {
+		var LastEventID string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Last-Event-ID", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Last-Event-ID", valueList[0], &LastEventID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Last-Event-ID", Err: err})
+			return
+		}
+
+		params.LastEventID = &LastEventID
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StreamProjectChanges(w, r, project, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListProjectTokens operation middleware
 func (siw *ServerInterfaceWrapper) ListProjectTokens(w http.ResponseWriter, r *http.Request) {
 
@@ -50253,6 +50696,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/tokens/{token}", wrapper.RevokeProjectToken)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit", wrapper.ListProjectAuditEntries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/audit/{entry}", wrapper.GetProjectAuditEntry)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/stream", wrapper.StreamProjectChanges)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members", wrapper.ListMembers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/members", wrapper.InviteMember)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/members/{member}", wrapper.GetMember)
@@ -62310,6 +62754,145 @@ func (response ListSegmentUsages404ApplicationProblemPlusJSONResponse) VisitList
 	return err
 }
 
+type StreamProjectChangesRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Params  StreamProjectChangesParams
+}
+
+type StreamProjectChangesResponseObject interface {
+	VisitStreamProjectChangesResponse(w http.ResponseWriter) error
+}
+
+type StreamProjectChanges200ResponseHeaders struct {
+	CacheControl    *string
+	XAccelBuffering *string
+}
+
+type StreamProjectChanges200TexteventStreamResponse struct {
+	Body          io.Reader
+	Headers       StreamProjectChanges200ResponseHeaders
+	ContentLength int64
+}
+
+func (response StreamProjectChanges200TexteventStreamResponse) VisitStreamProjectChangesResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	if response.Headers.CacheControl != nil {
+		w.Header().Set("Cache-Control", fmt.Sprint(*response.Headers.CacheControl))
+	}
+	if response.Headers.XAccelBuffering != nil {
+		w.Header().Set("X-Accel-Buffering", fmt.Sprint(*response.Headers.XAccelBuffering))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		// If w doesn't support flushing, fall back to io.Copy.
+		_, err := io.Copy(w, response.Body)
+		return err
+	}
+	// text/event-stream messages are typically small; use a
+	// modest buffer and flush after each chunk so clients see
+	// events immediately instead of waiting on OS buffering.
+	buf := make([]byte, 4096)
+	for {
+		n, err := response.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return writeErr
+			}
+			flusher.Flush()
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
+}
+
+type StreamProjectChanges401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response StreamProjectChanges401ApplicationProblemPlusJSONResponse) VisitStreamProjectChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StreamProjectChanges403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response StreamProjectChanges403ApplicationProblemPlusJSONResponse) VisitStreamProjectChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StreamProjectChanges404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response StreamProjectChanges404ApplicationProblemPlusJSONResponse) VisitStreamProjectChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StreamProjectChanges429ResponseHeaders struct {
+	RetryAfter *int
+}
+
+type StreamProjectChanges429ApplicationProblemPlusJSONResponse struct {
+	Body    Problem
+	Headers StreamProjectChanges429ResponseHeaders
+}
+
+func (response StreamProjectChanges429ApplicationProblemPlusJSONResponse) VisitStreamProjectChangesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListProjectTokensRequestObject struct {
 	Project ProjectKey `json:"project"`
 }
@@ -64210,6 +64793,9 @@ type StrictServerInterface interface {
 	// ListSegmentUsages Where a segment is used
 	// (GET /projects/{project}/segments/{segment}/usages)
 	ListSegmentUsages(ctx context.Context, request ListSegmentUsagesRequestObject) (ListSegmentUsagesResponseObject, error)
+	// StreamProjectChanges The project's change stream
+	// (GET /projects/{project}/stream)
+	StreamProjectChanges(ctx context.Context, request StreamProjectChangesRequestObject) (StreamProjectChangesResponseObject, error)
 	// ListProjectTokens The tokens of a project
 	// (GET /projects/{project}/tokens)
 	ListProjectTokens(ctx context.Context, request ListProjectTokensRequestObject) (ListProjectTokensResponseObject, error)
@@ -67639,6 +68225,33 @@ func (sh *strictHandler) ListSegmentUsages(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListSegmentUsagesResponseObject); ok {
 		if err := validResponse.VisitListSegmentUsagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StreamProjectChanges operation middleware
+func (sh *strictHandler) StreamProjectChanges(w http.ResponseWriter, r *http.Request, project ProjectKey, params StreamProjectChangesParams) {
+	var request StreamProjectChangesRequestObject
+
+	request.Project = project
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StreamProjectChanges(ctx, request.(StreamProjectChangesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StreamProjectChanges")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StreamProjectChangesResponseObject); ok {
+		if err := validResponse.VisitStreamProjectChangesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
