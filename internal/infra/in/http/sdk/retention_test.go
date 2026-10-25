@@ -148,6 +148,7 @@ func TestADropOfRowsARollupHadNotReadRecordsAGapAndMovesItsCursorPast(t *testing
 
 func TestRetentionWaitsForATransactionStillWritingAPartition(t *testing.T) {
 	f := startRetention(t)
+	f.post(t, aliasEvent(eventID(f.clock.Now(), 901)))
 	written, release := f.srv.HoldNextIngest(t)
 	done := make(chan sdk.EventBatchResult, 1)
 	body := f.envelope(t, f.summary(f.clock.Now().Add(-time.Minute), counted("checkout", "true", "rule", 1)))
@@ -159,6 +160,10 @@ func TestRetentionWaitsForATransactionStillWritingAPartition(t *testing.T) {
 	f.clock.Advance(retention + 24*time.Hour)
 	if err := f.srv.Tick(t, worker.EventRetentionName); err == nil {
 		t.Error("retention dropped a partition a transaction still writes")
+	}
+	// The tables the transaction does not write still drop in the same round.
+	if n := f.storedAliases(t); n != 0 {
+		t.Errorf("%d aliases stored after the round, want their partition dropped", n)
 	}
 	release()
 	if res := <-done; res.Accepted != 1 {
