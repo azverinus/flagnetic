@@ -41,7 +41,15 @@ import {
   getFlag,
   listExperiments,
   getExperiment,
+  getExperimentAssignment,
+  getExperimentConflicts,
+  getExperimentExposures,
+  getExperimentExposureTimeline,
   type Experiment,
+  type ExperimentAssignment,
+  type ExperimentExposures,
+  type ExposureConflicts,
+  type ExposureTimeline,
   type ExperimentList,
   listSegments,
   getSegment,
@@ -274,6 +282,69 @@ export function experimentQuery(project: string, experiment: string) {
   return queryOptions<Experiment>({
     queryKey: [...experimentsQueryKey(project), "detail", experiment],
     queryFn: () => unwrap(getExperiment({ path: { project, experiment } })),
+    retry: false,
+  });
+}
+
+/**
+ * What an experiment's exposures in one environment came to, as the
+ * exposure rollup last counted them: under the experiment's own key, so a
+ * transition refreshes them with it.
+ */
+export function experimentExposuresQuery(project: string, experiment: string, environment: string) {
+  return queryOptions<ExperimentExposures>({
+    queryKey: [...experimentsQueryKey(project), "detail", experiment, "exposures", environment],
+    queryFn: () =>
+      unwrap(getExperimentExposures({ path: { project, experiment }, query: { environment } })),
+  });
+}
+
+/** An experiment's exposures per UTC day in one environment, every day it has. */
+export function experimentTimelineQuery(project: string, experiment: string, environment: string) {
+  return queryOptions<ExposureTimeline>({
+    queryKey: [...experimentsQueryKey(project), "detail", experiment, "timeline", environment],
+    queryFn: () =>
+      unwrap(
+        getExperimentExposureTimeline({ path: { project, experiment }, query: { environment } }),
+      ),
+  });
+}
+
+/** The latest of an experiment's conflicting units in one environment, at most 100. */
+export function experimentConflictsQuery(project: string, experiment: string, environment: string) {
+  return queryOptions<ExposureConflicts>({
+    queryKey: [...experimentsQueryKey(project), "detail", experiment, "conflicts", environment],
+    queryFn: () =>
+      unwrap(getExperimentConflicts({ path: { project, experiment }, query: { environment } })),
+  });
+}
+
+/**
+ * How an experiment treats one unit ID. The answer follows from the
+ * experiment's salts and allocation, so it is cached per version: an
+ * edit or a transition asks again.
+ */
+export function experimentAssignmentQuery(
+  project: string,
+  experiment: Pick<Experiment, "key" | "version">,
+  unitId: string,
+) {
+  return queryOptions<ExperimentAssignment>({
+    queryKey: [
+      ...experimentsQueryKey(project),
+      "detail",
+      experiment.key,
+      "assignment",
+      experiment.version,
+      unitId,
+    ],
+    queryFn: () =>
+      unwrap(
+        getExperimentAssignment({
+          path: { project, experiment: experiment.key },
+          query: { unit_id: unitId },
+        }),
+      ),
     retry: false,
   });
 }
