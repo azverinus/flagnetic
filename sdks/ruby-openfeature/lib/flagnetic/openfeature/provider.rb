@@ -12,7 +12,7 @@ module Flagnetic
     #   client.fetch_boolean_value(flag_key: "new_checkout", default_value: false,
     #                              evaluation_context: OpenFeature::SDK::EvaluationContext.new(targeting_key: "u-1001"))
     #
-    # Reasons map as every Flagnetic provider maps them (REASONS), the
+    # Reasons map as every Flagnetic provider maps them (reason_of), the
     # Flagnetic reason itself in the flag metadata under
     # REASON_METADATA_KEY. Exposures and aliases go through track:
     #
@@ -101,36 +101,36 @@ module Flagnetic
       end
 
       def fetch_boolean_value(flag_key:, default_value:, evaluation_context: nil)
-        OpenFeature.resolution(detail(flag_key, default_value, evaluation_context))
+        Mapping.resolution(detail(flag_key, default_value, evaluation_context))
       end
 
       def fetch_string_value(flag_key:, default_value:, evaluation_context: nil)
-        OpenFeature.resolution(detail(flag_key, default_value, evaluation_context))
+        Mapping.resolution(detail(flag_key, default_value, evaluation_context))
       end
 
       # fetch_number_value serves a number flag as the ruleset has it, an
       # Integer or a Float.
       def fetch_number_value(flag_key:, default_value:, evaluation_context: nil)
-        OpenFeature.resolution(detail(flag_key, default_value, evaluation_context))
+        Mapping.resolution(detail(flag_key, default_value, evaluation_context))
       end
 
       # fetch_integer_value serves a number flag as an Integer, as the
       # client's int getter does: a number that is not whole serves
       # default_value with TYPE_MISMATCH rather than a truncated value.
       def fetch_integer_value(flag_key:, default_value:, evaluation_context: nil)
-        OpenFeature.resolution(integral(detail(flag_key, default_value, evaluation_context), default_value))
+        Mapping.resolution(integral(detail(flag_key, default_value, evaluation_context), default_value))
       end
 
       # fetch_float_value serves a number flag as a Float.
       def fetch_float_value(flag_key:, default_value:, evaluation_context: nil)
         served = detail(flag_key, default_value, evaluation_context)
         served = Flagnetic::Detail.new(**served.to_h, value: served.value.to_f) if served.reason != :fallback
-        OpenFeature.resolution(served)
+        Mapping.resolution(served)
       end
 
       # fetch_object_value serves a JSON flag's value, parsed and frozen.
       def fetch_object_value(flag_key:, default_value:, evaluation_context: nil)
-        OpenFeature.resolution(detail(flag_key, default_value, evaluation_context))
+        Mapping.resolution(detail(flag_key, default_value, evaluation_context))
       end
 
       # track reports the exposure of the flag named by the flag attribute
@@ -158,7 +158,7 @@ module Flagnetic
         @client.detail(flag_key, default: default_value, context: context(evaluation_context))
       end
 
-      def context(evaluation_context) = OpenFeature.context(evaluation_context, @unit_type)
+      def context(evaluation_context) = Mapping.context(evaluation_context, @unit_type)
 
       def present?(value) = value.is_a?(String) && !value.empty?
 

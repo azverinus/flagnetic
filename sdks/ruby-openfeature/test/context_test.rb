@@ -7,7 +7,9 @@ require "test_helper"
 # unit type, the units attribute adds further unit IDs by unit type, and
 # every other attribute is an attribute.
 class ContextTest < Minitest::Test
-  def convert(context, unit_type = "user") = Flagnetic::OpenFeature.context(context, unit_type)
+  MAPPING = Flagnetic::OpenFeature.const_get(:Mapping)
+
+  def convert(context, unit_type = "user") = MAPPING.context(context, unit_type)
 
   def test_targeting_key_becomes_the_unit_id_of_unit_type
     assert_equal({ units: { "user" => "u-1" }, attributes: {} },

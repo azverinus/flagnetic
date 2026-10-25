@@ -24,6 +24,11 @@ class ReasonsTest < Minitest::Test
     assert_equal OF::Provider::Reason::UNKNOWN, Flagnetic::OpenFeature.reason_of(:a_reason_a_newer_server_adds)
   end
 
+  def test_only_the_provider_and_the_reason_mapping_are_public
+    assert_equal %i[Provider REASON_METADATA_KEY VERSION], Flagnetic::OpenFeature.constants.sort
+    assert_equal %i[reason_of], Flagnetic::OpenFeature.singleton_methods
+  end
+
   def test_fixtures_are_found
     refute_empty FILES
   end

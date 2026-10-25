@@ -6,9 +6,11 @@ require "test_helper"
 # OpenFeature resolution on details built directly: error codes, the
 # variant, and the flag metadata.
 class MappingTest < Minitest::Test
+  MAPPING = Flagnetic::OpenFeature.const_get(:Mapping)
+
   def resolution(**fields)
-    Flagnetic::OpenFeature.resolution(Flagnetic::Detail.new(value: true, reason: :fallthrough, ruleset_version: 3,
-                                                            stage: :fresh, **fields))
+    MAPPING.resolution(Flagnetic::Detail.new(value: true, reason: :fallthrough, ruleset_version: 3,
+                                             stage: :fresh, **fields))
   end
 
   def test_fallback_is_error_with_the_variant_left_unset
