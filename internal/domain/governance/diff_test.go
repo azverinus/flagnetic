@@ -3,6 +3,7 @@ package governance_test
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -169,4 +170,20 @@ func applyOp(d any, op string, path []string, value any) (any, error) {
 		}
 	}
 	return nil, &json.UnsupportedValueError{Str: "path into a scalar"}
+}
+
+func TestAnArrayTooLongToDiffElementByElementIsReplacedWhole(t *testing.T) {
+	long := make([]any, 1001)
+	for i := range long {
+		long[i] = float64(i)
+	}
+	changed := slices.Clone(long)
+	changed[500] = "moved"
+
+	got := governance.Diff(map[string]any{"overrides": long}, map[string]any{"overrides": changed})
+
+	want := []governance.PatchOperation{{Op: "replace", Path: "/overrides", Value: changed}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Diff = %d operations, want the array replaced whole", len(got))
+	}
 }

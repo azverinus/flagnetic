@@ -55,7 +55,7 @@ func diffValue(ops []PatchOperation, path string, a, b any) []PatchOperation {
 }
 
 func diffObject(ops []PatchOperation, path string, a, b map[string]any) []PatchOperation {
-	keys := make([]string, 0, len(a)+len(b))
+	keys := make([]string, 0, len(a))
 	for k := range a {
 		keys = append(keys, k)
 	}
@@ -81,12 +81,21 @@ func diffObject(ops []PatchOperation, path string, a, b map[string]any) []PatchO
 	return ops
 }
 
+// maxDiffedArray is the longest array diffArray diffs element by element.
+const maxDiffedArray = 1000
+
 // diffArray walks the edit script from a's longest common subsequence with
 // b. Each run of elements between two kept ones is removals from a and
 // insertions from b: as many as both have are taken as elements changed in
 // place, the rest removed or added. Indices are those of the array as the
 // operations before have left it, as RFC 6902 applies them in order.
 func diffArray(ops []PatchOperation, path string, a, b []any) []PatchOperation {
+	// The table below grows with the product of both lengths; an array
+	// longer than any a reviewer reads element by element, such as
+	// thousands of overrides, is replaced whole instead.
+	if len(a) > maxDiffedArray || len(b) > maxDiffedArray {
+		return append(ops, PatchOperation{Op: "replace", Path: path, Value: b})
+	}
 	// common[i][j] is the length of the longest common subsequence of a[i:]
 	// and b[j:].
 	common := make([][]int, len(a)+1)
