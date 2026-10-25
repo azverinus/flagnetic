@@ -135,6 +135,41 @@ The provider takes a client the application built with `createClient`, which it 
 
 To render on the server, pass the document `values(context)` of `flagnetic/server` produced as `bootstrap`, and write the same document into the page for the browser. The hooks serve it while the page renders on the server and while it hydrates, so the first render in the browser matches the HTML; the provider builds its client after hydration, from the same document, and the first remote evaluation happens then. Nothing is fetched while a page renders on the server. A `bootstrap` of `undefined`, what `values()` gives before the server mode has a ruleset, renders built-in defaults at stage `built_in` on both sides.
 
+## OpenFeature
+
+`flagnetic/openfeature` has a provider for each OpenFeature SDK: `FlagneticServerProvider` for `@openfeature/server-sdk` 1.23 and later in Node, `FlagneticWebProvider` for `@openfeature/web-sdk` 1.10 and later in the browser. Install the SDK of your side; the entry point loads neither at run time.
+
+```ts
+import { OpenFeature } from "@openfeature/server-sdk";
+import { FlagneticServerProvider } from "flagnetic/openfeature";
+
+await OpenFeature.setProviderAndWait(new FlagneticServerProvider(process.env.FLAGNETIC_SDK_KEY!, "https://flags.example.com"));
+const client = OpenFeature.getClient();
+
+const context = { targetingKey: "u-1001", country: "DE", units: { anonymous: "d-8f1c" } };
+const enabled = await client.getBooleanValue("new_checkout", false, context);
+
+client.track("exposure", context, { flag: "pricing" }); // an experiment's exposure is explicit
+client.track("alias", context, { fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
+```
+
+```ts
+import { OpenFeature } from "@openfeature/web-sdk";
+import { FlagneticWebProvider } from "flagnetic/openfeature";
+
+await OpenFeature.setProviderAndWait(new FlagneticWebProvider("fn_cli_…", "https://flags.example.com"), { targetingKey: "u-1001" });
+const enabled = OpenFeature.getClient().getBooleanValue("new_checkout", false);
+await OpenFeature.setContext({ targetingKey: "u-2002" }); // evaluated for the new context
+```
+
+Each provider builds and owns a client of its mode, `provider.client`, and takes that mode's options plus two of its own: `unitType`, the unit type the targeting key is a unit ID of (`user` by default), and `readyTimeout`, how long `initialize` waits for the first ruleset or values (10 seconds on the server, 5 in the browser). `initialize` never fails: at stage `built_in` every getter serves your default. The context attribute `units` adds unit IDs by unit type; every other attribute is an attribute, a `Date` sent as an RFC 3339 string. The web provider evaluates OpenFeature's context, so it takes no `context` option.
+
+Reasons map as `reasonOf` does, the same in every Flagnetic provider: `rule`, `prerequisite_failed`, `override` and `targeting_match` are `TARGETING_MATCH`, `rollout` and `experiment` `SPLIT`, `fallthrough` `DEFAULT`, `off` `DISABLED`, `local_override` `STATIC`, and a reason a newer server adds `UNKNOWN`. A built-in default served instead is `ERROR` with `FLAG_NOT_FOUND`, `TYPE_MISMATCH` or `GENERAL`, the Flagnetic error code as message. The flag metadata carries the Flagnetic reason under `REASON_METADATA_KEY` (`flagnetic_reason`), with `stage`, `ruleset_version`, `variation`, `overridden` and an experiment's `experiment_key`, `experiment_variation`, `experiment_unit_type`, `experiment_unit_id`, `experiment_inclusion_bucket`, `experiment_variation_bucket` and `experiment_override`.
+
+`track("exposure")` reports the exposure of the flag named by `flag`, for the context (the current one in the browser), as `exposure` does; `track("alias")` records an alias. Any other event name, or one missing what it needs, does nothing.
+
+Events: `PROVIDER_CONFIGURATION_CHANGED` with the keys of the flags that may have changed; `PROVIDER_STALE` when the client moves to `last_good`; `PROVIDER_READY` when it is fresh again; `PROVIDER_ERROR` when the SDK key is revoked, kept until the key is accepted again. OpenFeature reports `READY` once `initialize` or a context change resolves, whatever was reached; right after it the provider sends `ERROR` or `STALE` when that is where the client stands.
+
 ## Evaluator
 
 ```ts

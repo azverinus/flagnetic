@@ -77,6 +77,13 @@ export interface ClientInternals {
   readonly fetch?: typeof fetch;
   readonly page?: Page;
   readonly trace?: (event: ClientTraceEvent) => void;
+  /**
+   * Makes no request until the first `setContext`, for an owner that learns
+   * the context only after building the client: the OpenFeature web
+   * provider. An evaluation of the constructor's context would be thrown
+   * away.
+   */
+  readonly deferStart?: boolean;
 }
 
 /** Why an evaluation was started; it reaches the `fetch_failed` log event. */
@@ -142,13 +149,16 @@ export class FlagneticClient {
   private readonly served = new Map<string, Detail>();
   private readonly ingest: Ingest | undefined;
   private readonly recorder: Recorder | undefined;
-  private readonly stream: ChangeStream | undefined;
+  private stream: ChangeStream | undefined;
+  private readonly streamTiming: Partial<StreamTiming> | undefined;
   private readonly unlisten: () => void;
 
   // The evaluation loop. Every trigger coalesces into the request in flight.
   private inFlight = false;
   private again = false;
   private started = false;
+  /** No request until the first setContext: see ClientInternals.deferStart. */
+  private deferred: boolean;
   private retrying = false;
   private lastAttemptAt = Number.NEGATIVE_INFINITY;
   /** The poll or the retry, whichever is due: the next attempt is one timer. */
@@ -186,6 +196,8 @@ export class FlagneticClient {
   constructor(sdkKey: string, baseUrl: string, options: ClientOptions, internals: ClientInternals) {
     this.sdkKey = sdkKey;
     this.options = options;
+    this.deferred = internals.deferStart === true;
+    this.streamTiming = internals.streamTiming;
     this.logger = options.logger ?? consoleLogger("warn");
     this.allowOverrides = options.allowOverrides === true;
     this.overrides = new LocalOverrides(this);
@@ -271,15 +283,21 @@ export class FlagneticClient {
     this.ingest.setVisible(this.visible);
     this.ingest.start();
 
-    if (options.stream === true) {
+    if (!this.deferred) this.begin();
+  }
+
+  // begin opens the change stream when it is on and starts the first
+  // evaluation, which with the stream waits for it to open.
+  private begin(): void {
+    if (this.options.stream === true) {
       this.stream = new ChangeStream(
         {
           url: `${this.baseUrl}${SDK_API_PATH}/stream`,
-          sdkKey,
+          sdkKey: this.sdkKey,
           clock: this.clock,
           random: this.random,
           fetch: this.doFetch,
-          timing: { ...defaultStreamTiming, ...internals.streamTiming },
+          timing: { ...defaultStreamTiming, ...this.streamTiming },
         },
         {
           opened: () => {
@@ -358,7 +376,14 @@ export class FlagneticClient {
     // The previous values are no longer the server's answer for this
     // context, so they serve as last good until the new ones arrive.
     if (this.currentStage === "fresh") this.setStage("last_good");
-    return this.attemptAfter("context");
+    if (this.deferred) {
+      // The first context starts the client as the constructor would have:
+      // with the stream on, the evaluation waits for it to open, so a page
+      // load sends one evaluation and no change falls between the two.
+      this.deferred = false;
+      return this.attemptAfter(() => { this.begin(); });
+    }
+    return this.attemptAfter(() => { this.refetch("context"); });
   }
 
   /**
@@ -663,11 +688,11 @@ export class FlagneticClient {
     this.refetch("stream");
   }
 
-  /** Refetches and resolves once an evaluation started no earlier than now has settled. */
-  private attemptAfter(trigger: Trigger): Promise<Stage> {
+  /** Runs start, which starts an evaluation, and resolves once an evaluation started no earlier than now has settled. */
+  private attemptAfter(start: () => void): Promise<Stage> {
     const minSeq = this.attemptSeq + 1;
     const waited = new Promise<Stage>((resolve) => this.attemptWaiters.push({ minSeq, resolve }));
-    this.refetch(trigger);
+    start();
     return waited;
   }
 
@@ -676,7 +701,7 @@ export class FlagneticClient {
    * flight: a further trigger only marks that another is due once it returns.
    */
   private refetch(trigger: Trigger): void {
-    if (this.closed || this.offline) return;
+    if (this.closed || this.offline || this.deferred) return;
     if (this.inFlight) {
       this.again = true;
       return;
