@@ -1,0 +1,7 @@
+# Development only: resolve flagnetic from this repository rather than from
+# pub.dev, so a change to both packages is tested together. pub reads this
+# file in this directory and never publishes it; the published package
+# requires the released flagnetic named in pubspec.yaml.
+dependency_overrides:
+  flagnetic:
+    path: ../dart

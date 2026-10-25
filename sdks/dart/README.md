@@ -1,6 +1,6 @@
 # flagnetic
 
-Feature flags and experiments for Dart and Flutter apps, served by a self-hosted [Flagnetic](https://github.com/azverinus/flagnetic) instance. This package is the client mode: it runs on the Dart VM and has no dependency, Flutter included.
+Feature flags and experiments for Dart and Flutter apps, served by a self-hosted [Flagnetic](https://github.com/azverinus/flagnetic) instance. This package is the client mode: it runs on the Dart VM and has no dependency, Flutter included. A Flutter app adds [`flagnetic_flutter`](https://pub.dev/packages/flagnetic_flutter) for widgets that rebuild when a flag changes, the app lifecycle, a store on every platform and a Dev Tools screen.
 
 A client posts its context to remote evaluation with a **client key** and serves every flag from memory, so getters are synchronous and never throw. The values it last received are kept in a store on the device, so a cold start without a network serves them. A server key cannot build a client: it must never ship in an app.
 
