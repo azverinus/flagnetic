@@ -230,31 +230,37 @@ func (h *CreateWebhook) Handle(ctx context.Context, cmd CreateWebhookCommand) (C
 	now := h.d.now()
 	var out CreatedWebhook
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		if err := h.d.lockProject(ctx, cmd.Project); err != nil {
-			return err
-		}
-		// Checked again under the lock: an environment may have gone since.
-		in, err := h.d.check(ctx, cmd.Project, in)
-		if err != nil {
-			return err
-		}
-		w := governance.Webhook{
-			ID: id.New[governance.Webhook](h.d.IDs), Project: cmd.Project, WebhookInput: in, SealedSecret: sealed,
-			CreatedBy: cmd.CreatedBy, EnabledAt: now, CreatedAt: now, UpdatedAt: now, Version: 1,
-		}
-		if err := h.d.Store.CreateWebhook(ctx, w); err != nil {
-			return err
-		}
-		if err := h.d.record(ctx, now, cmd.Request, "webhook.created", nil, &w); err != nil {
-			return err
-		}
-		if w, err = webhookOf(ctx, h.d.Store, cmd.Project, w.ID); err != nil {
-			return err
-		}
+		w, txErr := h.create(ctx, cmd, in, sealed, now)
 		out = CreatedWebhook{Webhook: w, Secret: value}
-		return nil
+		return txErr
 	})
 	return out, err
+}
+
+// create stores the subscription in, under the project's lock, and records
+// it.
+func (h *CreateWebhook) create(ctx context.Context, cmd CreateWebhookCommand, in governance.WebhookInput, sealed string,
+	now time.Time,
+) (governance.Webhook, error) {
+	if err := h.d.lockProject(ctx, cmd.Project); err != nil {
+		return governance.Webhook{}, err
+	}
+	// Checked again under the lock: an environment may have gone since.
+	in, err := h.d.check(ctx, cmd.Project, in)
+	if err != nil {
+		return governance.Webhook{}, err
+	}
+	w := governance.Webhook{
+		ID: id.New[governance.Webhook](h.d.IDs), Project: cmd.Project, WebhookInput: in, SealedSecret: sealed,
+		CreatedBy: cmd.CreatedBy, EnabledAt: now, CreatedAt: now, UpdatedAt: now, Version: 1,
+	}
+	if err = h.d.Store.CreateWebhook(ctx, w); err != nil {
+		return w, err
+	}
+	if err = h.d.record(ctx, now, cmd.Request, "webhook.created", nil, &w); err != nil {
+		return w, err
+	}
+	return webhookOf(ctx, h.d.Store, cmd.Project, w.ID)
 }
 
 // UpdateWebhookCommand is an edit of the subscription Webhook of Project,
@@ -290,45 +296,49 @@ func (h *UpdateWebhook) Handle(ctx context.Context, cmd UpdateWebhookCommand) (g
 			return seen, err
 		}
 	}
-	now := h.d.now()
 	var out governance.Webhook
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
-		if err := h.d.lockProject(ctx, cmd.Project); err != nil {
-			return err
-		}
-		before, err := webhookOf(ctx, h.d.Store, cmd.Project, cmd.Webhook)
-		if err != nil {
-			return err
-		}
-		in, err := h.d.check(ctx, cmd.Project, before.With(cmd.Change))
-		if err != nil {
-			return err
-		}
-		// The target is the one checked above when the change names one, and
-		// otherwise the stored one, checked when it was written.
-		if err := precondition.Check(cmd.Expected, before.Version); err != nil {
-			return err
-		}
-		out = before
-		if in.Same(before.WebhookInput) {
-			return nil
-		}
-		after := before
-		after.WebhookInput = in
-		if in.Enabled && !before.Enabled {
-			after.EnabledAt = now
-		}
-		after.UpdatedAt, after.Version = now, before.Version+1
-		if err := h.d.Store.UpdateWebhook(ctx, after); err != nil {
-			return err
-		}
-		if err := h.d.record(ctx, now, cmd.Request, "webhook.updated", &before, &after); err != nil {
-			return err
-		}
-		out, err = webhookOf(ctx, h.d.Store, cmd.Project, cmd.Webhook)
-		return err
+		var txErr error
+		out, txErr = h.update(ctx, cmd, h.d.now())
+		return txErr
 	})
 	return out, err
+}
+
+// update applies cmd's change under the project's lock. The target is the
+// one Handle checked when the change names one, and otherwise the stored
+// one, checked when it was written.
+func (h *UpdateWebhook) update(ctx context.Context, cmd UpdateWebhookCommand, now time.Time) (governance.Webhook, error) {
+	if err := h.d.lockProject(ctx, cmd.Project); err != nil {
+		return governance.Webhook{}, err
+	}
+	before, err := webhookOf(ctx, h.d.Store, cmd.Project, cmd.Webhook)
+	if err != nil {
+		return before, err
+	}
+	in, err := h.d.check(ctx, cmd.Project, before.With(cmd.Change))
+	if err != nil {
+		return before, err
+	}
+	if err = precondition.Check(cmd.Expected, before.Version); err != nil {
+		return before, err
+	}
+	if in.Same(before.WebhookInput) {
+		return before, nil
+	}
+	after := before
+	after.WebhookInput = in
+	if in.Enabled && !before.Enabled {
+		after.EnabledAt = now
+	}
+	after.UpdatedAt, after.Version = now, before.Version+1
+	if err = h.d.Store.UpdateWebhook(ctx, after); err != nil {
+		return after, err
+	}
+	if err = h.d.record(ctx, now, cmd.Request, "webhook.updated", &before, &after); err != nil {
+		return after, err
+	}
+	return webhookOf(ctx, h.d.Store, cmd.Project, cmd.Webhook)
 }
 
 // DeleteWebhookCommand asks for the subscription Webhook of Project to go.
