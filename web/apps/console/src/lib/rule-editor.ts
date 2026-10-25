@@ -140,9 +140,7 @@ export function servableExperiments(
 ): Experiment[] {
   return experiments.filter(
     (experiment) =>
-      experiment.status === "draft" ||
-      experiment.status === "running" ||
-      experiment.key === served,
+      experiment.status === "draft" || experiment.status === "running" || experiment.key === served,
   );
 }
 

@@ -278,7 +278,12 @@ describe("what a rule serves in one line", () => {
   it("names a variation, a rollout and an experiment", () => {
     expect(describeServe(i18n, { kind: "variation", variation: "on" })).toBe("on");
     expect(
-      describeServe(i18n, { kind: "rollout", variation: "on", unit_type: "user", percentage: 2500 }),
+      describeServe(i18n, {
+        kind: "rollout",
+        variation: "on",
+        unit_type: "user",
+        percentage: 2500,
+      }),
     ).toBe("on to 25% of user units");
     expect(describeServe(i18n, { kind: "experiment", experiment: "checkout-test" })).toBe(
       "experiment checkout-test",
