@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,6 +23,7 @@ import (
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	appworkspace "github.com/azverinus/flagnetic/internal/app/workspace"
 	"github.com/azverinus/flagnetic/internal/domain/events"
+	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
@@ -81,6 +83,9 @@ type Options struct {
 	// SDKInventoryRetention is how long the SDK inventory keeps an SDK
 	// after it was last seen.
 	SDKInventoryRetention time.Duration
+	// WebhookTargets is what the operator allows a webhook subscription's
+	// target to be.
+	WebhookTargets governance.TargetPolicy
 	management.Options
 }
 
@@ -157,6 +162,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Pool: d.Pool, Next: appdelivery.NewBumpRulesets(deliveryStore, d.Clock),
 		After: materialize, Before: rulesetCache, Registerer: reg,
 	})
+	// A subscription's secret is sealed under the instance's secret key, and
+	// its target's name resolved by the system's resolver.
+	webhookStore := pggovernance.NewWebhooks(d.Pool)
+	webhooks := appgovernance.WebhookDeps{
+		Tx: tx, Store: webhookStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
+		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets,
+	}
 	sdkKeys := appdelivery.SDKKeyDeps{
 		Tx: tx, Store: deliveryStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 	}
@@ -380,6 +392,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RebaseChangeRequest: appgovernance.NewRebaseChangeRequest(changeRequests),
 		CancelChangeRequest: appgovernance.NewCancelChangeRequest(changeRequests),
 		CopyChangeRequest:   appgovernance.NewCopyChangeRequest(changeRequests),
+
+		ListWebhookEventTypes: appgovernance.NewListWebhookEventTypes(),
+		ListWebhooks:          appgovernance.NewListWebhooks(webhookStore),
+		CreateWebhook:         appgovernance.NewCreateWebhook(webhooks),
+		GetWebhook:            appgovernance.NewGetWebhook(webhookStore),
+		UpdateWebhook:         appgovernance.NewUpdateWebhook(webhooks),
+		DeleteWebhook:         appgovernance.NewDeleteWebhook(webhooks),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),

@@ -15,8 +15,13 @@ import (
 // of its own, so a value sealed for one purpose never opens as another.
 type Purpose string
 
-// PurposeCanary seals the canary.
-const PurposeCanary Purpose = "canary"
+// The purposes values are sealed for.
+const (
+	// PurposeCanary seals the canary.
+	PurposeCanary Purpose = "canary"
+	// PurposeWebhookSecret seals the secrets signing webhook calls.
+	PurposeWebhookSecret Purpose = "webhook secret"
+)
 
 // Use names a key derived from the secret key for something other than
 // sealing.

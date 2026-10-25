@@ -66,6 +66,9 @@ import type {
   CreateUnitTypeData,
   CreateUnitTypeErrors,
   CreateUnitTypeResponses,
+  CreateWebhookData,
+  CreateWebhookErrors,
+  CreateWebhookResponses,
   DeactivateMemberData,
   DeactivateMemberErrors,
   DeactivateMemberResponses,
@@ -96,6 +99,9 @@ import type {
   DeleteUnitTypeData,
   DeleteUnitTypeErrors,
   DeleteUnitTypeResponses,
+  DeleteWebhookData,
+  DeleteWebhookErrors,
+  DeleteWebhookResponses,
   DismissDiscoveredAttributeData,
   DismissDiscoveredAttributeErrors,
   DismissDiscoveredAttributeResponses,
@@ -168,6 +174,9 @@ import type {
   GetUnitTypeData,
   GetUnitTypeErrors,
   GetUnitTypeResponses,
+  GetWebhookData,
+  GetWebhookErrors,
+  GetWebhookResponses,
   InviteMemberData,
   InviteMemberErrors,
   InviteMemberResponses,
@@ -243,6 +252,12 @@ import type {
   ListUnitTypesData,
   ListUnitTypesErrors,
   ListUnitTypesResponses,
+  ListWebhookEventTypesData,
+  ListWebhookEventTypesErrors,
+  ListWebhookEventTypesResponses,
+  ListWebhooksData,
+  ListWebhooksErrors,
+  ListWebhooksResponses,
   OpenChangeRequestData,
   OpenChangeRequestErrors,
   OpenChangeRequestResponses,
@@ -351,6 +366,9 @@ import type {
   UpdateUnitTypeData,
   UpdateUnitTypeErrors,
   UpdateUnitTypeResponses,
+  UpdateWebhookData,
+  UpdateWebhookErrors,
+  UpdateWebhookResponses,
 } from "./types.gen";
 
 export type Options<
@@ -3588,4 +3606,166 @@ export const listAuditEntries = <ThrowOnError extends boolean = false>(
     ],
     url: "/audit",
     ...options,
+  });
+
+/**
+ * The event catalogue
+ *
+ * Every event type a webhook subscription may name, with what emits
+ * it. `*` in a subscription's `events` matches every type but
+ * `audit.entry`, which a subscription names to get.
+ *
+ */
+export const listWebhookEventTypes = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWebhookEventTypesData, ThrowOnError>,
+): RequestResult<ListWebhookEventTypesResponses, ListWebhookEventTypesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListWebhookEventTypesResponses,
+    ListWebhookEventTypesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhook-event-types",
+    ...options,
+  });
+
+/**
+ * The project's webhook subscriptions
+ *
+ * The oldest first. A secret is never listed; it is shown once, when it is issued.
+ */
+export const listWebhooks = <ThrowOnError extends boolean = false>(
+  options: Options<ListWebhooksData, ThrowOnError>,
+): RequestResult<ListWebhooksResponses, ListWebhooksErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListWebhooksResponses, ListWebhooksErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks",
+    ...options,
+  });
+
+/**
+ * Subscribe to events
+ *
+ * Creates a webhook subscription and answers it with its `secret`,
+ * shown this once: it is stored sealed under `FLAGNETIC_SECRET_KEY`
+ * and never answered again, and audit entries record it as
+ * `[redacted]`. A subscription created now is sent only events of
+ * changes made after it.
+ *
+ * `url` must be `https` (`insecure_url`) unless the operator set
+ * `FLAGNETIC_WEBHOOK_ALLOW_HTTP`, and a target whose name resolves to a
+ * loopback, private, link-local, unspecified or multicast address is
+ * refused (`private_network_target`) unless the operator set
+ * `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
+ * resolve is accepted, and every call checks the address it reaches
+ * again. An event type outside the catalogue is `unknown_event_type`.
+ * A blank name or one over 200 characters, a `url` that is not an
+ * absolute http or https URL without credentials or a fragment, no
+ * event type, and an environment the project does not have are
+ * `invalid_webhook`.
+ *
+ */
+export const createWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWebhookData, ThrowOnError>,
+): RequestResult<CreateWebhookResponses, CreateWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<CreateWebhookResponses, CreateWebhookErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a webhook subscription
+ *
+ * The subscription goes, and nothing more is sent under it. Unlike an
+ * edit it takes no `If-Match`: whatever the subscription became, the
+ * caller wants nothing more sent to its target.
+ *
+ */
+export const deleteWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteWebhookData, ThrowOnError>,
+): RequestResult<DeleteWebhookResponses, DeleteWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).delete<DeleteWebhookResponses, DeleteWebhookErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}",
+    ...options,
+  });
+
+/**
+ * A webhook subscription
+ */
+export const getWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<GetWebhookData, ThrowOnError>,
+): RequestResult<GetWebhookResponses, GetWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetWebhookResponses, GetWebhookErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}",
+    ...options,
+  });
+
+/**
+ * Edit a webhook subscription
+ *
+ * Changes each property present and leaves the others as they are,
+ * with the refusals of creation; a new `url` is checked as on
+ * creation. An edit that changes nothing stores and records nothing.
+ *
+ */
+export const updateWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateWebhookData, ThrowOnError>,
+): RequestResult<UpdateWebhookResponses, UpdateWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).patch<UpdateWebhookResponses, UpdateWebhookErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });

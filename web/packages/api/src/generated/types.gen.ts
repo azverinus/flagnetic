@@ -2011,6 +2011,160 @@ export type EvaluationResult = {
 };
 
 /**
+ * A type of the event catalogue, or `*` for every type but
+ * `audit.entry`. `GET /webhook-event-types` lists the catalogue with
+ * what emits each type.
+ *
+ */
+export type WebhookEventType =
+  | "flag.created"
+  | "flag.updated"
+  | "flag.deleted"
+  | "flag.switched_on"
+  | "flag.switched_off"
+  | "flag.kill_switch"
+  | "flag.rules_changed"
+  | "flag.reverted"
+  | "segment.created"
+  | "segment.updated"
+  | "segment.deleted"
+  | "experiment.started"
+  | "experiment.stopped"
+  | "experiment.archived"
+  | "experiment.traffic_allocation_changed"
+  | "experiment.srm_detected"
+  | "experiment.srm_cleared"
+  | "experiment.no_exposures"
+  | "experiment.exposure_conflicts"
+  | "experiment.past_expected_end"
+  | "change_request.opened"
+  | "change_request.approved"
+  | "change_request.rejected"
+  | "change_request.applied"
+  | "change_request.cancelled"
+  | "change_request.superseded"
+  | "change_request.scheduled"
+  | "change_request.schedule_failed"
+  | "grant.created"
+  | "grant.deleted"
+  | "sdk_key.created"
+  | "sdk_key.revoked"
+  | "webhook.disabled"
+  | "report.stale_flags"
+  | "audit.entry"
+  | "ping"
+  | "*";
+
+export type WebhookEventTypeInfo = {
+  type: string;
+  /**
+   * What emits an event of this type.
+   */
+  description: string;
+};
+
+export type WebhookEventTypeList = {
+  items: Array<WebhookEventTypeInfo>;
+};
+
+/**
+ * Why the platform disabled a subscription.
+ */
+export type WebhookDisabledReason = "persistent_failure";
+
+/**
+ * The member or the project token that created a webhook subscription.
+ */
+export type WebhookCreator = {
+  kind: "member" | "token";
+  id: string;
+  /**
+   * The member's display name or the token's name, as it is now.
+   */
+  name: string;
+};
+
+export type Webhook = {
+  id: string;
+  name: Name;
+  /**
+   * Where every event is posted: `https` unless the operator set
+   * `FLAGNETIC_WEBHOOK_ALLOW_HTTP`.
+   *
+   */
+  url: string;
+  events: Array<WebhookEventType>;
+  /**
+   * The keys of the environments whose events are sent; empty for
+   * every one. An event of no environment is always sent.
+   *
+   */
+  environments: Array<string>;
+  enabled: boolean;
+  /**
+   * Why the platform disabled the subscription; null when it is enabled or a member disabled it.
+   */
+  disabled_reason: WebhookDisabledReason | null;
+  created_by: WebhookCreator | null;
+  /**
+   * When a call last succeeded; null before the first.
+   */
+  last_success_at: string | null;
+  /**
+   * The calls that failed since the last success or the last enable.
+   */
+  consecutive_failures: number;
+  /**
+   * Until when the secret the last rotation replaced signs beside the
+   * current one; null outside a rotation's overlap.
+   *
+   */
+  previous_secret_expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+  version: Version;
+};
+
+export type WebhookWithSecret = Webhook & {
+  /**
+   * Base64url of 32 random bytes, the key of every signature
+   * under this subscription. Shown once, by the operation that
+   * issued it: it is stored sealed and never answered again.
+   *
+   */
+  secret: string;
+};
+
+export type WebhookCreate = {
+  name: string;
+  url: string;
+  events: Array<WebhookEventType>;
+  /**
+   * The keys of the environments whose events to send; empty or absent for every one.
+   */
+  environments?: Array<string>;
+  /**
+   * Whether events are sent; true when absent.
+   */
+  enabled?: boolean;
+};
+
+/**
+ * The properties to change; each absent one is left as it is.
+ */
+export type WebhookPatch = {
+  name?: string;
+  url?: string;
+  events?: Array<WebhookEventType>;
+  environments?: Array<string>;
+  enabled?: boolean;
+};
+
+export type WebhookList = {
+  items: Array<Webhook>;
+};
+
+/**
  * A member's identifier; their own changes and those of their personal access tokens.
  */
 export type AuditActor = string;
@@ -2076,6 +2230,11 @@ export type FlagKey = string;
  * The change request's identifier.
  */
 export type ChangeRequestId = string;
+
+/**
+ * The webhook subscription's identifier.
+ */
+export type WebhookId = string;
 
 /**
  * The experiment's key.
@@ -9643,3 +9802,349 @@ export type ListAuditEntriesResponses = {
 };
 
 export type ListAuditEntriesResponse = ListAuditEntriesResponses[keyof ListAuditEntriesResponses];
+
+export type ListWebhookEventTypesData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/webhook-event-types";
+};
+
+export type ListWebhookEventTypesErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+};
+
+export type ListWebhookEventTypesError =
+  ListWebhookEventTypesErrors[keyof ListWebhookEventTypesErrors];
+
+export type ListWebhookEventTypesResponses = {
+  /**
+   * The catalogue.
+   */
+  200: WebhookEventTypeList;
+};
+
+export type ListWebhookEventTypesResponse =
+  ListWebhookEventTypesResponses[keyof ListWebhookEventTypesResponses];
+
+export type ListWebhooksData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks";
+};
+
+export type ListWebhooksErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListWebhooksError = ListWebhooksErrors[keyof ListWebhooksErrors];
+
+export type ListWebhooksResponses = {
+  /**
+   * The project's webhook subscriptions.
+   */
+  200: WebhookList;
+};
+
+export type ListWebhooksResponse = ListWebhooksResponses[keyof ListWebhooksResponses];
+
+export type CreateWebhookData = {
+  body: WebhookCreate;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks";
+};
+
+export type CreateWebhookErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+};
+
+export type CreateWebhookError = CreateWebhookErrors[keyof CreateWebhookErrors];
+
+export type CreateWebhookResponses = {
+  /**
+   * The new subscription with its secret, shown this once.
+   */
+  201: WebhookWithSecret;
+};
+
+export type CreateWebhookResponse = CreateWebhookResponses[keyof CreateWebhookResponses];
+
+export type DeleteWebhookData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The webhook subscription's identifier.
+     */
+    webhook: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks/{webhook}";
+};
+
+export type DeleteWebhookErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type DeleteWebhookError = DeleteWebhookErrors[keyof DeleteWebhookErrors];
+
+export type DeleteWebhookResponses = {
+  /**
+   * Deleted.
+   */
+  204: void;
+};
+
+export type DeleteWebhookResponse = DeleteWebhookResponses[keyof DeleteWebhookResponses];
+
+export type GetWebhookData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The webhook subscription's identifier.
+     */
+    webhook: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks/{webhook}";
+};
+
+export type GetWebhookErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type GetWebhookError = GetWebhookErrors[keyof GetWebhookErrors];
+
+export type GetWebhookResponses = {
+  /**
+   * The subscription; its `ETag` is its version.
+   */
+  200: Webhook;
+};
+
+export type GetWebhookResponse = GetWebhookResponses[keyof GetWebhookResponses];
+
+export type UpdateWebhookData = {
+  body: WebhookPatch;
+  headers?: {
+    /**
+     * The version of the entity this write is based on, as its `ETag`
+     * answered it (`"7"`, or `7`). Required: without it the write is
+     * refused `428 precondition_required`, and with any other version than
+     * the current one `412 version_mismatch`, both judged after the request
+     * is validated.
+     *
+     */
+    "If-Match"?: string;
+  };
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The webhook subscription's identifier.
+     */
+    webhook: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks/{webhook}";
+};
+
+export type UpdateWebhookErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
+   */
+  412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
+  /**
+   * `precondition_required`: the write names no version in `If-Match`.
+   */
+  428: Problem;
+};
+
+export type UpdateWebhookError = UpdateWebhookErrors[keyof UpdateWebhookErrors];
+
+export type UpdateWebhookResponses = {
+  /**
+   * The subscription as it is now.
+   */
+  200: Webhook;
+};
+
+export type UpdateWebhookResponse = UpdateWebhookResponses[keyof UpdateWebhookResponses];

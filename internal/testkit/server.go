@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/compose"
 	"github.com/azverinus/flagnetic/internal/infra/config"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
@@ -106,6 +107,7 @@ type serverOptions struct {
 	// console is the default locale of the console served, "" for none.
 	console string
 	listen  pglisten.Options
+	targets governance.TargetPolicy
 	fault   *pgdelivery.RulesetLoadFault
 	limits  []func(*config.RateLimits)
 }
@@ -152,6 +154,12 @@ func WithRulesetLoadFault(f *pgdelivery.RulesetLoadFault) ServerOption {
 // defaults of the configuration.
 func WithRateLimits(change func(*config.RateLimits)) ServerOption {
 	return func(o *serverOptions) { o.limits = append(o.limits, change) }
+}
+
+// WithWebhookTargets serves allowing webhook targets as p does, such as a
+// receiver the test runs on loopback over plain http.
+func WithWebhookTargets(p governance.TargetPolicy) ServerOption {
+	return func(o *serverOptions) { o.targets = p }
 }
 
 // WithClock serves with c as the application clock instead of the wall clock.
@@ -235,6 +243,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
+		WebhookTargets:        o.targets,
 	})
 	// Registered first, so it runs once the server below has stopped.
 	t.Cleanup(background.Close)

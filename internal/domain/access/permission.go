@@ -90,6 +90,10 @@ const (
 	// them, edits, rebases, opens and cancels its holder's own, and copies
 	// any into a new draft.
 	PermChangeRequestPropose Permission = "change_request.propose"
+	// PermWebhookManage creates, reads, edits and deletes a project's
+	// webhook subscriptions. Reading them needs it too: a subscription
+	// says where a project's changes are sent.
+	PermWebhookManage Permission = "webhook.manage"
 )
 
 // catalog is every permission an operation can require. Each context adds
@@ -128,6 +132,10 @@ var catalog = []PermissionSpec{
 	// writing flags reaches an environment whose changes are reviewed, so it
 	// falls under the same scope; deciding stays with members.
 	{Name: PermChangeRequestPropose, Scope: ScopeFlagsWrite},
+	// A pipeline provisioning a project may subscribe its tools to the
+	// project's changes; a subscription changes nothing SDKs receive and
+	// nobody's access.
+	{Name: PermWebhookManage, Scope: ScopeProjectAdmin},
 }
 
 // Catalog returns the permission catalog.
@@ -217,12 +225,12 @@ var roles = []Role{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermEnvironmentProtect, PermDeclarationManage,
 		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
 		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete, PermSDKKeyManage,
-		PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose,
+		PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermWebhookManage,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
 		PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete,
-		PermSDKKeyManage, PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose,
+		PermSDKKeyManage, PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermWebhookManage,
 	}},
 	{Name: RoleDeveloper, Permissions: []Permission{
 		PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert,
