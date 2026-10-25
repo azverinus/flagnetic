@@ -145,11 +145,12 @@ tasks:
   # --- Checks (what CI runs) ---
 
   check:
-    desc: Run every CI check locally (lint, tests, vulnerabilities, tidy, the console, the Dart SDK)
+    desc: Run every CI check locally (lint, tests, vulnerabilities, tidy, the console, the Dart SDK and the Flutter package)
     cmds:
       - task: lint
       - task: web:check
       - task: dart:check
+      - task: flutter:check
       - task: sdk-js:check
       - task: test
       - task: cover
@@ -164,6 +165,15 @@ tasks:
       - dart format --output=none --set-exit-if-changed .
       - dart analyze --fatal-infos
       - dart test
+
+  flutter:check:
+    desc: Format, analyze and test the Flutter package
+    dir: sdks/flutter
+    cmds:
+      - flutter pub get
+      - dart format --output=none --set-exit-if-changed .
+      - flutter analyze --fatal-infos
+      - flutter test
 
   lint:
     desc: Lint the Go code of every module (layer rules included) and the CI workflows

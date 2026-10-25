@@ -1,0 +1,24 @@
+name: flagnetic_flutter
+description: Flutter widgets for Flagnetic feature flags and experiments. A scope, a flag builder, listenables, the app lifecycle, a store on every platform and a Dev Tools screen.
+version: 0.1.0
+repository: https://github.com/azverinus/flagnetic/tree/main/sdks/flutter
+issue_tracker: https://github.com/azverinus/flagnetic/issues
+topics:
+  - feature-flags
+  - experiments
+
+environment:
+  sdk: ^3.9.0
+  flutter: '>=3.35.0'
+
+dependencies:
+  flagnetic: ^0.1.0
+  flutter:
+    sdk: flutter
+  path_provider: ^2.1.5
+  shared_preferences: ^2.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^6.1.0

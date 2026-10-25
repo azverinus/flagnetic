@@ -101,3 +101,9 @@ updates:
       interval: weekly
     commit-message:
       prefix: "deps(sdk-dart)"
+  - package-ecosystem: pub
+    directory: /sdks/flutter
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(sdk-flutter)"

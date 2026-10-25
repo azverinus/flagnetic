@@ -532,14 +532,15 @@ jobs:
         working-directory: e2e
         run: go test -count=1 -v ./...
 
-  # Whether a pull request touches what the Dart SDK is tested against; push,
-  # schedule and release runs always test it.
+  # Whether a pull request touches what the Dart SDK and the Flutter package
+  # are tested against; push, schedule and release runs always test them.
   dart-changes:
     name: dart changed
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     outputs:
       dart: ${{ steps.diff.outputs.dart }}
+      flutter: ${{ steps.diff.outputs.flutter }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -554,6 +555,14 @@ jobs:
           else
             echo "dart=false" >> "$GITHUB_OUTPUT"
           fi
+          # The Flutter package resolves the Dart SDK from the working tree,
+          # so a change to either one tests it.
+          if git diff --name-only "$BASE...HEAD" |
+            grep -qE '^(sdks/dart/|sdks/flutter/|\.github/workflows/(sdk-flutter|ci)\.yml$)'; then
+            echo "flutter=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "flutter=false" >> "$GITHUB_OUTPUT"
+          fi
 
   dart:
     name: dart
@@ -564,6 +573,16 @@ jobs:
         needs.dart-changes.outputs.dart == 'true'
       )
     uses: ./.github/workflows/sdk-dart.yml
+
+  flutter:
+    name: flutter
+    needs: dart-changes
+    if: >-
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.dart-changes.outputs.flutter == 'true'
+      )
+    uses: ./.github/workflows/sdk-flutter.yml
 
   # The JavaScript SDK, on a pull request that touches it, the conformance
   # suite or the SDK API, on release pull requests and on main.
@@ -583,7 +602,7 @@ jobs:
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, npm-audit, tidy, console, changes, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, docker, modules, module, released, dart-changes, dart, sdk-js]
+    needs: [lint, test, vuln, npm-audit, tidy, console, changes, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, docker, modules, module, released, dart-changes, dart, flutter, sdk-js]
     if: always()
     runs-on: ubuntu-latest
     steps:
