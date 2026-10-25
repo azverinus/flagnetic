@@ -22,5 +22,5 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_dependency "flagnetic", "~> 0.1"
-  spec.add_dependency "openfeature-sdk", ">= 0.6.1"
+  spec.add_dependency "openfeature-sdk", "~> 0.6", ">= 0.6.1"
 end

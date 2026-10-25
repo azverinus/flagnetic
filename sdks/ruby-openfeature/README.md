@@ -2,7 +2,7 @@
 
 `flagnetic-openfeature` is an [OpenFeature](https://openfeature.dev) provider over the [Flagnetic Ruby SDK](../ruby/README.md), for a service already standardised on OpenFeature. It is a gem of its own, so `flagnetic` itself stays free of the OpenFeature dependency.
 
-Requires Ruby 3.4 or later and `openfeature-sdk` 0.6.1 or later.
+Requires Ruby 3.4 or later and `openfeature-sdk` 0.6.1 or a later 0.x release.
 
 ## Install
 
