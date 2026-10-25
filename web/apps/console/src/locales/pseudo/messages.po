@@ -24,7 +24,7 @@ msgid "{bucket} of {total}"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
-msgid "{conflictUnits, plural, one {# unit was exposed to a variation other than its first, in {conflictTotal} exposures. The latest conflicts:} other {# units were exposed to a variation other than their first, in {conflictTotal} exposures. The latest conflicts:}}"
+msgid "{conflictUnits, plural, one {# unit was exposed to a variation other than its first,} other {# units were exposed to a variation other than their first,}} {conflictTotal, plural, one {in # exposure.} other {in # exposures.}} The latest conflicts:"
 msgstr ""
 
 #: src/components/duration-input.tsx
@@ -66,11 +66,11 @@ msgid "{environment}, rule {position} “{description}”"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
-msgid "{exposures} exposures"
+msgid "{exposures, plural, one {# exposure, {overridden} overridden} other {# exposures, {overridden} overridden}}"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
-msgid "{exposures} exposures, {overridden} overridden"
+msgid "{exposures, plural, one {# exposure} other {# exposures}}"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -78,7 +78,7 @@ msgid "{first} and {second}"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
-msgid "{firstExposed} units first exposed, counted up to <0/>."
+msgid "{firstExposed}, counted up to <0/>."
 msgstr ""
 
 #: src/lib/conditions.ts
@@ -197,6 +197,10 @@ msgstr ""
 
 #: src/components/compare-environments.tsx
 msgid "{to} takes the rules of {source} with their identifiers and salts, its prerequisites and its off and fallthrough variations. {to} stays on."
+msgstr ""
+
+#: src/components/experiment-exposures.tsx
+msgid "{total, plural, one {# unit first exposed} other {# units first exposed}}"
 msgstr ""
 
 #: src/lib/conditions.ts

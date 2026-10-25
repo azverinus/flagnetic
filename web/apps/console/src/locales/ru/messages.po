@@ -24,8 +24,8 @@ msgid "{bucket} of {total}"
 msgstr "{bucket} из {total}"
 
 #: src/components/experiment-exposures.tsx
-msgid "{conflictUnits, plural, one {# unit was exposed to a variation other than its first, in {conflictTotal} exposures. The latest conflicts:} other {# units were exposed to a variation other than their first, in {conflictTotal} exposures. The latest conflicts:}}"
-msgstr "{conflictUnits, plural, one {# единица получила экспозицию другого варианта, не первого, в {conflictTotal} экспозициях. Последние конфликты:} few {# единицы получили экспозицию другого варианта, не первого, в {conflictTotal} экспозициях. Последние конфликты:} many {# единиц получили экспозицию другого варианта, не первого, в {conflictTotal} экспозициях. Последние конфликты:} other {# единицы получили экспозицию другого варианта, не первого, в {conflictTotal} экспозициях. Последние конфликты:}}"
+msgid "{conflictUnits, plural, one {# unit was exposed to a variation other than its first,} other {# units were exposed to a variation other than their first,}} {conflictTotal, plural, one {in # exposure.} other {in # exposures.}} The latest conflicts:"
+msgstr "{conflictUnits, plural, one {# единица получила экспозицию другого варианта, не первого,} few {# единицы получили экспозицию другого варианта, не первого,} many {# единиц получили экспозицию другого варианта, не первого,} other {# единицы получили экспозицию другого варианта, не первого,}} {conflictTotal, plural, one {в # экспозиции.} few {в # экспозициях.} many {в # экспозициях.} other {в # экспозиции.}} Последние конфликты:"
 
 #: src/components/duration-input.tsx
 msgid "{count, plural, one {day} other {days}}"
@@ -66,20 +66,20 @@ msgid "{environment}, rule {position} “{description}”"
 msgstr "{environment}, правило {position} «{description}»"
 
 #: src/components/experiment-exposures.tsx
-msgid "{exposures} exposures"
-msgstr "Экспозиций: {exposures}"
+msgid "{exposures, plural, one {# exposure, {overridden} overridden} other {# exposures, {overridden} overridden}}"
+msgstr "{exposures, plural, one {# экспозиция, переопределено: {overridden}} few {# экспозиции, переопределено: {overridden}} many {# экспозиций, переопределено: {overridden}} other {# экспозиции, переопределено: {overridden}}}"
 
 #: src/components/experiment-exposures.tsx
-msgid "{exposures} exposures, {overridden} overridden"
-msgstr "Экспозиций: {exposures}, переопределено: {overridden}"
+msgid "{exposures, plural, one {# exposure} other {# exposures}}"
+msgstr "{exposures, plural, one {# экспозиция} few {# экспозиции} many {# экспозиций} other {# экспозиции}}"
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "{first} and {second}"
 msgstr "{first} и {second}"
 
 #: src/components/experiment-exposures.tsx
-msgid "{firstExposed} units first exposed, counted up to <0/>."
-msgstr "Впервые получили экспозицию: {firstExposed}; подсчитано до <0/>."
+msgid "{firstExposed}, counted up to <0/>."
+msgstr "{firstExposed}; подсчитано до <0/>."
 
 #: src/lib/conditions.ts
 msgid "{flag} serves {variation}"
@@ -198,6 +198,10 @@ msgstr "{to} получает правила {source} с их идентифик
 #: src/components/compare-environments.tsx
 msgid "{to} takes the rules of {source} with their identifiers and salts, its prerequisites and its off and fallthrough variations. {to} stays on."
 msgstr "{to} получает правила {source} с их идентификаторами и солями, предусловия, вариант при выключении и вариант без совпадений. {to} остаётся включённым."
+
+#: src/components/experiment-exposures.tsx
+msgid "{total, plural, one {# unit first exposed} other {# units first exposed}}"
+msgstr "{total, plural, one {Впервые получила экспозицию # единица} few {Впервые получили экспозицию # единицы} many {Впервые получили экспозицию # единиц} other {Впервые получили экспозицию # единицы}}"
 
 #: src/lib/conditions.ts
 msgid "{variation} to {percent}% of {unitType} units"

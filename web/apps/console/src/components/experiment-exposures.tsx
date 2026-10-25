@@ -7,7 +7,7 @@ import type {
   VariationExposures,
 } from "@flagnetic/api";
 import { plural } from "@lingui/core/macro";
-import { Trans, useLingui } from "@lingui/react/macro";
+import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCwIcon } from "lucide-react";
 import { useMemo } from "react";
@@ -191,15 +191,18 @@ export function ExposuresView({
   refreshing = false,
   onRefresh,
 }: ExposuresViewProps) {
-  const { i18n, t } = useLingui();
+  const { t } = useLingui();
   const total = summary.variations.reduce((sum, row) => sum + row.first_exposures, 0);
   // The per-variation counts already list every variation, the
   // experiment's first; the timeline adds none they lack.
   const order = summary.variations.map(({ variation }) => variation);
   const days = timelineDays(timeline.items, order.length > 0 ? order : variations);
-  const firstExposed = formatNumber(i18n, total);
+  const firstExposed = t`${plural(total, {
+    one: "# unit first exposed",
+    other: "# units first exposed",
+  })}`;
   const conflictUnits = summary.conflicts.units;
-  const conflictTotal = formatNumber(i18n, summary.conflicts.total);
+  const conflictTotal = summary.conflicts.total;
   const expected = Object.fromEntries(
     summary.variations.map((row) => [row.variation, row.expected_share]),
   );
@@ -210,7 +213,7 @@ export function ExposuresView({
         <p className="text-sm text-muted-foreground">
           {summary.as_of ? (
             <Trans>
-              {firstExposed} units first exposed, counted up to <Moment value={summary.as_of} />.
+              {firstExposed}, counted up to <Moment value={summary.as_of} />.
             </Trans>
           ) : (
             <Trans>
@@ -242,9 +245,12 @@ export function ExposuresView({
             <Trans>No unit was exposed to a variation other than its first.</Trans>
           ) : (
             t`${plural(conflictUnits, {
-              one: `# unit was exposed to a variation other than its first, in ${conflictTotal} exposures. The latest conflicts:`,
-              other: `# units were exposed to a variation other than their first, in ${conflictTotal} exposures. The latest conflicts:`,
-            })}`
+              one: "# unit was exposed to a variation other than its first,",
+              other: "# units were exposed to a variation other than their first,",
+            })} ${plural(conflictTotal, {
+              one: "in # exposure.",
+              other: "in # exposures.",
+            })} The latest conflicts:`
           )}
         </p>
         {conflictUnits === 0 ? null : <ConflictTable items={conflicts.items} />}
@@ -424,18 +430,20 @@ function TimelineTable({
         cell: ({ row }) => {
           const counts = row.original.counts[variation];
           if (!counts) return null;
-          const exposures = formatNumber(i18n, counts.exposures);
+          const exposures = counts.exposures;
           const overridden = formatNumber(i18n, counts.overridden);
           return (
             <span className="flex flex-col">
               <span className="tabular-nums">{formatNumber(i18n, counts.first_exposures)}</span>
               <span className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
                 {counts.overridden > 0 ? (
-                  <Trans>
-                    {exposures} exposures, {overridden} overridden
-                  </Trans>
+                  <Plural
+                    value={exposures}
+                    one={`# exposure, ${overridden} overridden`}
+                    other={`# exposures, ${overridden} overridden`}
+                  />
                 ) : (
-                  <Trans>{exposures} exposures</Trans>
+                  <Plural value={exposures} one="# exposure" other="# exposures" />
                 )}
               </span>
             </span>

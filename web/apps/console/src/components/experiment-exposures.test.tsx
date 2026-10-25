@@ -155,4 +155,23 @@ describe("an environment's exposures", () => {
     const cells = within(rowOf(table, "user-7")).getAllByRole("cell");
     expect(cells.slice(1, 3).map((cell) => cell.textContent)).toEqual(["control", "treatment"]);
   });
+
+  it("counts one unit and one exposure in the singular", () => {
+    show({
+      summary: {
+        ...summary,
+        variations: [
+          variation("control", 1, { observed: 1, expected: 0.5 }),
+          variation("treatment", 0, { observed: 0, expected: 0.5 }),
+        ],
+        conflicts: { total: 1, units: 1 },
+      },
+    });
+    expect(screen.getByText(/^1 unit first exposed, counted up to/)).toBeVisible();
+    expect(
+      screen.getByText(
+        "1 unit was exposed to a variation other than its first, in 1 exposure. The latest conflicts:",
+      ),
+    ).toBeVisible();
+  });
 });
