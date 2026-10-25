@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+require_relative "config/application"
+Rails.application.load_tasks
+
+desc "Report whether the Flagnetic client exists, without touching it"
+task report: :environment do
+  puts "client_started=#{Flagnetic.client?}"
+end

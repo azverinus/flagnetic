@@ -51,6 +51,37 @@ jobs:
       - name: Gem builds
         run: gem build --strict flagnetic.gemspec
 
+  # The Rails integration against a minimal Rails application booted
+  # in-process, as console, runner and rake, and as a two-worker Puma, on
+  # every supported Rails major: the oldest with the oldest Ruby, the newest
+  # with the newest. Rails and Puma live only in that bundle; the gem
+  # depends on neither.
+  rails:
+    name: rails ${{ matrix.rails }} on ruby ${{ matrix.ruby }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rails: "8.0"
+            ruby: "3.3"
+          - rails: "8.1"
+            ruby: "4.0"
+    env:
+      RAILS_VERSION: ${{ matrix.rails }}
+    defaults:
+      run:
+        working-directory: sdks/ruby/rails
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+          working-directory: sdks/ruby/rails
+      - name: Test
+        run: bundle exec rake test
+
   # The case folding orbits and property names come from the Go the server is
   # built with; a Go upgrade that changes them must regenerate them.
   unicode-tables:
