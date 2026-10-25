@@ -121,19 +121,22 @@ type Handlers struct {
 	RotateSDKKey *appdelivery.RotateSDKKey
 	RevokeSDKKey *appdelivery.RevokeSDKKey
 
-	ListExperiments           *appexperiments.ListExperiments
-	CreateExperiment          *appexperiments.CreateExperiment
-	GetExperiment             *appexperiments.GetExperiment
-	UpdateExperiment          *appexperiments.UpdateExperiment
-	DeleteExperiment          *appexperiments.DeleteExperiment
-	RegenerateExperimentSalts *appexperiments.RegenerateSalts
-	CloneExperiment           *appexperiments.CloneExperiment
-	GetExperimentAssignment   *appexperiments.GetAssignment
-	CheckHashUniformity       *appexperiments.CheckUniformity
-	StartExperiment           *appexperiments.StartExperiment
-	StopExperiment            *appexperiments.StopExperiment
-	ArchiveExperiment         *appexperiments.ArchiveExperiment
-	SetExperimentDecisionNote *appexperiments.SetDecisionNote
+	ListExperiments            *appexperiments.ListExperiments
+	CreateExperiment           *appexperiments.CreateExperiment
+	GetExperiment              *appexperiments.GetExperiment
+	UpdateExperiment           *appexperiments.UpdateExperiment
+	DeleteExperiment           *appexperiments.DeleteExperiment
+	RegenerateExperimentSalts  *appexperiments.RegenerateSalts
+	CloneExperiment            *appexperiments.CloneExperiment
+	GetExperimentAssignment    *appexperiments.GetAssignment
+	ListExperimentAlerts       *appexperiments.ListAlerts
+	AcknowledgeExperimentAlert *appexperiments.AcknowledgeAlert
+	GetSampleRatio             *appexperiments.GetSampleRatio
+	CheckHashUniformity        *appexperiments.CheckUniformity
+	StartExperiment            *appexperiments.StartExperiment
+	StopExperiment             *appexperiments.StopExperiment
+	ArchiveExperiment          *appexperiments.ArchiveExperiment
+	SetExperimentDecisionNote  *appexperiments.SetDecisionNote
 
 	GetExperimentExposures *appevents.GetExperimentExposures
 	GetExposureTimeline    *appevents.GetExposureTimeline

@@ -832,6 +832,82 @@ export const zHashCheck = z.object({
   independence: zHashCheckIndependence.optional(),
 });
 
+/**
+ * `below_minimum_sample`: fewer than 1,000 first exposures. `expected_below_5`: a variation expects fewer than 5.
+ */
+export const zSampleRatioSkippedReason = z.enum(["below_minimum_sample", "expected_below_5"]);
+
+export const zSampleRatioCheck = z.object({
+  n: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  chi_square: z.number().nullable(),
+  p_value: z.number().nullable(),
+  skipped_reason: zSampleRatioSkippedReason.nullable(),
+  active: z.boolean(),
+  checked_at: z.iso.datetime(),
+});
+
+/**
+ * `srm`: the sample-ratio check found first exposures out of line with the weights.
+ */
+export const zExperimentAlertKind = z.enum(["srm"]);
+
+export const zSampleRatioVariation = z.object({
+  variation: z.string(),
+  observed: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  expected: z.number(),
+  observed_share: z.number(),
+  expected_share: z.number(),
+});
+
+export const zSampleRatioAlertDetails = z.object({
+  n: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  chi_square: z.number(),
+  p_value: z.number(),
+  variations: z.array(zSampleRatioVariation),
+});
+
+/**
+ * What the check found when it raised the alert; the block of the alert's kind is set, every other one is null.
+ */
+export const zExperimentAlertDetails = z.object({
+  sample_ratio: zSampleRatioAlertDetails.nullable(),
+});
+
+export const zExperimentAlert = z.object({
+  id: z.uuid(),
+  kind: zExperimentAlertKind,
+  environment: z.string().nullable(),
+  raised_at: z.iso.datetime(),
+  cleared_at: z.iso.datetime().nullable(),
+  acknowledged_at: z.iso.datetime().nullable(),
+  details: zExperimentAlertDetails,
+});
+
+export const zExperimentAlertList = z.object({
+  items: z.array(zExperimentAlert),
+});
+
 export const zConflictTotals = z.object({
   total: z.coerce
     .bigint()
@@ -898,6 +974,7 @@ export const zExperimentExposures = z.object({
   conflicts: zConflictTotals,
   rejections: z.array(zExposureRejections),
   as_of: z.iso.datetime().nullable(),
+  sample_ratio: zSampleRatioCheck.nullable(),
 });
 
 export const zExposureDay = z.object({
@@ -2773,6 +2850,31 @@ export const zGetExperimentConflictsQuery = z.object({
  * The conflicting units.
  */
 export const zGetExperimentConflictsResponse = zExposureConflicts;
+
+export const zListExperimentAlertsPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+export const zListExperimentAlertsQuery = z.object({
+  active: z.boolean().optional(),
+});
+
+/**
+ * The experiment's alerts.
+ */
+export const zListExperimentAlertsResponse = zExperimentAlertList;
+
+export const zAcknowledgeExperimentAlertPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+  alert: z.uuid(),
+});
+
+/**
+ * The alert, acknowledged.
+ */
+export const zAcknowledgeExperimentAlertResponse = zExperimentAlert;
 
 export const zListChangeRequestsPath = z.object({
   project: z.string(),

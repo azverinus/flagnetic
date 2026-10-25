@@ -363,6 +363,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		// the flags context, each as a configuration write of its own.
 		StopExperiment: appexperiments.NewStopExperiment(appexperiments.StopExperimentDeps{
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
+			Holders: flagStore, FirstExposures: eventStore, Checks: experimentStore,
 			Rules: appflags.NewApplyExperimentDecision(appflags.ApplyExperimentDecisionDeps{
 				Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 			}),
@@ -385,6 +386,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		}),
 		GetExperimentAssignment: appexperiments.NewGetAssignment(experimentStore),
 		CheckHashUniformity:     appexperiments.NewCheckUniformity(),
+		ListExperimentAlerts:    appexperiments.NewListAlerts(experimentStore),
+		AcknowledgeExperimentAlert: appexperiments.NewAcknowledgeAlert(appexperiments.AcknowledgeAlertDeps{
+			Tx: tx, Store: experimentStore, Recorder: experimentRec,
+		}),
+		GetSampleRatio: appexperiments.NewGetSampleRatio(experimentStore),
 
 		GetExperimentExposures: appevents.NewGetExperimentExposures(tx, eventStore),
 		GetExposureTimeline:    appevents.NewGetExposureTimeline(tx, eventStore),
@@ -474,6 +480,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 				appevents.NewRunRetention(tx, eventStore, d.Clock, d.IDs, o.EventsRetention, o.EventsPartitionsAhead),
 				appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention), edge.Logger(), reg),
 			worker.WebhookFanOut(appgovernance.NewRunFanOut(tx, outbox, d.Clock, d.IDs), reg),
+			worker.ExperimentChecks(appexperiments.CheckInterval, appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
+				Tx: tx, Lock: experimentStore, Running: experimentStore, Projects: experimentStore, Store: experimentStore,
+				Holders: flagStore, FirstExposures: eventStore, Checks: experimentStore, Recorder: experimentRec,
+			}).Handle),
 		},
 		Listeners: []Listener{
 			{Channel: pgaccess.AuthSettingsChannel, Handler: settings},

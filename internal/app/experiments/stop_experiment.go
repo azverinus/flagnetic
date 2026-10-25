@@ -25,11 +25,14 @@ type ExperimentRules interface {
 
 // StopExperimentDeps are what StopExperiment runs on.
 type StopExperimentDeps struct {
-	Tx       Transactor
-	Projects ProjectLocker
-	Store    ExperimentUpdater
-	Rules    ExperimentRules
-	Recorder Recorder
+	Tx             Transactor
+	Projects       ProjectLocker
+	Store          ExperimentUpdater
+	Rules          ExperimentRules
+	Holders        Holders
+	FirstExposures FirstExposures
+	Checks         CheckStore
+	Recorder       Recorder
 }
 
 // StopExperiment stops a running experiment with a decision.
@@ -51,7 +54,10 @@ type StopExperimentCommand struct {
 // work every rule serving it, in every environment, serves the winner in
 // its place or is deleted, and each environment whose configuration changed
 // has its ruleset moved on, so every SDK stops assigning the experiment from
-// the same commit that records the decision.
+// the same commit that records the decision. The final sample-ratio check is
+// taken there too, in the environments holding the experiment's rule until
+// the decision rewrites it; nothing checks the experiment again, so it is
+// the result the experiment keeps.
 func (h *StopExperiment) Handle(ctx context.Context, cmd StopExperimentCommand) (experiments.Experiment, error) {
 	now := h.d.Recorder.now()
 	c := cmd.Experiment
@@ -77,8 +83,16 @@ func (h *StopExperiment) Handle(ctx context.Context, cmd StopExperimentCommand) 
 		if err = h.d.Store.UpdateExperiment(ctx, after); err != nil {
 			return err
 		}
+		holders, err := h.d.Holders.HoldingEnvironments(ctx, c.Project, c.Key)
+		if err != nil {
+			return err
+		}
 		if err = h.d.Rules.ApplyDecision(ctx, c.Project, after.FlagKey, after.Key, after.Decision.WinnerVariation,
 			cmd.Caller, now, c.Request); err != nil {
+			return err
+		}
+		final := sampleRatioCheck{holders: h.d.Holders, counts: h.d.FirstExposures, store: h.d.Checks, recorder: h.d.Recorder}
+		if err = final.in(ctx, before, holders, now, c.Request); err != nil {
 			return err
 		}
 		out = after

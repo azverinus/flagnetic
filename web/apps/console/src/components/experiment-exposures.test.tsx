@@ -30,6 +30,7 @@ const summary: ExperimentExposures = {
   conflicts: { total: 0, units: 0 },
   rejections: [],
   as_of: "2026-10-21T09:30:00Z",
+  sample_ratio: null,
 };
 
 const timeline: ExposureTimeline = {

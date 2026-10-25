@@ -23,7 +23,14 @@ func (a *api) GetExperimentExposures(ctx context.Context, req GetExperimentExpos
 	if err != nil {
 		return nil, err
 	}
+	// The exposures answer found the experiment and the environment, so the
+	// check is read of the same two.
+	check, err := a.h.GetSampleRatio.Handle(ctx, projectID(ctx), req.Experiment, req.Params.Environment)
+	if err != nil {
+		return nil, err
+	}
 	out := GetExperimentExposures200JSONResponse{
+		SampleRatio: sampleRatioOf(check),
 		Variations: each(x.Variations, func(v events.VariationExposures) VariationExposures {
 			return VariationExposures{
 				Variation: v.Variation, Exposures: v.Exposures, Overridden: v.Overridden, FirstExposures: v.FirstExposures,
