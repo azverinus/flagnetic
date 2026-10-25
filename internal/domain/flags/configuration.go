@@ -254,8 +254,10 @@ func (c Configuration) Replace(f Flag, in ConfigurationInput, r Referents, m Min
 // Revert returns the configuration of f made recorded again by w, the
 // document an earlier version of it was, whole: rule identifiers and salts,
 // so the same units fall in every rollout again, and override notes and
-// authors as they were. It is checked against r as a replace is, since a
-// variation, segment, declaration or flag it names may be gone since.
+// authors as they were. It is refused experiment_rules_changed when it would
+// change which rules serve which experiment, then checked against r as a
+// replace is, since a variation, segment, declaration or flag it names may
+// be gone since.
 func (c Configuration) Revert(f Flag, recorded Configuration, r Referents, w Write) (Configuration, Changed, error) {
 	if err := c.keepsExperimentRules(recorded); err != nil {
 		return c, Changed{}, err
@@ -303,8 +305,10 @@ func (c Configuration) experimentRules() map[RuleID]string {
 // It stays on or off as it is, so a copy never switches a flag on by
 // accident, and keeps its overrides unless overrides asks for source's,
 // notes and authors with them. It is checked against r, the requirements
-// of c's environment, as a replace is. A configuration is not copied from
-// its own environment, which would change nothing on purpose.
+// of c's environment, as a replace is, after being refused
+// experiment_rules_changed when it would change which rules serve which
+// experiment. A configuration is not copied from its own environment, which
+// would change nothing on purpose.
 func (c Configuration) Copy(f Flag, source Configuration, overrides bool, r Referents, w Write) (Configuration, Changed, error) {
 	if source.Environment == c.Environment {
 		ck := newCheck(invalidConfiguration, configurationNotValid)

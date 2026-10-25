@@ -1949,7 +1949,12 @@ paths:
         (`invalid_configuration`, its pointers into the configuration the
         revert would write), so a variation, segment, attribute or flag
         removed since refuses it. `If-Match` names the current version, not
-        the one reverted to. Reverting to what the configuration already is
+        the one reverted to. A revert that would add or remove a rule
+        serving an experiment, or change which experiment a rule serves, is
+        refused `experiment_rules_changed` (409, before the document is
+        validated): whether an experiment runs lives on the experiment, so
+        an experiment reaches or leaves an environment only through an
+        explicit rule edit. Reverting to what the configuration already is
         changes nothing and records nothing.
       x-permission: flag_configuration.revert
       tags: [flags]
@@ -2006,8 +2011,13 @@ paths:
         authors. Validated as replacing the configuration would be
         (`invalid_configuration`, its pointers into the configuration the
         copy would write); copying from this environment itself is
-        `invalid_configuration`. `If-Match` names this environment's
-        version. A copy that changes nothing records nothing.
+        `invalid_configuration`. A copy that would add or remove a rule
+        serving an experiment in this environment, or change which
+        experiment a rule serves, is refused `experiment_rules_changed`
+        (409, before the document is validated): an experiment reaches
+        another environment only through an explicit rule edit. `If-Match`
+        names this environment's version. A copy that changes nothing
+        records nothing.
       x-permission: flag_configuration.update
       tags: [flags]
       parameters:
@@ -2357,8 +2367,12 @@ paths:
         smaller allocation is `traffic_allocation_decrease` (409). Growing it
         moves the ruleset of every environment holding a rule serving the
         experiment and includes more units without moving any unit already
-        included. Past running nothing is changed (`not_draft`). A change to
-        the values the experiment already has changes nothing and records
+        included. A stopped experiment changes its name, hypothesis, owner
+        and tags; a change to its flag, unit type, weights, traffic
+        allocation or expected end date is `frozen` (409, a violation per
+        field), and its decision's note is changed through `/decision`. An
+        archived experiment changes nothing (`archived`). A change to the
+        values the experiment already has changes nothing and records
         nothing.
       x-permission: experiment.edit
       tags: [experiments]
@@ -2400,8 +2414,9 @@ paths:
       operationId: deleteExperiment
       summary: Delete a draft experiment
       description: |
-        Deletes the experiment. Only a draft is deleted (`not_draft`): once
-        started, an experiment keeps its history.
+        Deletes the experiment. Only a draft is deleted (`not_draft`;
+        `archived` for an archived one): once started, an experiment keeps
+        its history.
       x-permission: experiment.delete
       tags: [experiments]
       parameters:
@@ -2433,8 +2448,8 @@ paths:
       description: |
         Draws a new inclusion salt and a new variation salt, apart from every
         salt of the project's experiments and rollouts. Only a draft has its
-        salts regenerated (`not_draft`): past the draft, units have been
-        assigned from them.
+        salts regenerated (`not_draft`; `archived` for an archived one):
+        past the draft, units have been assigned from them.
       x-permission: experiment.edit
       tags: [experiments]
       parameters:
@@ -2477,8 +2492,8 @@ paths:
         begins everywhere at once; no other environment's ruleset moves. An
         experiment no environment holds starts all the same, and reaches an
         environment when a rule there serves it. Only a draft starts
-        (`not_draft`): there is no restart, a stopped experiment is rerun as
-        a clone. A draft missing anything a running experiment needs is
+        (`not_draft`; `archived` for an archived one): there is no restart,
+        a stopped experiment is rerun as a clone. A draft missing anything a running experiment needs is
         refused `experiment_not_ready`, with one violation per missing
         item: its flag archived (`flag_archived` on `/flag`), its unit type
         no longer declared (`undeclared_unit_type` on `/unit_type`), weights
@@ -2513,6 +2528,153 @@ paths:
           $ref: "#/components/responses/VersionMismatch"
         "422":
           $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/experiments/{experiment}/stop:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+    post:
+      operationId: stopExperiment
+      summary: Stop a running experiment with a decision
+      description: |
+        Stops the experiment with a decision, in one transaction with every
+        rule serving it. With `winner`, every rule serving the experiment, in
+        every environment, serves `winner_variation` instead, keeping its
+        identifier, conditions and place, so the winner ships at once; with
+        `removed`, every such rule is deleted and the flag goes on to its
+        other rules. Each configuration rewritten is a configuration write of
+        its own, at its next version, recorded as `flag.configuration_updated`
+        with `experiment_stopped`, and the ruleset of its environment moves
+        on; no other ruleset moves. A winner is one of the variations the
+        experiment compares (`invalid_decision`: `required` or
+        `unknown_variation` on `/winner_variation`), a removal names none
+        (`invalid_value`), and a note has at most 2,000 characters
+        (`too_long` on `/note`). Only a running experiment stops
+        (`not_running`; `archived` for an archived one).
+      x-permission: experiment.edit
+      tags: [experiments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentStop"
+      responses:
+        "200":
+          description: The experiment, stopped, with its decision.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/experiments/{experiment}/decision:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+    put:
+      operationId: setExperimentDecisionNote
+      summary: Change the note of a stopped experiment's decision
+      description: |
+        Sets the note of the decision, `""` clearing it; the outcome and the
+        winner never change. Only a stopped experiment has a decision
+        (`not_stopped`; `archived` for an archived one). A note has at most
+        2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+        same note changes nothing and records nothing.
+      x-permission: experiment.edit
+      tags: [experiments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentDecisionNote"
+      responses:
+        "200":
+          description: The experiment with its decision.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/experiments/{experiment}/archive:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ExperimentKey"
+    post:
+      operationId: archiveExperiment
+      summary: Archive a draft or stopped experiment
+      description: |
+        Archives the experiment: it is hidden from the list unless asked for
+        and no write changes it again (`archived`), though it can still be
+        cloned. A running experiment is stopped with a decision first
+        (`running`). No ruleset moves.
+      x-permission: experiment.edit
+      tags: [experiments]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The experiment, archived.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/experiments/{experiment}/clone:
@@ -5393,6 +5555,47 @@ components:
           description: Defaults to the key.
         description:
           $ref: "#/components/schemas/Description"
+    ExperimentDecision:
+      type: object
+      required: [outcome, winner_variation, note]
+      properties:
+        outcome:
+          $ref: "#/components/schemas/ExperimentOutcome"
+        winner_variation:
+          type: string
+          nullable: true
+          description: The variation that won; null for a removal.
+        note:
+          type: string
+          maxLength: 2000
+          description: Why, as the members who decided wrote it; empty for none.
+    ExperimentOutcome:
+      type: string
+      enum: [winner, removed]
+      description: |
+        `winner` serves the winning variation where the experiment was
+        served; `removed` deletes the experiment's rules.
+    ExperimentStop:
+      type: object
+      required: [outcome]
+      properties:
+        outcome:
+          $ref: "#/components/schemas/ExperimentOutcome"
+        winner_variation:
+          type: string
+          description: The variation that won, one the experiment compares; required for `winner`, absent for `removed`.
+        note:
+          type: string
+          maxLength: 2000
+          description: Why; empty or absent for none.
+    ExperimentDecisionNote:
+      type: object
+      required: [note]
+      properties:
+        note:
+          type: string
+          maxLength: 2000
+          description: Why; empty clears it.
     ExperimentStatus:
       type: string
       enum: [draft, running, stopped, archived]
@@ -5415,8 +5618,8 @@ components:
     Experiment:
       type: object
       required: [id, key, name, hypothesis, owner, tags, flag, unit_type, variations, traffic_allocation,
-        inclusion_salt, variation_salt, status, expected_end_at, started_at, stopped_at, archived_at, created_by,
-        created_at, updated_at, version]
+        inclusion_salt, variation_salt, status, expected_end_at, started_at, stopped_at, archived_at, decision,
+        created_by, created_at, updated_at, version]
       properties:
         id:
           type: string
@@ -5480,6 +5683,11 @@ components:
           type: string
           format: date-time
           nullable: true
+        decision:
+          allOf:
+            - $ref: "#/components/schemas/ExperimentDecision"
+          nullable: true
+          description: What the stop decided; null until the experiment stops, and for one archived from its draft.
         created_by:
           type: string
           format: uuid

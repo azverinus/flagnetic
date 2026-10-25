@@ -131,6 +131,9 @@ type Handlers struct {
 	GetExperimentAssignment   *appexperiments.GetAssignment
 	CheckHashUniformity       *appexperiments.CheckUniformity
 	StartExperiment           *appexperiments.StartExperiment
+	StopExperiment            *appexperiments.StopExperiment
+	ArchiveExperiment         *appexperiments.ArchiveExperiment
+	SetExperimentDecisionNote *appexperiments.SetDecisionNote
 
 	GetExperimentExposures *appevents.GetExperimentExposures
 	GetExposureTimeline    *appevents.GetExposureTimeline

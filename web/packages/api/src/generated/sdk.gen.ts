@@ -6,6 +6,9 @@ import type {
   AcceptInvitationData,
   AcceptInvitationErrors,
   AcceptInvitationResponses,
+  ArchiveExperimentData,
+  ArchiveExperimentErrors,
+  ArchiveExperimentResponses,
   ArchiveFlagData,
   ArchiveFlagErrors,
   ArchiveFlagResponses,
@@ -297,6 +300,9 @@ import type {
   SetEnvironmentProtectionData,
   SetEnvironmentProtectionErrors,
   SetEnvironmentProtectionResponses,
+  SetExperimentDecisionNoteData,
+  SetExperimentDecisionNoteErrors,
+  SetExperimentDecisionNoteResponses,
   SignInData,
   SignInErrors,
   SignInResponses,
@@ -306,6 +312,9 @@ import type {
   StartExperimentData,
   StartExperimentErrors,
   StartExperimentResponses,
+  StopExperimentData,
+  StopExperimentErrors,
+  StopExperimentResponses,
   UpdateAttributeData,
   UpdateAttributeErrors,
   UpdateAttributeResponses,
@@ -1851,7 +1860,12 @@ export const killFlag = <ThrowOnError extends boolean = false>(
  * (`invalid_configuration`, its pointers into the configuration the
  * revert would write), so a variation, segment, attribute or flag
  * removed since refuses it. `If-Match` names the current version, not
- * the one reverted to. Reverting to what the configuration already is
+ * the one reverted to. A revert that would add or remove a rule
+ * serving an experiment, or change which experiment a rule serves, is
+ * refused `experiment_rules_changed` (409, before the document is
+ * validated): whether an experiment runs lives on the experiment, so
+ * an experiment reaches or leaves an environment only through an
+ * explicit rule edit. Reverting to what the configuration already is
  * changes nothing and records nothing.
  *
  */
@@ -1892,8 +1906,13 @@ export const revertFlagConfiguration = <ThrowOnError extends boolean = false>(
  * authors. Validated as replacing the configuration would be
  * (`invalid_configuration`, its pointers into the configuration the
  * copy would write); copying from this environment itself is
- * `invalid_configuration`. `If-Match` names this environment's
- * version. A copy that changes nothing records nothing.
+ * `invalid_configuration`. A copy that would add or remove a rule
+ * serving an experiment in this environment, or change which
+ * experiment a rule serves, is refused `experiment_rules_changed`
+ * (409, before the document is validated): an experiment reaches
+ * another environment only through an explicit rule edit. `If-Match`
+ * names this environment's version. A copy that changes nothing
+ * records nothing.
  *
  */
 export const copyFlagConfiguration = <ThrowOnError extends boolean = false>(
@@ -2102,8 +2121,9 @@ export const createExperiment = <ThrowOnError extends boolean = false>(
 /**
  * Delete a draft experiment
  *
- * Deletes the experiment. Only a draft is deleted (`not_draft`): once
- * started, an experiment keeps its history.
+ * Deletes the experiment. Only a draft is deleted (`not_draft`;
+ * `archived` for an archived one): once started, an experiment keeps
+ * its history.
  *
  */
 export const deleteExperiment = <ThrowOnError extends boolean = false>(
@@ -2160,8 +2180,12 @@ export const getExperiment = <ThrowOnError extends boolean = false>(
  * smaller allocation is `traffic_allocation_decrease` (409). Growing it
  * moves the ruleset of every environment holding a rule serving the
  * experiment and includes more units without moving any unit already
- * included. Past running nothing is changed (`not_draft`). A change to
- * the values the experiment already has changes nothing and records
+ * included. A stopped experiment changes its name, hypothesis, owner
+ * and tags; a change to its flag, unit type, weights, traffic
+ * allocation or expected end date is `frozen` (409, a violation per
+ * field), and its decision's note is changed through `/decision`. An
+ * archived experiment changes nothing (`archived`). A change to the
+ * values the experiment already has changes nothing and records
  * nothing.
  *
  */
@@ -2192,8 +2216,8 @@ export const updateExperiment = <ThrowOnError extends boolean = false>(
  *
  * Draws a new inclusion salt and a new variation salt, apart from every
  * salt of the project's experiments and rollouts. Only a draft has its
- * salts regenerated (`not_draft`): past the draft, units have been
- * assigned from them.
+ * salts regenerated (`not_draft`; `archived` for an archived one):
+ * past the draft, units have been assigned from them.
  *
  */
 export const regenerateExperimentSalts = <ThrowOnError extends boolean = false>(
@@ -2229,8 +2253,8 @@ export const regenerateExperimentSalts = <ThrowOnError extends boolean = false>(
  * begins everywhere at once; no other environment's ruleset moves. An
  * experiment no environment holds starts all the same, and reaches an
  * environment when a rule there serves it. Only a draft starts
- * (`not_draft`): there is no restart, a stopped experiment is rerun as
- * a clone. A draft missing anything a running experiment needs is
+ * (`not_draft`; `archived` for an archived one): there is no restart,
+ * a stopped experiment is rerun as a clone. A draft missing anything a running experiment needs is
  * refused `experiment_not_ready`, with one violation per missing
  * item: its flag archived (`flag_archived` on `/flag`), its unit type
  * no longer declared (`undeclared_unit_type` on `/unit_type`), weights
@@ -2252,6 +2276,112 @@ export const startExperiment = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/experiments/{experiment}/start",
+    ...options,
+  });
+
+/**
+ * Stop a running experiment with a decision
+ *
+ * Stops the experiment with a decision, in one transaction with every
+ * rule serving it. With `winner`, every rule serving the experiment, in
+ * every environment, serves `winner_variation` instead, keeping its
+ * identifier, conditions and place, so the winner ships at once; with
+ * `removed`, every such rule is deleted and the flag goes on to its
+ * other rules. Each configuration rewritten is a configuration write of
+ * its own, at its next version, recorded as `flag.configuration_updated`
+ * with `experiment_stopped`, and the ruleset of its environment moves
+ * on; no other ruleset moves. A winner is one of the variations the
+ * experiment compares (`invalid_decision`: `required` or
+ * `unknown_variation` on `/winner_variation`), a removal names none
+ * (`invalid_value`), and a note has at most 2,000 characters
+ * (`too_long` on `/note`). Only a running experiment stops
+ * (`not_running`; `archived` for an archived one).
+ *
+ */
+export const stopExperiment = <ThrowOnError extends boolean = false>(
+  options: Options<StopExperimentData, ThrowOnError>,
+): RequestResult<StopExperimentResponses, StopExperimentErrors, ThrowOnError> =>
+  (options.client ?? client).post<StopExperimentResponses, StopExperimentErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/stop",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Change the note of a stopped experiment's decision
+ *
+ * Sets the note of the decision, `""` clearing it; the outcome and the
+ * winner never change. Only a stopped experiment has a decision
+ * (`not_stopped`; `archived` for an archived one). A note has at most
+ * 2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+ * same note changes nothing and records nothing.
+ *
+ */
+export const setExperimentDecisionNote = <ThrowOnError extends boolean = false>(
+  options: Options<SetExperimentDecisionNoteData, ThrowOnError>,
+): RequestResult<
+  SetExperimentDecisionNoteResponses,
+  SetExperimentDecisionNoteErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    SetExperimentDecisionNoteResponses,
+    SetExperimentDecisionNoteErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/decision",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Archive a draft or stopped experiment
+ *
+ * Archives the experiment: it is hidden from the list unless asked for
+ * and no write changes it again (`archived`), though it can still be
+ * cloned. A running experiment is stopped with a decision first
+ * (`running`). No ruleset moves.
+ *
+ */
+export const archiveExperiment = <ThrowOnError extends boolean = false>(
+  options: Options<ArchiveExperimentData, ThrowOnError>,
+): RequestResult<ArchiveExperimentResponses, ArchiveExperimentErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ArchiveExperimentResponses,
+    ArchiveExperimentErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/experiments/{experiment}/archive",
     ...options,
   });
 

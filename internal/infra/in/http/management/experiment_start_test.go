@@ -194,12 +194,12 @@ func TestOnlyADraftStartsAndOnlyFromItsCurrentVersion(t *testing.T) {
 	again := startExperiment(t, f.admin, f.project.Key, "title_test", 2)
 	assertProblem(t, "a second start", again.StatusCode(), again.Body, http.StatusConflict, "not_draft")
 
-	for _, status := range []experiments.Status{experiments.StatusStopped, experiments.StatusArchived} {
+	for status, code := range map[experiments.Status]string{experiments.StatusStopped: "not_draft", experiments.StatusArchived: "archived"} {
 		key := string(status)
 		createExperiment(t, f.admin, f.project.Key, startableExperiment(key))
 		putInStatus(t, f, key, status)
 		res := startExperiment(t, f.admin, f.project.Key, key, 1)
-		assertProblem(t, "a start of a "+key+" experiment", res.StatusCode(), res.Body, http.StatusConflict, "not_draft")
+		assertProblem(t, "a start of a "+key+" experiment", res.StatusCode(), res.Body, http.StatusConflict, code)
 	}
 }
 
