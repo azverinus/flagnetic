@@ -39,7 +39,7 @@ An archived flag's definition can still be edited, but none of its configuration
 
 ## Flag configurations
 
-`GET /flags/{flag}` answers the definition with the configuration in every environment, each carrying its own version; `GET /flags/{flag}/environments/{environment}` answers one configuration and `PUT` on the same path replaces it whole.
+`GET /flags/{flag}` answers the definition with the configuration in every environment, each carrying its own version, and in `last_evaluated` when SDKs last evaluated the flag in each (see [Evaluations](#evaluations)); `GET /flags/{flag}/environments/{environment}` answers one configuration and `PUT` on the same path replaces it whole.
 
 A configuration holds:
 
@@ -131,7 +131,7 @@ To compare, `GET /flags?differs_between=staging,production` lists the flags whos
 
 ## Listing flags
 
-`GET /flags` lists the project's flags, each with its **flag state** in every environment: `{environment, on, has_rules, has_rollout, has_experiment}`, and its `updated_at`.
+`GET /flags` lists the project's flags, each with its **flag state** in every environment: `{environment, on, has_rules, has_rollout, has_experiment, last_evaluated_at}`, and its `updated_at`.
 
 | Parameter                 | Lists                                                                                                     |
 | ------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -151,6 +151,14 @@ A flag's page has one tab per environment and a History tab. **Edit definition**
 The rest of an environment's tab is a draft, laid out in the order evaluation reads it: the off variation, the overrides, the prerequisites, the rules and the fallthrough. Each rule holds up to 20 conditions on an attribute (the operators and value inputs follow the attribute's type: lists as chips, full semantic versions, dates and times), on a segment, or on another flag's variation, and serves a variation or a rollout, whose salt is shown and is regenerated only on request, after a warning. Rules reorder by dragging, with their arrow buttons, or with Alt+Arrow Up and Down. **Save** replaces the configuration under the version the draft was loaded at; leaving the tab with a draft asks first; a refusal is shown on the rule and condition it names. If someone saved the configuration meanwhile, saving shows who and when with a diff of their change, and offers to reload and reapply the draft (rules matched by identifier; new cards, and edited cards whose rule they removed, are appended and marked) or to discard it.
 
 The History tab lists every change to the flag, its definition and its configuration in every environment, newest first; an entry opens in a drawer with what it changed, and one that changed a configuration offers **Revert to this version**, or to the version before the change (the configuration's first version included), to a member holding `flag_configuration.revert`, confirming against the version the configuration is at now. **Compare environments** shows the flag's configurations in two environments side by side, marking every part SDKs would receive differently, and each side's copy button copies the other side into it as the copy operation above does, the target staying on or off, its overrides replaced only on request.
+
+## Evaluations
+
+SDKs report how often they evaluated each flag in [evaluation summaries](sdks/events.md), and the server counts every flag of every remote evaluation it answers. `GET /flags/{flag}/environments/{environment}/evaluations?from=&to=` reads them per UTC day they were received, by `source`, variation and reason: `sdk` for what SDKs reported, `remote_evaluation` for what the server answered. The two are separate series, never added together: a client SDK is sent every flag at once, whether its application reads it or not, and counts again the ones it reads. `from` and `to` are days, both included; `to` defaults to today and `from` to 29 days before `to`, and a range of more than 90 days is refused `400 invalid_request`. A count stops at the largest 64-bit integer rather than overflow.
+
+`last_evaluated_at`, on the flag's `last_evaluated` and on each flag state of the list, is when an SDK last evaluated the flag in the environment: the end of the latest interval an evaluation summary covered, or the latest exposure recorded, never later than the server received them; null when no SDK ever did. Remote evaluations never move it, so a flag sent to client SDKs in every answer, yet read by no application, still shows as never evaluated.
+
+Both lag the SDKs by the rollup's round of 10 seconds, and by as long as a transaction left open in the database holds the rollups back ([Operations](operations.md#raw-events)). A summary row naming a flag deleted since is counted nowhere.
 
 ## Trying a configuration
 

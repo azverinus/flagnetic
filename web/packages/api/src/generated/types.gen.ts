@@ -1678,7 +1678,10 @@ export type FlagEvaluationDay = {
    */
   variation: string | null;
   /**
-   * The evaluation reason; what an SDK reports with a client key is masked to `targeting_match`.
+   * The evaluation reason as counted: a true reason, an SDK's own
+   * `fallback` or `local_override`, or `targeting_match`, which a
+   * client SDK counts from the answers it receives.
+   *
    */
   reason: string;
   /**

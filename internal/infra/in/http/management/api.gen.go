@@ -1439,7 +1439,9 @@ type FlagEvaluationDay struct {
 	// Evaluations Stops at the largest int64 rather than overflow.
 	Evaluations int64 `json:"evaluations"`
 
-	// Reason The evaluation reason; what an SDK reports with a client key is masked to `targeting_match`.
+	// Reason The evaluation reason as counted: a true reason, an SDK's own
+	// `fallback` or `local_override`, or `targeting_match`, which a
+	// client SDK counts from the answers it receives.
 	Reason string `json:"reason"`
 
 	// Source Who counted the evaluations: an SDK reporting those it made (`sdk`),

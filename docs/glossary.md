@@ -346,7 +346,7 @@ The time between saving a change and SDKs evaluating with it. For a mobile app i
 _Avoid_: TTL, latency, refresh interval
 
 **Evaluation summary**:
-Aggregated counts per flag, variation and evaluation reason that an SDK reports periodically, together with its version and platform. It carries no unit IDs.
+Aggregated counts per flag, variation and evaluation reason that an SDK reports periodically, together with its version and platform; the server counts the remote evaluations it answers the same way, by the true reason. It carries no unit IDs. Evaluations per day and when a flag was last evaluated count what SDKs report and the exposures they record; remote evaluations are a separate count, since a client SDK is sent every flag whether it reads it or not.
 _Avoid_: telemetry, usage stats, analytics, metrics
 
 ## Events and export
@@ -356,7 +356,7 @@ A configured destination that receives a durable copy of events: ClickHouse, obj
 _Avoid_: export target, destination, integration, connector
 
 **Stream**:
-One reader of a raw event table moving an `(xid, seq)` cursor of its own: a rollup stream (such as `exposures`, keeping first exposures and daily counts), or one `(sink, event kind)` pair, a sink with all three event kinds selected moving three streams, each at its own pace. It reads only rows of transactions below the snapshot horizon, which have all ended, so its cursor is a position below which every row is either already applied or delivered, or never will be.
+One reader of a raw event table moving an `(xid, seq)` cursor of its own: a rollup stream (such as `exposures`, keeping first exposures and daily counts, or `evaluation_summaries`, keeping evaluations per day), or one `(sink, event kind)` pair, a sink with all three event kinds selected moving three streams, each at its own pace. It reads only rows of transactions below the snapshot horizon, which have all ended, so its cursor is a position below which every row is either already applied or delivered, or never will be.
 _Avoid_: subscription (reserved for a webhook subscription), channel, topic, position (as a field name; the word is cursor)
 
 **In-flight batch**:

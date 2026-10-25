@@ -6385,7 +6385,10 @@ components:
           description: The variation served; null when none was.
         reason:
           type: string
-          description: The evaluation reason; what an SDK reports with a client key is masked to `targeting_match`.
+          description: |
+            The evaluation reason as counted: a true reason, an SDK's own
+            `fallback` or `local_override`, or `targeting_match`, which a
+            client SDK counts from the answers it receives.
         evaluations:
           type: integer
           format: int64
