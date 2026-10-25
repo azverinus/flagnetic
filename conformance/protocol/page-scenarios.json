@@ -375,8 +375,10 @@
           }
         },
         {
+          "advance_ms": 1000
+        },
+        {
           "note": "recorded a second later, while hidden",
-          "advance_ms": 1000,
           "call": {
             "op": "alias"
           }
