@@ -880,7 +880,10 @@ describe("the beacon of a hidden or closing page", () => {
     await h.serve("/sdk/v1/evaluate", values(1, {}));
     // About 1.7 KiB each, fewer than a batch: 90 of them are over twice the quota.
     const id = (i: number): string => `d-${String(i).padStart(4, "0")}-${"x".repeat(1_500)}`;
-    for (let i = 0; i < 90; i++, h.tick()) c.alias(link(id(i)));
+    for (let i = 0; i < 90; i++) {
+      c.alias(link(id(i)));
+      h.tick();
+    }
     h.page.hide();
     const beacons = h.net.waiting("/sdk/v1/events");
     expect(beacons.length).toBeGreaterThan(0);

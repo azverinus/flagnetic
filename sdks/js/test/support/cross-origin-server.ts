@@ -3,7 +3,8 @@
 // exactly as the server does (any origin, no credentials, the request
 // headers a browser SDK sends, the response headers it reads) and serves
 // what the test puts in it: one values document per SDK key, a change
-// stream it can write to, and events it accepts. Every request is recorded,
+// stream it can write to, and events it accepts, from a beacon too (the
+// client key as `sdk_key`, no header). Every request is recorded,
 // preflights too, for the test to read back.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -87,7 +88,9 @@ export class CrossOriginServer {
       res.writeHead(204).end();
       return;
     }
-    const key = /^Bearer (.+)$/.exec(headers.authorization ?? "")?.[1];
+    const key =
+      /^Bearer (.+)$/.exec(headers.authorization ?? "")?.[1] ??
+      (url.pathname === "/sdk/v1/events" ? (url.searchParams.get("sdk_key") ?? undefined) : undefined);
     const doc = key === undefined ? undefined : this.values.get(key);
     if (doc === undefined) {
       res.writeHead(401, { "Content-Type": "application/problem+json" }).end(JSON.stringify({ status: 401, code: "sdk_key_invalid" }));

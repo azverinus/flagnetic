@@ -6,6 +6,7 @@
  * locally, so this entry point never contains the evaluator.
  */
 export { createClient, FlagneticClient, LocalOverrides, OfflineMode } from "./client/client.js";
+export { anonymousId } from "./client/anonymous.js";
 export { LocalOverrideRefused, LocalOverridesNotAllowed } from "./internal/overrides.js";
 export { consoleLogger } from "./client/logger.js";
 export type { AliasLink, QueuedEvent } from "./internal/events.js";

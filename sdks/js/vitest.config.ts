@@ -36,7 +36,20 @@ const crossOriginServe: BrowserCommand<[sdkKey: string, doc: unknown]> = (_ctx, 
 };
 const crossOriginRequests: BrowserCommand = () => crossOrigin.requests();
 const crossOriginSend: BrowserCommand<[text: string]> = (_ctx, text) => crossOrigin.send(text);
-const commands = { crossOriginStart, crossOriginReset, crossOriginServe, crossOriginRequests, crossOriginSend };
+// Opens test/support/closing-page.html in a tab of its own, on the test
+// page's origin, waits for its client to record an event and closes the tab
+// as a user would: what the page sends on its way out is all the server gets.
+const closePage: BrowserCommand<[baseUrl: string, sdkKey: string]> = async (ctx, baseUrl, sdkKey) => {
+  const query = new URLSearchParams({ base_url: baseUrl, sdk_key: sdkKey });
+  const page = await ctx.context.newPage();
+  try {
+    await page.goto(`${new URL(ctx.page.url()).origin}/test/support/closing-page.html?${query.toString()}`);
+    await page.waitForFunction(() => (window as { flagneticReady?: boolean }).flagneticReady === true, undefined, { timeout: 10_000 });
+  } finally {
+    await page.close({ runBeforeUnload: true });
+  }
+};
+const commands = { crossOriginStart, crossOriginReset, crossOriginServe, crossOriginRequests, crossOriginSend, closePage };
 
 export default defineConfig({
   server: { fs: { allow: [repoRoot] } },
