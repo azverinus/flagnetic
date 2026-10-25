@@ -9,7 +9,13 @@ import {
 import { expect, type Page, test } from "@playwright/test";
 
 import { type Credentials, managementClient, must, seedProject, signIn } from "../support/console";
-import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
+import {
+  choose,
+  readConfiguration,
+  seedFlag,
+  stringFlag,
+  writeConfiguration,
+} from "../support/flags";
 import { admin, viewer } from "../support/instance";
 
 /** Signs in and opens a project's experiments. */
@@ -191,6 +197,100 @@ test.describe("experiments", () => {
         { variation: "treatment", weight: 4000 },
       ],
     });
+  });
+
+  test("starts, grows, stops with a winner and clones, confirming what changes where", async ({
+    page,
+  }) => {
+    const project = await seedProject("exp-transitions");
+    const flag = "checkout_cta";
+    await seedFlag(project, stringFlag(flag));
+    await seedExperiment(project, experimentOn(flag, "cta_copy", { traffic_allocation: 2500 }));
+    const serving = (description: string) => ({
+      description,
+      conditions: [],
+      serve: { kind: "experiment" as const, experiment: "cta_copy" },
+    });
+    await writeConfiguration(project, flag, "development", () => ({
+      rules: [serving("Beta testers")],
+    }));
+    await writeConfiguration(project, flag, "staging", () => ({ rules: [serving("")] }));
+    await signIn(page, admin);
+    await page.goto(`/projects/${project}/experiments/cta_copy`);
+    await expect(page.getByRole("heading", { level: 1, name: "cta_copy" })).toBeVisible();
+
+    // Start, naming the environments whose rulesets take it.
+    await page.getByRole("button", { name: "Start", exact: true }).click();
+    let dialog = page.getByRole("dialog", { name: "Start cta_copy" });
+    await expect(dialog.getByRole("list", { name: "Environments changed" })).toHaveText(
+      /Development\s*Staging/,
+    );
+    await dialog.getByRole("button", { name: "Start experiment" }).click();
+    await expect(page.getByText("The experiment cta_copy is running.")).toBeVisible();
+    await expect(page.getByText("Running", { exact: true })).toBeVisible();
+    expect((await readExperiment(project, "cta_copy")).status).toBe("running");
+
+    // The traffic allocation only grows, through its own confirmation.
+    await expect(page.getByLabel("Traffic allocation (%)")).toBeDisabled();
+    await page.getByRole("button", { name: "Grow traffic allocation" }).click();
+    dialog = page.getByRole("dialog", { name: "Grow the traffic allocation of cta_copy" });
+    await dialog.getByLabel("New traffic allocation (%)").fill("20");
+    await dialog.getByRole("button", { name: "Grow traffic allocation" }).click();
+    await expect(
+      dialog.getByText("Enter more than 25.00 %: the traffic allocation only grows."),
+    ).toBeVisible();
+    await dialog.getByLabel("New traffic allocation (%)").fill("50");
+    await dialog.getByRole("button", { name: "Grow traffic allocation" }).click();
+    await expect(page.getByText("The traffic allocation of cta_copy grew.")).toBeVisible();
+    expect((await readExperiment(project, "cta_copy")).traffic_allocation).toBe(5000);
+
+    // Stop with a winner, listing each rule it rewrites.
+    const before = await readConfiguration(project, flag, "development");
+    await page.getByRole("button", { name: "Stop", exact: true }).click();
+    dialog = page.getByRole("dialog", { name: "Stop cta_copy" });
+    await choose(page, "Winning variation", "treatment");
+    await expect(dialog.getByRole("list", { name: "Rules rewritten" })).toContainText(
+      "Development, rule 1 “Beta testers”: serves treatment, its conditions kept",
+    );
+    await expect(dialog.getByRole("list", { name: "Rules rewritten" })).toContainText(
+      "Staging, rule 1: serves treatment, its conditions kept",
+    );
+    await dialog.getByLabel("Note").fill("Clear lift on checkout.");
+    await dialog.getByRole("button", { name: "Stop experiment" }).click();
+    await expect(page.getByText("The experiment cta_copy is stopped.")).toBeVisible();
+    await expect(page.getByText("Shipped treatment: its rules serve it.")).toBeVisible();
+    await expect(page.getByText("Clear lift on checkout.")).toBeVisible();
+    expect(await readExperiment(project, "cta_copy")).toMatchObject({
+      status: "stopped",
+      decision: {
+        outcome: "winner",
+        winner_variation: "treatment",
+        note: "Clear lift on checkout.",
+      },
+    });
+    const after = await readConfiguration(project, flag, "development");
+    expect(after.rules).toEqual([
+      {
+        id: before.rules[0]?.id,
+        description: "Beta testers",
+        conditions: [],
+        serve: { kind: "variation", variation: "treatment" },
+      },
+    ]);
+
+    // Clone into a new draft with new salts.
+    const source = await readExperiment(project, "cta_copy");
+    await page.getByRole("button", { name: "Clone", exact: true }).click();
+    dialog = page.getByRole("dialog", { name: "Clone cta_copy" });
+    await dialog.getByLabel("Key").fill("cta_copy_rerun");
+    await dialog.getByRole("button", { name: "Clone experiment" }).click();
+    await expect(page.getByText("The draft cta_copy_rerun is created.")).toBeVisible();
+    await expect(page).toHaveURL(/\/experiments\/cta_copy_rerun$/);
+    await expect(page.getByText("Draft", { exact: true })).toBeVisible();
+    const clone = await readExperiment(project, "cta_copy_rerun");
+    expect(clone).toMatchObject({ status: "draft", name: "cta_copy", decision: null });
+    expect(clone.inclusion_salt).not.toBe(source.inclusion_salt);
+    expect(clone.variation_salt).not.toBe(source.variation_salt);
   });
 
   test("tells a viewer which roles may create and edit experiments", async ({ page }) => {

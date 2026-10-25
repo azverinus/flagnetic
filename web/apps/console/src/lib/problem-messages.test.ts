@@ -50,6 +50,21 @@ describe("a refusal in the member's language", () => {
     );
   });
 
+  it("explains the refusals of an experiment's transitions", () => {
+    expect(problemMessage(i18n, refusal(409, { code: "not_running" }))).toBe(
+      "Only a running experiment can be stopped.",
+    );
+    expect(problemMessage(i18n, refusal(409, { code: "running" }))).toBe(
+      "A running experiment is stopped with a decision before it is archived.",
+    );
+    expect(problemMessage(i18n, refusal(409, { code: "not_stopped" }))).toBe(
+      "Only a stopped experiment has a decision note.",
+    );
+    expect(problemMessage(i18n, refusal(422, { code: "experiment_not_ready" }))).toBe(
+      "The experiment is not ready to start.",
+    );
+  });
+
   it("asks to reload when someone else saved since the form was opened", () => {
     expect(
       problemMessage(i18n, refusal(412, { code: "version_mismatch", current_version: 3 })),

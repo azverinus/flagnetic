@@ -111,8 +111,13 @@ describe("the fields an experiment's status leaves open", () => {
     expect(lockedFields("draft").size).toBe(0);
   });
 
-  it("freeze what the comparison rests on while it runs", () => {
-    expect([...lockedFields("running")].sort()).toEqual(["flag", "unit_type", "variations"]);
+  it("freeze what the comparison rests on while it runs, the allocation growing apart", () => {
+    expect([...lockedFields("running")].sort()).toEqual([
+      "flag",
+      "traffic_allocation",
+      "unit_type",
+      "variations",
+    ]);
   });
 
   it("leave the description alone once stopped", () => {
@@ -295,17 +300,14 @@ describe("the experiment form's issues", () => {
     expect(issues.any).toBe(true);
   });
 
-  it("refuse shrinking a running experiment's allocation and skip what its status locks", () => {
+  it("skip what a running experiment's status locks", () => {
     const base = { status: "running", traffic_allocation: 5000 } as Experiment;
     const issues = experimentIssues(
       i18n,
-      { ...filled, traffic_allocation: "40", variations: [] },
+      { ...filled, traffic_allocation: "", variations: [] },
       { variations: flagVariations, base },
     );
-    expect(Object.fromEntries(issues.fields)).toEqual({
-      traffic_allocation:
-        "While the experiment runs its traffic allocation can only grow, from 50.00 %.",
-    });
+    expect(issues.fields.size).toBe(0);
     expect(issues.weights).toEqual({ rows: [], total: undefined });
   });
 });

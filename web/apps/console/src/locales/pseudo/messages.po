@@ -39,6 +39,10 @@ msgstr ""
 msgid "{count, plural, one {second} other {seconds}}"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "{created} by {creator}"
+msgstr ""
+
 #: src/components/condition-row.tsx
 #: src/lib/conditions.ts
 msgid "{entry} is not a full semantic version, such as 1.41.0."
@@ -47,6 +51,14 @@ msgstr ""
 #: src/components/condition-row.tsx
 #: src/lib/conditions.ts
 msgid "{entry} is not a number."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "{environment}, rule {position}"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "{environment}, rule {position} “{description}”"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -246,6 +258,10 @@ msgstr ""
 msgid "A named set of attribute conditions that rules of every flag can target by name."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "A new draft with everything but its salts, decision and owner: new salts, so no unit keeps the assignment it had; you own it. Its rules are not copied."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "A new flag is off in every environment until it is switched on."
 msgstr ""
@@ -301,6 +317,10 @@ msgstr ""
 
 #: src/components/tester-panel.tsx
 msgid "A rule's rollout served: the unit's bucket is below its percentage."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "A running experiment is stopped with a decision before it is archived."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -602,16 +622,22 @@ msgstr ""
 msgid "Apply filters"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archive"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archive {key}"
 msgstr ""
 
 #: src/lib/access-names.ts
 msgid "archive and delete flags"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Archive experiment"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -622,6 +648,7 @@ msgstr ""
 msgid "Archive the flag first; only an archived flag can be deleted."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
 #: src/lib/experiments.ts
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Archived"
@@ -651,6 +678,10 @@ msgstr ""
 
 #: src/components/sdk-keys.tsx
 msgid "At most {maxAllowedOrigins} origins."
+msgstr ""
+
+#: src/lib/experiment-transitions.ts
+msgid "At most {maxNoteLength} characters."
 msgstr ""
 
 #. A kind of entity in the audit log.
@@ -762,6 +793,7 @@ msgstr ""
 msgid "Bucket"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
 #: src/components/kill-switch-dialog.tsx
 #: src/components/ui/confirm-dialog.tsx
 #: src/components/ui/form-page.tsx
@@ -861,6 +893,10 @@ msgstr ""
 msgid "Choose a flag."
 msgstr ""
 
+#: src/lib/experiment-transitions.ts
+msgid "Choose a key no other experiment has."
+msgstr ""
+
 #: src/components/grant-form.tsx
 msgid "Choose a member"
 msgstr ""
@@ -919,6 +955,7 @@ msgid "Choose a unit type."
 msgstr ""
 
 #: src/components/condition-row.tsx
+#: src/components/experiment-transitions.tsx
 #: src/components/prerequisites-section.tsx
 #: src/components/rule-editor.tsx
 #: src/components/weights-input.tsx
@@ -973,6 +1010,10 @@ msgstr ""
 msgid "Choose the day the experiment is expected to end: it starts only with one."
 msgstr ""
 
+#: src/lib/experiment-transitions.ts
+msgid "Choose the variation that won."
+msgstr ""
+
 #: src/lib/conditions.ts
 #: src/lib/tester.ts
 msgid "Choose true or false."
@@ -995,6 +1036,18 @@ msgstr ""
 
 #: src/lib/sdk-keys.ts
 msgid "Client"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Clone"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Clone {key}"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Clone experiment"
 msgstr ""
 
 #: src/components/ui/dialog.tsx
@@ -1158,6 +1211,7 @@ msgstr ""
 msgid "Create unit type"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
 #: src/components/sdk-keys.tsx
 #: src/components/token-list.tsx
 msgid "Created"
@@ -1201,6 +1255,14 @@ msgstr ""
 msgid "Deactivation ends every session and API token of yours at once, this one included, and you cannot sign in until another instance admin reactivates you."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Decision"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Decision note"
+msgstr ""
+
 #: src/components/discovered-attributes.tsx
 msgid "Declare {key}"
 msgstr ""
@@ -1221,11 +1283,13 @@ msgstr ""
 msgid "Declaring {key} makes it usable in rules. Its type is fixed once declared."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Delete"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
 #: src/routes/_signed-in/projects/$project/attributes.tsx
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
@@ -1246,6 +1310,10 @@ msgstr ""
 msgid "Delete environment"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Delete experiment"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Delete flag"
 msgstr ""
@@ -1260,6 +1328,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "Delete unit type"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "deleted"
 msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
@@ -1360,6 +1432,10 @@ msgstr ""
 msgid "Each experiment compares variations of one flag over the units of one unit type; a flag's rule serves it in the environments that hold it."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Each of these rules is rewritten, and its environment's ruleset changes:"
+msgstr ""
+
 #: src/components/weights-input.tsx
 msgid "Each variation's share of the units the traffic allocation includes; the shares sum to 100.00 %."
 msgstr ""
@@ -1398,6 +1474,10 @@ msgstr ""
 msgid "Edit key {name}"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Edit note"
+msgstr ""
+
 #: src/lib/access-names.ts
 msgid "edit segments"
 msgstr ""
@@ -1410,6 +1490,10 @@ msgstr ""
 #: src/components/profile-form.tsx
 #: src/components/sign-in-form.tsx
 msgid "Email"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Empty clears it."
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -1460,6 +1544,7 @@ msgstr ""
 msgid "Enter a pattern in RE2 syntax, which has no look-around or back-references."
 msgstr ""
 
+#: src/lib/experiment-transitions.ts
 #: src/lib/experiments.ts
 #: src/lib/problem-messages.ts
 msgid "Enter a percentage from 0 to 100, at most two decimals."
@@ -1503,6 +1588,10 @@ msgstr ""
 
 #: src/lib/variations.ts
 msgid "Enter JSON other than null."
+msgstr ""
+
+#: src/lib/experiment-transitions.ts
+msgid "Enter more than {from} %: the traffic allocation only grows."
 msgstr ""
 
 #: src/lib/flag-detail.ts
@@ -1568,6 +1657,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "Environments and history"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Environments changed"
 msgstr ""
 
 #: src/lib/conditions.ts
@@ -1667,6 +1760,8 @@ msgid "Expand the sidebar"
 msgstr ""
 
 #: src/components/experiment-fields.tsx
+#: src/components/experiment-transitions.tsx
+#: src/lib/experiment-transitions.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Expected end"
 msgstr ""
@@ -1794,6 +1889,7 @@ msgstr ""
 #. A kind of entity in the audit log.
 #: src/components/experiment-fields.tsx
 #: src/lib/audit.ts
+#: src/lib/experiment-transitions.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Flag"
@@ -1915,6 +2011,14 @@ msgstr ""
 msgid "Grants"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Grow the traffic allocation of {key}"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Grow traffic allocation"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Has a rollout"
 msgstr ""
@@ -1956,6 +2060,7 @@ msgid "How the instance knows you. An instance admin can change it."
 msgstr ""
 
 #: src/components/experiment-fields.tsx
+#: src/lib/experiment-transitions.ts
 msgid "Hypothesis"
 msgstr ""
 
@@ -1989,6 +2094,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Include archived experiments"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Inclusion salt"
 msgstr ""
 
 #. An audit entry that belongs to no project.
@@ -2100,8 +2209,20 @@ msgstr ""
 msgid "Issue link"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "It cannot start until these are fixed:"
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "It does not exist, or it was deleted."
+msgstr ""
+
+#: src/lib/experiment-transitions.ts
+msgid "It has no expected end date."
+msgstr ""
+
+#: src/lib/experiment-transitions.ts
+msgid "It has no hypothesis."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -2141,6 +2262,7 @@ msgstr ""
 
 #: src/components/discovered-attributes.tsx
 #: src/components/experiment-fields.tsx
+#: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/sdk-inventory.tsx
@@ -2233,6 +2355,10 @@ msgstr ""
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "Left empty, 90 days from today."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Left empty, it keeps “{sourceName}”."
 msgstr ""
 
 #: src/lib/project-members.ts
@@ -2413,6 +2539,10 @@ msgstr ""
 msgid "Membership (condition {position})"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Missing to start"
+msgstr ""
+
 #: src/components/rule-editor.tsx
 msgid "Move rule {position} down"
 msgstr ""
@@ -2422,6 +2552,7 @@ msgid "Move rule {position} up"
 msgstr ""
 
 #: src/components/experiment-fields.tsx
+#: src/components/experiment-transitions.tsx
 #: src/components/flag-definition-sheet.tsx
 #: src/components/projects-table.tsx
 #: src/components/sdk-keys.tsx
@@ -2515,6 +2646,10 @@ msgstr ""
 msgid "New segment"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "New traffic allocation (%)"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "New unit type"
 msgstr ""
@@ -2573,6 +2708,10 @@ msgstr ""
 msgid "No members yet."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "No note."
+msgstr ""
+
 #: src/components/overrides-section.tsx
 msgid "No overrides in this environment."
 msgstr ""
@@ -2600,6 +2739,18 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "No rule serves it"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "No rule serves it yet: it starts, but no SDK receives it until a rule of its flag serves it in an environment."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "No rule serves it: no configuration or ruleset changes."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "No rule serves it: no ruleset changes."
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -2670,12 +2821,17 @@ msgstr ""
 msgid "Not recorded"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
 #: src/components/overrides-section.tsx
 msgid "Note"
 msgstr ""
 
 #: src/components/overrides-section.tsx
 msgid "Note (optional)"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Nothing about the experiment changes any more, its decision note included; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -2696,6 +2852,10 @@ msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Nothing that a member edits changed."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Now {current} %. It only grows: every unit included so far stays included."
 msgstr ""
 
 #. An attribute type.
@@ -2764,7 +2924,15 @@ msgid "Only a rule serving a rollout has a salt."
 msgstr ""
 
 #: src/lib/problem-messages.ts
+msgid "Only a running experiment can be stopped."
+msgstr ""
+
+#: src/lib/problem-messages.ts
 msgid "Only a signed-in session can do this, not an API token."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Only a stopped experiment has a decision note."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -2820,6 +2988,7 @@ msgstr ""
 msgid "Overrides in this environment"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
 #: src/components/navigation.tsx
 msgid "Overview"
 msgstr ""
@@ -3034,6 +3203,14 @@ msgstr ""
 msgid "Reading the members…"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Reading which environments hold it…"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Reading which rules serve it…"
+msgstr ""
+
 #: src/components/rule-editor.tsx
 msgid "Reapplied after a conflict: saves as a new rule"
 msgstr ""
@@ -3121,6 +3298,14 @@ msgstr ""
 #: src/components/variations-editor.tsx
 #: src/components/weights-input.tsx
 msgid "Remove variation {n}"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Remove: its rules are deleted, the flag's other rules decide"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Removed: its rules were deleted."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/environments/index.tsx
@@ -3337,6 +3522,10 @@ msgstr ""
 msgid "Rules of these flags use the segment and evaluate by what it holds once saved:"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Rules rewritten"
+msgstr ""
+
 #: src/lib/experiments.ts
 msgid "Running"
 msgstr ""
@@ -3375,6 +3564,14 @@ msgstr ""
 
 #: src/components/flag-definition-sheet.tsx
 msgid "Save definition"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Save note"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
+msgid "Save or discard your edits before changing the experiment's status."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
@@ -3482,6 +3679,10 @@ msgstr ""
 msgid "Serves (rule {position})"
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "serves {winner}, its conditions kept"
+msgstr ""
+
 #: src/components/structural-diff-view.tsx
 msgid "Serves <0/> instead of <1/>."
 msgstr ""
@@ -3492,6 +3693,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Serves an experiment"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "serves the winner, its conditions kept"
 msgstr ""
 
 #. A kind of entity in the audit log.
@@ -3520,6 +3725,14 @@ msgstr ""
 #: src/components/navigation.tsx
 #: src/routes/_signed-in/projects/$project/settings.tsx
 msgid "Settings"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Ship a winner: its rules serve the winning variation"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Shipped {winner}: its rules serve it."
 msgstr ""
 
 #: src/components/app-shell.tsx
@@ -3609,6 +3822,19 @@ msgstr ""
 msgid "Standard attributes are part of every project, so they cannot be deleted."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Start"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Start {key}"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Start experiment"
+msgstr ""
+
+#: src/lib/experiment-transitions.ts
 #: src/lib/experiments.ts
 #: src/lib/flags.ts
 msgid "Start with a letter; then letters, digits, ., - and _, at most 128 in all."
@@ -3616,6 +3842,14 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Start with a lowercase letter; then lowercase letters, digits, - and _, at most 64 in all."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Started"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Starting puts it into the ruleset of each of these environments at once, and its flag, unit type and weights stay as they are while it runs:"
 msgstr ""
 
 #: src/lib/conditions.ts
@@ -3638,6 +3872,19 @@ msgstr ""
 msgid "Status changed from {before} to {after}."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Stop"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Stop {key}"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Stop experiment"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
 #: src/lib/experiments.ts
 msgid "Stopped"
 msgstr ""
@@ -3791,6 +4038,10 @@ msgstr ""
 msgid "The day the experiment is expected to have its answer."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "The decision note is saved."
+msgstr ""
+
 #: src/components/flag-definition-sheet.tsx
 msgid "The definition is saved."
 msgstr ""
@@ -3801,6 +4052,18 @@ msgstr ""
 
 #: src/components/session-list.tsx
 msgid "The devices you are signed in on"
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "The draft {key} is created."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "The draft is deleted. This cannot be taken back; its audit entries stay."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "The draft never starts and nothing about it changes any more; no ruleset changes. Archived experiments are listed only on request; it can still be cloned."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -3823,14 +4086,31 @@ msgstr ""
 msgid "The environments serve differently where marked."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "The experiment {key} is archived."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/experiments/[-].new.tsx
 msgid "The experiment {key} is created."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "The experiment {key} is deleted."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "The experiment {key} is running."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "The experiment {key} is stopped."
 msgstr ""
 
 #: src/components/rule-editor.tsx
 msgid "The experiment has ended: SDKs no longer receive this rule, and units continue to the next rule."
 msgstr ""
 
+#: src/lib/experiment-transitions.ts
 #: src/lib/experiments.ts
 msgid "The experiment is archived: nothing about it changes any more."
 msgstr ""
@@ -3839,8 +4119,12 @@ msgstr ""
 msgid "The experiment is created as a draft: nothing changes for users until a rule serves it and it starts."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "The experiment is not ready to start."
+msgstr ""
+
 #: src/lib/experiments.ts
-msgid "The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid, and its traffic allocation can only grow, so no included unit ever leaves."
+msgid "The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid. Its traffic allocation only grows, through Grow traffic allocation above, so no included unit ever leaves."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/$experiment.tsx
@@ -3867,6 +4151,7 @@ msgstr ""
 msgid "the flag {key}"
 msgstr ""
 
+#: src/lib/experiment-transitions.ts
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 msgid "The flag {key} is archived."
 msgstr ""
@@ -4107,6 +4392,10 @@ msgstr ""
 msgid "The rollout has a new salt."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "The ruleset of each of these environments changes at once:"
+msgstr ""
+
 #: src/components/sdk-inventory.tsx
 msgid "The SDKs that have asked this environment for its ruleset or for values, most recently seen first. A row appears within a minute of an SDK’s request; whether an SDK is connected right now is not shown."
 msgstr ""
@@ -4167,12 +4456,20 @@ msgstr ""
 msgid "The token is revoked."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "The traffic allocation of {key} grew."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "The type of every value the flag serves. It never changes."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/unit-types.tsx
 msgid "The unit type {key} is no longer declared, and its key can be declared again."
+msgstr ""
+
+#: src/lib/experiment-transitions.ts
+msgid "The unit type {unitType} is not declared."
 msgstr ""
 
 #: src/components/tester-panel.tsx
@@ -4494,6 +4791,7 @@ msgstr ""
 #: src/components/experiment-fields.tsx
 #: src/components/overrides-section.tsx
 #: src/lib/audit.ts
+#: src/lib/experiment-transitions.ts
 msgid "Unit type"
 msgstr ""
 
@@ -4628,6 +4926,10 @@ msgstr ""
 msgid "Variation <0>{key}</0> serves <1/> instead of <2/>."
 msgstr ""
 
+#: src/components/experiment-transitions.tsx
+msgid "Variation salt"
+msgstr ""
+
 #: src/components/variations-editor.tsx
 msgid "Variations"
 msgstr ""
@@ -4663,6 +4965,10 @@ msgstr ""
 
 #: src/components/weights-input.tsx
 msgid "Weight of variation {n} (%)"
+msgstr ""
+
+#: src/lib/experiment-transitions.ts
+msgid "Weights"
 msgstr ""
 
 #: src/components/rule-editor.tsx
@@ -4721,16 +5027,20 @@ msgstr ""
 msgid "While the experiment is a draft, SDKs do not receive this rule: units continue to the next rule until it starts."
 msgstr ""
 
-#: src/lib/experiments.ts
-msgid "While the experiment runs its traffic allocation can only grow, from {from} %."
-msgstr ""
-
 #: src/components/experiment-fields.tsx
 msgid "Whose units are split: users, accounts, devices."
 msgstr ""
 
 #: src/components/overrides-section.tsx
 msgid "Why the unit has this override, such as the test it is for. Never sent to SDKs."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Why, for whoever reads the decision later. Optional; editable while stopped."
+msgstr ""
+
+#: src/components/experiment-transitions.tsx
+msgid "Winning variation"
 msgstr ""
 
 #: src/components/compare-environments.tsx
