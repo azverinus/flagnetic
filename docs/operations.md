@@ -140,7 +140,7 @@ The public listener bounds what one client can hold:
 | `FLAGNETIC_HTTP_IDLE_TIMEOUT` | `120s` | Time a keep-alive connection may stay idle. |
 | `FLAGNETIC_HTTP_MAX_BODY_BYTES` | `1048576` | Size of a request body; a larger one is answered 413. The few routes that take larger bodies declare their own limit, such as the uniformity check's 64 MiB. |
 
-There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) and must allow it a read timeout above its 15-second heartbeat; see [TLS and a reverse proxy](install.md#tls-and-a-reverse-proxy).
+There is no bound on the time to write a response, which would cut off streams; a proxy in front may add its own. A proxy in front must not buffer the [ruleset stream](sdks/stream.md) or the management change stream and must allow them a read timeout above their 15-second heartbeat; see [TLS and a reverse proxy](install.md#tls-and-a-reverse-proxy).
 
 ## Delivery across replicas
 
@@ -160,6 +160,7 @@ Each replica holds one PostgreSQL connection per channel, outside its pool, for 
 | `rulesets` | every change to an environment's ruleset, and the deletion of an environment | The replica caches no ruleset: it builds one from PostgreSQL for every ruleset request and remote evaluation (`flagnetic_ruleset_materializations_total` grows with each). The streams it holds hear of no change made through another replica, so their SDKs learn of it only at their next poll (every 5 minutes for a Go SDK holding the ruleset stream, by default) and the [declared propagation time](#propagation) does not hold for them. A pooler in transaction or statement mode keeps this listener down for good: connect directly or through a pooler in session mode ([Poolers in session mode only](install.md#poolers-in-session-mode-only)). |
 | `sdk_keys` | every change that ends or restricts an SDK key | The replica caches no key and reads every SDK request's key from PostgreSQL, so a revocation still applies at once. |
 | `auth_settings` | changes to the instance's auth settings | The replica reads the settings from PostgreSQL on every use (see [Signing in to the console](#signing-in-to-the-console)). |
+| `flagnetic_management_change` | every audit entry of a project, for the management change streams (`GET /api/v1/projects/{project}/stream`) | The change streams the replica holds hear of nothing; once it listens again, each is told to refetch, so the console reloads what it shows. |
 
 A listener that is down never serves stale data, only slower. When a listener connects again, the replica starts afresh: the `rulesets` listener drops every ruleset it holds, takes the versions PostgreSQL holds as the newest (even when older than versions it saw before, as after a failover that lost recent writes), and tells every stream it holds of the current version. Ruleset versions come from the clock of the replica that commits a change, so the first change after a failover or a restore is numbered above every version handed out before it, and every SDK accepts it.
 
@@ -272,6 +273,8 @@ Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNET
 | `flagnetic_worker_round_duration_seconds` | `worker` | Time a worker's round took (histogram). |
 | `flagnetic_auth_purged_rows_total` | `kind` | Rows the auth retention worker deleted: `sessions`, `email_failures`, `source_failures`, `invitations`. |
 | `flagnetic_management_refusals_total` | `operation`, `code` | Requests to the management API refused before their operation ran, by the operation and the problem code: no credential (`401 unauthenticated`), a bad or ended one (`401 invalid_token`, `token_expired`, `token_revoked`, `session_expired`), another origin (`403 cross_origin`), a project token outside its project (`403 forbidden`), an API token where a session is required (`403 session_required`), a missing scope (`403 insufficient_scope`), an unknown project (`404 not_found`) and a missing permission (`403 forbidden`). See [How a request is judged](access.md#how-a-request-is-judged). |
+| `flagnetic_management_streams` | | Management change streams (`GET /api/v1/projects/{project}/stream`, which the console holds for the project it shows) open on the replica. |
+| `flagnetic_management_streams_refused_total` | | Management change streams refused `429 too_many_streams`: a member, or a project token, holds at most 10 open on one replica, whatever credentials they use. |
 | `flagnetic_listener_up` | `channel` | Whether the replica is listening on a PostgreSQL notification channel, through which replicas tell each other about changes: 1 listening, 0 not. Each listener checks itself every 10 seconds by sending itself a notification, so a connection that went silent without failing is caught too. |
 | `flagnetic_ruleset_materializations_total` | | Rulesets the replica built from PostgreSQL. It grows by one per environment change the replica serves, and by one per request while the `rulesets` listener is down. |
 | `flagnetic_ruleset_propagation_seconds` | `environment` (its identifier) | Time from a change to an environment's ruleset to this replica's first answer carrying it (histogram, 0.01 s to 60 s). A version nobody asks for is not observed. The series of a deleted environment is dropped. |
@@ -299,7 +302,7 @@ Each request is logged once when it completes, as a `request` record with `metho
 
 On SIGTERM or SIGINT a replica stops in three steps:
 
-1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. Every [ruleset stream](sdks/stream.md) the replica holds is closed, and its SDK reconnects, usually to another replica. This gives load balancers time to notice and route away, so stopping one replica of several never refuses a request. `0` skips the drain.
+1. **Drain** (`FLAGNETIC_SHUTDOWN_DRAIN`, 5 s by default): `/readyz` answers 503 at once, while every request that still arrives is served. Every [ruleset stream](sdks/stream.md) and management change stream the replica holds is closed, and its SDK or console reconnects, usually to another replica. This gives load balancers time to notice and route away, so stopping one replica of several never refuses a request. `0` skips the drain.
 2. **Grace** (`FLAGNETIC_SHUTDOWN_GRACE`, 15 s by default): the replica stops accepting connections and lets requests in flight finish.
 3. **Cancel**: requests still running when the grace period ends are cancelled, background work is stopped, and the database pool closes.
 
