@@ -502,7 +502,7 @@ func Settings() []Setting {
 			Key:     "webhook_allow_private_networks",
 			Default: "false",
 			Description: "Accept webhook targets that resolve to loopback, private, link-local, unspecified or multicast addresses. " +
-				"Without it such a target is refused `private_network_target` when a subscription is written, and a call is not made when the address it would reach is one, " +
+				"Without it such a target is refused `private_network_target` when a subscription is written, " +
 				"so that whoever manages webhooks cannot reach the network the instance runs in.",
 			Example: "true",
 			apply:   boolSetting(func(c *Config, b bool) { c.WebhookAllowPrivateNetworks = b }),

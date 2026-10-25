@@ -5480,8 +5480,7 @@ type ClientInterface interface {
 	// loopback, private, link-local, unspecified or multicast address is
 	// refused (`private_network_target`) unless the operator set
 	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
-	// resolve is accepted, and every call checks the address it reaches
-	// again. An event type outside the catalogue is `unknown_event_type`.
+	// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 	// A blank name or one over 200 characters, a `url` that is not an
 	// absolute http or https URL without credentials or a fragment, no
 	// event type, and an environment the project does not have are
@@ -5505,8 +5504,7 @@ type ClientInterface interface {
 	// loopback, private, link-local, unspecified or multicast address is
 	// refused (`private_network_target`) unless the operator set
 	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
-	// resolve is accepted, and every call checks the address it reaches
-	// again. An event type outside the catalogue is `unknown_event_type`.
+	// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 	// A blank name or one over 200 characters, a `url` that is not an
 	// absolute http or https URL without credentials or a fragment, no
 	// event type, and an environment the project does not have are
@@ -9063,8 +9061,7 @@ func (c *Client) ListWebhooks(ctx context.Context, project ProjectKey, reqEditor
 // loopback, private, link-local, unspecified or multicast address is
 // refused (`private_network_target`) unless the operator set
 // `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
-// resolve is accepted, and every call checks the address it reaches
-// again. An event type outside the catalogue is `unknown_event_type`.
+// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 // A blank name or one over 200 characters, a `url` that is not an
 // absolute http or https URL without credentials or a fragment, no
 // event type, and an environment the project does not have are
@@ -9098,8 +9095,7 @@ func (c *Client) CreateWebhookWithBody(ctx context.Context, project ProjectKey, 
 // loopback, private, link-local, unspecified or multicast address is
 // refused (`private_network_target`) unless the operator set
 // `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
-// resolve is accepted, and every call checks the address it reaches
-// again. An event type outside the catalogue is `unknown_event_type`.
+// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 // A blank name or one over 200 characters, a `url` that is not an
 // absolute http or https URL without credentials or a fragment, no
 // event type, and an environment the project does not have are
@@ -17844,8 +17840,7 @@ type ClientWithResponsesInterface interface {
 	// loopback, private, link-local, unspecified or multicast address is
 	// refused (`private_network_target`) unless the operator set
 	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
-	// resolve is accepted, and every call checks the address it reaches
-	// again. An event type outside the catalogue is `unknown_event_type`.
+	// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 	// A blank name or one over 200 characters, a `url` that is not an
 	// absolute http or https URL without credentials or a fragment, no
 	// event type, and an environment the project does not have are
@@ -17869,8 +17864,7 @@ type ClientWithResponsesInterface interface {
 	// loopback, private, link-local, unspecified or multicast address is
 	// refused (`private_network_target`) unless the operator set
 	// `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
-	// resolve is accepted, and every call checks the address it reaches
-	// again. An event type outside the catalogue is `unknown_event_type`.
+	// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 	// A blank name or one over 200 characters, a `url` that is not an
 	// absolute http or https URL without credentials or a fragment, no
 	// event type, and an environment the project does not have are
@@ -31028,8 +31022,7 @@ func (c *ClientWithResponses) ListWebhooksWithResponse(ctx context.Context, proj
 // loopback, private, link-local, unspecified or multicast address is
 // refused (`private_network_target`) unless the operator set
 // `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
-// resolve is accepted, and every call checks the address it reaches
-// again. An event type outside the catalogue is `unknown_event_type`.
+// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 // A blank name or one over 200 characters, a `url` that is not an
 // absolute http or https URL without credentials or a fragment, no
 // event type, and an environment the project does not have are
@@ -31059,8 +31052,7 @@ func (c *ClientWithResponses) CreateWebhookWithBodyWithResponse(ctx context.Cont
 // loopback, private, link-local, unspecified or multicast address is
 // refused (`private_network_target`) unless the operator set
 // `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS`; a name that does not
-// resolve is accepted, and every call checks the address it reaches
-// again. An event type outside the catalogue is `unknown_event_type`.
+// resolve is accepted. An event type outside the catalogue is `unknown_event_type`.
 // A blank name or one over 200 characters, a `url` that is not an
 // absolute http or https URL without credentials or a fragment, no
 // event type, and an environment the project does not have are

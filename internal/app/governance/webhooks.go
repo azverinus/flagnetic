@@ -89,8 +89,7 @@ func keptEnvironments(w governance.Webhook, change governance.WebhookChange) []s
 // checkTarget refuses a target whose name resolves to an address the
 // operator does not allow. It runs before the write's transaction, since it
 // waits on the network. A name that does not resolve is accepted: the
-// receiver may not be up yet, or the resolver briefly unreachable, and every
-// connection checks the address it reaches again.
+// receiver may not be up yet, or the resolver briefly unreachable.
 func (d WebhookDeps) checkTarget(ctx context.Context, url string) error {
 	if d.Targets.AllowPrivateNetworks {
 		return nil
