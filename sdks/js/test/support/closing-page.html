@@ -1,0 +1,29 @@
+<!doctype html>
+<!--
+  A page that a test opens in a tab of its own and closes: it builds a
+  browser client against the server named in its query, waits for its
+  values, records an alias whose flush interval is far away, and sets
+  `window.flagneticReady`. Closing the tab must hand the alias to a beacon.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>closing page</title>
+  </head>
+  <body>
+    <script type="module">
+      import { createClient } from "/src/client.ts";
+
+      const query = new URLSearchParams(location.search);
+      const client = createClient(query.get("sdk_key"), query.get("base_url"), {
+        context: { units: { anonymous: "d-8f1c" } },
+        flushInterval: 3_600_000,
+        sendSummaries: false,
+        logger: () => undefined,
+      });
+      await client.ready(5_000);
+      client.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
+      window.flagneticReady = true;
+    </script>
+  </body>
+</html>

@@ -76,10 +76,10 @@ A change made in Flagnetic reaches a server client within 2 seconds at p99 while
 ## Browser client
 
 ```ts
-import { createClient } from "flagnetic/client";
+import { anonymousId, createClient } from "flagnetic/client";
 
 const flagnetic = createClient("fn_cli_…", "https://flags.example.com", {
-  context: { units: { anonymous: anonymousId }, attributes: { country: "DE" } },
+  context: { units: { anonymous: anonymousId() }, attributes: { country: "DE" } },
 });
 
 // Values serve at once: the bootstrap document, else the last good values
@@ -92,7 +92,7 @@ if (flagnetic.getBool("new_checkout", false)) {
 
 // After sign-in: resolves once the new context's values arrived, while the
 // previous values keep serving, so there is no flash of defaults.
-await flagnetic.setContext({ units: { anonymous: anonymousId, user: "u-1001" } });
+await flagnetic.setContext({ units: { anonymous: anonymousId(), user: "u-1001" } });
 ```
 
 `createClient` refuses a server key (`fn_srv_…`), which must never ship in a bundle. The client asks the server to evaluate for its context and never contains the evaluator, so `flagnetic/client` stays within a gzip size budget checked in CI. It names itself to the server through the context's `sdk`, `sdk_version` and `platform` attributes, since a browser cannot set a `User-Agent`.
@@ -101,7 +101,9 @@ The last good values are kept in `localStorage` under the SDK key and the contex
 
 The client refetches when the tab becomes visible or the network comes back, at most once every 10 seconds, and polls every 300 seconds while the tab is visible. With `stream: true` it also holds the change stream, read over `fetch` so that it can send its key and `Last-Event-ID` in headers and reconnect by itself; it is off by default, since every open tab holds one connection.
 
-Exposures, aliases and evaluation summaries are queued in `localStorage` under the key and sent every 5 seconds while the tab is visible; `flush()` and `close()` send them within 5 seconds. Options: `context`, `bootstrap`, `offline`, `store`, `stream`, `pollInterval`, `requestTimeout`, `flushInterval`, `sendExposures`, `sendSummaries`, `allowOverrides`, `logger`, `platform` and `appVersion`. Getters, `getDetail`, `stage`, `status()`, `onChange`, `onStage`, `overrides`, `exposure(key)` and `alias` work as in server mode, without the context argument.
+`anonymousId(unitType = "anonymous")` gives this browser one ID per unit type: a random UUIDv7 minted on the first call and kept in `localStorage` for every later visit of the origin. It lives outside the key's storage, so a rotated or replaced client key keeps every anonymous visitor in the experiment arm their ID buckets into; where `localStorage` cannot be reached, the ID holds for the page. Pass the unit type your project declared for anonymous traffic, and keep the ID in the context's units after sign-in.
+
+Exposures, aliases and evaluation summaries are queued in `localStorage` under the key and sent every 5 seconds while the tab is visible; `flush()` and `close()` send them within 5 seconds. Tabs of one origin with the same key share the queue, so what a closed tab left is sent by the next batch of any of them. When the tab is hidden or the page is closed, the client hands the queue to `navigator.sendBeacon`, which the browser delivers after the page is gone: the client key travels as the `sdk_key` query parameter and the envelope as `text/plain`, so no CORS preflight is needed, and what does not fit the browser's 64 KiB beacon quota stays queued for the next visit. Options: `context`, `bootstrap`, `offline`, `store`, `stream`, `pollInterval`, `requestTimeout`, `flushInterval`, `sendExposures`, `sendSummaries`, `allowOverrides`, `logger`, `platform` and `appVersion`. Getters, `getDetail`, `stage`, `status()`, `onChange`, `onStage`, `overrides`, `exposure(key)` and `alias` work as in server mode, without the context argument.
 
 ### Propagation
 

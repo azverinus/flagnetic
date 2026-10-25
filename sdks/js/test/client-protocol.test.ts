@@ -1,6 +1,7 @@
 // Runs the protocol fixtures of conformance/protocol against browser client
 // mode: every client-mode scenario of scenarios.json,
-// versioning-scenarios.json and experiment-scenarios.json, whole, and the
+// versioning-scenarios.json, experiment-scenarios.json and
+// page-scenarios.json, whole, and the
 // evaluate degradation cases of degradation/cases.json. It runs in Node and
 // in a real browser, so the fixtures are bundled through import.meta.glob and
 // the server is mocked at `fetch` rather than on a socket. Time is virtual:
@@ -10,6 +11,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { createClientWith, type ClientTraceEvent, type FlagneticClient } from "../src/client/client.js";
 import { MemoryStore, StoreKeys } from "../src/client/storage.js";
 import type { ClientOptions, Context, Experiment, JsonValue, LogEvent } from "../src/client/types.js";
+import type { PageHandlers } from "../src/client/page.js";
 import { LocalOverrideRefused, LocalOverridesNotAllowed } from "../src/client.js";
 import { MockNetwork, type Pending, type Reply } from "./support/mock-network.js";
 import { VirtualClock } from "./support/virtual-clock.js";
@@ -68,6 +70,8 @@ interface Step {
   readonly request?: {
     readonly method: string;
     readonly path: string;
+    /** Query parameters the request's URL must carry with these values. */
+    readonly query?: Record<string, string>;
     readonly headers?: Record<string, string>;
     readonly absent_headers?: string[];
     readonly delay_ms?: { readonly min: number; readonly max: number };
@@ -117,6 +121,9 @@ scenarios.scenarios.push(...(JSON.parse(read("versioning-scenarios.json")) as { 
 const experiments = JSON.parse(read("experiment-scenarios.json")) as { answers: Record<string, Answer[]>; scenarios: Scenario[] };
 Object.assign(scenarios.answers, experiments.answers);
 scenarios.scenarios.push(...experiments.scenarios);
+// The page a browser client runs in: visibility, the network coming back
+// and the beacon of a hidden or closing page.
+scenarios.scenarios.push(...(JSON.parse(read("page-scenarios.json")) as { scenarios: Scenario[] }).scenarios);
 
 const cases = JSON.parse(read("degradation/cases.json")) as {
   context: Context;
@@ -162,6 +169,9 @@ class Runner {
   /** Evaluations this runner made to look at an answer, by (flag, variation, reason). */
   private readonly observed = new Map<string, number>();
   private step = 0;
+  /** The client's subscription to the page, which the page calls drive. */
+  private page: PageHandlers | undefined;
+  private visible = true;
 
   constructor(private readonly context: Context) {}
 
@@ -194,7 +204,16 @@ class Runner {
       now: () => this.clock.now(),
       random: () => 0.999999,
       fetch: this.net.fetch,
-      page: { visible: () => true, listen: () => () => undefined },
+      page: {
+        visible: () => this.visible,
+        listen: (handlers) => {
+          this.page = handlers;
+          return () => {
+            this.page = undefined;
+          };
+        },
+      },
+      beacon: this.net.beacon,
       trace: (e: ClientTraceEvent) => {
         if (e === "fetch_handled") this.handled.fetch++;
         else this.handled.events++;
@@ -249,6 +268,9 @@ class Runner {
     expect(elapsed, `${where}: delay of ${want.path}`).toBeGreaterThanOrEqual(window.min);
     expect(elapsed, `${where}: delay of ${want.path}`).toBeLessThanOrEqual(window.max);
     expect(req.method, where).toBe(want.method);
+    for (const [name, value] of Object.entries(want.query ?? {})) {
+      expect(req.url.searchParams.get(name), `${where}: query ${name}`).toBe(value.replace("<sdk key>", key));
+    }
     for (const [name, value] of Object.entries(want.headers ?? {})) {
       expect(req.headers[name.toLowerCase()], `${where}: header ${name}`).toBe(value.replace("<sdk key>", key));
     }
@@ -404,6 +426,27 @@ class Runner {
         for (let n = 0; n < (call.times ?? 1); n++) {
           this.client.alias({ fromUnitType: "anonymous", fromUnitId: "d-8f1c", toUnitType: "user", toUnitId: "u-1001" });
         }
+        return undefined;
+      case "visibility_hidden":
+        this.visible = false;
+        this.page?.hidden();
+        await settle();
+        return undefined;
+      case "pagehide":
+        // A page being unloaded or put in the back-forward cache: the
+        // client hears it as hidden whatever the visibility said before.
+        this.visible = false;
+        this.page?.hidden();
+        await settle();
+        return undefined;
+      case "visibility_visible":
+        this.visible = true;
+        this.page?.visible();
+        await settle();
+        return undefined;
+      case "online":
+        this.page?.online();
+        await settle();
         return undefined;
       case "flush":
         // Not awaited: the batch it starts is answered by a later step.

@@ -18,7 +18,8 @@ export interface Reply {
 
 /** One request the client made and has not been answered yet. */
 export interface Pending {
-  readonly kind: "fetch" | "stream";
+  /** A beacon is answered, but nobody reads the answer. */
+  readonly kind: "fetch" | "stream" | "beacon";
   readonly method: string;
   readonly path: string;
   readonly url: URL;
@@ -83,6 +84,28 @@ export class MockNetwork {
       });
       this.record(pending);
     });
+  };
+
+  /**
+   * Stands in for `navigator.sendBeacon` with a string body, which a browser
+   * posts as `text/plain;charset=UTF-8` with no other header and without
+   * waiting for the answer. It always takes the beacon.
+   */
+  readonly beacon = (url: string, body: string): boolean => {
+    const pending: Pending = {
+      kind: "beacon",
+      method: "POST",
+      path: new URL(url).pathname,
+      url: new URL(url),
+      headers: { "content-type": "text/plain;charset=UTF-8" },
+      body,
+      at: this.clock.now(),
+      answer: () => {
+        this.take(pending);
+      },
+    };
+    this.record(pending);
+    return true;
   };
 
   /** The requests that arrived at path and have not been answered. */

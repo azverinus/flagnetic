@@ -3,10 +3,11 @@
 // mock of `fetch` cannot show. The browser preflights every request, so
 // the client may send only the headers the server allows; `localStorage`
 // is the real one, and so is its absence; the stream is a real streamed
-// response.
+// response. A page closed in a tab of its own hands its last events to a
+// real beacon.
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { commands } from "vitest/browser";
-import { createClient, type ClientOptions, type FlagneticClient } from "../src/client.js";
+import { anonymousId, createClient, type ClientOptions, type FlagneticClient } from "../src/client.js";
 
 interface SeenRequest {
   readonly method: string;
@@ -23,6 +24,7 @@ declare module "vitest/browser" {
     crossOriginServe(sdkKey: string, doc: unknown): Promise<void>;
     crossOriginRequests(): Promise<SeenRequest[]>;
     crossOriginSend(text: string): Promise<number>;
+    closePage(baseUrl: string, sdkKey: string): Promise<void>;
   }
 }
 
@@ -175,5 +177,30 @@ describe("a page on another origin", () => {
     const body = JSON.parse(events?.body ?? "{}") as { sdk: unknown; events: { type: string }[] };
     expect(body.sdk).toStrictEqual({ name: "flagnetic-js", version: "0.0.0", platform: "browser" });
     expect(body.events.map((e) => e.type)).toStrictEqual(["alias"]);
+  });
+
+  test("hands its last events to a beacon when the page is closed, with no preflight", async () => {
+    await commands.crossOriginServe(key, values(1, true));
+    await commands.closePage(baseUrl, key);
+    await until(async () => (await requests("/sdk/v1/events", "POST")).length > 0, "the beacon of the closed page");
+    const [beacon, ...more] = await requests("/sdk/v1/events", "POST");
+    expect(more, "one beacon, nothing sent twice").toHaveLength(0);
+    expect(beacon?.query).toBe(`?sdk_key=${key}`);
+    expect(beacon?.headers["content-type"]).toMatch(/^text\/plain/);
+    expect(beacon?.headers.authorization).toBeUndefined();
+    expect(await requests("/sdk/v1/events", "OPTIONS"), "a beacon is a simple request").toHaveLength(0);
+    const body = JSON.parse(beacon?.body ?? "{}") as { schema_version: number; sdk: unknown; events: { type: string }[] };
+    expect(body.schema_version).toBe(1);
+    expect(body.sdk).toStrictEqual({ name: "flagnetic-js", version: "0.0.0", platform: "browser" });
+    expect(body.events.map((e) => e.type)).toStrictEqual(["alias"]);
+  });
+});
+
+describe("anonymousId", () => {
+  test("keeps one ID per unit type in localStorage, outside every key's storage", () => {
+    const id = anonymousId();
+    expect(anonymousId("anonymous")).toBe(id);
+    expect(localStorage.getItem("flagnetic.anonymous.anonymous")).toBe(id);
+    expect(anonymousId("device")).not.toBe(id);
   });
 });
