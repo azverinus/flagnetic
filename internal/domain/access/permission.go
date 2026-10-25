@@ -3,7 +3,11 @@
 // roles and how a caller is judged against what an operation requires.
 package access
 
-import "slices"
+import (
+	"slices"
+
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
+)
 
 // Scope is what an API token is allowed to touch. Scopes narrow a token's
 // permissions and never add to them.
@@ -37,6 +41,10 @@ type PermissionSpec struct {
 	// its role, so a pipeline credential cannot be turned into a way in or
 	// around review.
 	MembersOnly bool
+	// TokenRefusal, for a permission kept to members, is how a project
+	// token whose role holds it is refused, when that says more than the
+	// permission missing.
+	TokenRefusal error
 }
 
 // The permissions of the catalog.
@@ -90,6 +98,9 @@ const (
 	// them, edits, rebases, opens and cancels its holder's own, and copies
 	// any into a new draft.
 	PermChangeRequestPropose Permission = "change_request.propose"
+	// PermChangeRequestApprove decides change requests: approves and
+	// rejects another's, and cancels or applies another's.
+	PermChangeRequestApprove Permission = "change_request.approve"
 )
 
 // catalog is every permission an operation can require. Each context adds
@@ -128,7 +139,16 @@ var catalog = []PermissionSpec{
 	// writing flags reaches an environment whose changes are reviewed, so it
 	// falls under the same scope; deciding stays with members.
 	{Name: PermChangeRequestPropose, Scope: ScopeFlagsWrite},
+	// Approval is the second pair of eyes on a change, so it stays with
+	// members: an owner could otherwise create a token and approve their own
+	// change request with it, one person standing for two.
+	{Name: PermChangeRequestApprove, Scope: ScopeFlagsWrite, MembersOnly: true, TokenRefusal: ErrTokenCannotApprove},
 }
+
+// ErrTokenCannotApprove refuses a project token whose role would decide
+// change requests, naming why rather than the permission it lacks: no token
+// ever decides one, whatever its role.
+var ErrTokenCannotApprove = apperrors.Forbidden("token_cannot_approve", "a project token cannot decide a change request")
 
 // Catalog returns the permission catalog.
 func Catalog() []PermissionSpec { return slices.Clone(catalog) }
@@ -217,12 +237,12 @@ var roles = []Role{
 		PermProjectRead, PermProjectUpdate, PermEnvironmentManage, PermEnvironmentProtect, PermDeclarationManage,
 		PermGrantManage, PermProjectTokenManage, PermFlagEdit, PermFlagArchive, PermFlagConfigurationUpdate,
 		PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete, PermSDKKeyManage,
-		PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose,
+		PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermChangeRequestApprove,
 	}},
 	{Name: RoleMaintainer, Permissions: []Permission{
 		PermProjectRead, PermEnvironmentManage, PermDeclarationManage, PermFlagEdit, PermFlagArchive,
 		PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert, PermSegmentEdit, PermSegmentDelete,
-		PermSDKKeyManage, PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose,
+		PermSDKKeyManage, PermExperimentEdit, PermExperimentDelete, PermChangeRequestPropose, PermChangeRequestApprove,
 	}},
 	{Name: RoleDeveloper, Permissions: []Permission{
 		PermProjectRead, PermFlagEdit, PermFlagConfigurationUpdate, PermFlagConfigurationKill, PermFlagConfigurationRevert,

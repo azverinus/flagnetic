@@ -9,6 +9,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
+	"github.com/azverinus/flagnetic/internal/shared/protection"
 )
 
 // CreateChangeRequest proposes a flag's configuration in one environment.
@@ -328,4 +329,101 @@ func (h *ListChangeRequests) Handle(ctx context.Context, f ChangeRequestFilter, 
 	}
 	list = list[:p.Limit]
 	return list, list[p.Limit-1].ID, nil
+}
+
+// DecideChangeRequestCommand is an approval or a rejection of a change
+// request, and what the member deciding says.
+type DecideChangeRequestCommand struct {
+	ChangeRequestCommand
+	Comment string
+}
+
+// ApproveChangeRequest approves an open change request.
+type ApproveChangeRequest struct{ d ChangeRequestDeps }
+
+// NewApproveChangeRequest returns the handler.
+func NewApproveChangeRequest(d ChangeRequestDeps) *ApproveChangeRequest {
+	return &ApproveChangeRequest{d: d}
+}
+
+// Handle approves the change request and returns it. When the
+// configuration was written since the change request was based on it, what
+// would be approved is not what was reviewed: the change request is
+// superseded and the approval refused as base_moved.
+func (h *ApproveChangeRequest) Handle(ctx context.Context, cmd DecideChangeRequestCommand) (governance.ChangeRequest, error) {
+	return transition(ctx, h.d, cmd.ChangeRequestCommand, "change_request.approved",
+		func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
+			if _, err := cr.Next(governance.TransitionApprove, cmd.By); err != nil {
+				return cr, false, err
+			}
+			_, saved, err := h.d.Configurations.Current(ctx, cr.Project, cr.Flag.Key, cr.Environment.Key)
+			if err != nil {
+				return cr, false, err
+			}
+			approved, err := cr.Approve(cmd.By, cmd.Comment, saved.Configuration.Version, now)
+			return supersededOr(cr, approved, err)
+		})
+}
+
+// RejectChangeRequest rejects an open change request.
+type RejectChangeRequest struct{ d ChangeRequestDeps }
+
+// NewRejectChangeRequest returns the handler.
+func NewRejectChangeRequest(d ChangeRequestDeps) *RejectChangeRequest {
+	return &RejectChangeRequest{d: d}
+}
+
+// Handle rejects the change request and returns it.
+func (h *RejectChangeRequest) Handle(ctx context.Context, cmd DecideChangeRequestCommand) (governance.ChangeRequest, error) {
+	return transition(ctx, h.d, cmd.ChangeRequestCommand, "change_request.rejected",
+		func(_ context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
+			rejected, err := cr.Reject(cmd.By, cmd.Comment, now)
+			return rejected, err == nil, err
+		})
+}
+
+// ApplyChangeRequest applies an approved change request.
+type ApplyChangeRequest struct{ d ChangeRequestDeps }
+
+// NewApplyChangeRequest returns the handler.
+func NewApplyChangeRequest(d ChangeRequestDeps) *ApplyChangeRequest {
+	return &ApplyChangeRequest{d: d}
+}
+
+// Handle applies the change request and returns it: under the project's
+// lock it re-reads the change request and the configuration, and when the
+// configuration is still the one the change request was based on, the flags
+// context writes the proposal in the same transaction, allowed to change the
+// environment the change request covers although it is protected, and its
+// entries carry the change request's identifier. When the configuration was
+// written since, the change request is superseded and the application
+// refused as base_moved; when the write is refused, nothing is written and
+// the change request stays approved.
+func (h *ApplyChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand) (governance.ChangeRequest, error) {
+	return transition(ctx, h.d, cmd, "change_request.applied",
+		func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
+			if _, err := cr.Next(governance.TransitionApply, cmd.By); err != nil {
+				return cr, false, err
+			}
+			_, saved, err := h.d.Configurations.Current(ctx, cr.Project, cr.Flag.Key, cr.Environment.Key)
+			if err != nil {
+				return cr, false, err
+			}
+			applied, err := cr.Apply(cmd.By, saved.Configuration.Version, now)
+			if err != nil {
+				return supersededOr(cr, applied, err)
+			}
+			proposed, err := configurationInputOf(cr.Proposed)
+			if err != nil {
+				return cr, false, err
+			}
+			// The approval covered the change request's environment, and
+			// no other.
+			writing := applying(protection.Bypass(ctx, cr.Environment.ID), cr.ID)
+			if err = h.d.Proposals.Apply(writing, cr.Project, cr.Flag.Key, cr.Environment.Key, proposed, cr.BaseVersion,
+				cmd.By.As.Member, cmd.Request); err != nil {
+				return cr, false, under(err, "/proposed")
+			}
+			return applied, true, nil
+		})
 }

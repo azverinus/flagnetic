@@ -25,7 +25,21 @@ type Record struct {
 // NewRecord returns the service appending to log.
 func NewRecord(log AuditAppender) *Record { return &Record{log: log} }
 
-// Record appends e to the audit log in the unit of work ctx carries.
+// Record appends e to the audit log in the unit of work ctx carries. An
+// entry recorded while a change request is applied carries its identifier,
+// whichever context wrote the change, so an auditor traces the change to
+// its approval.
 func (r *Record) Record(ctx context.Context, e governance.Entry) error {
+	if applying, ok := ctx.Value(applyingKey{}).(governance.ChangeRequestID); ok {
+		e.ChangeRequest = applying
+	}
 	return r.log.Append(ctx, e)
+}
+
+type applyingKey struct{}
+
+// applying returns ctx carrying that the change request with changeRequest
+// is being applied in it.
+func applying(ctx context.Context, changeRequest governance.ChangeRequestID) context.Context {
+	return context.WithValue(ctx, applyingKey{}, changeRequest)
 }

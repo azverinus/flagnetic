@@ -3201,9 +3201,10 @@ paths:
       operationId: cancelChangeRequest
       summary: Cancel a change request
       description: |
-        The author cancels a draft, open or approved change request
-        (`not_author`, `invalid_state`). A cancelled change request is
-        final; copying it resumes its work.
+        The author, or a member holding `change_request.approve`, cancels
+        a draft, open or approved change request (`not_author`,
+        `invalid_state`). A cancelled change request is final; copying it
+        resumes its work.
       x-permission: change_request.propose
       tags: [change-requests]
       parameters:
@@ -3264,6 +3265,148 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/Invalid"
+  /projects/{project}/change-requests/{change_request}/approve:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ChangeRequestID"
+    post:
+      operationId: approveChangeRequest
+      summary: Approve an open change request
+      description: |
+        A member holding `change_request.approve` approves an open change
+        request (`invalid_state`) with an optional comment of at most 2,000
+        characters, unless they are its author (`author_cannot_approve`); a
+        project token never decides one (`token_cannot_approve`). When the
+        configuration was written since the change request was based on it,
+        what would be approved is no longer what was reviewed: the change
+        request is superseded and the approval refused (`base_moved`).
+      x-permission: change_request.approve
+      tags: [change-requests]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRequestApprove"
+      responses:
+        "200":
+          description: The change request as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/change-requests/{change_request}/reject:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ChangeRequestID"
+    post:
+      operationId: rejectChangeRequest
+      summary: Reject an open change request
+      description: |
+        A member holding `change_request.approve` rejects an open change
+        request (`invalid_state`) with a comment telling its author why,
+        required and at most 2,000 characters, unless they are its author
+        (`author_cannot_approve`); a project token never decides one
+        (`token_cannot_approve`). A rejected change request is final;
+        copying it resumes its work.
+      x-permission: change_request.approve
+      tags: [change-requests]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRequestReject"
+      responses:
+        "200":
+          description: The change request as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
+  /projects/{project}/change-requests/{change_request}/apply:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/ChangeRequestID"
+    post:
+      operationId: applyChangeRequest
+      summary: Apply an approved change request
+      description: |
+        Writes the configuration proposed, in a protected environment too,
+        as one write whose audit entries carry the change request's
+        identifier. Its author or a member holding `change_request.approve`
+        applies it (`not_author`), once approved (`invalid_state`). When the
+        configuration was written since the change request was based on it,
+        the change request is superseded and the application refused
+        (`base_moved`). The configuration is checked again as a replace is,
+        since what it names may be gone since the approval: a refusal
+        writes nothing and leaves the change request approved.
+      x-permission: change_request.propose
+      tags: [change-requests]
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      responses:
+        "200":
+          description: The change request as it is now.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangeRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "412":
+          $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
+        "428":
+          $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/segments:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -3645,6 +3788,7 @@ paths:
       - $ref: "#/components/parameters/AuditTo"
       - $ref: "#/components/parameters/AuditQ"
       - $ref: "#/components/parameters/AuditKillSwitch"
+      - $ref: "#/components/parameters/AuditChangeRequest"
       - $ref: "#/components/parameters/Cursor"
       - $ref: "#/components/parameters/Limit"
       responses:
@@ -4055,6 +4199,7 @@ paths:
         - $ref: "#/components/parameters/AuditTo"
         - $ref: "#/components/parameters/AuditQ"
         - $ref: "#/components/parameters/AuditKillSwitch"
+        - $ref: "#/components/parameters/AuditChangeRequest"
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -4131,6 +4276,13 @@ components:
       description: Lists only the entries of kill switches when true, only the others when false.
       schema:
         type: boolean
+    AuditChangeRequest:
+      name: change_request
+      in: query
+      description: A change request's identifier; lists the entries its application wrote.
+      schema:
+        type: string
+        format: uuid
     AuditQ:
       name: q
       in: query
@@ -5428,7 +5580,7 @@ components:
       type: object
       description: Who changed what, when, from which value to which. Secrets are never recorded; a token appears by its hint.
       required: [id, occurred_at, project_id, environment_id, actor, action, entity, before, after, kill_switch,
-        request_id]
+        request_id, change_request_id]
       properties:
         id:
           type: string
@@ -5466,6 +5618,11 @@ components:
           type: string
           nullable: true
           description: The request that made the change; null outside a request, such as for the command line.
+        change_request_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The change request whose application made the change; null for any other change.
     Actor:
       type: object
       required: [kind, id, name, member_id]
@@ -6356,6 +6513,58 @@ components:
         name:
           type: string
           description: The member's display name or the token's name, as it is now.
+    ChangeRequestDecision:
+      type: object
+      description: An approval or a rejection of a change request.
+      required: [member, at, comment]
+      properties:
+        member:
+          $ref: "#/components/schemas/ChangeRequestMember"
+        at:
+          type: string
+          format: date-time
+        comment:
+          type: string
+          description: What the member said, empty when an approval said nothing.
+    ChangeRequestMember:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: The member's display name, as it is now.
+    ChangeRequestApplier:
+      type: object
+      description: The member or the project token that applied a change request, or the system at its scheduled time.
+      required: [kind, id, name]
+      properties:
+        kind:
+          type: string
+          enum: [member, token, system]
+        id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The member's or the token's identifier; null for the system.
+        name:
+          type: string
+          description: The member's display name or the token's name, as it is now; empty for the system.
+    ChangeRequestApprove:
+      type: object
+      properties:
+        comment:
+          type: string
+          description: Optional, at most 2,000 characters.
+    ChangeRequestReject:
+      type: object
+      required: [comment]
+      properties:
+        comment:
+          type: string
+          description: Why the change request is rejected, at most 2,000 characters.
     PatchOperation:
       type: object
       description: One operation of an RFC 6902 JSON Patch; `value` is absent from a `remove`.
@@ -6414,7 +6623,8 @@ components:
             $ref: "#/components/schemas/Rule"
     ChangeRequest:
       type: object
-      required: [id, kind, state, title, description, base_version, proposed, diff, author, created_at, updated_at, version]
+      required: [id, kind, state, title, description, base_version, proposed, diff, author, approval, rejection, applied_at,
+        applied_by, created_at, updated_at, version]
       properties:
         id:
           type: string
@@ -6446,6 +6656,26 @@ components:
             $ref: "#/components/schemas/PatchOperation"
         author:
           $ref: "#/components/schemas/ChangeRequestAuthor"
+        approval:
+          description: Who approved the change request, when and why; null unless it was approved.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ChangeRequestDecision"
+        rejection:
+          description: Who rejected the change request, when and why; null unless it was rejected.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ChangeRequestDecision"
+        applied_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the change request was applied; null until it is.
+        applied_by:
+          description: Who applied the change request; null until it is applied.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ChangeRequestApplier"
         created_at:
           type: string
           format: date-time

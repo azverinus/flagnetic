@@ -117,8 +117,26 @@ func Authorize(c Caller, op Operation, in *ProjectAccess) error {
 		return ErrProjectNotFound
 	}
 	if in == nil || !slices.Contains(in.Permissions, Permission(op.Requirement)) {
+		if refusal := c.tokenRefusal(Permission(op.Requirement)); refusal != nil {
+			return refusal
+		}
 		return apperrors.Forbidden("forbidden", "this operation needs the permission "+string(op.Requirement)+" in its project").
 			WithExtension("permission", string(op.Requirement))
+	}
+	return nil
+}
+
+// tokenRefusal returns how a project token whose role holds p, a permission
+// kept to members, is refused it, when the catalog says more than that the
+// permission is missing; nil otherwise, and for a token whose role would
+// not hold p anyway, which is short of the permission like any caller.
+func (c Caller) tokenRefusal(p Permission) error {
+	spec, ok := PermissionNamed(string(p))
+	if !ok || spec.TokenRefusal == nil || !c.isProjectToken() {
+		return nil
+	}
+	if role, ok := RoleNamed(c.Token.Role); ok && slices.Contains(role.Permissions, p) {
+		return spec.TokenRefusal
 	}
 	return nil
 }

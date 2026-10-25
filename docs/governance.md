@@ -1,6 +1,6 @@
 # Governance
 
-Governance is how a team controls changes to what its SDKs receive: which environments need a second pair of eyes, and how a change reaches them. This page covers protected environments; [change requests](change-requests.md) covers proposing changes.
+Governance is how a team controls changes to what its SDKs receive: which environments need a second pair of eyes, and how a change reaches them. This page covers protected environments and how a change reaches one; [change requests](change-requests.md) covers each operation in full.
 
 ## Protected environments
 
@@ -34,3 +34,21 @@ The kill switch is the one direct write to a protected environment: `POST /flags
 ### What protection costs
 
 A write that changes no ruleset pays nothing. A write that changes a ruleset pays, for each protected environment it reaches, one build of that environment's ruleset inside its transaction, compared with the ruleset the replica already holds in memory. When the replica does not hold it yet, it reads it on two PostgreSQL connections of its own, outside its pool, so writes waiting for each other never wait for a connection too. `flagnetic_protection_guard_seconds` measures it per write (see [Operations](operations.md#metrics)).
+
+## Changing a protected environment
+
+A change to a protected environment goes through a [change request](change-requests.md):
+
+1. A developer proposes the configuration as a change request (`change_request.propose`) and opens it for review. The change request shows the diff from what the environment serves now.
+2. A maintainer or owner who is not the author approves it (`change_request.approve`), or rejects it with a comment. Approval always takes a second person: the author is refused (`author_cannot_approve`).
+3. The author, the approver or any member holding `change_request.approve` applies it. The application writes the configuration into the protected environment, past protection for that environment alone, and its audit entries carry the change request's identifier.
+
+A change request is based on the configuration as it was proposed. If anything writes the configuration before the change request is approved or applied, approving or applying it is refused `409 base_moved` and it is superseded, since what was reviewed is no longer what would be written; copy it to propose it again. A change request may be proposed for any environment, protected or not.
+
+## Pipelines and change requests
+
+A project token proposes, edits, opens, cancels and applies its own change requests like a member of its role, so a pipeline holding a token with `flags:write` can propose a production change and apply it once approved. It never approves or rejects one, whatever its role (`403 token_cannot_approve`), and never cancels or applies another author's: deciding is a member's. A typical pipeline:
+
+1. `POST /projects/{project}/change-requests` with `"open": true` and the configuration it wants, keeping the change request's `id` and `ETag`.
+2. Wait until a member approves it: poll `GET …/change-requests/{id}` until `state` is `approved` (or `rejected`, `superseded`, `cancelled`, which end the run).
+3. `POST …/change-requests/{id}/apply` with `If-Match` on the version it read.

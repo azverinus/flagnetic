@@ -134,12 +134,38 @@ type ChangeRequest struct {
 	Description string
 	// Proposed is the document the change request would leave the entity
 	// with, and Diff the RFC 6902 patch turning Base into it.
-	Proposed  Document
-	Diff      []PatchOperation
-	Author    Author
+	Proposed Document
+	Diff     []PatchOperation
+	Author   Author
+	// Approval and Rejection are the decision taken on the change request,
+	// at most one of them; Applied is its application.
+	Approval  *Decision
+	Rejection *Decision
+	Applied   *Application
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Version   int64
+}
+
+// Decision is an approval or a rejection: the member who took it, when, and
+// what they said.
+type Decision struct {
+	Member access.MemberID
+	// Name is the member's display name as it is now, filled in when a
+	// change request is read.
+	Name    string
+	At      time.Time
+	Comment string
+}
+
+// Application is who applied a change request and when: an author, a
+// member who may decide, or the system at the scheduled time.
+type Application struct {
+	At time.Time
+	// By is the member or project token that applied it; zero when the
+	// system did. Its Name is filled in when a change request is read.
+	By     Author
+	System bool
 }
 
 // Proposal is what an author writes of a change request: its title and
@@ -416,6 +442,89 @@ func (cr ChangeRequest) Cancel(by Taker, now time.Time) (ChangeRequest, error) {
 		return cr, err
 	}
 	return cr.moved(state, now), nil
+}
+
+// Approve returns cr approved by by at now with comment, which is
+// optional. currentVersion is the version of the entity now: when it is not
+// the one cr was based on, what would be approved is no longer what was
+// reviewed, and Approve answers base_moved with cr superseded, which the
+// caller stores although it refuses the approval.
+func (cr ChangeRequest) Approve(by Taker, comment string, currentVersion int64, now time.Time) (ChangeRequest, error) {
+	state, err := cr.Next(TransitionApprove, by)
+	if err != nil {
+		return cr, err
+	}
+	comment, err = checkComment(comment, false)
+	if err != nil {
+		return cr, err
+	}
+	if currentVersion != cr.BaseVersion {
+		return cr.moved(StateSuperseded, now), baseMoved(cr.BaseVersion, currentVersion)
+	}
+	out := cr.moved(state, now)
+	out.Approval = &Decision{Member: *by.As.Member, At: now, Comment: comment}
+	return out, nil
+}
+
+// Reject returns cr rejected by by at now, with comment telling the author
+// why, which is required.
+func (cr ChangeRequest) Reject(by Taker, comment string, now time.Time) (ChangeRequest, error) {
+	state, err := cr.Next(TransitionReject, by)
+	if err != nil {
+		return cr, err
+	}
+	if comment, err = checkComment(comment, true); err != nil {
+		return cr, err
+	}
+	out := cr.moved(state, now)
+	out.Rejection = &Decision{Member: *by.As.Member, At: now, Comment: comment}
+	return out, nil
+}
+
+// Apply returns cr applied by by at now. currentVersion is the version of
+// the entity now: when it is not the one cr was based on, applying it would
+// write over a change nobody who approved it saw, and Apply answers
+// base_moved with cr superseded, which the caller stores although it
+// refuses the application.
+func (cr ChangeRequest) Apply(by Taker, currentVersion int64, now time.Time) (ChangeRequest, error) {
+	state, err := cr.Next(TransitionApply, by)
+	if err != nil {
+		return cr, err
+	}
+	if currentVersion != cr.BaseVersion {
+		return cr.moved(StateSuperseded, now), baseMoved(cr.BaseVersion, currentVersion)
+	}
+	out := cr.moved(state, now)
+	out.Applied = &Application{At: now, System: by.System}
+	if !by.System {
+		out.Applied.By = by.As
+	}
+	return out, nil
+}
+
+// baseMoved refuses to approve or apply a change request whose base moved.
+func baseMoved(baseVersion, currentVersion int64) error {
+	return apperrors.Conflict("base_moved",
+		"what the change request is based on has changed since it was reviewed; copy it to propose it again").
+		WithExtension("base_version", baseVersion).WithExtension("current_version", currentVersion)
+}
+
+// checkComment returns the comment of a decision trimmed, or
+// invalid_change_request when it is over the limit, or blank and required.
+func checkComment(comment string, required bool) (string, error) {
+	comment = strings.TrimSpace(comment)
+	switch n := utf8.RuneCountInString(comment); {
+	case n == 0 && required:
+		return "", apperrors.Invalid("invalid_change_request", "the decision is not valid", apperrors.Violation{
+			Pointer: "/comment", Code: "required", Detail: "a rejection tells the author why",
+		})
+	case n > MaxDecisionComment:
+		return "", apperrors.Invalid("invalid_change_request", "the decision is not valid", apperrors.Violation{
+			Pointer: "/comment", Code: "too_long", Detail: "a comment has at most 2,000 characters",
+			Params: map[string]any{"max": MaxDecisionComment},
+		})
+	}
+	return comment, nil
 }
 
 // moved returns cr in state at now, as its next version.

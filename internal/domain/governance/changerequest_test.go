@@ -304,3 +304,110 @@ func TestAProjectTokenIsTheAuthorOfItsOwnChangeRequestsOnly(t *testing.T) {
 }
 
 func ptrTo[T any](v T) *T { return &v }
+
+func TestApprovingRecordsTheDeciderAndAnOptionalComment(t *testing.T) {
+	cr := inState(t, governance.StateOpen)
+	later := now.Add(time.Minute)
+
+	approved, err := cr.Approve(byDecider, "  Looks right  ", 3, later)
+	want := &governance.Decision{Member: bob, At: later, Comment: "Looks right"}
+	if err != nil || approved.State != governance.StateApproved || approved.Version != 2 || !approved.UpdatedAt.Equal(later) ||
+		!reflect.DeepEqual(approved.Approval, want) || approved.Rejection != nil {
+		t.Errorf("approved = %+v, %v", approved, err)
+	}
+	if approved, err := cr.Approve(byDecider, " ", 3, later); err != nil || approved.Approval == nil || approved.Approval.Comment != "" {
+		t.Errorf("approved without a comment = %+v, %v", approved.Approval, err)
+	}
+	if _, err := cr.Approve(byDecider, strings.Repeat("é", 2_000), 3, later); err != nil {
+		t.Errorf("a comment at the limit = %v", err)
+	}
+	_, err = cr.Approve(byDecider, strings.Repeat("é", 2_001), 3, later)
+	if e, ok := apperrors.From(err); !ok || e.Code != "invalid_change_request" || len(e.Violations) != 1 ||
+		e.Violations[0].Pointer != "/comment" || e.Violations[0].Code != "too_long" {
+		t.Errorf("a comment over the limit = %v", err)
+	}
+}
+
+func TestRejectingNeedsAComment(t *testing.T) {
+	cr := inState(t, governance.StateOpen)
+	later := now.Add(time.Minute)
+
+	rejected, err := cr.Reject(byDecider, " Not before the release ", later)
+	want := &governance.Decision{Member: bob, At: later, Comment: "Not before the release"}
+	if err != nil || rejected.State != governance.StateRejected || rejected.Version != 2 ||
+		!reflect.DeepEqual(rejected.Rejection, want) || rejected.Approval != nil {
+		t.Errorf("rejected = %+v, %v", rejected, err)
+	}
+	_, err = cr.Reject(byDecider, "  ", later)
+	if e, ok := apperrors.From(err); !ok || e.Code != "invalid_change_request" || len(e.Violations) != 1 ||
+		e.Violations[0].Pointer != "/comment" || e.Violations[0].Code != "required" {
+		t.Errorf("a blank comment = %v", err)
+	}
+	if _, err := cr.Reject(byDecider, strings.Repeat("d", 2_001), later); codeOf(err) != "invalid_change_request" {
+		t.Errorf("a comment over the limit = %v", err)
+	}
+	// Who may decide is answered before the comment.
+	if _, err := cr.Reject(byAda, "", later); codeOf(err) != "author_cannot_approve" {
+		t.Errorf("the author rejecting without a comment = %v", err)
+	}
+}
+
+func TestApplyingRecordsWhoAppliedAndWhen(t *testing.T) {
+	cr := inState(t, governance.StateApproved)
+	later := now.Add(time.Minute)
+	for name, tc := range map[string]struct {
+		by   governance.Taker
+		want governance.Application
+	}{
+		"the author":         {by: byAda, want: governance.Application{At: later, By: byAda.As}},
+		"a decider":          {by: byDecider, want: governance.Application{At: later, By: byDecider.As}},
+		"the system":         {by: bySystem, want: governance.Application{At: later, System: true}},
+		"the token as maker": {by: byPipeline, want: governance.Application{At: later, By: byPipeline.As}},
+	} {
+		applying := cr
+		if name == "the token as maker" {
+			applying.Author = governance.Author{Token: &pipeline}
+		}
+		applied, err := applying.Apply(tc.by, 3, later)
+		if err != nil || applied.State != governance.StateApplied || applied.Version != 2 || applied.Applied == nil ||
+			!reflect.DeepEqual(*applied.Applied, tc.want) {
+			t.Errorf("applied by %s = %+v, %v", name, applied.Applied, err)
+		}
+	}
+	if _, err := cr.Apply(byBob, 3, later); codeOf(err) != "not_author" {
+		t.Errorf("applied by another member = %v", err)
+	}
+}
+
+// Approving or applying a change request whose base moved would decide or
+// write what nobody reviewed: it is answered base_moved, and the change
+// request is left superseded for the caller to store.
+func TestApprovingOrApplyingOnAMovedBaseSupersedes(t *testing.T) {
+	later := now.Add(time.Minute)
+	for name, decide := range map[string]func(governance.ChangeRequest) (governance.ChangeRequest, error){
+		"approve": func(cr governance.ChangeRequest) (governance.ChangeRequest, error) {
+			return cr.Approve(byDecider, "", 4, later)
+		},
+		"apply": func(cr governance.ChangeRequest) (governance.ChangeRequest, error) { return cr.Apply(byAda, 4, later) },
+	} {
+		from := governance.StateOpen
+		if name == "apply" {
+			from = governance.StateApproved
+		}
+		superseded, err := decide(inState(t, from))
+		if e, ok := apperrors.From(err); !ok || e.Code != "base_moved" || e.Kind != apperrors.KindConflict {
+			t.Errorf("%s on a moved base = %v, want base_moved", name, err)
+		}
+		if superseded.State != governance.StateSuperseded || superseded.Version != 2 || !superseded.UpdatedAt.Equal(later) ||
+			superseded.Approval != nil && name == "approve" || superseded.Applied != nil {
+			t.Errorf("%s on a moved base left %+v, want it superseded", name, superseded)
+		}
+	}
+	// Who may act and the state are answered before the base.
+	if _, err := inState(t, governance.StateOpen).Approve(byAda, "", 4, later); codeOf(err) != "author_cannot_approve" {
+		t.Errorf("the author approving on a moved base = %v", err)
+	}
+	if _, err := inState(t, governance.StateDraft).Apply(byAda, 4, later); codeOf(err) != "invalid_state" {
+		t.Errorf("applying a draft on a moved base = %v", err)
+	}
+}
