@@ -55,12 +55,12 @@ func NewGetFlagEvaluations(snapshots Snapshotter, store EvaluationReader, c cloc
 // environment the project does not have; a range of days that cannot be
 // read is an *events.RangeError.
 func (h *GetFlagEvaluations) Handle(ctx context.Context, q EvaluationQuery) ([]events.FlagEvaluationDay, error) {
-	first, last, err := events.EvaluationDays(q.From, q.To, h.clock.Now())
-	if err != nil {
-		return nil, err
+	first, last, rangeErr := events.EvaluationDays(q.From, q.To, h.clock.Now())
+	if rangeErr != nil {
+		return nil, rangeErr
 	}
 	var out []events.FlagEvaluationDay
-	err = h.snapshots.Snapshot(ctx, func(ctx context.Context) error {
+	err := h.snapshots.Snapshot(ctx, func(ctx context.Context) error {
 		flag, err := h.store.FlagOf(ctx, q.Project, q.Flag)
 		if errors.Is(err, ErrNotFound) {
 			err = errFlagNotFound
