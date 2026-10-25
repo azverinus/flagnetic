@@ -105,7 +105,8 @@ func (s *Store) ExperimentSalts(ctx context.Context, project workspace.ProjectID
 
 const columns = `e.id, e.project_id, e.key, e.name, e.hypothesis, e.owner_id, e.tags, e.flag_id, f.key, e.unit_type,
 	e.variations, e.traffic_allocation, e.inclusion_salt, e.variation_salt, e.status, e.expected_end_at, e.started_at,
-	e.stopped_at, e.archived_at, e.created_by, e.created_at, e.updated_at, e.version`
+	e.stopped_at, e.archived_at, e.created_by, e.created_at, e.updated_at, e.version, e.decision_outcome,
+	e.decision_winner, e.decision_note`
 
 // from joins an experiment to its flag, whose key it carries.
 const from = ` FROM experiments e JOIN flags f ON f.id = e.flag_id`
@@ -119,10 +120,11 @@ func scan(row pgx.Row) (experiments.Experiment, error) {
 		variations                       []byte
 		expectedEnd                      *time.Time
 		startedAt, stoppedAt, archivedAt *time.Time
+		outcome, winner, note            *string
 	)
 	if err := row.Scan(&ek, &pk, &e.Key, &e.Name, &e.Hypothesis, &owner, &e.Tags, &fk, &e.FlagKey, &e.UnitType,
 		&variations, &e.TrafficAllocation, &e.InclusionSalt, &e.VariationSalt, &status, &expectedEnd, &startedAt,
-		&stoppedAt, &archivedAt, &createdBy, &e.CreatedAt, &e.UpdatedAt, &e.Version); err != nil {
+		&stoppedAt, &archivedAt, &createdBy, &e.CreatedAt, &e.UpdatedAt, &e.Version, &outcome, &winner, &note); err != nil {
 		return experiments.Experiment{}, err
 	}
 	var docs []weightDoc
@@ -140,6 +142,15 @@ func scan(row pgx.Row) (experiments.Experiment, error) {
 	if createdBy != nil {
 		m := id.FromBytes[access.Member](*createdBy)
 		e.CreatedBy = &m
+	}
+	if outcome != nil {
+		e.Decision = &experiments.Decision{Outcome: experiments.Outcome(*outcome)}
+		if winner != nil {
+			e.Decision.WinnerVariation = *winner
+		}
+		if note != nil {
+			e.Decision.Note = *note
+		}
 	}
 	if e.Tags == nil {
 		e.Tags = []string{}
@@ -213,14 +224,22 @@ func (s *Store) UpdateExperiment(ctx context.Context, e experiments.Experiment) 
 	if err != nil {
 		return err
 	}
+	var outcome, winner, note any
+	if d := e.Decision; d != nil {
+		outcome, note = string(d.Outcome), d.Note
+		if d.WinnerVariation != "" {
+			winner = d.WinnerVariation
+		}
+	}
 	tag, err := s.db(ctx).Exec(ctx, `
 		UPDATE experiments SET name = $2, hypothesis = $3, owner_id = $4, tags = $5, flag_id = $6, unit_type = $7,
 		    variations = $8, traffic_allocation = $9, inclusion_salt = $10, variation_salt = $11, status = $12,
-		    expected_end_at = $13, started_at = $14, stopped_at = $15, archived_at = $16, updated_at = $17, version = $18
+		    expected_end_at = $13, started_at = $14, stopped_at = $15, archived_at = $16, updated_at = $17, version = $18,
+		    decision_outcome = $19, decision_winner = $20, decision_note = $21
 		WHERE id = $1`,
 		e.ID.Bytes(), e.Name, e.Hypothesis, e.Owner.Bytes(), e.Tags, e.Flag.Bytes(), e.UnitType, variations,
 		e.TrafficAllocation, e.InclusionSalt, e.VariationSalt, string(e.Status), e.ExpectedEndAt, e.StartedAt,
-		e.StoppedAt, e.ArchivedAt, e.UpdatedAt, e.Version)
+		e.StoppedAt, e.ArchivedAt, e.UpdatedAt, e.Version, outcome, winner, note)
 	if err != nil {
 		return fmt.Errorf("updating an experiment: %w", err)
 	}

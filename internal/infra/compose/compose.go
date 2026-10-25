@@ -314,6 +314,20 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws,
 			Holders: flagStore, Rulesets: rulesets, Recorder: experimentRec,
 		}),
+		// A stop rewrites the rules serving the experiment, which belong to
+		// the flags context, each as a configuration write of its own.
+		StopExperiment: appexperiments.NewStopExperiment(appexperiments.StopExperimentDeps{
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
+			Rules: appflags.NewApplyExperimentDecision(appflags.ApplyExperimentDecisionDeps{
+				Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+			}),
+		}),
+		ArchiveExperiment: appexperiments.NewArchiveExperiment(appexperiments.ArchiveExperimentDeps{
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
+		}),
+		SetExperimentDecisionNote: appexperiments.NewSetDecisionNote(appexperiments.SetDecisionNoteDeps{
+			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
+		}),
 		DeleteExperiment: appexperiments.NewDeleteExperiment(appexperiments.DeleteExperimentDeps{
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
 		}),

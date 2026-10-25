@@ -179,6 +179,55 @@ func (a *api) StartExperiment(ctx context.Context, req StartExperimentRequestObj
 	return StartExperiment200JSONResponse{Body: experimentOut(e), Headers: StartExperiment200ResponseHeaders{ETag: etag(e.Version)}}, nil
 }
 
+// StopExperiment stops a running experiment with a decision.
+func (a *api) StopExperiment(ctx context.Context, req StopExperimentRequestObject) (StopExperimentResponseObject, error) {
+	cmd, err := experimentCommand(ctx, req.Experiment, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	b := req.Body
+	if !b.Outcome.Valid() {
+		return nil, flaghttp.InvalidRequest("outcome must be winner or removed")
+	}
+	e, err := a.h.StopExperiment.Handle(ctx, appexperiments.StopExperimentCommand{
+		Experiment: cmd, Caller: callerMember(ctx),
+		Decision: experiments.Decision{
+			Outcome: experiments.Outcome(b.Outcome), WinnerVariation: valueOr(b.WinnerVariation, ""), Note: valueOr(b.Note, ""),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return StopExperiment200JSONResponse{Body: experimentOut(e), Headers: StopExperiment200ResponseHeaders{ETag: etag(e.Version)}}, nil
+}
+
+// SetExperimentDecisionNote changes the note of a stopped experiment's
+// decision.
+func (a *api) SetExperimentDecisionNote(ctx context.Context, req SetExperimentDecisionNoteRequestObject) (SetExperimentDecisionNoteResponseObject, error) {
+	cmd, err := experimentCommand(ctx, req.Experiment, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	e, err := a.h.SetExperimentDecisionNote.Handle(ctx, appexperiments.SetDecisionNoteCommand{Experiment: cmd, Note: req.Body.Note})
+	if err != nil {
+		return nil, err
+	}
+	return SetExperimentDecisionNote200JSONResponse{Body: experimentOut(e), Headers: SetExperimentDecisionNote200ResponseHeaders{ETag: etag(e.Version)}}, nil
+}
+
+// ArchiveExperiment archives a draft or stopped experiment.
+func (a *api) ArchiveExperiment(ctx context.Context, req ArchiveExperimentRequestObject) (ArchiveExperimentResponseObject, error) {
+	cmd, err := experimentCommand(ctx, req.Experiment, req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	e, err := a.h.ArchiveExperiment.Handle(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	return ArchiveExperiment200JSONResponse{Body: experimentOut(e), Headers: ArchiveExperiment200ResponseHeaders{ETag: etag(e.Version)}}, nil
+}
+
 // CloneExperiment copies an experiment into a new draft.
 func (a *api) CloneExperiment(ctx context.Context, req CloneExperimentRequestObject) (CloneExperimentResponseObject, error) {
 	e, err := a.h.CloneExperiment.Handle(ctx, appexperiments.CloneExperimentCommand{
@@ -208,6 +257,12 @@ func experimentOut(e experiments.Experiment) Experiment {
 	if e.CreatedBy != nil {
 		m := openapi_types.UUID(e.CreatedBy.Bytes())
 		out.CreatedBy = &m
+	}
+	if d := e.Decision; d != nil {
+		out.Decision = &ExperimentDecision{Outcome: ExperimentOutcome(d.Outcome), Note: d.Note}
+		if d.WinnerVariation != "" {
+			out.Decision.WinnerVariation = &d.WinnerVariation
+		}
 	}
 	return out
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
@@ -158,12 +159,74 @@ func TestARevertOrCopyKeepsTheExperimentARuleServes(t *testing.T) {
 		t.Errorf("reverted rules = %+v, want %+v", reverted.Rules, recorded.Rules)
 	}
 
-	target := flags.InitialConfiguration(copyFlag, id.New[workspace.Environment](ids), &anna, now)
-	copied, _, err := target.Copy(copyFlag, recorded, false, referents(nil), later)
+	// The target holds the same rule serving the same experiment already,
+	// so the copy only brings its description over.
+	target := recorded
+	target.Environment = id.New[workspace.Environment](ids)
+	copied, _, err := target.Copy(copyFlag, current, false, referents(nil), later)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(copied.Rules, recorded.Rules) {
-		t.Errorf("copied rules = %+v, want %+v", copied.Rules, recorded.Rules)
+	if !reflect.DeepEqual(copied.Rules, current.Rules) {
+		t.Errorf("copied rules = %+v, want %+v", copied.Rules, current.Rules)
+	}
+}
+
+// isExperimentRulesChanged reports whether err is the refusal of a revert or
+// copy that would change which rules serve which experiment.
+func isExperimentRulesChanged(err error) bool {
+	e, ok := apperrors.From(err)
+	return ok && e.Kind == apperrors.KindConflict && e.Code == "experiment_rules_changed"
+}
+
+// A revert or a copy writes a whole document, and the status of the
+// experiment a rule serves lives on the experiment: bringing a rule serving
+// one in would put an experiment in an environment nobody chose, taking one
+// out would starve a running experiment there, and turning a rule to another
+// experiment would do both.
+func TestARevertOrCopyIsRefusedWhenItWouldChangeWhichRulesServeAnExperiment(t *testing.T) {
+	later := flags.Write{By: &bob, Now: now.Add(2 * time.Hour)}
+	plain := base()
+	plain.Rules = []flags.RuleInput{{Description: "Staff", Serve: serveVariation("b")}}
+	without := mustReplace(t, initial(), plain)
+	in := plain
+	in.Rules = []flags.RuleInput{{ID: &without.Rules[0].ID, Description: "Staff", Serve: serveVariation("b")},
+		{Description: "Titles under test", Serve: experimentServe("running_title")}}
+	with := mustReplace(t, without, in)
+	turned := in
+	turned.Rules = []flags.RuleInput{turned.Rules[0], {ID: &with.Rules[1].ID, Serve: experimentServe("draft_title")}}
+	other := mustReplace(t, with, turned)
+	asVariation := turned
+	asVariation.Rules = []flags.RuleInput{turned.Rules[0], {ID: &with.Rules[1].ID, Serve: serveVariation("c")}}
+	decided := mustReplace(t, with, asVariation)
+
+	for name, tc := range map[string]struct{ current, recorded flags.Configuration }{
+		"adding a rule serving one":         {without, with},
+		"removing a rule serving one":       {with, without},
+		"turning a rule to another one":     {other, with},
+		"turning a variation rule into one": {decided, with},
+		"turning one into a variation rule": {with, decided},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, _, err := tc.current.Revert(copyFlag, tc.recorded, referents(nil), later); !isExperimentRulesChanged(err) {
+				t.Errorf("revert: err = %v, want experiment_rules_changed", err)
+			}
+			source := tc.recorded
+			source.Environment = id.New[workspace.Environment](ids)
+			if _, _, err := tc.current.Copy(copyFlag, source, false, referents(nil), later); !isExperimentRulesChanged(err) {
+				t.Errorf("copy: err = %v, want experiment_rules_changed", err)
+			}
+		})
+	}
+
+	// Everything around the experiment's rule may still go back: its own
+	// position and description, the other rules and the rest.
+	moved := plain
+	moved.On, moved.Fallthrough = true, "b"
+	moved.Rules = []flags.RuleInput{{ID: &with.Rules[1].ID, Description: "Moved up", Serve: experimentServe("running_title")}}
+	current := mustReplace(t, with, moved)
+	reverted, _, err := current.Revert(copyFlag, with, referents(nil), later)
+	if err != nil || !sameServed(reverted, with) {
+		t.Errorf("revert around the experiment's rule = %+v, %v, want the recorded document", reverted, err)
 	}
 }

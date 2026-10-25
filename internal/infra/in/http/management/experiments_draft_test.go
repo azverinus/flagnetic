@@ -20,8 +20,7 @@ func patchExperiment(t *testing.T, c *management.ClientWithResponses, project, k
 	return do(c.UpdateExperimentWithResponse(t.Context(), project, key, &management.UpdateExperimentParams{IfMatch: ifMatch(version)}, body))
 }
 
-// putInStatus moves an experiment to status through the repository, as its
-// transition will: the API offers no transition out of draft yet, and these
+// putInStatus moves an experiment to status through the repository: these
 // tests are about what each status allows, not how it is reached.
 func putInStatus(t *testing.T, f experimentFixture, key string, status experiments.Status) {
 	t.Helper()
@@ -47,10 +46,15 @@ func TestOnlyADraftIsEditedHasItsSaltsRegeneratedAndIsDeletedButAnyIsCloned(t *t
 		if patch.StatusCode() != http.StatusConflict {
 			t.Errorf("PATCH of a %s experiment's weights = %d, want 409: %s", status, patch.StatusCode(), patch.Body)
 		}
+		// An archived experiment refuses every write as archived.
+		code := "not_draft"
+		if status == experiments.StatusArchived {
+			code = "archived"
+		}
 		salts := do(f.admin.RegenerateExperimentSaltsWithResponse(t.Context(), f.project.Key, key, &management.RegenerateExperimentSaltsParams{IfMatch: ifMatch(1)}))
-		assertProblem(t, "salts of a "+key+" experiment", salts.StatusCode(), salts.Body, http.StatusConflict, "not_draft")
+		assertProblem(t, "salts of a "+key+" experiment", salts.StatusCode(), salts.Body, http.StatusConflict, code)
 		del := do(f.admin.DeleteExperimentWithResponse(t.Context(), f.project.Key, key, &management.DeleteExperimentParams{IfMatch: ifMatch(1)}))
-		assertProblem(t, "delete of a "+key+" experiment", del.StatusCode(), del.Body, http.StatusConflict, "not_draft")
+		assertProblem(t, "delete of a "+key+" experiment", del.StatusCode(), del.Body, http.StatusConflict, code)
 
 		got := do(f.admin.GetExperimentWithResponse(t.Context(), f.project.Key, key))
 		if got.JSON200 == nil || got.JSON200.Version != 1 || got.JSON200.InclusionSalt != created.InclusionSalt || !slices.Equal(got.JSON200.Variations, created.Variations) {

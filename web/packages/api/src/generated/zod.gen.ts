@@ -689,6 +689,29 @@ export const zVariationInput = z.object({
   description: zDescription.optional(),
 });
 
+/**
+ * `winner` serves the winning variation where the experiment was
+ * served; `removed` deletes the experiment's rules.
+ *
+ */
+export const zExperimentOutcome = z.enum(["winner", "removed"]);
+
+export const zExperimentDecision = z.object({
+  outcome: zExperimentOutcome,
+  winner_variation: z.string().nullable(),
+  note: z.string().max(2000),
+});
+
+export const zExperimentStop = z.object({
+  outcome: zExperimentOutcome,
+  winner_variation: z.string().optional(),
+  note: z.string().max(2000).optional(),
+});
+
+export const zExperimentDecisionNote = z.object({
+  note: z.string().max(2000),
+});
+
 export const zExperimentStatus = z.enum(["draft", "running", "stopped", "archived"]);
 
 /**
@@ -720,6 +743,7 @@ export const zExperiment = z.object({
   started_at: z.iso.datetime().nullable(),
   stopped_at: z.iso.datetime().nullable(),
   archived_at: z.iso.datetime().nullable(),
+  decision: zExperimentDecision.nullable(),
   created_by: z.uuid().nullable(),
   created_at: z.iso.datetime(),
   updated_at: z.iso.datetime(),
@@ -2349,6 +2373,52 @@ export const zStartExperimentPath = z.object({
  * The experiment, running.
  */
 export const zStartExperimentResponse = zExperiment;
+
+export const zStopExperimentBody = zExperimentStop;
+
+export const zStopExperimentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zStopExperimentPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+/**
+ * The experiment, stopped, with its decision.
+ */
+export const zStopExperimentResponse = zExperiment;
+
+export const zSetExperimentDecisionNoteBody = zExperimentDecisionNote;
+
+export const zSetExperimentDecisionNoteHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zSetExperimentDecisionNotePath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+/**
+ * The experiment with its decision.
+ */
+export const zSetExperimentDecisionNoteResponse = zExperiment;
+
+export const zArchiveExperimentHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zArchiveExperimentPath = z.object({
+  project: z.string(),
+  experiment: z.string(),
+});
+
+/**
+ * The experiment, archived.
+ */
+export const zArchiveExperimentResponse = zExperiment;
 
 export const zCloneExperimentBody = zExperimentClone;
 

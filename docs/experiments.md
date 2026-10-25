@@ -47,7 +47,7 @@ A draft missing anything a running experiment needs is refused `422 experiment_n
 | `/hypothesis` | `required` | The experiment has no hypothesis. |
 | `/expected_end_at` | `required` | The experiment has no expected end date. |
 
-Only a draft starts (`409 not_draft`): there is no restart, and a stopped experiment is rerun as a [clone](#cloning) with new salts. There is no pause either: the flag's kill switch is the pause.
+Only a draft starts (`409 not_draft`; `409 archived` for an archived experiment): there is no restart, and a stopped experiment is rerun as a [clone](#cloning) with new salts. There is no pause either: the flag's kill switch is the pause.
 
 ## A running experiment
 
@@ -57,7 +57,30 @@ A context evaluated in the tester (`POST /projects/{project}/environments/{envir
 
 The traffic allocation only grows: a smaller one is refused `409 traffic_allocation_decrease`. Growing it moves on the ruleset of every environment holding the experiment, and includes more units without moving any unit already included, since the inclusion bucket of a unit never changes. It is recorded as `experiment.traffic_allocation_changed`.
 
-`POST /projects/{project}/experiments/{experiment}/salts` (`experiment.edit`) draws a new inclusion salt and variation salt, again apart from every salt of the project's experiments and rollouts. `DELETE /projects/{project}/experiments/{experiment}` (`experiment.delete`, maintainers and owners) deletes the experiment. Regenerating salts and deleting are for drafts only: any other status is refused `409 not_draft`; past the draft, editing follows [what a running experiment allows](#a-running-experiment).
+`POST /projects/{project}/experiments/{experiment}/salts` (`experiment.edit`) draws a new inclusion salt and variation salt, again apart from every salt of the project's experiments and rollouts. `DELETE /projects/{project}/experiments/{experiment}` (`experiment.delete`, maintainers and owners) deletes the experiment. Regenerating salts and deleting are for drafts only: a running or stopped experiment is refused `409 not_draft`, an archived one `409 archived`; past the draft, editing follows [what a running experiment allows](#a-running-experiment) and [what a stopped one allows](#stopping-with-a-decision).
+
+## Stopping with a decision
+
+`POST /projects/{project}/experiments/{experiment}/stop` (`experiment.edit`, with `If-Match`) stops a running experiment with a decision: `{"outcome": "winner", "winner_variation": "short", "note": "Short titles won."}` or `{"outcome": "removed"}`. In the same transaction, every rule serving the experiment, in every environment, is rewritten:
+
+- With `winner`, each rule serves the winning variation instead, keeping its identifier, description, conditions and place, so the winner reaches everyone the experiment was served to at once.
+- With `removed`, each rule is deleted, and the flag goes on to its other rules.
+
+Each configuration rewritten is a configuration write of its own: its version moves on, it is recorded as `flag.configuration_updated` with `experiment_stopped` naming the experiment, and the ruleset of its environment moves on. No other ruleset moves. The experiment is recorded as `experiment.stopped` and answers its `decision`: `outcome`, `winner_variation` (null for a removal) and `note` (empty for none).
+
+A decision that is not valid is refused `422 invalid_decision`: a winner naming no variation (`required` on `/winner_variation`) or one the experiment does not compare (`unknown_variation`), a removal naming a winner (`invalid_value`), a note over 2,000 characters (`too_long` on `/note`). An unknown `outcome` is `400 invalid_request`. Only a running experiment stops: a draft or a stopped one is refused `409 not_running`.
+
+A stopped experiment keeps its name, hypothesis (never emptied), owner and tags editable; its flag, unit type, weights, traffic allocation and expected end date are refused `409 frozen`, a violation per field. `PUT /projects/{project}/experiments/{experiment}/decision` (`experiment.edit`, with `If-Match`) sets the decision's note, `{"note": ""}` clearing it, recorded as `experiment.updated`; the outcome and the winner never change. Only a stopped experiment has a decision to note (`409 not_stopped`).
+
+The flag of a stopped experiment can be archived again, but a variation the experiment compared still cannot be removed from it: the decision and the exposures counted keep naming it.
+
+## Archiving
+
+`POST /projects/{project}/experiments/{experiment}/archive` (`experiment.edit`, with `If-Match`) archives a draft or a stopped experiment, recorded as `experiment.archived`; no ruleset moves. A running experiment is stopped with a decision first (`409 running`). An archived experiment is left out of the list unless asked for, and every write of it, archiving it again included, is refused `409 archived`; it can still be [cloned](#cloning).
+
+## Reverts and copies keep experiment rules
+
+A [revert or a copy](flags.md) writes a whole configuration, but whether an experiment runs is decided on the experiment. Either is refused `409 experiment_rules_changed` when it would add or remove a rule serving an experiment, or change which experiment a rule serves: a copy would put an experiment into an environment nobody chose, a revert across a start would starve it, and a revert across a stop would serve again what no longer runs in place of the decision. Everything around the experiment's rules may still be reverted or copied; an experiment reaches or leaves an environment only through an explicit rule edit.
 
 ## Cloning
 
@@ -113,4 +136,4 @@ A unit's first exposure is its exposure with the earliest `occurred_at`, ties br
 
 ## Audit
 
-Every write records one entry (see [The audit log](access.md#the-audit-log)): `experiment.created` and `experiment.cloned` with the experiment after it (a clone also names the experiment it was copied from), `experiment.updated`, `experiment.salts_regenerated`, `experiment.started` and `experiment.traffic_allocation_changed` (a change of a running experiment's allocation, whatever else the same `PATCH` changed) with the experiment before and after, and `experiment.deleted` with the experiment before.
+Every write records one entry (see [The audit log](access.md#the-audit-log)): `experiment.created` and `experiment.cloned` with the experiment after it (a clone also names the experiment it was copied from), `experiment.updated` (a decision's note included), `experiment.salts_regenerated`, `experiment.started`, `experiment.stopped`, `experiment.archived` and `experiment.traffic_allocation_changed` (a change of a running experiment's allocation, whatever else the same `PATCH` changed) with the experiment before and after, and `experiment.deleted` with the experiment before.

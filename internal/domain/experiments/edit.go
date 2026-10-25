@@ -40,10 +40,13 @@ type Change struct {
 // invalid_experiment with every field to fix. A draft is edited in full; a
 // running experiment refuses a change to its split first (frozen), and its
 // traffic allocation only grows (traffic_allocation_decrease, judged once the
-// fields are); past running nothing is edited (not_draft), judged once the
-// fields are.
+// fields are); a stopped one changes its description alone (frozen
+// otherwise); an archived one changes nothing (archived).
 func (e Experiment) Change(ch Change, now time.Time) (Experiment, bool, error) {
-	if e.Status == StatusRunning {
+	if e.Status == StatusArchived {
+		return e, false, errArchived
+	}
+	if e.Status == StatusRunning || e.Status == StatusStopped {
 		var err error
 		if ch, err = e.frozen(ch); err != nil {
 			return e, false, err
@@ -106,14 +109,8 @@ func (e Experiment) Change(ch Change, now time.Time) (Experiment, bool, error) {
 	if err := c.err(); err != nil {
 		return e, false, err
 	}
-	switch e.Status {
-	case StatusDraft:
-	case StatusRunning:
-		if out.TrafficAllocation < e.TrafficAllocation {
-			return e, false, errAllocationDecrease
-		}
-	default:
-		return e, false, errNotDraft
+	if e.Status == StatusRunning && out.TrafficAllocation < e.TrafficAllocation {
+		return e, false, errAllocationDecrease
 	}
 	if out.sameDefinition(e) {
 		return e, false, nil
@@ -138,18 +135,28 @@ func sameDay(a, b *time.Time) bool {
 // CanDelete refuses to delete an experiment that is not a draft: once
 // started it has exposures and a history that deleting would erase.
 func (e Experiment) CanDelete() error {
-	if e.Status != StatusDraft {
+	return e.draftOnly()
+}
+
+// draftOnly refuses what only a draft allows: archived for an archived
+// experiment, which no write changes, not_draft for any other.
+func (e Experiment) draftOnly() error {
+	switch e.Status {
+	case StatusDraft:
+		return nil
+	case StatusArchived:
+		return errArchived
+	default:
 		return errNotDraft
 	}
-	return nil
 }
 
 // RegenerateSalts returns the draft with s as its salts at now, its version
 // incremented. Past the draft its assignments exist, and moving every unit
 // is not an edit (not_draft).
 func (e Experiment) RegenerateSalts(s Salts, now time.Time) (Experiment, error) {
-	if e.Status != StatusDraft {
-		return e, errNotDraft
+	if err := e.draftOnly(); err != nil {
+		return e, err
 	}
 	out := e
 	out.InclusionSalt, out.VariationSalt = s.Inclusion, s.Variation

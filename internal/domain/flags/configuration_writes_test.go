@@ -1,9 +1,11 @@
 package flags_test
 
 import (
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
@@ -110,5 +112,42 @@ func TestRolloutsCarryAGeneratedSaltOnlyRegenerationChanges(t *testing.T) {
 	}
 	if _, _, err = c.RegenerateSalt(id.New[flags.Rule](ids), mint, flags.Write{Now: now}); !isNotFound(err) {
 		t.Errorf("an unknown rule: %v, want not_found", err)
+	}
+}
+
+func TestApplyingADecisionRewritesOrDeletesTheRulesServingIt(t *testing.T) {
+	in := base()
+	in.Rules = []flags.RuleInput{
+		{Description: "Staff", Conditions: []flags.Condition{cond("os", "eq", `"linux"`)}, Serve: experimentServe("running_title")},
+		{Description: "Others", Serve: experimentServe("draft_title")},
+		{Description: "Everyone", Serve: experimentServe("running_title")},
+		{Description: "Rest", Serve: serveVariation("a")},
+	}
+	c := mustReplace(t, initial(), in)
+	w := flags.Write{By: &bob, Now: now.Add(3 * time.Hour)}
+
+	won, changed := c.ApplyDecision("running_title", "b", w)
+	if !changed.Any || !changed.Ruleset || won.Version != c.Version+1 || won.UpdatedAt != w.Now || len(won.Rules) != 4 {
+		t.Fatalf("won = %+v, %+v", won, changed)
+	}
+	for _, i := range []int{0, 2} {
+		r := won.Rules[i]
+		if r.ID != c.Rules[i].ID || r.Description != c.Rules[i].Description || !reflect.DeepEqual(r.Conditions, c.Rules[i].Conditions) ||
+			r.Serve != (flags.Serve{Kind: "variation", Variation: "b"}) {
+			t.Errorf("rule %d = %+v, want the winner served in its place", i, r)
+		}
+	}
+	if !reflect.DeepEqual(won.Rules[1], c.Rules[1]) || !reflect.DeepEqual(won.Rules[3], c.Rules[3]) {
+		t.Errorf("rules = %+v, want the others as they were", won.Rules)
+	}
+
+	removed, changed := c.ApplyDecision("running_title", "", w)
+	if !changed.Ruleset || len(removed.Rules) != 2 || removed.Rules[0].ID != c.Rules[1].ID || removed.Rules[1].ID != c.Rules[3].ID {
+		t.Errorf("removed = %+v, want the experiment's rules gone", removed.Rules)
+	}
+
+	same, changed := c.ApplyDecision("stopped_title", "b", w)
+	if changed.Any || same.Version != c.Version {
+		t.Errorf("applying a decision on an experiment no rule serves = %+v, want nothing changed", changed)
 	}
 }

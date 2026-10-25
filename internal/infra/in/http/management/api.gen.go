@@ -199,6 +199,24 @@ func (e EvaluationSource) Valid() bool {
 	}
 }
 
+// Defines values for ExperimentOutcome.
+const (
+	ExperimentOutcomeRemoved ExperimentOutcome = "removed"
+	ExperimentOutcomeWinner  ExperimentOutcome = "winner"
+)
+
+// Valid indicates whether the value is a known member of the ExperimentOutcome enum.
+func (e ExperimentOutcome) Valid() bool {
+	switch e {
+	case ExperimentOutcomeRemoved:
+		return true
+	case ExperimentOutcomeWinner:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ExperimentStatus.
 const (
 	ExperimentStatusArchived ExperimentStatus = "archived"
@@ -1085,7 +1103,10 @@ type Experiment struct {
 	CreatedAt  time.Time  `json:"created_at"`
 
 	// CreatedBy The member who created the experiment; null when a project token did.
-	CreatedBy     *openapi_types.UUID `json:"created_by"`
+	CreatedBy *openapi_types.UUID `json:"created_by"`
+
+	// Decision What the stop decided; null until the experiment stops, and for one archived from its draft.
+	Decision      *ExperimentDecision `json:"decision"`
 	ExpectedEndAt *openapi_types.Date `json:"expected_end_at"`
 
 	// Flag The key of the flag whose variations the experiment compares.
@@ -1185,6 +1206,25 @@ type ExperimentCreate struct {
 	Variations []ExperimentWeight `json:"variations"`
 }
 
+// ExperimentDecision defines model for ExperimentDecision.
+type ExperimentDecision struct {
+	// Note Why, as the members who decided wrote it; empty for none.
+	Note string `json:"note"`
+
+	// Outcome `winner` serves the winning variation where the experiment was
+	// served; `removed` deletes the experiment's rules.
+	Outcome ExperimentOutcome `json:"outcome"`
+
+	// WinnerVariation The variation that won; null for a removal.
+	WinnerVariation *string `json:"winner_variation"`
+}
+
+// ExperimentDecisionNote defines model for ExperimentDecisionNote.
+type ExperimentDecisionNote struct {
+	// Note Why; empty clears it.
+	Note string `json:"note"`
+}
+
 // ExperimentExposures defines model for ExperimentExposures.
 type ExperimentExposures struct {
 	// AsOf When the exposure rollup last moved; null before it first did.
@@ -1203,6 +1243,10 @@ type ExperimentList struct {
 	// NextCursor Pass as `cursor` for the next page; null on the last.
 	NextCursor *string `json:"next_cursor"`
 }
+
+// ExperimentOutcome `winner` serves the winning variation where the experiment was
+// served; `removed` deletes the experiment's rules.
+type ExperimentOutcome string
 
 // ExperimentPatch defines model for ExperimentPatch.
 type ExperimentPatch struct {
@@ -1228,6 +1272,19 @@ type ExperimentPatch struct {
 
 // ExperimentStatus defines model for ExperimentStatus.
 type ExperimentStatus string
+
+// ExperimentStop defines model for ExperimentStop.
+type ExperimentStop struct {
+	// Note Why; empty or absent for none.
+	Note *string `json:"note,omitempty"`
+
+	// Outcome `winner` serves the winning variation where the experiment was
+	// served; `removed` deletes the experiment's rules.
+	Outcome ExperimentOutcome `json:"outcome"`
+
+	// WinnerVariation The variation that won, one the experiment compares; required for `winner`, absent for `removed`.
+	WinnerVariation *string `json:"winner_variation,omitempty"`
+}
 
 // ExperimentWeight The share of the allocated traffic one variation of the experiment's
 // flag gets. The order of an experiment's weights fixes the cumulative
@@ -2859,6 +2916,16 @@ type UpdateExperimentParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// ArchiveExperimentParams defines parameters for ArchiveExperiment.
+type ArchiveExperimentParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // GetExperimentAssignmentParams defines parameters for GetExperimentAssignment.
 type GetExperimentAssignmentParams struct {
 	// UnitId A unit ID of the experiment's unit type, 1 to 256 bytes.
@@ -2869,6 +2936,16 @@ type GetExperimentAssignmentParams struct {
 type GetExperimentConflictsParams struct {
 	// Environment The key of the environment whose exposures to read.
 	Environment ExposureEnvironment `form:"environment" json:"environment"`
+}
+
+// SetExperimentDecisionNoteParams defines parameters for SetExperimentDecisionNote.
+type SetExperimentDecisionNoteParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // GetExperimentExposuresParams defines parameters for GetExperimentExposures.
@@ -2901,6 +2978,16 @@ type RegenerateExperimentSaltsParams struct {
 
 // StartExperimentParams defines parameters for StartExperiment.
 type StartExperimentParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// StopExperimentParams defines parameters for StopExperiment.
+type StopExperimentParams struct {
 	// IfMatch The version of the entity this write is based on, as its `ETag`
 	// answered it (`"7"`, or `7`). Required: without it the write is
 	// refused `428 precondition_required`, and with any other version than
@@ -3164,6 +3251,12 @@ type UpdateExperimentJSONRequestBody = ExperimentPatch
 
 // CloneExperimentJSONRequestBody defines body for CloneExperiment for application/json ContentType.
 type CloneExperimentJSONRequestBody = ExperimentClone
+
+// SetExperimentDecisionNoteJSONRequestBody defines body for SetExperimentDecisionNote for application/json ContentType.
+type SetExperimentDecisionNoteJSONRequestBody = ExperimentDecisionNote
+
+// StopExperimentJSONRequestBody defines body for StopExperiment for application/json ContentType.
+type StopExperimentJSONRequestBody = ExperimentStop
 
 // CreateFlagJSONRequestBody defines body for CreateFlag for application/json ContentType.
 type CreateFlagJSONRequestBody = FlagCreate
@@ -4275,8 +4368,9 @@ type ClientInterface interface {
 
 	// DeleteExperiment Delete a draft experiment
 	//
-	// Deletes the experiment. Only a draft is deleted (`not_draft`): once
-	// started, an experiment keeps its history.
+	// Deletes the experiment. Only a draft is deleted (`not_draft`;
+	// `archived` for an archived one): once started, an experiment keeps
+	// its history.
 	//
 	// Corresponds with DELETE /projects/{project}/experiments/{experiment} (the `DeleteExperiment` operationId).
 	DeleteExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *DeleteExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4300,8 +4394,12 @@ type ClientInterface interface {
 	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
 	// moves the ruleset of every environment holding a rule serving the
 	// experiment and includes more units without moving any unit already
-	// included. Past running nothing is changed (`not_draft`). A change to
-	// the values the experiment already has changes nothing and records
+	// included. A stopped experiment changes its name, hypothesis, owner
+	// and tags; a change to its flag, unit type, weights, traffic
+	// allocation or expected end date is `frozen` (409, a violation per
+	// field), and its decision's note is changed through `/decision`. An
+	// archived experiment changes nothing (`archived`). A change to the
+	// values the experiment already has changes nothing and records
 	// nothing.
 	//
 	// Takes any type of body and a specified content type.
@@ -4321,14 +4419,28 @@ type ClientInterface interface {
 	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
 	// moves the ruleset of every environment holding a rule serving the
 	// experiment and includes more units without moving any unit already
-	// included. Past running nothing is changed (`not_draft`). A change to
-	// the values the experiment already has changes nothing and records
+	// included. A stopped experiment changes its name, hypothesis, owner
+	// and tags; a change to its flag, unit type, weights, traffic
+	// allocation or expected end date is `frozen` (409, a violation per
+	// field), and its decision's note is changed through `/decision`. An
+	// archived experiment changes nothing (`archived`). A change to the
+	// values the experiment already has changes nothing and records
 	// nothing.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
 	UpdateExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ArchiveExperiment Archive a draft or stopped experiment
+	//
+	// Archives the experiment: it is hidden from the list unless asked for
+	// and no write changes it again (`archived`), though it can still be
+	// cloned. A running experiment is stopped with a decision first
+	// (`running`). No ruleset moves.
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/archive (the `ArchiveExperiment` operationId).
+	ArchiveExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *ArchiveExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetExperimentAssignment How the experiment treats one unit
 	//
@@ -4387,6 +4499,32 @@ type ClientInterface interface {
 	// Corresponds with GET /projects/{project}/experiments/{experiment}/conflicts (the `GetExperimentConflicts` operationId).
 	GetExperimentConflicts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentConflictsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SetExperimentDecisionNoteWithBody Change the note of a stopped experiment's decision
+	//
+	// Sets the note of the decision, `""` clearing it; the outcome and the
+	// winner never change. Only a stopped experiment has a decision
+	// (`not_stopped`; `archived` for an archived one). A note has at most
+	// 2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+	// same note changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /projects/{project}/experiments/{experiment}/decision (the `SetExperimentDecisionNote` operationId).
+	SetExperimentDecisionNoteWithBody(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetExperimentDecisionNote Change the note of a stopped experiment's decision
+	//
+	// Sets the note of the decision, `""` clearing it; the outcome and the
+	// winner never change. Only a stopped experiment has a decision
+	// (`not_stopped`; `archived` for an archived one). A note has at most
+	// 2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+	// same note changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /projects/{project}/experiments/{experiment}/decision (the `SetExperimentDecisionNote` operationId).
+	SetExperimentDecisionNote(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, body SetExperimentDecisionNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetExperimentExposures An experiment's exposures in one environment
 	//
 	// What the exposures of an experiment of any status came to in one
@@ -4428,8 +4566,8 @@ type ClientInterface interface {
 	//
 	// Draws a new inclusion salt and a new variation salt, apart from every
 	// salt of the project's experiments and rollouts. Only a draft has its
-	// salts regenerated (`not_draft`): past the draft, units have been
-	// assigned from them.
+	// salts regenerated (`not_draft`; `archived` for an archived one):
+	// past the draft, units have been assigned from them.
 	//
 	// Corresponds with POST /projects/{project}/experiments/{experiment}/salts (the `RegenerateExperimentSalts` operationId).
 	RegenerateExperimentSalts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4442,8 +4580,8 @@ type ClientInterface interface {
 	// begins everywhere at once; no other environment's ruleset moves. An
 	// experiment no environment holds starts all the same, and reaches an
 	// environment when a rule there serves it. Only a draft starts
-	// (`not_draft`): there is no restart, a stopped experiment is rerun as
-	// a clone. A draft missing anything a running experiment needs is
+	// (`not_draft`; `archived` for an archived one): there is no restart,
+	// a stopped experiment is rerun as a clone. A draft missing anything a running experiment needs is
 	// refused `experiment_not_ready`, with one violation per missing
 	// item: its flag archived (`flag_archived` on `/flag`), its unit type
 	// no longer declared (`undeclared_unit_type` on `/unit_type`), weights
@@ -4453,6 +4591,50 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/experiments/{experiment}/start (the `StartExperiment` operationId).
 	StartExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StartExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StopExperimentWithBody Stop a running experiment with a decision
+	//
+	// Stops the experiment with a decision, in one transaction with every
+	// rule serving it. With `winner`, every rule serving the experiment, in
+	// every environment, serves `winner_variation` instead, keeping its
+	// identifier, conditions and place, so the winner ships at once; with
+	// `removed`, every such rule is deleted and the flag goes on to its
+	// other rules. Each configuration rewritten is a configuration write of
+	// its own, at its next version, recorded as `flag.configuration_updated`
+	// with `experiment_stopped`, and the ruleset of its environment moves
+	// on; no other ruleset moves. A winner is one of the variations the
+	// experiment compares (`invalid_decision`: `required` or
+	// `unknown_variation` on `/winner_variation`), a removal names none
+	// (`invalid_value`), and a note has at most 2,000 characters
+	// (`too_long` on `/note`). Only a running experiment stops
+	// (`not_running`; `archived` for an archived one).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
+	StopExperimentWithBody(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StopExperiment Stop a running experiment with a decision
+	//
+	// Stops the experiment with a decision, in one transaction with every
+	// rule serving it. With `winner`, every rule serving the experiment, in
+	// every environment, serves `winner_variation` instead, keeping its
+	// identifier, conditions and place, so the winner ships at once; with
+	// `removed`, every such rule is deleted and the flag goes on to its
+	// other rules. Each configuration rewritten is a configuration write of
+	// its own, at its next version, recorded as `flag.configuration_updated`
+	// with `experiment_stopped`, and the ruleset of its environment moves
+	// on; no other ruleset moves. A winner is one of the variations the
+	// experiment compares (`invalid_decision`: `required` or
+	// `unknown_variation` on `/winner_variation`), a removal names none
+	// (`invalid_value`), and a note has at most 2,000 characters
+	// (`too_long` on `/note`). Only a running experiment stops
+	// (`not_running`; `archived` for an archived one).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
+	StopExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, body StopExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListFlags The project's flags
 	//
@@ -4615,8 +4797,13 @@ type ClientInterface interface {
 	// authors. Validated as replacing the configuration would be
 	// (`invalid_configuration`, its pointers into the configuration the
 	// copy would write); copying from this environment itself is
-	// `invalid_configuration`. `If-Match` names this environment's
-	// version. A copy that changes nothing records nothing.
+	// `invalid_configuration`. A copy that would add or remove a rule
+	// serving an experiment in this environment, or change which
+	// experiment a rule serves, is refused `experiment_rules_changed`
+	// (409, before the document is validated): an experiment reaches
+	// another environment only through an explicit rule edit. `If-Match`
+	// names this environment's version. A copy that changes nothing
+	// records nothing.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4635,8 +4822,13 @@ type ClientInterface interface {
 	// authors. Validated as replacing the configuration would be
 	// (`invalid_configuration`, its pointers into the configuration the
 	// copy would write); copying from this environment itself is
-	// `invalid_configuration`. `If-Match` names this environment's
-	// version. A copy that changes nothing records nothing.
+	// `invalid_configuration`. A copy that would add or remove a rule
+	// serving an experiment in this environment, or change which
+	// experiment a rule serves, is refused `experiment_rules_changed`
+	// (409, before the document is validated): an experiment reaches
+	// another environment only through an explicit rule edit. `If-Match`
+	// names this environment's version. A copy that changes nothing
+	// records nothing.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4738,7 +4930,12 @@ type ClientInterface interface {
 	// (`invalid_configuration`, its pointers into the configuration the
 	// revert would write), so a variation, segment, attribute or flag
 	// removed since refuses it. `If-Match` names the current version, not
-	// the one reverted to. Reverting to what the configuration already is
+	// the one reverted to. A revert that would add or remove a rule
+	// serving an experiment, or change which experiment a rule serves, is
+	// refused `experiment_rules_changed` (409, before the document is
+	// validated): whether an experiment runs lives on the experiment, so
+	// an experiment reaches or leaves an environment only through an
+	// explicit rule edit. Reverting to what the configuration already is
 	// changes nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type.
@@ -4758,7 +4955,12 @@ type ClientInterface interface {
 	// (`invalid_configuration`, its pointers into the configuration the
 	// revert would write), so a variation, segment, attribute or flag
 	// removed since refuses it. `If-Match` names the current version, not
-	// the one reverted to. Reverting to what the configuration already is
+	// the one reverted to. A revert that would add or remove a rule
+	// serving an experiment, or change which experiment a rule serves, is
+	// refused `experiment_rules_changed` (409, before the document is
+	// validated): whether an experiment runs lives on the experiment, so
+	// an experiment reaches or leaves an environment only through an
+	// explicit rule edit. Reverting to what the configuration already is
 	// changes nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type.
@@ -6967,8 +7169,9 @@ func (c *Client) CreateExperiment(ctx context.Context, project ProjectKey, body 
 
 // DeleteExperiment Delete a draft experiment
 //
-// Deletes the experiment. Only a draft is deleted (`not_draft`): once
-// started, an experiment keeps its history.
+// Deletes the experiment. Only a draft is deleted (`not_draft`;
+// `archived` for an archived one): once started, an experiment keeps
+// its history.
 //
 // Corresponds with DELETE /projects/{project}/experiments/{experiment} (the `DeleteExperiment` operationId).
 func (c *Client) DeleteExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *DeleteExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7012,8 +7215,12 @@ func (c *Client) GetExperiment(ctx context.Context, project ProjectKey, experime
 // smaller allocation is `traffic_allocation_decrease` (409). Growing it
 // moves the ruleset of every environment holding a rule serving the
 // experiment and includes more units without moving any unit already
-// included. Past running nothing is changed (`not_draft`). A change to
-// the values the experiment already has changes nothing and records
+// included. A stopped experiment changes its name, hypothesis, owner
+// and tags; a change to its flag, unit type, weights, traffic
+// allocation or expected end date is `frozen` (409, a violation per
+// field), and its decision's note is changed through `/decision`. An
+// archived experiment changes nothing (`archived`). A change to the
+// values the experiment already has changes nothing and records
 // nothing.
 //
 // Takes any type of body and a specified content type.
@@ -7043,8 +7250,12 @@ func (c *Client) UpdateExperimentWithBody(ctx context.Context, project ProjectKe
 // smaller allocation is `traffic_allocation_decrease` (409). Growing it
 // moves the ruleset of every environment holding a rule serving the
 // experiment and includes more units without moving any unit already
-// included. Past running nothing is changed (`not_draft`). A change to
-// the values the experiment already has changes nothing and records
+// included. A stopped experiment changes its name, hypothesis, owner
+// and tags; a change to its flag, unit type, weights, traffic
+// allocation or expected end date is `frozen` (409, a violation per
+// field), and its decision's note is changed through `/decision`. An
+// archived experiment changes nothing (`archived`). A change to the
+// values the experiment already has changes nothing and records
 // nothing.
 //
 // Takes a body of the `application/json` content type.
@@ -7052,6 +7263,26 @@ func (c *Client) UpdateExperimentWithBody(ctx context.Context, project ProjectKe
 // Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
 func (c *Client) UpdateExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateExperimentRequest(c.Server, project, experiment, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ArchiveExperiment Archive a draft or stopped experiment
+//
+// Archives the experiment: it is hidden from the list unless asked for
+// and no write changes it again (`archived`), though it can still be
+// cloned. A running experiment is stopped with a decision first
+// (`running`). No ruleset moves.
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/archive (the `ArchiveExperiment` operationId).
+func (c *Client) ArchiveExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *ArchiveExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewArchiveExperimentRequest(c.Server, project, experiment, params)
 	if err != nil {
 		return nil, err
 	}
@@ -7159,6 +7390,52 @@ func (c *Client) GetExperimentConflicts(ctx context.Context, project ProjectKey,
 	return c.Client.Do(req)
 }
 
+// SetExperimentDecisionNoteWithBody Change the note of a stopped experiment's decision
+//
+// Sets the note of the decision, `""` clearing it; the outcome and the
+// winner never change. Only a stopped experiment has a decision
+// (`not_stopped`; `archived` for an archived one). A note has at most
+// 2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+// same note changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /projects/{project}/experiments/{experiment}/decision (the `SetExperimentDecisionNote` operationId).
+func (c *Client) SetExperimentDecisionNoteWithBody(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetExperimentDecisionNoteRequestWithBody(c.Server, project, experiment, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetExperimentDecisionNote Change the note of a stopped experiment's decision
+//
+// Sets the note of the decision, `""` clearing it; the outcome and the
+// winner never change. Only a stopped experiment has a decision
+// (`not_stopped`; `archived` for an archived one). A note has at most
+// 2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+// same note changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /projects/{project}/experiments/{experiment}/decision (the `SetExperimentDecisionNote` operationId).
+func (c *Client) SetExperimentDecisionNote(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, body SetExperimentDecisionNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetExperimentDecisionNoteRequest(c.Server, project, experiment, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetExperimentExposures An experiment's exposures in one environment
 //
 // What the exposures of an experiment of any status came to in one
@@ -7220,8 +7497,8 @@ func (c *Client) GetExperimentExposureTimeline(ctx context.Context, project Proj
 //
 // Draws a new inclusion salt and a new variation salt, apart from every
 // salt of the project's experiments and rollouts. Only a draft has its
-// salts regenerated (`not_draft`): past the draft, units have been
-// assigned from them.
+// salts regenerated (`not_draft`; `archived` for an archived one):
+// past the draft, units have been assigned from them.
 //
 // Corresponds with POST /projects/{project}/experiments/{experiment}/salts (the `RegenerateExperimentSalts` operationId).
 func (c *Client) RegenerateExperimentSalts(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *RegenerateExperimentSaltsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7244,8 +7521,8 @@ func (c *Client) RegenerateExperimentSalts(ctx context.Context, project ProjectK
 // begins everywhere at once; no other environment's ruleset moves. An
 // experiment no environment holds starts all the same, and reaches an
 // environment when a rule there serves it. Only a draft starts
-// (`not_draft`): there is no restart, a stopped experiment is rerun as
-// a clone. A draft missing anything a running experiment needs is
+// (`not_draft`; `archived` for an archived one): there is no restart,
+// a stopped experiment is rerun as a clone. A draft missing anything a running experiment needs is
 // refused `experiment_not_ready`, with one violation per missing
 // item: its flag archived (`flag_archived` on `/flag`), its unit type
 // no longer declared (`undeclared_unit_type` on `/unit_type`), weights
@@ -7256,6 +7533,70 @@ func (c *Client) RegenerateExperimentSalts(ctx context.Context, project ProjectK
 // Corresponds with POST /projects/{project}/experiments/{experiment}/start (the `StartExperiment` operationId).
 func (c *Client) StartExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StartExperimentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewStartExperimentRequest(c.Server, project, experiment, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StopExperimentWithBody Stop a running experiment with a decision
+//
+// Stops the experiment with a decision, in one transaction with every
+// rule serving it. With `winner`, every rule serving the experiment, in
+// every environment, serves `winner_variation` instead, keeping its
+// identifier, conditions and place, so the winner ships at once; with
+// `removed`, every such rule is deleted and the flag goes on to its
+// other rules. Each configuration rewritten is a configuration write of
+// its own, at its next version, recorded as `flag.configuration_updated`
+// with `experiment_stopped`, and the ruleset of its environment moves
+// on; no other ruleset moves. A winner is one of the variations the
+// experiment compares (`invalid_decision`: `required` or
+// `unknown_variation` on `/winner_variation`), a removal names none
+// (`invalid_value`), and a note has at most 2,000 characters
+// (`too_long` on `/note`). Only a running experiment stops
+// (`not_running`; `archived` for an archived one).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
+func (c *Client) StopExperimentWithBody(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopExperimentRequestWithBody(c.Server, project, experiment, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StopExperiment Stop a running experiment with a decision
+//
+// Stops the experiment with a decision, in one transaction with every
+// rule serving it. With `winner`, every rule serving the experiment, in
+// every environment, serves `winner_variation` instead, keeping its
+// identifier, conditions and place, so the winner ships at once; with
+// `removed`, every such rule is deleted and the flag goes on to its
+// other rules. Each configuration rewritten is a configuration write of
+// its own, at its next version, recorded as `flag.configuration_updated`
+// with `experiment_stopped`, and the ruleset of its environment moves
+// on; no other ruleset moves. A winner is one of the variations the
+// experiment compares (`invalid_decision`: `required` or
+// `unknown_variation` on `/winner_variation`), a removal names none
+// (`invalid_value`), and a note has at most 2,000 characters
+// (`too_long` on `/note`). Only a running experiment stops
+// (`not_running`; `archived` for an archived one).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
+func (c *Client) StopExperiment(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, body StopExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopExperimentRequest(c.Server, project, experiment, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -7537,8 +7878,13 @@ func (c *Client) PutFlagConfiguration(ctx context.Context, project ProjectKey, f
 // authors. Validated as replacing the configuration would be
 // (`invalid_configuration`, its pointers into the configuration the
 // copy would write); copying from this environment itself is
-// `invalid_configuration`. `If-Match` names this environment's
-// version. A copy that changes nothing records nothing.
+// `invalid_configuration`. A copy that would add or remove a rule
+// serving an experiment in this environment, or change which
+// experiment a rule serves, is refused `experiment_rules_changed`
+// (409, before the document is validated): an experiment reaches
+// another environment only through an explicit rule edit. `If-Match`
+// names this environment's version. A copy that changes nothing
+// records nothing.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7567,8 +7913,13 @@ func (c *Client) CopyFlagConfigurationWithBody(ctx context.Context, project Proj
 // authors. Validated as replacing the configuration would be
 // (`invalid_configuration`, its pointers into the configuration the
 // copy would write); copying from this environment itself is
-// `invalid_configuration`. `If-Match` names this environment's
-// version. A copy that changes nothing records nothing.
+// `invalid_configuration`. A copy that would add or remove a rule
+// serving an experiment in this environment, or change which
+// experiment a rule serves, is refused `experiment_rules_changed`
+// (409, before the document is validated): an experiment reaches
+// another environment only through an explicit rule edit. `If-Match`
+// names this environment's version. A copy that changes nothing
+// records nothing.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7740,7 +8091,12 @@ func (c *Client) PutOverride(ctx context.Context, project ProjectKey, flag FlagK
 // (`invalid_configuration`, its pointers into the configuration the
 // revert would write), so a variation, segment, attribute or flag
 // removed since refuses it. `If-Match` names the current version, not
-// the one reverted to. Reverting to what the configuration already is
+// the one reverted to. A revert that would add or remove a rule
+// serving an experiment, or change which experiment a rule serves, is
+// refused `experiment_rules_changed` (409, before the document is
+// validated): whether an experiment runs lives on the experiment, so
+// an experiment reaches or leaves an environment only through an
+// explicit rule edit. Reverting to what the configuration already is
 // changes nothing and records nothing.
 //
 // Takes any type of body and a specified content type.
@@ -7770,7 +8126,12 @@ func (c *Client) RevertFlagConfigurationWithBody(ctx context.Context, project Pr
 // (`invalid_configuration`, its pointers into the configuration the
 // revert would write), so a variation, segment, attribute or flag
 // removed since refuses it. `If-Match` names the current version, not
-// the one reverted to. Reverting to what the configuration already is
+// the one reverted to. A revert that would add or remove a rule
+// serving an experiment, or change which experiment a rule serves, is
+// refused `experiment_rules_changed` (409, before the document is
+// validated): whether an experiment runs lives on the experiment, so
+// an experiment reaches or leaves an environment only through an
+// explicit rule edit. Reverting to what the configuration already is
 // changes nothing and records nothing.
 //
 // Takes a body of the `application/json` content type.
@@ -11934,6 +12295,62 @@ func NewUpdateExperimentRequestWithBody(server string, project ProjectKey, exper
 	return req, nil
 }
 
+// NewArchiveExperimentRequest constructs an http.Request for the ArchiveExperiment method
+func NewArchiveExperimentRequest(server string, project ProjectKey, experiment ExperimentKey, params *ArchiveExperimentParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/archive", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewGetExperimentAssignmentRequest constructs an http.Request for the GetExperimentAssignment method
 func NewGetExperimentAssignmentRequest(server string, project ProjectKey, experiment ExperimentKey, params *GetExperimentAssignmentParams) (*http.Request, error) {
 	var err error
@@ -12111,6 +12528,75 @@ func NewGetExperimentConflictsRequest(server string, project ProjectKey, experim
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetExperimentDecisionNoteRequest calls the generic SetExperimentDecisionNote builder with application/json body
+func NewSetExperimentDecisionNoteRequest(server string, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, body SetExperimentDecisionNoteJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetExperimentDecisionNoteRequestWithBody(server, project, experiment, params, "application/json", bodyReader)
+}
+
+// NewSetExperimentDecisionNoteRequestWithBody constructs an http.Request for the SetExperimentDecisionNote method, with any body, and a specified content type
+func NewSetExperimentDecisionNoteRequestWithBody(server string, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/decision", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -12361,6 +12847,75 @@ func NewStartExperimentRequest(server string, project ProjectKey, experiment Exp
 	if err != nil {
 		return nil, err
 	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewStopExperimentRequest calls the generic StopExperiment builder with application/json body
+func NewStopExperimentRequest(server string, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, body StopExperimentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewStopExperimentRequestWithBody(server, project, experiment, params, "application/json", bodyReader)
+}
+
+// NewStopExperimentRequestWithBody constructs an http.Request for the StopExperiment method, with any body, and a specified content type
+func NewStopExperimentRequestWithBody(server string, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "experiment", experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/experiments/%s/stop", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	if params != nil {
 
@@ -15568,8 +16123,9 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteExperimentWithResponse Delete a draft experiment
 	//
-	// Deletes the experiment. Only a draft is deleted (`not_draft`): once
-	// started, an experiment keeps its history.
+	// Deletes the experiment. Only a draft is deleted (`not_draft`;
+	// `archived` for an archived one): once started, an experiment keeps
+	// its history.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15597,8 +16153,12 @@ type ClientWithResponsesInterface interface {
 	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
 	// moves the ruleset of every environment holding a rule serving the
 	// experiment and includes more units without moving any unit already
-	// included. Past running nothing is changed (`not_draft`). A change to
-	// the values the experiment already has changes nothing and records
+	// included. A stopped experiment changes its name, hypothesis, owner
+	// and tags; a change to its flag, unit type, weights, traffic
+	// allocation or expected end date is `frozen` (409, a violation per
+	// field), and its decision's note is changed through `/decision`. An
+	// archived experiment changes nothing (`archived`). A change to the
+	// values the experiment already has changes nothing and records
 	// nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -15618,14 +16178,30 @@ type ClientWithResponsesInterface interface {
 	// smaller allocation is `traffic_allocation_decrease` (409). Growing it
 	// moves the ruleset of every environment holding a rule serving the
 	// experiment and includes more units without moving any unit already
-	// included. Past running nothing is changed (`not_draft`). A change to
-	// the values the experiment already has changes nothing and records
+	// included. A stopped experiment changes its name, hypothesis, owner
+	// and tags; a change to its flag, unit type, weights, traffic
+	// allocation or expected end date is `frozen` (409, a violation per
+	// field), and its decision's note is changed through `/decision`. An
+	// archived experiment changes nothing (`archived`). A change to the
+	// values the experiment already has changes nothing and records
 	// nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /projects/{project}/experiments/{experiment} (the `UpdateExperiment` operationId).
 	UpdateExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *UpdateExperimentParams, body UpdateExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateExperimentResponse, error)
+
+	// ArchiveExperimentWithResponse Archive a draft or stopped experiment
+	//
+	// Archives the experiment: it is hidden from the list unless asked for
+	// and no write changes it again (`archived`), though it can still be
+	// cloned. A running experiment is stopped with a decision first
+	// (`running`). No ruleset moves.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/archive (the `ArchiveExperiment` operationId).
+	ArchiveExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *ArchiveExperimentParams, reqEditors ...RequestEditorFn) (*ArchiveExperimentResponse, error)
 
 	// GetExperimentAssignmentWithResponse How the experiment treats one unit
 	//
@@ -15688,6 +16264,32 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /projects/{project}/experiments/{experiment}/conflicts (the `GetExperimentConflicts` operationId).
 	GetExperimentConflictsWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *GetExperimentConflictsParams, reqEditors ...RequestEditorFn) (*GetExperimentConflictsResponse, error)
 
+	// SetExperimentDecisionNoteWithBodyWithResponse Change the note of a stopped experiment's decision
+	//
+	// Sets the note of the decision, `""` clearing it; the outcome and the
+	// winner never change. Only a stopped experiment has a decision
+	// (`not_stopped`; `archived` for an archived one). A note has at most
+	// 2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+	// same note changes nothing and records nothing.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project}/experiments/{experiment}/decision (the `SetExperimentDecisionNote` operationId).
+	SetExperimentDecisionNoteWithBodyWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetExperimentDecisionNoteResponse, error)
+
+	// SetExperimentDecisionNoteWithResponse Change the note of a stopped experiment's decision
+	//
+	// Sets the note of the decision, `""` clearing it; the outcome and the
+	// winner never change. Only a stopped experiment has a decision
+	// (`not_stopped`; `archived` for an archived one). A note has at most
+	// 2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+	// same note changes nothing and records nothing.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /projects/{project}/experiments/{experiment}/decision (the `SetExperimentDecisionNote` operationId).
+	SetExperimentDecisionNoteWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, body SetExperimentDecisionNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*SetExperimentDecisionNoteResponse, error)
+
 	// GetExperimentExposuresWithResponse An experiment's exposures in one environment
 	//
 	// What the exposures of an experiment of any status came to in one
@@ -15733,8 +16335,8 @@ type ClientWithResponsesInterface interface {
 	//
 	// Draws a new inclusion salt and a new variation salt, apart from every
 	// salt of the project's experiments and rollouts. Only a draft has its
-	// salts regenerated (`not_draft`): past the draft, units have been
-	// assigned from them.
+	// salts regenerated (`not_draft`; `archived` for an archived one):
+	// past the draft, units have been assigned from them.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15749,8 +16351,8 @@ type ClientWithResponsesInterface interface {
 	// begins everywhere at once; no other environment's ruleset moves. An
 	// experiment no environment holds starts all the same, and reaches an
 	// environment when a rule there serves it. Only a draft starts
-	// (`not_draft`): there is no restart, a stopped experiment is rerun as
-	// a clone. A draft missing anything a running experiment needs is
+	// (`not_draft`; `archived` for an archived one): there is no restart,
+	// a stopped experiment is rerun as a clone. A draft missing anything a running experiment needs is
 	// refused `experiment_not_ready`, with one violation per missing
 	// item: its flag archived (`flag_archived` on `/flag`), its unit type
 	// no longer declared (`undeclared_unit_type` on `/unit_type`), weights
@@ -15762,6 +16364,50 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/experiments/{experiment}/start (the `StartExperiment` operationId).
 	StartExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StartExperimentParams, reqEditors ...RequestEditorFn) (*StartExperimentResponse, error)
+
+	// StopExperimentWithBodyWithResponse Stop a running experiment with a decision
+	//
+	// Stops the experiment with a decision, in one transaction with every
+	// rule serving it. With `winner`, every rule serving the experiment, in
+	// every environment, serves `winner_variation` instead, keeping its
+	// identifier, conditions and place, so the winner ships at once; with
+	// `removed`, every such rule is deleted and the flag goes on to its
+	// other rules. Each configuration rewritten is a configuration write of
+	// its own, at its next version, recorded as `flag.configuration_updated`
+	// with `experiment_stopped`, and the ruleset of its environment moves
+	// on; no other ruleset moves. A winner is one of the variations the
+	// experiment compares (`invalid_decision`: `required` or
+	// `unknown_variation` on `/winner_variation`), a removal names none
+	// (`invalid_value`), and a note has at most 2,000 characters
+	// (`too_long` on `/note`). Only a running experiment stops
+	// (`not_running`; `archived` for an archived one).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
+	StopExperimentWithBodyWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*StopExperimentResponse, error)
+
+	// StopExperimentWithResponse Stop a running experiment with a decision
+	//
+	// Stops the experiment with a decision, in one transaction with every
+	// rule serving it. With `winner`, every rule serving the experiment, in
+	// every environment, serves `winner_variation` instead, keeping its
+	// identifier, conditions and place, so the winner ships at once; with
+	// `removed`, every such rule is deleted and the flag goes on to its
+	// other rules. Each configuration rewritten is a configuration write of
+	// its own, at its next version, recorded as `flag.configuration_updated`
+	// with `experiment_stopped`, and the ruleset of its environment moves
+	// on; no other ruleset moves. A winner is one of the variations the
+	// experiment compares (`invalid_decision`: `required` or
+	// `unknown_variation` on `/winner_variation`), a removal names none
+	// (`invalid_value`), and a note has at most 2,000 characters
+	// (`too_long` on `/note`). Only a running experiment stops
+	// (`not_running`; `archived` for an archived one).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
+	StopExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, body StopExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*StopExperimentResponse, error)
 
 	// ListFlagsWithResponse The project's flags
 	//
@@ -15934,8 +16580,13 @@ type ClientWithResponsesInterface interface {
 	// authors. Validated as replacing the configuration would be
 	// (`invalid_configuration`, its pointers into the configuration the
 	// copy would write); copying from this environment itself is
-	// `invalid_configuration`. `If-Match` names this environment's
-	// version. A copy that changes nothing records nothing.
+	// `invalid_configuration`. A copy that would add or remove a rule
+	// serving an experiment in this environment, or change which
+	// experiment a rule serves, is refused `experiment_rules_changed`
+	// (409, before the document is validated): an experiment reaches
+	// another environment only through an explicit rule edit. `If-Match`
+	// names this environment's version. A copy that changes nothing
+	// records nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15954,8 +16605,13 @@ type ClientWithResponsesInterface interface {
 	// authors. Validated as replacing the configuration would be
 	// (`invalid_configuration`, its pointers into the configuration the
 	// copy would write); copying from this environment itself is
-	// `invalid_configuration`. `If-Match` names this environment's
-	// version. A copy that changes nothing records nothing.
+	// `invalid_configuration`. A copy that would add or remove a rule
+	// serving an experiment in this environment, or change which
+	// experiment a rule serves, is refused `experiment_rules_changed`
+	// (409, before the document is validated): an experiment reaches
+	// another environment only through an explicit rule edit. `If-Match`
+	// names this environment's version. A copy that changes nothing
+	// records nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16061,7 +16717,12 @@ type ClientWithResponsesInterface interface {
 	// (`invalid_configuration`, its pointers into the configuration the
 	// revert would write), so a variation, segment, attribute or flag
 	// removed since refuses it. `If-Match` names the current version, not
-	// the one reverted to. Reverting to what the configuration already is
+	// the one reverted to. A revert that would add or remove a rule
+	// serving an experiment, or change which experiment a rule serves, is
+	// refused `experiment_rules_changed` (409, before the document is
+	// validated): whether an experiment runs lives on the experiment, so
+	// an experiment reaches or leaves an environment only through an
+	// explicit rule edit. Reverting to what the configuration already is
 	// changes nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -16081,7 +16742,12 @@ type ClientWithResponsesInterface interface {
 	// (`invalid_configuration`, its pointers into the configuration the
 	// revert would write), so a variation, segment, attribute or flag
 	// removed since refuses it. `If-Match` names the current version, not
-	// the one reverted to. Reverting to what the configuration already is
+	// the one reverted to. A revert that would add or remove a rule
+	// serving an experiment, or change which experiment a rule serves, is
+	// refused `experiment_rules_changed` (409, before the document is
+	// validated): whether an experiment runs lives on the experiment, so
+	// an experiment reaches or leaves an environment only through an
+	// explicit rule edit. Reverting to what the configuration already is
 	// changes nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -21971,6 +22637,110 @@ func (r UpdateExperimentResponse) ContentType() string {
 	return ""
 }
 
+// ArchiveExperimentResponse200Headers the declared response headers of an HTTP 200 response for ArchiveExperiment
+type ArchiveExperimentResponse200Headers struct {
+	ETag *string
+}
+
+// ArchiveExperimentResponse401Headers the declared response headers of an HTTP 401 response for ArchiveExperiment
+type ArchiveExperimentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ArchiveExperimentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Experiment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ArchiveExperimentResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ArchiveExperimentResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ArchiveExperimentResponse) GetJSON200() *Experiment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ArchiveExperimentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ArchiveExperimentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ArchiveExperimentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ArchiveExperimentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ArchiveExperimentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r ArchiveExperimentResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r ArchiveExperimentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r ArchiveExperimentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ArchiveExperimentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ArchiveExperimentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ArchiveExperimentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // GetExperimentAssignmentResponse401Headers the declared response headers of an HTTP 401 response for GetExperimentAssignment
 type GetExperimentAssignmentResponse401Headers struct {
 	WWWAuthenticate *string
@@ -22214,6 +22984,117 @@ func (r GetExperimentConflictsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetExperimentConflictsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// SetExperimentDecisionNoteResponse200Headers the declared response headers of an HTTP 200 response for SetExperimentDecisionNote
+type SetExperimentDecisionNoteResponse200Headers struct {
+	ETag *string
+}
+
+// SetExperimentDecisionNoteResponse401Headers the declared response headers of an HTTP 401 response for SetExperimentDecisionNote
+type SetExperimentDecisionNoteResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type SetExperimentDecisionNoteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Experiment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SetExperimentDecisionNoteResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *SetExperimentDecisionNoteResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetExperimentDecisionNoteResponse) GetJSON200() *Experiment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetExperimentDecisionNoteResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetExperimentDecisionNoteResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetExperimentDecisionNoteResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetExperimentDecisionNoteResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r SetExperimentDecisionNoteResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r SetExperimentDecisionNoteResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r SetExperimentDecisionNoteResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r SetExperimentDecisionNoteResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r SetExperimentDecisionNoteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetExperimentDecisionNoteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetExperimentDecisionNoteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetExperimentDecisionNoteResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -22581,6 +23462,117 @@ func (r StartExperimentResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r StartExperimentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// StopExperimentResponse200Headers the declared response headers of an HTTP 200 response for StopExperiment
+type StopExperimentResponse200Headers struct {
+	ETag *string
+}
+
+// StopExperimentResponse401Headers the declared response headers of an HTTP 401 response for StopExperiment
+type StopExperimentResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type StopExperimentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Experiment
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *StopExperimentResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *StopExperimentResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r StopExperimentResponse) GetJSON200() *Experiment {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r StopExperimentResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r StopExperimentResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r StopExperimentResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r StopExperimentResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r StopExperimentResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r StopExperimentResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r StopExperimentResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r StopExperimentResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r StopExperimentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StopExperimentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StopExperimentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StopExperimentResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -27334,8 +28326,9 @@ func (c *ClientWithResponses) CreateExperimentWithResponse(ctx context.Context, 
 
 // DeleteExperimentWithResponse Delete a draft experiment
 //
-// Deletes the experiment. Only a draft is deleted (`not_draft`): once
-// started, an experiment keeps its history.
+// Deletes the experiment. Only a draft is deleted (`not_draft`;
+// `archived` for an archived one): once started, an experiment keeps
+// its history.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27375,8 +28368,12 @@ func (c *ClientWithResponses) GetExperimentWithResponse(ctx context.Context, pro
 // smaller allocation is `traffic_allocation_decrease` (409). Growing it
 // moves the ruleset of every environment holding a rule serving the
 // experiment and includes more units without moving any unit already
-// included. Past running nothing is changed (`not_draft`). A change to
-// the values the experiment already has changes nothing and records
+// included. A stopped experiment changes its name, hypothesis, owner
+// and tags; a change to its flag, unit type, weights, traffic
+// allocation or expected end date is `frozen` (409, a violation per
+// field), and its decision's note is changed through `/decision`. An
+// archived experiment changes nothing (`archived`). A change to the
+// values the experiment already has changes nothing and records
 // nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -27402,8 +28399,12 @@ func (c *ClientWithResponses) UpdateExperimentWithBodyWithResponse(ctx context.C
 // smaller allocation is `traffic_allocation_decrease` (409). Growing it
 // moves the ruleset of every environment holding a rule serving the
 // experiment and includes more units without moving any unit already
-// included. Past running nothing is changed (`not_draft`). A change to
-// the values the experiment already has changes nothing and records
+// included. A stopped experiment changes its name, hypothesis, owner
+// and tags; a change to its flag, unit type, weights, traffic
+// allocation or expected end date is `frozen` (409, a violation per
+// field), and its decision's note is changed through `/decision`. An
+// archived experiment changes nothing (`archived`). A change to the
+// values the experiment already has changes nothing and records
 // nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -27415,6 +28416,24 @@ func (c *ClientWithResponses) UpdateExperimentWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseUpdateExperimentResponse(rsp)
+}
+
+// ArchiveExperimentWithResponse Archive a draft or stopped experiment
+//
+// Archives the experiment: it is hidden from the list unless asked for
+// and no write changes it again (`archived`), though it can still be
+// cloned. A running experiment is stopped with a decision first
+// (`running`). No ruleset moves.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/archive (the `ArchiveExperiment` operationId).
+func (c *ClientWithResponses) ArchiveExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *ArchiveExperimentParams, reqEditors ...RequestEditorFn) (*ArchiveExperimentResponse, error) {
+	rsp, err := c.ArchiveExperiment(ctx, project, experiment, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseArchiveExperimentResponse(rsp)
 }
 
 // GetExperimentAssignmentWithResponse How the experiment treats one unit
@@ -27502,6 +28521,44 @@ func (c *ClientWithResponses) GetExperimentConflictsWithResponse(ctx context.Con
 	return ParseGetExperimentConflictsResponse(rsp)
 }
 
+// SetExperimentDecisionNoteWithBodyWithResponse Change the note of a stopped experiment's decision
+//
+// Sets the note of the decision, `""` clearing it; the outcome and the
+// winner never change. Only a stopped experiment has a decision
+// (`not_stopped`; `archived` for an archived one). A note has at most
+// 2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+// same note changes nothing and records nothing.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project}/experiments/{experiment}/decision (the `SetExperimentDecisionNote` operationId).
+func (c *ClientWithResponses) SetExperimentDecisionNoteWithBodyWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetExperimentDecisionNoteResponse, error) {
+	rsp, err := c.SetExperimentDecisionNoteWithBody(ctx, project, experiment, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetExperimentDecisionNoteResponse(rsp)
+}
+
+// SetExperimentDecisionNoteWithResponse Change the note of a stopped experiment's decision
+//
+// Sets the note of the decision, `""` clearing it; the outcome and the
+// winner never change. Only a stopped experiment has a decision
+// (`not_stopped`; `archived` for an archived one). A note has at most
+// 2,000 characters (`invalid_decision`, `too_long` on `/note`). The
+// same note changes nothing and records nothing.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /projects/{project}/experiments/{experiment}/decision (the `SetExperimentDecisionNote` operationId).
+func (c *ClientWithResponses) SetExperimentDecisionNoteWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *SetExperimentDecisionNoteParams, body SetExperimentDecisionNoteJSONRequestBody, reqEditors ...RequestEditorFn) (*SetExperimentDecisionNoteResponse, error) {
+	rsp, err := c.SetExperimentDecisionNote(ctx, project, experiment, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetExperimentDecisionNoteResponse(rsp)
+}
+
 // GetExperimentExposuresWithResponse An experiment's exposures in one environment
 //
 // What the exposures of an experiment of any status came to in one
@@ -27559,8 +28616,8 @@ func (c *ClientWithResponses) GetExperimentExposureTimelineWithResponse(ctx cont
 //
 // Draws a new inclusion salt and a new variation salt, apart from every
 // salt of the project's experiments and rollouts. Only a draft has its
-// salts regenerated (`not_draft`): past the draft, units have been
-// assigned from them.
+// salts regenerated (`not_draft`; `archived` for an archived one):
+// past the draft, units have been assigned from them.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27581,8 +28638,8 @@ func (c *ClientWithResponses) RegenerateExperimentSaltsWithResponse(ctx context.
 // begins everywhere at once; no other environment's ruleset moves. An
 // experiment no environment holds starts all the same, and reaches an
 // environment when a rule there serves it. Only a draft starts
-// (`not_draft`): there is no restart, a stopped experiment is rerun as
-// a clone. A draft missing anything a running experiment needs is
+// (`not_draft`; `archived` for an archived one): there is no restart,
+// a stopped experiment is rerun as a clone. A draft missing anything a running experiment needs is
 // refused `experiment_not_ready`, with one violation per missing
 // item: its flag archived (`flag_archived` on `/flag`), its unit type
 // no longer declared (`undeclared_unit_type` on `/unit_type`), weights
@@ -27599,6 +28656,62 @@ func (c *ClientWithResponses) StartExperimentWithResponse(ctx context.Context, p
 		return nil, err
 	}
 	return ParseStartExperimentResponse(rsp)
+}
+
+// StopExperimentWithBodyWithResponse Stop a running experiment with a decision
+//
+// Stops the experiment with a decision, in one transaction with every
+// rule serving it. With `winner`, every rule serving the experiment, in
+// every environment, serves `winner_variation` instead, keeping its
+// identifier, conditions and place, so the winner ships at once; with
+// `removed`, every such rule is deleted and the flag goes on to its
+// other rules. Each configuration rewritten is a configuration write of
+// its own, at its next version, recorded as `flag.configuration_updated`
+// with `experiment_stopped`, and the ruleset of its environment moves
+// on; no other ruleset moves. A winner is one of the variations the
+// experiment compares (`invalid_decision`: `required` or
+// `unknown_variation` on `/winner_variation`), a removal names none
+// (`invalid_value`), and a note has at most 2,000 characters
+// (`too_long` on `/note`). Only a running experiment stops
+// (`not_running`; `archived` for an archived one).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
+func (c *ClientWithResponses) StopExperimentWithBodyWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*StopExperimentResponse, error) {
+	rsp, err := c.StopExperimentWithBody(ctx, project, experiment, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStopExperimentResponse(rsp)
+}
+
+// StopExperimentWithResponse Stop a running experiment with a decision
+//
+// Stops the experiment with a decision, in one transaction with every
+// rule serving it. With `winner`, every rule serving the experiment, in
+// every environment, serves `winner_variation` instead, keeping its
+// identifier, conditions and place, so the winner ships at once; with
+// `removed`, every such rule is deleted and the flag goes on to its
+// other rules. Each configuration rewritten is a configuration write of
+// its own, at its next version, recorded as `flag.configuration_updated`
+// with `experiment_stopped`, and the ruleset of its environment moves
+// on; no other ruleset moves. A winner is one of the variations the
+// experiment compares (`invalid_decision`: `required` or
+// `unknown_variation` on `/winner_variation`), a removal names none
+// (`invalid_value`), and a note has at most 2,000 characters
+// (`too_long` on `/note`). Only a running experiment stops
+// (`not_running`; `archived` for an archived one).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/experiments/{experiment}/stop (the `StopExperiment` operationId).
+func (c *ClientWithResponses) StopExperimentWithResponse(ctx context.Context, project ProjectKey, experiment ExperimentKey, params *StopExperimentParams, body StopExperimentJSONRequestBody, reqEditors ...RequestEditorFn) (*StopExperimentResponse, error) {
+	rsp, err := c.StopExperiment(ctx, project, experiment, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStopExperimentResponse(rsp)
 }
 
 // ListFlagsWithResponse The project's flags
@@ -27838,8 +28951,13 @@ func (c *ClientWithResponses) PutFlagConfigurationWithResponse(ctx context.Conte
 // authors. Validated as replacing the configuration would be
 // (`invalid_configuration`, its pointers into the configuration the
 // copy would write); copying from this environment itself is
-// `invalid_configuration`. `If-Match` names this environment's
-// version. A copy that changes nothing records nothing.
+// `invalid_configuration`. A copy that would add or remove a rule
+// serving an experiment in this environment, or change which
+// experiment a rule serves, is refused `experiment_rules_changed`
+// (409, before the document is validated): an experiment reaches
+// another environment only through an explicit rule edit. `If-Match`
+// names this environment's version. A copy that changes nothing
+// records nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27864,8 +28982,13 @@ func (c *ClientWithResponses) CopyFlagConfigurationWithBodyWithResponse(ctx cont
 // authors. Validated as replacing the configuration would be
 // (`invalid_configuration`, its pointers into the configuration the
 // copy would write); copying from this environment itself is
-// `invalid_configuration`. `If-Match` names this environment's
-// version. A copy that changes nothing records nothing.
+// `invalid_configuration`. A copy that would add or remove a rule
+// serving an experiment in this environment, or change which
+// experiment a rule serves, is refused `experiment_rules_changed`
+// (409, before the document is validated): an experiment reaches
+// another environment only through an explicit rule edit. `If-Match`
+// names this environment's version. A copy that changes nothing
+// records nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28013,7 +29136,12 @@ func (c *ClientWithResponses) PutOverrideWithResponse(ctx context.Context, proje
 // (`invalid_configuration`, its pointers into the configuration the
 // revert would write), so a variation, segment, attribute or flag
 // removed since refuses it. `If-Match` names the current version, not
-// the one reverted to. Reverting to what the configuration already is
+// the one reverted to. A revert that would add or remove a rule
+// serving an experiment, or change which experiment a rule serves, is
+// refused `experiment_rules_changed` (409, before the document is
+// validated): whether an experiment runs lives on the experiment, so
+// an experiment reaches or leaves an environment only through an
+// explicit rule edit. Reverting to what the configuration already is
 // changes nothing and records nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -28039,7 +29167,12 @@ func (c *ClientWithResponses) RevertFlagConfigurationWithBodyWithResponse(ctx co
 // (`invalid_configuration`, its pointers into the configuration the
 // revert would write), so a variation, segment, attribute or flag
 // removed since refuses it. `If-Match` names the current version, not
-// the one reverted to. Reverting to what the configuration already is
+// the one reverted to. A revert that would add or remove a rule
+// serving an experiment, or change which experiment a rule serves, is
+// refused `experiment_rules_changed` (409, before the document is
+// validated): whether an experiment runs lives on the experiment, so
+// an experiment reaches or leaves an environment only through an
+// explicit rule edit. Reverting to what the configuration already is
 // changes nothing and records nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -33625,6 +34758,104 @@ func ParseUpdateExperimentResponse(rsp *http.Response) (*UpdateExperimentRespons
 	return response, nil
 }
 
+// ParseArchiveExperimentResponse parses an HTTP response from a ArchiveExperimentWithResponse call
+func ParseArchiveExperimentResponse(rsp *http.Response) (*ArchiveExperimentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ArchiveExperimentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Experiment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ArchiveExperimentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers ArchiveExperimentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseGetExperimentAssignmentResponse parses an HTTP response from a GetExperimentAssignmentWithResponse call
 func ParseGetExperimentAssignmentResponse(rsp *http.Response) (*GetExperimentAssignmentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -33837,6 +35068,111 @@ func ParseGetExperimentConflictsResponse(rsp *http.Response) (*GetExperimentConf
 	switch {
 	case rsp.StatusCode == 401:
 		var headers GetExperimentConflictsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseSetExperimentDecisionNoteResponse parses an HTTP response from a SetExperimentDecisionNoteWithResponse call
+func ParseSetExperimentDecisionNoteResponse(rsp *http.Response) (*SetExperimentDecisionNoteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetExperimentDecisionNoteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Experiment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers SetExperimentDecisionNoteResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers SetExperimentDecisionNoteResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -34174,6 +35510,111 @@ func ParseStartExperimentResponse(rsp *http.Response) (*StartExperimentResponse,
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers StartExperimentResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseStopExperimentResponse parses an HTTP response from a StopExperimentWithResponse call
+func ParseStopExperimentResponse(rsp *http.Response) (*StopExperimentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StopExperimentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Experiment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers StopExperimentResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers StopExperimentResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -37262,6 +38703,9 @@ type ServerInterface interface {
 	// UpdateExperiment Change an experiment
 	// (PATCH /projects/{project}/experiments/{experiment})
 	UpdateExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params UpdateExperimentParams)
+	// ArchiveExperiment Archive a draft or stopped experiment
+	// (POST /projects/{project}/experiments/{experiment}/archive)
+	ArchiveExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params ArchiveExperimentParams)
 	// GetExperimentAssignment How the experiment treats one unit
 	// (GET /projects/{project}/experiments/{experiment}/assignment)
 	GetExperimentAssignment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentAssignmentParams)
@@ -37271,6 +38715,9 @@ type ServerInterface interface {
 	// GetExperimentConflicts A sample of an experiment's conflicting units in one environment
 	// (GET /projects/{project}/experiments/{experiment}/conflicts)
 	GetExperimentConflicts(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentConflictsParams)
+	// SetExperimentDecisionNote Change the note of a stopped experiment's decision
+	// (PUT /projects/{project}/experiments/{experiment}/decision)
+	SetExperimentDecisionNote(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params SetExperimentDecisionNoteParams)
 	// GetExperimentExposures An experiment's exposures in one environment
 	// (GET /projects/{project}/experiments/{experiment}/exposures)
 	GetExperimentExposures(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentExposuresParams)
@@ -37283,6 +38730,9 @@ type ServerInterface interface {
 	// StartExperiment Start a draft experiment
 	// (POST /projects/{project}/experiments/{experiment}/start)
 	StartExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params StartExperimentParams)
+	// StopExperiment Stop a running experiment with a decision
+	// (POST /projects/{project}/experiments/{experiment}/stop)
+	StopExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params StopExperimentParams)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListFlagsParams)
@@ -40135,6 +41585,65 @@ func (siw *ServerInterfaceWrapper) UpdateExperiment(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ArchiveExperiment operation middleware
+func (siw *ServerInterfaceWrapper) ArchiveExperiment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ArchiveExperimentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ArchiveExperiment(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetExperimentAssignment operation middleware
 func (siw *ServerInterfaceWrapper) GetExperimentAssignment(w http.ResponseWriter, r *http.Request) {
 
@@ -40263,6 +41772,65 @@ func (siw *ServerInterfaceWrapper) GetExperimentConflicts(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetExperimentConflicts(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetExperimentDecisionNote operation middleware
+func (siw *ServerInterfaceWrapper) SetExperimentDecisionNote(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SetExperimentDecisionNoteParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetExperimentDecisionNote(w, r, project, experiment, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -40509,6 +42077,65 @@ func (siw *ServerInterfaceWrapper) StartExperiment(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.StartExperiment(w, r, project, experiment, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StopExperiment operation middleware
+func (siw *ServerInterfaceWrapper) StopExperiment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "experiment" -------------
+	var experiment ExperimentKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "experiment", r.PathValue("experiment"), &experiment, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StopExperimentParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StopExperiment(w, r, project, experiment, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -42454,6 +44081,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.UpdateExperiment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/salts", wrapper.RegenerateExperimentSalts)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/start", wrapper.StartExperiment)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/stop", wrapper.StopExperiment)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/decision", wrapper.SetExperimentDecisionNote)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/archive", wrapper.ArchiveExperiment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/clone", wrapper.CloneExperiment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/assignment", wrapper.GetExperimentAssignment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/hash-check", wrapper.CheckHashUniformity)
@@ -49233,6 +50863,155 @@ func (response UpdateExperiment428ApplicationProblemPlusJSONResponse) VisitUpdat
 	return err
 }
 
+type ArchiveExperimentRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     ArchiveExperimentParams
+}
+
+type ArchiveExperimentResponseObject interface {
+	VisitArchiveExperimentResponse(w http.ResponseWriter) error
+}
+
+type ArchiveExperiment200ResponseHeaders struct {
+	ETag *string
+}
+
+type ArchiveExperiment200JSONResponse struct {
+	Body    Experiment
+	Headers ArchiveExperiment200ResponseHeaders
+}
+
+func (response ArchiveExperiment200JSONResponse) VisitArchiveExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveExperiment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveExperiment400ApplicationProblemPlusJSONResponse) VisitArchiveExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveExperiment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveExperiment401ApplicationProblemPlusJSONResponse) VisitArchiveExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveExperiment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveExperiment403ApplicationProblemPlusJSONResponse) VisitArchiveExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveExperiment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveExperiment404ApplicationProblemPlusJSONResponse) VisitArchiveExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveExperiment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveExperiment409ApplicationProblemPlusJSONResponse) VisitArchiveExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveExperiment412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveExperiment412ApplicationProblemPlusJSONResponse) VisitArchiveExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ArchiveExperiment428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response ArchiveExperiment428ApplicationProblemPlusJSONResponse) VisitArchiveExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetExperimentAssignmentRequestObject struct {
 	Project    ProjectKey    `json:"project"`
 	Experiment ExperimentKey `json:"experiment"`
@@ -49544,6 +51323,172 @@ func (response GetExperimentConflicts404ApplicationProblemPlusJSONResponse) Visi
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetExperimentDecisionNoteRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     SetExperimentDecisionNoteParams
+	Body       *SetExperimentDecisionNoteJSONRequestBody
+}
+
+type SetExperimentDecisionNoteResponseObject interface {
+	VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error
+}
+
+type SetExperimentDecisionNote200ResponseHeaders struct {
+	ETag *string
+}
+
+type SetExperimentDecisionNote200JSONResponse struct {
+	Body    Experiment
+	Headers SetExperimentDecisionNote200ResponseHeaders
+}
+
+func (response SetExperimentDecisionNote200JSONResponse) VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetExperimentDecisionNote400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response SetExperimentDecisionNote400ApplicationProblemPlusJSONResponse) VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetExperimentDecisionNote401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response SetExperimentDecisionNote401ApplicationProblemPlusJSONResponse) VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetExperimentDecisionNote403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response SetExperimentDecisionNote403ApplicationProblemPlusJSONResponse) VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetExperimentDecisionNote404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response SetExperimentDecisionNote404ApplicationProblemPlusJSONResponse) VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetExperimentDecisionNote409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response SetExperimentDecisionNote409ApplicationProblemPlusJSONResponse) VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetExperimentDecisionNote412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response SetExperimentDecisionNote412ApplicationProblemPlusJSONResponse) VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetExperimentDecisionNote422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response SetExperimentDecisionNote422ApplicationProblemPlusJSONResponse) VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetExperimentDecisionNote428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response SetExperimentDecisionNote428ApplicationProblemPlusJSONResponse) VisitSetExperimentDecisionNoteResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -50033,6 +51978,172 @@ type StartExperiment428ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response StartExperiment428ApplicationProblemPlusJSONResponse) VisitStartExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopExperimentRequestObject struct {
+	Project    ProjectKey    `json:"project"`
+	Experiment ExperimentKey `json:"experiment"`
+	Params     StopExperimentParams
+	Body       *StopExperimentJSONRequestBody
+}
+
+type StopExperimentResponseObject interface {
+	VisitStopExperimentResponse(w http.ResponseWriter) error
+}
+
+type StopExperiment200ResponseHeaders struct {
+	ETag *string
+}
+
+type StopExperiment200JSONResponse struct {
+	Body    Experiment
+	Headers StopExperiment200ResponseHeaders
+}
+
+func (response StopExperiment200JSONResponse) VisitStopExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopExperiment400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response StopExperiment400ApplicationProblemPlusJSONResponse) VisitStopExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopExperiment401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response StopExperiment401ApplicationProblemPlusJSONResponse) VisitStopExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopExperiment403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response StopExperiment403ApplicationProblemPlusJSONResponse) VisitStopExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopExperiment404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response StopExperiment404ApplicationProblemPlusJSONResponse) VisitStopExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopExperiment409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response StopExperiment409ApplicationProblemPlusJSONResponse) VisitStopExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopExperiment412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response StopExperiment412ApplicationProblemPlusJSONResponse) VisitStopExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopExperiment422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response StopExperiment422ApplicationProblemPlusJSONResponse) VisitStopExperimentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StopExperiment428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response StopExperiment428ApplicationProblemPlusJSONResponse) VisitStopExperimentResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -54266,6 +56377,9 @@ type StrictServerInterface interface {
 	// UpdateExperiment Change an experiment
 	// (PATCH /projects/{project}/experiments/{experiment})
 	UpdateExperiment(ctx context.Context, request UpdateExperimentRequestObject) (UpdateExperimentResponseObject, error)
+	// ArchiveExperiment Archive a draft or stopped experiment
+	// (POST /projects/{project}/experiments/{experiment}/archive)
+	ArchiveExperiment(ctx context.Context, request ArchiveExperimentRequestObject) (ArchiveExperimentResponseObject, error)
 	// GetExperimentAssignment How the experiment treats one unit
 	// (GET /projects/{project}/experiments/{experiment}/assignment)
 	GetExperimentAssignment(ctx context.Context, request GetExperimentAssignmentRequestObject) (GetExperimentAssignmentResponseObject, error)
@@ -54275,6 +56389,9 @@ type StrictServerInterface interface {
 	// GetExperimentConflicts A sample of an experiment's conflicting units in one environment
 	// (GET /projects/{project}/experiments/{experiment}/conflicts)
 	GetExperimentConflicts(ctx context.Context, request GetExperimentConflictsRequestObject) (GetExperimentConflictsResponseObject, error)
+	// SetExperimentDecisionNote Change the note of a stopped experiment's decision
+	// (PUT /projects/{project}/experiments/{experiment}/decision)
+	SetExperimentDecisionNote(ctx context.Context, request SetExperimentDecisionNoteRequestObject) (SetExperimentDecisionNoteResponseObject, error)
 	// GetExperimentExposures An experiment's exposures in one environment
 	// (GET /projects/{project}/experiments/{experiment}/exposures)
 	GetExperimentExposures(ctx context.Context, request GetExperimentExposuresRequestObject) (GetExperimentExposuresResponseObject, error)
@@ -54287,6 +56404,9 @@ type StrictServerInterface interface {
 	// StartExperiment Start a draft experiment
 	// (POST /projects/{project}/experiments/{experiment}/start)
 	StartExperiment(ctx context.Context, request StartExperimentRequestObject) (StartExperimentResponseObject, error)
+	// StopExperiment Stop a running experiment with a decision
+	// (POST /projects/{project}/experiments/{experiment}/stop)
+	StopExperiment(ctx context.Context, request StopExperimentRequestObject) (StopExperimentResponseObject, error)
 	// ListFlags The project's flags
 	// (GET /projects/{project}/flags)
 	ListFlags(ctx context.Context, request ListFlagsRequestObject) (ListFlagsResponseObject, error)
@@ -56422,6 +58542,34 @@ func (sh *strictHandler) UpdateExperiment(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// ArchiveExperiment operation middleware
+func (sh *strictHandler) ArchiveExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params ArchiveExperimentParams) {
+	var request ArchiveExperimentRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ArchiveExperiment(ctx, request.(ArchiveExperimentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ArchiveExperiment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ArchiveExperimentResponseObject); ok {
+		if err := validResponse.VisitArchiveExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetExperimentAssignment operation middleware
 func (sh *strictHandler) GetExperimentAssignment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params GetExperimentAssignmentParams) {
 	var request GetExperimentAssignmentRequestObject
@@ -56505,6 +58653,41 @@ func (sh *strictHandler) GetExperimentConflicts(w http.ResponseWriter, r *http.R
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetExperimentConflictsResponseObject); ok {
 		if err := validResponse.VisitGetExperimentConflictsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetExperimentDecisionNote operation middleware
+func (sh *strictHandler) SetExperimentDecisionNote(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params SetExperimentDecisionNoteParams) {
+	var request SetExperimentDecisionNoteRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	var body SetExperimentDecisionNoteJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetExperimentDecisionNote(ctx, request.(SetExperimentDecisionNoteRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetExperimentDecisionNote")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetExperimentDecisionNoteResponseObject); ok {
+		if err := validResponse.VisitSetExperimentDecisionNoteResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -56617,6 +58800,41 @@ func (sh *strictHandler) StartExperiment(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(StartExperimentResponseObject); ok {
 		if err := validResponse.VisitStartExperimentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StopExperiment operation middleware
+func (sh *strictHandler) StopExperiment(w http.ResponseWriter, r *http.Request, project ProjectKey, experiment ExperimentKey, params StopExperimentParams) {
+	var request StopExperimentRequestObject
+
+	request.Project = project
+	request.Experiment = experiment
+	request.Params = params
+
+	var body StopExperimentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StopExperiment(ctx, request.(StopExperimentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StopExperiment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StopExperimentResponseObject); ok {
+		if err := validResponse.VisitStopExperimentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

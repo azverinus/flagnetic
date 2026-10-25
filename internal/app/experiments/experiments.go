@@ -164,6 +164,19 @@ func experimentValues(e experiments.Experiment) map[string]any {
 		"flag": e.FlagKey, "unit_type": e.UnitType, "variations": weights, "traffic_allocation": e.TrafficAllocation,
 		"inclusion_salt": e.InclusionSalt, "variation_salt": e.VariationSalt, "status": e.Status,
 		"expected_end_at": e.ExpectedEndAt, "started_at": e.StartedAt, "stopped_at": e.StoppedAt,
-		"archived_at": e.ArchivedAt, "created_by": created, "version": e.Version,
+		"archived_at": e.ArchivedAt, "decision": decisionValues(e.Decision), "created_by": created, "version": e.Version,
 	}
+}
+
+// decisionValues are what an audit entry records of a decision; nil for
+// none.
+func decisionValues(d *experiments.Decision) any {
+	if d == nil {
+		return nil
+	}
+	var winner any
+	if d.WinnerVariation != "" {
+		winner = d.WinnerVariation
+	}
+	return map[string]any{"outcome": string(d.Outcome), "winner_variation": winner, "note": d.Note}
 }
