@@ -19,9 +19,19 @@ import (
 // projectKey returns a key no other test uses.
 func projectKey() string { return "p" + strings.ToLower(rand.Text()[:12]) }
 
-// createProject creates a project named after its key as the instance
-// admin.
+// createProject creates a project named after its key as c, an instance
+// admin, with its production unprotected: most tests write production
+// directly, and what protection refuses has tests of its own.
 func createProject(t *testing.T, c *management.ClientWithResponses, key string) management.Project {
+	t.Helper()
+	p := createProjectAsCreated(t, c, key)
+	setProtected(t, c, key, "production", false)
+	return p
+}
+
+// createProjectAsCreated creates a project named after its key as c, an
+// instance admin, with its production protected as every new project's is.
+func createProjectAsCreated(t *testing.T, c *management.ClientWithResponses, key string) management.Project {
 	t.Helper()
 	res, err := c.CreateProjectWithResponse(t.Context(), management.ProjectCreate{Key: key, Name: "Project " + key})
 	if err != nil {

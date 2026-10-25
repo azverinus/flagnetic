@@ -2,7 +2,7 @@ import { evaluate, updateFlag } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
 
 import { expectNoSeriousViolations, useTheme } from "../support/axe";
-import { managementClient, must, seedProject } from "../support/console";
+import { managementClient, must, seedProject, unprotectProduction } from "../support/console";
 import {
   choose,
   openFlag,
@@ -19,6 +19,8 @@ const sheet = (page: Page) => page.getByRole("dialog", { name: "Edit definition"
 test.describe("the flag's definition", () => {
   test("edits the name, a variation and the tags from the definition sheet", async ({ page }) => {
     const project = await seedProject("flag-definition");
+    // A variation's value is what production serves, which protection guards.
+    await unprotectProduction(project);
     await seedFlag(project, stringFlag("checkout_variant", { name: "Checkout variant" }));
     await openFlag(page, project, "checkout_variant");
     await expect(page.getByRole("heading", { name: "Checkout variant", level: 1 })).toBeVisible();

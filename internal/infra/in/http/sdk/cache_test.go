@@ -85,7 +85,8 @@ func TestAWriteIsServedByTheReplicaThatTookItAtOnce(t *testing.T) {
 func TestTheReplicaThatTookAWriteObservesItsPropagationOnce(t *testing.T) {
 	srv := testkit.StartServer(t)
 	listening(t, srv)
-	p := newProject(t, srv)
+	// As created: unprotecting would add a version of its own to observe.
+	p := newProjectAsCreated(t, srv)
 	_, value := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	series := `flagnetic_ruleset_propagation_seconds_count{environment="` + p.environmentID(t, "production").String() + `"}`
 	served(t, srv, value)

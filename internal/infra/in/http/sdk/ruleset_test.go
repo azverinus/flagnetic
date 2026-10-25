@@ -42,7 +42,7 @@ func TestAServerKeyDownloadsItsEnvironmentsRulesetWithItsVersionAsETag(t *testin
 
 func TestTheRulesetReportsWhetherItsEnvironmentIsProtected(t *testing.T) {
 	srv := testkit.StartServer(t)
-	p := newProject(t, srv)
+	p := newProjectAsCreated(t, srv)
 	_, production := p.sdkKey(t, "production", management.SdkKeyKindServer)
 	_, staging := p.sdkKey(t, "staging", management.SdkKeyKindServer)
 

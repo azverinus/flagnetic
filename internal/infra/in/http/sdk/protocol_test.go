@@ -154,6 +154,9 @@ func (p project) protocolProject(t *testing.T) map[string]string {
 	configure("max_items", "staging", management.FlagConfigurationPut{On: false, OffVariation: "few", Fallthrough: "few"})
 	configure("new_search", "staging", management.FlagConfigurationPut{On: false, OffVariation: "false", Fallthrough: "true"})
 	configure("theme", "staging", management.FlagConfigurationPut{On: false, OffVariation: "light", Fallthrough: "light"})
+	// Production was configured unprotected; its documents show it
+	// protected, as a new project's production is.
+	p.setProtected(t, "production", true)
 
 	// The experiment the documents' exposures belong to. It is a draft, which
 	// an SDK's ruleset does not show, so the ruleset documents stay as they are.

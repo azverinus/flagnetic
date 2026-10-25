@@ -30,7 +30,7 @@ func TestWorkspaceEntityWritesNeedTheCurrentVersionInIfMatch(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	ctx := t.Context()
-	p := createProject(t, admin, projectKey())
+	p := createProjectAsCreated(t, admin, projectKey())
 
 	var environmentID, unitTypeID, attributeID string
 	entities := map[string]versioned{
@@ -178,7 +178,7 @@ func TestListedWorkspaceEntitiesCarryTheirVersions(t *testing.T) {
 	srv := testkit.StartServer(t)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	ctx := t.Context()
-	p := createProject(t, admin, projectKey())
+	p := createProjectAsCreated(t, admin, projectKey())
 	if r := do(admin.UpdateEnvironmentWithResponse(ctx, p.Key, "staging", &management.UpdateEnvironmentParams{IfMatch: ifMatch(1)},
 		management.EnvironmentPatch{Name: ptr("Stage")})); r.JSON200 == nil {
 		t.Fatalf("rename = %d %s", r.StatusCode(), r.Body)

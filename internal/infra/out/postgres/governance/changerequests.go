@@ -14,6 +14,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/infra/out/postgres/projectrow"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -41,6 +42,7 @@ func (s *ChangeRequests) LockProject(ctx context.Context, project workspace.Proj
 	if err != nil {
 		return fmt.Errorf("locking a project: %w", err)
 	}
+	projectrow.MarkHeld(ctx, project)
 	return nil
 }
 

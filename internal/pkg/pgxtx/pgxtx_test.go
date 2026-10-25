@@ -271,3 +271,53 @@ func TestAfterCommitOutsideATransactionRunsAtOnce(t *testing.T) {
 		t.Error("a hook outside a transaction did not run at once")
 	}
 }
+
+func TestLocalKeepsAValueForTheTransactionsLife(t *testing.T) {
+	pool := pgtest.Pool(t)
+	tx := pgxtx.New(pool)
+	type seen struct{}
+	fresh := func() map[string]bool { return map[string]bool{} }
+	for range 2 {
+		err := tx.Within(t.Context(), func(ctx context.Context) error {
+			first, ok := pgxtx.Local(ctx, seen{}, fresh)
+			if !ok || len(first) != 0 {
+				t.Errorf("a new transaction's value = %v, %v, want an empty one kept", first, ok)
+			}
+			first["a"] = true
+			return tx.Within(ctx, func(ctx context.Context) error {
+				if again, _ := pgxtx.Local(ctx, seen{}, fresh); !again["a"] {
+					t.Error("a joined transaction does not see the value kept earlier in it")
+				}
+				return nil
+			})
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if v, ok := pgxtx.Local(t.Context(), seen{}, fresh); ok || len(v) != 0 {
+		t.Errorf("outside a transaction = %v, %v, want a fresh value not kept", v, ok)
+	}
+}
+
+func TestOutsideReadsWhatIsCommittedOnAnotherConnection(t *testing.T) {
+	pool := pgtest.Pool(t)
+	tx := pgxtx.New(pool)
+	k := key()
+	err := tx.Within(t.Context(), func(ctx context.Context) error {
+		insert(ctx, t, pool, k)
+		return tx.Snapshot(pgxtx.Outside(ctx), func(outside context.Context) error {
+			var found bool
+			if err := pgxtx.Querier(outside, pool).QueryRow(outside, `SELECT EXISTS (SELECT 1 FROM note WHERE key = $1)`, k).Scan(&found); err != nil {
+				return err
+			}
+			if found {
+				t.Error("a read outside the transaction sees its uncommitted write")
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

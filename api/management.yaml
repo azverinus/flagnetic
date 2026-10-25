@@ -40,6 +40,12 @@ info:
     the configuration's version on. A write that changes nothing stores
     nothing, keeps the version, records nothing and answers the entity as it
     is.
+
+    In a protected environment, a write that would change what its SDKs
+    receive, whatever entity it touches, is refused
+    `403 change_request_required`, judged after validation and `If-Match`;
+    nothing of the write is kept, in any environment. The kill switch is
+    the one exception.
 servers:
   - url: /api/v1
 security:
@@ -4374,9 +4380,12 @@ components:
     Forbidden:
       description: |
         The caller may not perform the operation: `forbidden` (with the
-        missing `permission`), `session_required`, `insufficient_scope`, or
+        missing `permission`), `session_required`, `insufficient_scope`,
         `cross_origin` for a request signed in by the session cookie, a read
-        included, that the browser says comes from another origin.
+        included, that the browser says comes from another origin, or, for a
+        write, `change_request_required` when it would change what a
+        protected environment's SDKs receive; `detail` names those
+        environments.
       content:
         application/problem+json:
           schema:

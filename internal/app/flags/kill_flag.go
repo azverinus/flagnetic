@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/flags"
+	"github.com/azverinus/flagnetic/internal/shared/protection"
 )
 
 // KillFlag switches a flag off in one environment at once: the kill switch.
@@ -31,6 +32,10 @@ func (h *KillFlag) Handle(ctx context.Context, cmd KillFlagCommand) (flags.Envir
 		return flags.EnvironmentConfiguration{}, false, err
 	}
 	var killed bool
+	// The kill switch stops an incident without waiting for an approval,
+	// in a protected environment too: the one write that changes a
+	// protected ruleset directly.
+	ctx = protection.BypassEverywhere(ctx)
 	ec, err := writeConfiguration(ctx, h.d, cmd.Configuration, func(_ context.Context, _ flags.Flag, before flags.Configuration, now time.Time) (configurationChange, error) {
 		after, changed := before.Kill(flags.Write{By: cmd.Configuration.Caller, Now: now})
 		killed = changed.Any

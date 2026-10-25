@@ -7,6 +7,7 @@ package compose
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -83,6 +84,12 @@ type Options struct {
 	management.Options
 }
 
+// protectionGuardConns is the size of the protection guard's own pool: a
+// read of what an environment served before a write is needed only when the
+// replica's memory does not hold it, and writes to one project wait for each
+// other anyway.
+const protectionGuardConns = 2
+
 // finalFlushBound bounds the writes a stopping replica makes of what it
 // gathered since its last round, so a database that does not answer never
 // holds the stop.
@@ -120,17 +127,36 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// on, through the delivery context.
 	deliveryStore := pgdelivery.NewStore(d.Pool)
 	eventStore := pgevents.NewStore(d.Pool)
-	rulesets := appdelivery.NewBumpRulesets(deliveryStore, d.Clock)
+	materialize := appdelivery.NewMaterializeRuleset(appdelivery.MaterializeRulesetDeps{
+		Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
+	})
 	// Every replica serves rulesets from memory by version, learning each
 	// version from its notification, and its own writes' versions as they
 	// commit, before they are answered.
+	// The protection guard reads what a protected environment serves before
+	// a write while the write, and the writes queued behind its project's
+	// row, hold connections of the pool: it reads on two connections of its
+	// own, which no write holds.
+	guardPool, err := postgres.SidePool(d.Pool, protectionGuardConns)
+	if err != nil {
+		panic(fmt.Sprintf("compose: the protection guard's pool: %v", err)) // only an invalid configuration fails, which Pool already accepted
+	}
+	committedLoad := appdelivery.NewMaterializeRuleset(appdelivery.MaterializeRulesetDeps{
+		Snapshots: postgres.NewTransactor(guardPool), Environments: pgdelivery.NewStore(guardPool),
+		Declarations: pgworkspace.NewStore(guardPool), Flags: pgflags.NewStore(guardPool),
+	})
 	rulesetCache := pgdelivery.NewRulesetCache(pgdelivery.RulesetCacheOptions{
-		Load: appdelivery.NewMaterializeRuleset(appdelivery.MaterializeRulesetDeps{
-			Snapshots: tx, Environments: deliveryStore, Declarations: ws, Flags: flagStore,
-		}),
+		Load: materialize, CommittedLoad: committedLoad,
 		Clock: d.Clock, Registerer: reg, Logger: edge.Logger(), Fault: o.RulesetLoadFault,
 	})
 	deliveryStore.OnCommitted(rulesetCache.Committed)
+	// The bump refuses a write that would change a protected environment's
+	// ruleset, comparing what the write would serve with what the cache
+	// serves now.
+	rulesets := pggovernance.NewProtectionGuard(pggovernance.ProtectionGuardDeps{
+		Pool: d.Pool, Next: appdelivery.NewBumpRulesets(deliveryStore, d.Clock),
+		After: materialize, Before: rulesetCache, Registerer: reg,
+	})
 	sdkKeys := appdelivery.SDKKeyDeps{
 		Tx: tx, Store: deliveryStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 	}
@@ -422,6 +448,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Close: func() {
 			rulesetStream.Close()
 			rulesetCache.Close()
+			guardPool.Close()
 			// The requests are done: what they counted since the last round
 			// is written now rather than lost with the replica.
 			ctx, cancel := context.WithTimeout(context.Background(), finalFlushBound)

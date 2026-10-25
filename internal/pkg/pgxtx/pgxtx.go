@@ -35,7 +35,7 @@ type DB interface {
 // statement of a repository goes through it, so the repository takes part in
 // whatever unit of work its caller began.
 func Querier(ctx context.Context, pool *pgxpool.Pool) DB {
-	if c, ok := ctx.Value(txKey{}).(*current); ok {
+	if c, ok := ctx.Value(txKey{}).(*current); ok && c != nil {
 		return c.tx
 	}
 	return pool
@@ -55,6 +55,8 @@ type current struct {
 	mode mode
 	// afterCommit are the hooks to run once tx commits, in order.
 	afterCommit []func()
+	// locals are the values kept for the transaction's life by Local.
+	locals map[any]any
 }
 
 // AfterCommit runs fn once the transaction ctx carries commits, and never if
@@ -64,11 +66,43 @@ type current struct {
 // replica's cache learning the version it just wrote. fn runs on the
 // committing goroutine and must return promptly.
 func AfterCommit(ctx context.Context, fn func()) {
-	if c, ok := ctx.Value(txKey{}).(*current); ok {
+	if c, ok := ctx.Value(txKey{}).(*current); ok && c != nil {
 		c.afterCommit = append(c.afterCommit, fn)
 		return
 	}
 	fn()
+}
+
+// Local returns the value the transaction ctx carries under key, storing
+// init() there first when it carries none, so code called more than once in
+// one unit of work remembers what it learned earlier in it, such as what a
+// row held before the unit of work changed it. key is compared as a map
+// key, so a package uses an unexported type of its own. Outside a
+// transaction there is nothing to remember: it returns init() and false.
+func Local[T any](ctx context.Context, key any, init func() T) (T, bool) {
+	c, ok := ctx.Value(txKey{}).(*current)
+	if !ok || c == nil {
+		return init(), false
+	}
+	if v, ok := c.locals[key]; ok {
+		// Only Local stores under key, and always a T for that key.
+		return v.(T), true
+	}
+	if c.locals == nil {
+		c.locals = map[any]any{}
+	}
+	v := init()
+	c.locals[key] = v
+	return v, true
+}
+
+// Outside returns ctx without the transaction it carries, keeping its
+// deadline and values otherwise: statements under it run on the pool, and a
+// Within or Snapshot under it begins a transaction of its own. Code waiting
+// inside a unit of work for what other transactions committed reads under
+// it, on another connection.
+func Outside(ctx context.Context) context.Context {
+	return context.WithValue(ctx, txKey{}, (*current)(nil))
 }
 
 // Transactor begins transactions on a pool.
@@ -117,7 +151,7 @@ func (t *Transactor) Snapshot(ctx context.Context, fn func(ctx context.Context) 
 }
 
 func (t *Transactor) run(ctx context.Context, m mode, opts pgx.TxOptions, fn func(context.Context) error) (err error) {
-	if c, ok := ctx.Value(txKey{}).(*current); ok {
+	if c, ok := ctx.Value(txKey{}).(*current); ok && c != nil {
 		if c.mode != m {
 			panic(fmt.Sprintf("pgxtx: a %s cannot run inside a %s", m, c.mode))
 		}

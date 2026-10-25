@@ -152,6 +152,7 @@ func TestAClientKeyIsAnsweredServedValuesWithoutHowTheyWereReached(t *testing.T)
 	srv := testkit.StartServer(t)
 	p := newProject(t, srv)
 	p.targeted(t)
+	p.setProtected(t, "production", true)
 	_, client := p.sdkKey(t, "production", management.SdkKeyKindClient)
 
 	ev, a := evaluation(t, srv, client, targetedContext)

@@ -203,9 +203,10 @@ Through a pooler that does not carry `LISTEN`, Flagnetic still works but slowly 
 Each replica opens at most:
 
 - `FLAGNETIC_DB_MAX_CONNS` connections in its pool (10 by default), and
-- 3 listener connections of its own, outside the pool, one per notification channel.
+- 3 listener connections of its own, outside the pool, one per notification channel, and
+- 2 connections outside the pool on which [protection](governance.md#what-protection-costs) reads what an environment served before a write, opened only when needed.
 
-So an instance takes `replicas × (FLAGNETIC_DB_MAX_CONNS + 3)` connections, plus a pool's worth while a `flagnetic migrate` job runs and whatever your own tools use. Keep the total below PostgreSQL's `max_connections` minus its reserved connections (`superuser_reserved_connections`, 3 by default). Three replicas at the default take 39; with PostgreSQL's default `max_connections` of 100 that leaves room for a migration job, backups and an operator's `psql`.
+So an instance takes `replicas × (FLAGNETIC_DB_MAX_CONNS + 5)` connections, plus a pool's worth while a `flagnetic migrate` job runs and whatever your own tools use. Keep the total below PostgreSQL's `max_connections` minus its reserved connections (`superuser_reserved_connections`, 3 by default). Three replicas at the default take 45; with PostgreSQL's default `max_connections` of 100 that leaves room for a migration job, backups and an operator's `psql`.
 
 A pool that is too small for the load shows as `flagnetic_db_pool_acquired_conns` near `flagnetic_db_pool_max_conns` (see [Metrics](operations.md#metrics)).
 

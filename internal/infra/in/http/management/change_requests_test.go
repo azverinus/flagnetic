@@ -28,6 +28,9 @@ func startChangeRequests(t *testing.T) changeRequestFixture {
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 	stringFlag(t, admin, p.Key, "checkout_title")
+	// The base of these change requests moves by direct writes to
+	// production, which protection would refuse.
+	setProtected(t, admin, p.Key, "production", false)
 	dev, m := grantedSession(t, srv, p, access.RoleDeveloper)
 	return changeRequestFixture{srv: srv, admin: admin, project: p, dev: dev, devID: m.ID}
 }
