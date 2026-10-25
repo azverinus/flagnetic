@@ -138,9 +138,9 @@ func (s *Store) SampleRatioOf(ctx context.Context, experiment experiments.Experi
 
 // sampleRatioDoc is a sample-ratio check as an alert's details store it.
 type sampleRatioDoc struct {
-	N          int64                   `json:"n"`
-	ChiSquare  *float64                `json:"chi_square"`
-	PValue     *float64                `json:"p_value"`
+	N          int64                     `json:"n"`
+	ChiSquare  *float64                  `json:"chi_square"`
+	PValue     *float64                  `json:"p_value"`
 	Variations []sampleRatioVariationDoc `json:"variations"`
 }
 
