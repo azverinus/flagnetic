@@ -228,6 +228,10 @@ The [events](sdks/events.md) SDKs post are stored as received in tables partitio
 
 Every 10 seconds, rollups read the raw events committed since their last round and keep what the API reads: first exposures, exposure counts per day and conflicts of each experiment, evaluations per day of each flag and when SDKs last evaluated it, and events received per day. A rollup reads only the rows of transactions that have ended, along transaction IDs, so a row committing late is never skipped; one replica at a time moves each rollup, so nothing is counted twice. Any transaction left open in the database, by Flagnetic or anything else connected to it, holds every rollup back until it ends: `flagnetic_rollup_lag_seconds` shows it.
 
+## Webhook targets
+
+A webhook subscription's target is `https` on the public internet. A target over plain `http` is refused unless `FLAGNETIC_WEBHOOK_ALLOW_HTTP` is set, and one whose name resolves to a loopback, private, link-local, unspecified or multicast address unless `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS` is set, so that whoever manages a project's webhooks cannot make the instance call into the network it runs in. Set them for a receiver on the same host or a trusted network, such as in a trial or a test; see [Webhooks](webhooks.md).
+
 ## Metrics
 
 Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNETIC_METRICS_LISTEN_ADDR` (`:9090` by default), and never on the public listener. Keep the port inside your network. Setting the address empty switches metrics off and opens no port.

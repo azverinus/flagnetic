@@ -2445,6 +2445,10 @@ msgid "manage unit types and attributes"
 msgstr "управлять типами единиц и атрибутами"
 
 #: src/lib/access-names.ts
+msgid "manage webhook subscriptions"
+msgstr "управлять подписками на вебхуки"
+
+#: src/lib/access-names.ts
 msgid "manage who has access"
 msgstr "управлять доступом"
 
@@ -4962,6 +4966,23 @@ msgstr "просматривать проект"
 #: src/lib/access-names.ts
 msgid "Viewer"
 msgstr "Наблюдатель"
+
+#. A kind of entity in the audit log.
+#: src/lib/audit.ts
+msgid "Webhook subscription"
+msgstr "Подписка на вебхук"
+
+#: src/lib/audit.ts
+msgid "Webhook subscription created"
+msgstr "Подписка на вебхук создана"
+
+#: src/lib/audit.ts
+msgid "Webhook subscription deleted"
+msgstr "Подписка на вебхук удалена"
+
+#: src/lib/audit.ts
+msgid "Webhook subscription updated"
+msgstr "Подписка на вебхук изменена"
 
 #: src/components/weights-input.tsx
 msgid "Weight of variation {n} (%)"

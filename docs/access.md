@@ -26,6 +26,7 @@ Every operation of the management API declares the one thing it needs in the Ope
 | `experiment.edit` | creating, changing and cloning experiments, and regenerating a draft's salts | `experiments:write` | |
 | `experiment.delete` | deleting draft experiments | `experiments:write` | |
 | `change_request.propose` | proposing changes as change requests: creating them, editing, rebasing, opening and cancelling one's own, copying any | `flags:write` | |
+| `webhook.manage` | creating, reading, editing and deleting a project's webhook subscriptions | `project:admin` | |
 
 A permission marked members only changes who has access to a project or whose review a change needs, so no project token exercises it, whatever its role (see [Project tokens](#project-tokens)): a pipeline cannot unprotect an environment, write it and protect it again.
 
@@ -70,6 +71,7 @@ A role is a fixed list of permissions. The four built-in roles are the same on e
 | `experiment.edit` | | ✓ | ✓ | ✓ |
 | `experiment.delete` | | | ✓ | ✓ |
 | `change_request.propose` | | ✓ | ✓ | ✓ |
+| `webhook.manage` | | | ✓ | ✓ |
 
 `GET /roles` lists every role with its permissions, so a client can explain which roles hold a permission a caller lacks. Later releases add permissions as features arrive and write them into the built-in roles.
 
