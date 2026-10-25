@@ -65,13 +65,25 @@ const resolveTimeout = 5 * time.Second
 func (d WebhookDeps) now() time.Time { return d.Clock.Now().UTC().Truncate(time.Microsecond) }
 
 // check returns in as CheckWebhook accepts it against project's
-// environments as the store reads them.
-func (d WebhookDeps) check(ctx context.Context, project workspace.ProjectID, in governance.WebhookInput) (governance.WebhookInput, error) {
+// environments as the store reads them, plus kept: the keys a subscription
+// already holds and the edit leaves alone. An environment deleted after the
+// subscription named it would otherwise refuse every later edit, a rename
+// or a disable included, until the caller rewrote the environments too.
+func (d WebhookDeps) check(ctx context.Context, project workspace.ProjectID, in governance.WebhookInput, kept ...string) (governance.WebhookInput, error) {
 	environments, err := d.Store.EnvironmentKeys(ctx, project)
 	if err != nil {
 		return in, err
 	}
-	return governance.CheckWebhook(in, environments, d.Targets)
+	return governance.CheckWebhook(in, append(environments, kept...), d.Targets)
+}
+
+// keptEnvironments returns the environments of w that change leaves as they
+// are: all of them when it names none, and otherwise none.
+func keptEnvironments(w governance.Webhook, change governance.WebhookChange) []string {
+	if change.Environments != nil {
+		return nil
+	}
+	return w.Environments
 }
 
 // checkTarget refuses a target whose name resolves to an address the
@@ -287,7 +299,7 @@ func (h *UpdateWebhook) Handle(ctx context.Context, cmd UpdateWebhookCommand) (g
 	if err != nil {
 		return seen, err
 	}
-	in, err := h.d.check(ctx, cmd.Project, seen.With(cmd.Change))
+	in, err := h.d.check(ctx, cmd.Project, seen.With(cmd.Change), keptEnvironments(seen, cmd.Change)...)
 	if err != nil {
 		return seen, err
 	}
@@ -316,7 +328,7 @@ func (h *UpdateWebhook) update(ctx context.Context, cmd UpdateWebhookCommand, no
 	if err != nil {
 		return before, err
 	}
-	in, err := h.d.check(ctx, cmd.Project, before.With(cmd.Change))
+	in, err := h.d.check(ctx, cmd.Project, before.With(cmd.Change), keptEnvironments(before, cmd.Change)...)
 	if err != nil {
 		return before, err
 	}

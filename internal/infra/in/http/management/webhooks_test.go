@@ -194,6 +194,30 @@ func TestAWebhookSubscriptionIsEditedAndDeleted(t *testing.T) {
 	}
 }
 
+func TestAWebhookSubscriptionStaysEditableAfterAnEnvironmentItNamesIsDeleted(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	body := siem()
+	body.Environments = &[]string{"staging", "production"}
+	created := createWebhook(t, admin, p.Key, body)
+	deleted := do(admin.DeleteEnvironmentWithResponse(t.Context(), p.Key, "staging", &management.DeleteEnvironmentParams{IfMatch: ifMatch(1)}))
+	status(t, "delete staging", deleted.StatusCode(), deleted.Body, http.StatusNoContent)
+
+	renamed := do(admin.UpdateWebhookWithResponse(t.Context(), p.Key, created.Id, &management.UpdateWebhookParams{IfMatch: ifMatch(1)},
+		management.WebhookPatch{Name: ptr("Security"), Enabled: ptr(false)}))
+	if renamed.JSON200 == nil || renamed.JSON200.Name != "Security" || renamed.JSON200.Enabled {
+		t.Fatalf("an edit leaving the environments alone = %d: %s", renamed.StatusCode(), renamed.Body)
+	}
+	// Naming the environments again judges each of them anew.
+	again := do(admin.UpdateWebhookWithResponse(t.Context(), p.Key, created.Id, &management.UpdateWebhookParams{IfMatch: ifMatch(2)},
+		management.WebhookPatch{Environments: &[]string{"production", "staging"}}))
+	if pr := assertProblem(t, "the deleted environment named again", again.StatusCode(), again.Body, http.StatusUnprocessableEntity, "invalid_webhook"); pr.Errors == nil ||
+		(*pr.Errors)[0].Pointer != "/environments/1" {
+		t.Errorf("violations %+v", pr.Errors)
+	}
+}
+
 func TestTheEventCatalogueIsReadableByAnyMember(t *testing.T) {
 	srv := testkit.StartServer(t)
 	res := do(testkit.Client(t, srv, testkit.MemberToken(t, testkit.Pool(t), access.ScopeRead)).ListWebhookEventTypesWithResponse(t.Context()))
