@@ -6131,9 +6131,12 @@ export type GetFlagEvaluationsErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6735,9 +6738,12 @@ export type StopExperimentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6818,9 +6824,12 @@ export type SetExperimentDecisionNoteErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
@@ -6903,9 +6912,12 @@ export type ArchiveExperimentErrors = {
   401: Problem;
   /**
    * The caller may not perform the operation: `forbidden` (with the
-   * missing `permission`), `session_required`, `insufficient_scope`, or
+   * missing `permission`), `session_required`, `insufficient_scope`,
    * `cross_origin` for a request signed in by the session cookie, a read
-   * included, that the browser says comes from another origin.
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
    *
    */
   403: Problem;
