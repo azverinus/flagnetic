@@ -244,6 +244,32 @@ export function experimentsQuery(project: string, search: ExperimentsSearch) {
   });
 }
 
+/**
+ * Every experiment comparing a flag's variations, archived ones included,
+ * read page by page: what a rule may serve, and the status of the one a
+ * rule serves already.
+ */
+export function flagExperimentsQuery(project: string, flag: string) {
+  return queryOptions<Experiment[]>({
+    queryKey: [...experimentsQueryKey(project), "flag", flag],
+    queryFn: async () => {
+      const items: Experiment[] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await unwrap(
+          listExperiments({
+            path: { project },
+            query: { flag, include_archived: true, limit: 200, ...(cursor ? { cursor } : {}) },
+          }),
+        );
+        items.push(...page.items);
+        cursor = page.next_cursor ?? undefined;
+      } while (cursor);
+      return items;
+    },
+  });
+}
+
 export function experimentQuery(project: string, experiment: string) {
   return queryOptions<Experiment>({
     queryKey: [...experimentsQueryKey(project), "detail", experiment],

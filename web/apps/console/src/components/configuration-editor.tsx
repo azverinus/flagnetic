@@ -1,6 +1,7 @@
 import {
   type Attribute,
   type AuditEntry,
+  type Experiment,
   type Flag,
   type FlagConfiguration,
   type FlagListItem,
@@ -59,6 +60,8 @@ export type Declarations = {
   segments: readonly Segment[];
   /** The project's flags that are not archived. */
   flags: readonly FlagListItem[];
+  /** The experiments comparing this flag's variations, archived ones included. */
+  experiments: readonly Experiment[];
 };
 
 export type ConfigurationEditorProps = {
@@ -382,6 +385,8 @@ export function ConfigurationEditor({
         attributes={attributes}
         segments={declarations.segments}
         flags={otherFlags}
+        project={project}
+        experiments={declarations.experiments}
         errors={errors}
         saltedRules={salted}
         onRegenerateSalt={readOnly === undefined ? setSalting : undefined}

@@ -9,6 +9,7 @@ import {
   conditionDraft,
   conditionIssue,
   conditionOf,
+  describeServe,
   isFullSemver,
   isRe2Pattern,
   localDateTime,
@@ -270,5 +271,17 @@ describe("what a condition still needs", () => {
     expect(prerequisite("gone", "on")).toBe("The project has no such flag, or it is archived.");
     expect(prerequisite("payments", "")).toBe("Choose a variation.");
     expect(prerequisite("payments", "treatment")).toBe("The flag has no such variation.");
+  });
+});
+
+describe("what a rule serves in one line", () => {
+  it("names a variation, a rollout and an experiment", () => {
+    expect(describeServe(i18n, { kind: "variation", variation: "on" })).toBe("on");
+    expect(
+      describeServe(i18n, { kind: "rollout", variation: "on", unit_type: "user", percentage: 2500 }),
+    ).toBe("on to 25% of user units");
+    expect(describeServe(i18n, { kind: "experiment", experiment: "checkout-test" })).toBe(
+      "experiment checkout-test",
+    );
   });
 });

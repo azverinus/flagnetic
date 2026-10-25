@@ -46,6 +46,7 @@ import {
   attributesQuery,
   environmentsQuery,
   flagChoicesQuery,
+  flagExperimentsQuery,
   flagQuery,
   flagsQueryKey,
   segmentsQuery,
@@ -495,7 +496,8 @@ function EnvironmentPanel(props: PanelProps) {
   const attributes = useQuery(attributesQuery(project));
   const segments = useQuery(segmentsQuery(project));
   const flags = useQuery(flagChoicesQuery(project));
-  const reads = [attributes, segments, flags];
+  const experiments = useQuery(flagExperimentsQuery(project, flag.key));
+  const reads = [attributes, segments, flags, experiments];
   const failed = reads.find((read) => read.isError);
 
   return (
@@ -512,7 +514,7 @@ function EnvironmentPanel(props: PanelProps) {
       <OnOff {...props} frozen={frozen !== undefined} />
       {failed ? (
         <QueryError error={failed.error} onRetry={() => void failed.refetch()} />
-      ) : environment && attributes.data && segments.data && flags.data ? (
+      ) : environment && attributes.data && segments.data && flags.data && experiments.data ? (
         <ConfigurationEditor
           // A configuration of another environment starts a draft of its own.
           key={configuration.environment}
@@ -525,6 +527,7 @@ function EnvironmentPanel(props: PanelProps) {
             unitTypes: props.unitTypes,
             segments: segments.data,
             flags: flags.data,
+            experiments: experiments.data,
           }}
           overrides={<OverridesSection {...props} frozen={frozen} />}
           readOnly={frozen ?? (can ? undefined : missing)}

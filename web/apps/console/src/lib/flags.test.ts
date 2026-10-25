@@ -62,10 +62,17 @@ describe("the flags list's search", () => {
     });
   });
 
+  it("keeps the experiment state, which lists flags with a rule serving an experiment", () => {
+    expect(validateFlagsSearch({ environment: "staging", state: "experiment" })).toEqual({
+      environment: "staging",
+      state: "experiment",
+    });
+  });
+
   it("drops a state, a comparison or an order the server would refuse", () => {
     expect(
       validateFlagsSearch({
-        state: "experiment",
+        state: "running",
         differs_between: "staging,staging",
         sort: "owner",
       }),

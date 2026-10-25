@@ -4,7 +4,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FlagIcon, ListChecksIcon, PercentIcon, PlusIcon } from "lucide-react";
+import { FlagIcon, FlaskConicalIcon, ListChecksIcon, PercentIcon, PlusIcon } from "lucide-react";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 
 import { Can } from "@/components/can";
@@ -56,6 +56,8 @@ function stateFilterName(i18n: I18n, state: FlagStateFilter): string {
       return i18n._(msg`Has rules`);
     case "rollout":
       return i18n._(msg`Has a rollout`);
+    case "experiment":
+      return i18n._(msg`Serves an experiment`);
   }
 }
 
@@ -418,7 +420,7 @@ function FlagsPages({
   );
 }
 
-/** What a flag serves in one environment at a glance: on or off, rules, a rollout. */
+/** What a flag serves in one environment at a glance: on or off, rules, a rollout, an experiment. */
 function StateCell({ state }: { state: FlagState | undefined }) {
   const { t } = useLingui();
   if (!state) return <span className="text-muted-foreground">—</span>;
@@ -442,6 +444,12 @@ function StateCell({ state }: { state: FlagState | undefined }) {
         <span title={t`Has a rollout`} className="text-muted-foreground">
           <PercentIcon aria-hidden className="size-4" />
           <span className="sr-only">{t`Has a rollout`}</span>
+        </span>
+      ) : null}
+      {state.has_experiment ? (
+        <span title={t`Serves an experiment`} className="text-muted-foreground">
+          <FlaskConicalIcon aria-hidden className="size-4" />
+          <span className="sr-only">{t`Serves an experiment`}</span>
         </span>
       ) : null}
     </span>

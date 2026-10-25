@@ -11,6 +11,10 @@ msgstr ""
 msgid "“{bad}” is not an origin. Use a scheme, a host and an optional port, such as https://app.example.com."
 msgstr "«{bad}» не источник. Укажите схему, хост и, при необходимости, порт, например https://app.example.com."
 
+#: src/components/rule-editor.tsx
+msgid "{allocation}% of {unitType} units included"
+msgstr "Включено {allocation}% единиц {unitType}"
+
 #: src/lib/device.ts
 msgid "{browser} on {os}"
 msgstr "{browser} на {os}"
@@ -937,6 +941,14 @@ msgstr "Выберите атрибут"
 msgid "Choose an attribute."
 msgstr "Выберите атрибут."
 
+#: src/components/rule-editor.tsx
+msgid "Choose an experiment"
+msgstr "Выберите эксперимент"
+
+#: src/lib/rule-editor.ts
+msgid "Choose an experiment."
+msgstr "Выберите эксперимент."
+
 #: src/lib/problem-messages.ts
 msgid "Choose one of the offered languages."
 msgstr "Выберите один из предложенных языков."
@@ -1672,9 +1684,18 @@ msgstr "Ожидаемое удаление"
 msgid "Expected removal changed from {before} to {after}."
 msgstr "Ожидаемое удаление изменено: было {before}, стало {after}."
 
+#: src/components/rule-editor.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "Experiment"
 msgstr "Эксперимент"
+
+#: src/components/rule-editor.tsx
+msgid "Experiment (rule {position})"
+msgstr "Эксперимент (правило {position})"
+
+#: src/lib/conditions.ts
+msgid "experiment {experiment}"
+msgstr "эксперимент {experiment}"
 
 #: src/lib/audit.ts
 msgid "Experiment cloned"
@@ -3469,6 +3490,10 @@ msgstr "Отдаёт <0/> вместо <1/>."
 msgid "Serves <0>{serves}</0>"
 msgstr "Отдаёт <0>{serves}</0>"
 
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+msgid "Serves an experiment"
+msgstr "Отдаёт эксперимент"
+
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
 msgid "Session"
@@ -3802,6 +3827,10 @@ msgstr "Окружения отдают разное там, где отмече
 msgid "The experiment {key} is created."
 msgstr "Эксперимент {key} создан."
 
+#: src/components/rule-editor.tsx
+msgid "The experiment has ended: SDKs no longer receive this rule, and units continue to the next rule."
+msgstr "Эксперимент завершён: SDK больше не получают это правило, и единицы переходят к следующему правилу."
+
 #: src/lib/experiments.ts
 msgid "The experiment is archived: nothing about it changes any more."
 msgstr "Эксперимент в архиве: в нём больше ничего не меняется."
@@ -3861,6 +3890,10 @@ msgstr "Флаг и его конфигурации во всех окружен
 #: src/components/tester-panel.tsx
 msgid "The flag could not be evaluated."
 msgstr "Флаг не удалось вычислить."
+
+#: src/components/rule-editor.tsx
+msgid "The flag has no draft or running experiment. <0>Create one</0> to serve it here."
+msgstr "У флага нет черновика или запущенного эксперимента. <0>Создайте его</0>, чтобы отдавать его здесь."
 
 #: src/lib/conditions.ts
 #: src/lib/configuration-draft.ts
@@ -4498,6 +4531,10 @@ msgid "Units"
 msgstr "Единицы"
 
 #: src/components/rule-editor.tsx
+msgid "Units matching this rule are assigned to the variations by the experiment's weights. Its weights and unit type change only on the experiment's page."
+msgstr "Единицы, подходящие под это правило, распределяются по вариантам согласно весам эксперимента. Веса и тип единицы меняются только на странице эксперимента."
+
+#: src/components/rule-editor.tsx
 msgid "Units outside the percentage continue to the next rule. Raising the percentage keeps every unit already in."
 msgstr "Единицы вне процента переходят к следующему правилу. При увеличении процента все уже попавшие единицы остаются."
 
@@ -4628,6 +4665,10 @@ msgstr "Наблюдатель"
 msgid "Weight of variation {n} (%)"
 msgstr "Вес варианта {n} (%)"
 
+#: src/components/rule-editor.tsx
+msgid "Weights (rule {position})"
+msgstr "Веса (правило {position})"
+
 #: src/components/structural-diff-view.tsx
 msgid "Weights changed to <0>{weights}</0>."
 msgstr "Веса изменены на <0>{weights}</0>."
@@ -4675,6 +4716,10 @@ msgstr "Откуда проект отдаёт значения. Ключ пос
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "Which flags use the segment could not be read; the rules of any that do evaluate by what it holds once saved."
 msgstr "Не удалось узнать, какие флаги используют сегмент; правила тех, что используют, после сохранения вычисляются по его новому содержимому."
+
+#: src/components/rule-editor.tsx
+msgid "While the experiment is a draft, SDKs do not receive this rule: units continue to the next rule until it starts."
+msgstr "Пока эксперимент в черновике, SDK не получают это правило: единицы переходят к следующему правилу, пока он не запущен."
 
 #: src/lib/experiments.ts
 msgid "While the experiment runs its traffic allocation can only grow, from {from} %."

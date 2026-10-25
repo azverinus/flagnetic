@@ -1,5 +1,6 @@
-import type { Segment, UnitType, Variation } from "@flagnetic/api";
+import type { Experiment, Segment, UnitType, Variation } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { Link } from "@tanstack/react-router";
 import { ArrowDownIcon, ArrowUpIcon, GripVerticalIcon, Trash2Icon } from "lucide-react";
 import {
   type DragEvent,
@@ -12,6 +13,7 @@ import {
 } from "react";
 
 import { ConditionRow } from "@/components/condition-row";
+import { ExperimentStatusBadge } from "@/components/experiment-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +27,7 @@ import {
   newPrerequisiteCondition,
   newSegmentCondition,
 } from "@/lib/conditions";
+import { percentText } from "@/lib/experiments";
 import {
   maxConditions,
   maxRules,
@@ -32,6 +35,7 @@ import {
   moveRule,
   newRule,
   type RuleDraft,
+  servableExperiments,
   type ServeDraft,
   withRule,
 } from "@/lib/rule-editor";
@@ -45,6 +49,10 @@ export type RuleEditorProps = {
   segments: readonly Segment[];
   /** The project's other flags that are not archived, with their variations' keys. */
   flags: ReadonlyMap<string, readonly string[]>;
+  /** The project the flag is in, which an experiment's link points into. */
+  project: string;
+  /** The experiments comparing this flag's variations, archived ones included. */
+  experiments: readonly Experiment[];
   /**
    * What is wrong, by where it shows: a condition by its key, a rule by
    * its key, a serve's field by the rule's key and the field.
@@ -74,6 +82,8 @@ export function RuleEditor({
   attributes,
   segments,
   flags,
+  project,
+  experiments,
   errors,
   onRegenerateSalt,
   saltedRules,
@@ -172,6 +182,8 @@ export function RuleEditor({
               attributes={attributes}
               segments={segments}
               flags={flags}
+              project={project}
+              experiments={experiments}
               errors={errors}
               onRegenerateSalt={
                 onRegenerateSalt &&
@@ -252,6 +264,8 @@ function RuleCard({
   attributes,
   segments,
   flags,
+  project,
+  experiments,
   errors,
   onRegenerateSalt,
   matched,
@@ -498,9 +512,12 @@ function RuleCard({
           onChange={(serve) => onChange({ ...rule, serve })}
           variations={variations}
           unitTypes={unitTypes}
+          project={project}
+          experiments={experiments}
           errors={{
             serve: errors.get(`${rule.key}/serve`),
             variation: errors.get(`${rule.key}/variation`),
+            experiment: errors.get(`${rule.key}/experiment`),
             unitType: errors.get(`${rule.key}/unit_type`),
             percent: errors.get(`${rule.key}/percent`),
           }}
@@ -518,6 +535,8 @@ function ServeEditor({
   onChange,
   variations,
   unitTypes,
+  project,
+  experiments,
   errors,
   onRegenerateSalt,
   disabled,
@@ -527,7 +546,15 @@ function ServeEditor({
   onChange: (serve: ServeDraft) => void;
   variations: readonly Variation[];
   unitTypes: readonly UnitType[];
-  errors: { serve?: string; variation?: string; unitType?: string; percent?: string };
+  project: string;
+  experiments: readonly Experiment[];
+  errors: {
+    serve?: string;
+    variation?: string;
+    experiment?: string;
+    unitType?: string;
+    percent?: string;
+  };
   onRegenerateSalt?: () => void;
   disabled: boolean;
 }) {
@@ -552,6 +579,7 @@ function ServeEditor({
           [
             ["variation", t`Variation`],
             ["rollout", t`Rollout`],
+            ["experiment", t`Experiment`],
           ] as const
         ).map(([kind, label]) => (
           <label key={kind} className="flex items-center gap-2">
@@ -567,7 +595,24 @@ function ServeEditor({
           </label>
         ))}
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
+      {serve.kind === "experiment" ? (
+        <ExperimentServe
+          position={position}
+          serve={serve}
+          onChange={onChange}
+          project={project}
+          experiments={experiments}
+          error={errors.experiment}
+          errorId={errorId("experiment")}
+          disabled={disabled}
+        />
+      ) : null}
+      <div
+        className={cn(
+          "flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start",
+          serve.kind === "experiment" && "hidden",
+        )}
+      >
         <div className="flex flex-col gap-1">
           <Select
             aria-label={t`Variation (rule ${position})`}
@@ -667,5 +712,125 @@ function ServeEditor({
         </p>
       ) : null}
     </fieldset>
+  );
+}
+
+/**
+ * The experiment a rule serves: chosen among the flag's draft and running
+ * experiments, with its status, traffic allocation and weights shown as
+ * they are and a link to change them on the experiment's own page, since
+ * a rule only names the experiment.
+ */
+function ExperimentServe({
+  position,
+  serve,
+  onChange,
+  project,
+  experiments,
+  error,
+  errorId,
+  disabled,
+}: {
+  position: number;
+  serve: ServeDraft;
+  onChange: (serve: ServeDraft) => void;
+  project: string;
+  experiments: readonly Experiment[];
+  error?: string;
+  errorId: string;
+  disabled: boolean;
+}) {
+  const { i18n, t } = useLingui();
+  const choices = servableExperiments(experiments, serve.experiment);
+  const chosen = experiments.find((experiment) => experiment.key === serve.experiment);
+  const allocation = chosen ? percentText(i18n, chosen.traffic_allocation) : "";
+  const unitType = chosen?.unit_type ?? "";
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <Select
+          aria-label={t`Experiment (rule ${position})`}
+          value={serve.experiment}
+          placeholder={t`Choose an experiment`}
+          onValueChange={(experiment) => onChange({ ...serve, experiment })}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          disabled={disabled || choices.length === 0}
+          className="sm:w-72"
+        >
+          {choices.map((experiment) => (
+            <SelectItem key={experiment.key} value={experiment.key}>
+              {experiment.key}
+            </SelectItem>
+          ))}
+        </Select>
+        {error ? (
+          <p id={errorId} className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+        {choices.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            <Trans>
+              The flag has no draft or running experiment.{" "}
+              <Link
+                to="/projects/$project/experiments/-/new"
+                params={{ project }}
+                className="underline"
+              >
+                Create one
+              </Link>{" "}
+              to serve it here.
+            </Trans>
+          </p>
+        ) : null}
+      </div>
+      {chosen ? (
+        <div className="flex flex-col gap-2 rounded-md border bg-muted/40 p-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/projects/$project/experiments/$experiment"
+              params={{ project, experiment: chosen.key }}
+              className="font-medium underline"
+            >
+              {chosen.name}
+            </Link>
+            <ExperimentStatusBadge status={chosen.status} />
+            <span className="text-muted-foreground">
+              <Trans>
+                {allocation}% of {unitType} units included
+              </Trans>
+            </span>
+          </div>
+          <ul aria-label={t`Weights (rule ${position})`} className="flex flex-wrap gap-x-4 gap-y-1">
+            {chosen.variations.map((weight) => (
+              <li key={weight.variation}>
+                <span className="font-mono">{weight.variation}</span>{" "}
+                <span className="text-muted-foreground">{percentText(i18n, weight.weight)}%</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-muted-foreground">
+            {chosen.status === "running" ? (
+              <Trans>
+                Units matching this rule are assigned to the variations by the experiment&apos;s
+                weights. Its weights and unit type change only on the experiment&apos;s page.
+              </Trans>
+            ) : chosen.status === "draft" ? (
+              <Trans>
+                While the experiment is a draft, SDKs do not receive this rule: units continue to
+                the next rule until it starts.
+              </Trans>
+            ) : (
+              <Trans>
+                The experiment has ended: SDKs no longer receive this rule, and units continue to
+                the next rule.
+              </Trans>
+            )}
+          </p>
+        </div>
+      ) : null}
+    </div>
   );
 }

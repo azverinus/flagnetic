@@ -125,6 +125,10 @@ export function describeCondition(i18n: I18n, condition: Condition): string {
 
 /** What a rule serves in one line, such as "treatment to 25% of user units". */
 export function describeServe(i18n: I18n, serve: Serve): string {
+  if (serve.kind === "experiment") {
+    const experiment = serve.experiment ?? "";
+    return i18n._(msg`experiment ${experiment}`);
+  }
   const variation = serve.variation ?? "";
   if (serve.kind === "rollout") {
     const percent = formatNumber(i18n, (serve.percentage ?? 0) / 100);
