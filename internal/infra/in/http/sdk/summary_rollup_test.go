@@ -35,7 +35,12 @@ func startSummaries(t *testing.T) *summaryFixture {
 	t.Helper()
 	c := clock.NewFake(protocolTime)
 	srv := testkit.StartServer(t, testkit.WithClock(c))
-	p := newProject(t, srv)
+	return summariesOf(t, srv, c, newProject(t, srv))
+}
+
+// summariesOf returns the summary fixture of p on srv, timed by c.
+func summariesOf(t *testing.T, srv *testkit.Server, c *clock.Fake, p project) *summaryFixture {
+	t.Helper()
 	p.flag(t, "checkout")
 	p.flag(t, "banner")
 	f := &summaryFixture{srv: srv, clock: c, p: p}
@@ -92,9 +97,11 @@ func (f *summaryFixture) envelope(t *testing.T, evs ...any) []byte {
 	return b
 }
 
+// rollUp runs the rollups of the streams reading what the fixture posts.
 func (f *summaryFixture) rollUp(t *testing.T) {
 	t.Helper()
 	f.srv.TickRollup(t, worker.SummaryRollupName)
+	f.srv.TickRollup(t, worker.AliasRollupName)
 }
 
 // evaluations reads flag's evaluations in production over the days given, nil

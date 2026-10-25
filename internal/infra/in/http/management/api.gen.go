@@ -220,6 +220,27 @@ func (e EvaluationSource) Valid() bool {
 	}
 }
 
+// Defines values for EventType.
+const (
+	EventTypeAlias             EventType = "alias"
+	EventTypeEvaluationSummary EventType = "evaluation_summary"
+	EventTypeExposure          EventType = "exposure"
+)
+
+// Valid indicates whether the value is a known member of the EventType enum.
+func (e EventType) Valid() bool {
+	switch e {
+	case EventTypeAlias:
+		return true
+	case EventTypeEvaluationSummary:
+		return true
+	case EventTypeExposure:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ExperimentOutcome.
 const (
 	ExperimentOutcomeRemoved ExperimentOutcome = "removed"
@@ -1207,6 +1228,51 @@ type EvaluationResult struct {
 // or the server counting every flag of every remote evaluation it
 // answered (`remote_evaluation`).
 type EvaluationSource string
+
+// EventGap defines model for EventGap.
+type EventGap struct {
+	// DroppedAt When retention dropped them.
+	DroppedAt time.Time `json:"dropped_at"`
+
+	// PeriodEnd When the last event lost was received.
+	PeriodEnd time.Time `json:"period_end"`
+
+	// PeriodStart When the first event lost was received.
+	PeriodStart time.Time `json:"period_start"`
+
+	// Rows The raw rows lost, every project's: an evaluation summary is
+	// stored as one row per flag, variation and reason it counts.
+	Rows int64 `json:"rows"`
+
+	// Stream The reader that lost the events: `exposures`,
+	// `evaluation_summaries` or `aliases`, the rollup streams.
+	Stream string `json:"stream"`
+
+	// Type The type of an event as SDKs post it to `/sdk/v1/events`.
+	Type EventType `json:"type"`
+}
+
+// EventType The type of an event as SDKs post it to `/sdk/v1/events`.
+type EventType string
+
+// EventVolume defines model for EventVolume.
+type EventVolume struct {
+	// Days By day, then type.
+	Days []EventVolumeDay `json:"days"`
+
+	// Gaps By when their first event was received.
+	Gaps []EventGap `json:"gaps"`
+}
+
+// EventVolumeDay defines model for EventVolumeDay.
+type EventVolumeDay struct {
+	// Day The UTC day the events were received.
+	Day    openapi_types.Date `json:"day"`
+	Events int64              `json:"events"`
+
+	// Type The type of an event as SDKs post it to `/sdk/v1/events`.
+	Type EventType `json:"type"`
+}
 
 // Experiment defines model for Experiment.
 type Experiment struct {
@@ -3156,6 +3222,15 @@ type SetEnvironmentProtectionParams struct {
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
+// GetEventVolumeParams defines parameters for GetEventVolume.
+type GetEventVolumeParams struct {
+	// From The first UTC day, included; 29 days before `to` when absent.
+	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
+
+	// To The last UTC day, included; today when absent.
+	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
+}
+
 // ListExperimentsParams defines parameters for ListExperiments.
 type ListExperimentsParams struct {
 	// Status Lists the experiments in this status.
@@ -4700,6 +4775,23 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
 	RotateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetEventVolume The events the project received per day, and the gaps
+	//
+	// The events SDKs posted to the project per UTC day they were
+	// received and type, as the rollups counted them; a day without an
+	// event of a type is left out. The counts are kept after retention
+	// drops the raw events. `gaps` are the raw events retention dropped
+	// before the stream reading them had read them, each gap whose
+	// received period meets the range: they are the instance's, so
+	// `rows` counts every project's events, and what those events would
+	// have added is missing from the counts and from what the streams
+	// feed. A range from after `to`, or of more than 90 days, is
+	// `invalid_request`. The counts lag the SDKs by the rollups' round,
+	// ten seconds, besides the time a long transaction holds them back.
+	//
+	// Corresponds with GET /projects/{project}/events/volume (the `GetEventVolume` operationId).
+	GetEventVolume(ctx context.Context, project ProjectKey, params *GetEventVolumeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListExperiments The project's experiments
 	//
@@ -7686,6 +7778,33 @@ func (c *Client) RotateSdkKeyWithBody(ctx context.Context, project ProjectKey, e
 // Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
 func (c *Client) RotateSdkKey(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRotateSdkKeyRequest(c.Server, project, environment, sdkKey, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetEventVolume The events the project received per day, and the gaps
+//
+// The events SDKs posted to the project per UTC day they were
+// received and type, as the rollups counted them; a day without an
+// event of a type is left out. The counts are kept after retention
+// drops the raw events. `gaps` are the raw events retention dropped
+// before the stream reading them had read them, each gap whose
+// received period meets the range: they are the instance's, so
+// `rows` counts every project's events, and what those events would
+// have added is missing from the counts and from what the streams
+// feed. A range from after `to`, or of more than 90 days, is
+// `invalid_request`. The counts lag the SDKs by the rollups' round,
+// ten seconds, besides the time a long transaction holds them back.
+//
+// Corresponds with GET /projects/{project}/events/volume (the `GetEventVolume` operationId).
+func (c *Client) GetEventVolume(ctx context.Context, project ProjectKey, params *GetEventVolumeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEventVolumeRequest(c.Server, project, params)
 	if err != nil {
 		return nil, err
 	}
@@ -12951,6 +13070,79 @@ func NewRotateSdkKeyRequestWithBody(server string, project ProjectKey, environme
 	return req, nil
 }
 
+// NewGetEventVolumeRequest constructs an http.Request for the GetEventVolume method
+func NewGetEventVolumeRequest(server string, project ProjectKey, params *GetEventVolumeParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/events/volume", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.From != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", *params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.To != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", *params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListExperimentsRequest constructs an http.Request for the ListExperiments method
 func NewListExperimentsRequest(server string, project ProjectKey, params *ListExperimentsParams) (*http.Request, error) {
 	var err error
@@ -17410,6 +17602,25 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate (the `RotateSdkKey` operationId).
 	RotateSdkKeyWithResponse(ctx context.Context, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID, body RotateSdkKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*RotateSdkKeyResponse, error)
+
+	// GetEventVolumeWithResponse The events the project received per day, and the gaps
+	//
+	// The events SDKs posted to the project per UTC day they were
+	// received and type, as the rollups counted them; a day without an
+	// event of a type is left out. The counts are kept after retention
+	// drops the raw events. `gaps` are the raw events retention dropped
+	// before the stream reading them had read them, each gap whose
+	// received period meets the range: they are the instance's, so
+	// `rows` counts every project's events, and what those events would
+	// have added is missing from the counts and from what the streams
+	// feed. A range from after `to`, or of more than 90 days, is
+	// `invalid_request`. The counts lag the SDKs by the rollups' round,
+	// ten seconds, besides the time a long transaction holds them back.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/events/volume (the `GetEventVolume` operationId).
+	GetEventVolumeWithResponse(ctx context.Context, project ProjectKey, params *GetEventVolumeParams, reqEditors ...RequestEditorFn) (*GetEventVolumeResponse, error)
 
 	// ListExperimentsWithResponse The project's experiments
 	//
@@ -23945,6 +24156,82 @@ func (r RotateSdkKeyResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RotateSdkKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetEventVolumeResponse401Headers the declared response headers of an HTTP 401 response for GetEventVolume
+type GetEventVolumeResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetEventVolumeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EventVolume
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetEventVolumeResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetEventVolumeResponse) GetJSON200() *EventVolume {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r GetEventVolumeResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetEventVolumeResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetEventVolumeResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetEventVolumeResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetEventVolumeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetEventVolumeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetEventVolumeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetEventVolumeResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -30585,6 +30872,31 @@ func (c *ClientWithResponses) RotateSdkKeyWithResponse(ctx context.Context, proj
 	return ParseRotateSdkKeyResponse(rsp)
 }
 
+// GetEventVolumeWithResponse The events the project received per day, and the gaps
+//
+// The events SDKs posted to the project per UTC day they were
+// received and type, as the rollups counted them; a day without an
+// event of a type is left out. The counts are kept after retention
+// drops the raw events. `gaps` are the raw events retention dropped
+// before the stream reading them had read them, each gap whose
+// received period meets the range: they are the instance's, so
+// `rows` counts every project's events, and what those events would
+// have added is missing from the counts and from what the streams
+// feed. A range from after `to`, or of more than 90 days, is
+// `invalid_request`. The counts lag the SDKs by the rollups' round,
+// ten seconds, besides the time a long transaction holds them back.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/events/volume (the `GetEventVolume` operationId).
+func (c *ClientWithResponses) GetEventVolumeWithResponse(ctx context.Context, project ProjectKey, params *GetEventVolumeParams, reqEditors ...RequestEditorFn) (*GetEventVolumeResponse, error) {
+	rsp, err := c.GetEventVolume(ctx, project, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetEventVolumeResponse(rsp)
+}
+
 // ListExperimentsWithResponse The project's experiments
 //
 // The project's experiments by key in byte order (capitals before
@@ -37124,6 +37436,73 @@ func ParseRotateSdkKeyResponse(rsp *http.Response) (*RotateSdkKeyResponse, error
 	return response, nil
 }
 
+// ParseGetEventVolumeResponse parses an HTTP response from a GetEventVolumeWithResponse call
+func ParseGetEventVolumeResponse(rsp *http.Response) (*GetEventVolumeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEventVolumeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EventVolume
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetEventVolumeResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListExperimentsResponse parses an HTTP response from a ListExperimentsWithResponse call
 func ParseListExperimentsResponse(rsp *http.Response) (*ListExperimentsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -41894,6 +42273,9 @@ type ServerInterface interface {
 	// RotateSdkKey Rotate an SDK key
 	// (POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate)
 	RotateSdkKey(w http.ResponseWriter, r *http.Request, project ProjectKey, environment EnvironmentKey, sdkKey SdkKeyID)
+	// GetEventVolume The events the project received per day, and the gaps
+	// (GET /projects/{project}/events/volume)
+	GetEventVolume(w http.ResponseWriter, r *http.Request, project ProjectKey, params GetEventVolumeParams)
 	// ListExperiments The project's experiments
 	// (GET /projects/{project}/experiments)
 	ListExperiments(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListExperimentsParams)
@@ -44704,6 +45086,61 @@ func (siw *ServerInterfaceWrapper) RotateSdkKey(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RotateSdkKey(w, r, project, environment, sdkKey)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEventVolume operation middleware
+func (siw *ServerInterfaceWrapper) GetEventVolume(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetEventVolumeParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEventVolume(w, r, project, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -47696,6 +48133,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/overrides/{unit_type}/{unit_id}", wrapper.PutOverride)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/rules/{rule}/regenerate-salt", wrapper.RegenerateRolloutSalt)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/flags/{flag}/environments/{environment}/evaluations", wrapper.GetFlagEvaluations)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/events/volume", wrapper.GetEventVolume)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.ListExperiments)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments", wrapper.CreateExperiment)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}", wrapper.DeleteExperiment)
@@ -54354,6 +54792,96 @@ func (response RotateSdkKey422ApplicationProblemPlusJSONResponse) VisitRotateSdk
 	return err
 }
 
+type GetEventVolumeRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Params  GetEventVolumeParams
+}
+
+type GetEventVolumeResponseObject interface {
+	VisitGetEventVolumeResponse(w http.ResponseWriter) error
+}
+
+type GetEventVolume200JSONResponse EventVolume
+
+func (response GetEventVolume200JSONResponse) VisitGetEventVolumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEventVolume400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetEventVolume400ApplicationProblemPlusJSONResponse) VisitGetEventVolumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEventVolume401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetEventVolume401ApplicationProblemPlusJSONResponse) VisitGetEventVolumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEventVolume403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetEventVolume403ApplicationProblemPlusJSONResponse) VisitGetEventVolumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEventVolume404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetEventVolume404ApplicationProblemPlusJSONResponse) VisitGetEventVolumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListExperimentsRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  ListExperimentsParams
@@ -60998,6 +61526,9 @@ type StrictServerInterface interface {
 	// RotateSdkKey Rotate an SDK key
 	// (POST /projects/{project}/environments/{environment}/sdk-keys/{sdk_key}/rotate)
 	RotateSdkKey(ctx context.Context, request RotateSdkKeyRequestObject) (RotateSdkKeyResponseObject, error)
+	// GetEventVolume The events the project received per day, and the gaps
+	// (GET /projects/{project}/events/volume)
+	GetEventVolume(ctx context.Context, request GetEventVolumeRequestObject) (GetEventVolumeResponseObject, error)
 	// ListExperiments The project's experiments
 	// (GET /projects/{project}/experiments)
 	ListExperiments(ctx context.Context, request ListExperimentsRequestObject) (ListExperimentsResponseObject, error)
@@ -63137,6 +63668,33 @@ func (sh *strictHandler) RotateSdkKey(w http.ResponseWriter, r *http.Request, pr
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RotateSdkKeyResponseObject); ok {
 		if err := validResponse.VisitRotateSdkKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEventVolume operation middleware
+func (sh *strictHandler) GetEventVolume(w http.ResponseWriter, r *http.Request, project ProjectKey, params GetEventVolumeParams) {
+	var request GetEventVolumeRequestObject
+
+	request.Project = project
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEventVolume(ctx, request.(GetEventVolumeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEventVolume")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEventVolumeResponseObject); ok {
+		if err := validResponse.VisitGetEventVolumeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -174,7 +174,7 @@ func TestAnExposureMovesWhenItsFlagWasLastEvaluated(t *testing.T) {
 	}
 }
 
-func TestTheEvaluationDaysDefaultToTheLastThirtyAndSpanNinetyAtMost(t *testing.T) {
+func TestTheDaysReadDefaultToTheLastThirtyAndSpanNinetyAtMost(t *testing.T) {
 	today := day1.Add(13 * time.Hour)
 	at := func(days int) *time.Time {
 		d := day1.AddDate(0, 0, days)
@@ -194,7 +194,7 @@ func TestTheEvaluationDaysDefaultToTheLastThirtyAndSpanNinetyAtMost(t *testing.T
 		"from only, too long": {from: at(-90), wantErr: true},
 		"reversed":            {from: at(1), to: at(0), wantErr: true},
 	} {
-		from, to, err := events.EvaluationDays(c.from, c.to, today)
+		from, to, err := events.DaysRead(c.from, c.to, today)
 		if c.wantErr {
 			var rangeErr *events.RangeError
 			if !errors.As(err, &rangeErr) {

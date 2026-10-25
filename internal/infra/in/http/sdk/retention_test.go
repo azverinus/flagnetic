@@ -28,6 +28,7 @@ func startRetention(t *testing.T) *summaryFixture {
 	f := startSummaries(t)
 	f.srv.TickRollup(t, worker.ExposureRollupName)
 	f.srv.TickRollup(t, worker.SummaryRollupName)
+	f.srv.TickRollup(t, worker.AliasRollupName)
 	return f
 }
 

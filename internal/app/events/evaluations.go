@@ -55,7 +55,7 @@ func NewGetFlagEvaluations(snapshots Snapshotter, store EvaluationReader, c cloc
 // environment the project does not have; a range of days that cannot be
 // read is an *events.RangeError.
 func (h *GetFlagEvaluations) Handle(ctx context.Context, q EvaluationQuery) ([]events.FlagEvaluationDay, error) {
-	first, last, rangeErr := events.EvaluationDays(q.From, q.To, h.clock.Now())
+	first, last, rangeErr := events.DaysRead(q.From, q.To, h.clock.Now())
 	if rangeErr != nil {
 		return nil, rangeErr
 	}

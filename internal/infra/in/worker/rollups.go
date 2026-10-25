@@ -19,6 +19,10 @@ const ExposureRollupName = "exposure_rollup"
 // logs, metrics and Tick.
 const SummaryRollupName = "summary_rollup"
 
+// AliasRollupName names the worker counting aliases in logs, metrics and
+// Tick.
+const AliasRollupName = "alias_rollup"
+
 // rollupInterval is how often a rollup stream reads what was committed since
 // its last round: the experiment pages are this far behind the SDKs at most,
 // besides the time a long transaction holds the horizon back.

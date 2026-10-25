@@ -388,6 +388,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetExposureTimeline:    appevents.NewGetExposureTimeline(tx, eventStore),
 		GetConflicts:           appevents.NewGetConflicts(tx, eventStore),
 		GetFlagEvaluations:     appevents.NewGetFlagEvaluations(tx, eventStore, d.Clock),
+		GetEventVolume:         appevents.NewGetEventVolume(tx, eventStore, d.Clock),
 
 		ListChangeRequests:   appgovernance.NewListChangeRequests(changeRequestStore),
 		CreateChangeRequest:  appgovernance.NewCreateChangeRequest(changeRequests),
@@ -462,6 +463,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 				appevents.NewRollUpExposures(tx, eventStore, d.Clock), rollupMetrics),
 			worker.RollupStream(worker.SummaryRollupName, events.StreamEvaluationSummaries,
 				appevents.NewRollUpSummaries(tx, eventStore, d.Clock), rollupMetrics),
+			worker.RollupStream(worker.AliasRollupName, events.StreamAliases,
+				appevents.NewRollUpAliases(tx, eventStore, d.Clock), rollupMetrics),
 			worker.EventRetention(
 				appevents.NewRunRetention(tx, eventStore, d.Clock, d.IDs, o.EventsRetention, o.EventsPartitionsAhead),
 				appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention), edge.Logger(), reg),

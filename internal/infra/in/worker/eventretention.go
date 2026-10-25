@@ -41,7 +41,7 @@ func EventRetention(r Retention, inventory Purge, log *slog.Logger, reg promethe
 		Help: "Raw events retention dropped before the stream reading them had read them, by stream.",
 	}, []string{"stream"})
 	reg.MustRegister(gapRows)
-	for _, s := range []events.Stream{events.StreamExposures, events.StreamEvaluationSummaries} {
+	for _, s := range []events.Stream{events.StreamExposures, events.StreamEvaluationSummaries, events.StreamAliases} {
 		gapRows.WithLabelValues(string(s))
 	}
 	return Worker{
