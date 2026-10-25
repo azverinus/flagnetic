@@ -71,6 +71,16 @@ func Open(ctx context.Context, cfg *pgxpool.Config) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(ctx, cfg)
 }
 
+// SidePool returns a pool of at most maxConns connections to the database
+// of pool, configured as it is, for work that must never wait for one of
+// pool's connections: work a holder of one of them waits on. It connects
+// lazily, as Open does.
+func SidePool(pool *pgxpool.Pool, maxConns int32) (*pgxpool.Pool, error) {
+	cfg := pool.Config()
+	cfg.MaxConns, cfg.MinConns = maxConns, 0
+	return pgxpool.NewWithConfig(context.Background(), cfg)
+}
+
 // ServerVersionNum reads the server's server_version_num, such as 170004.
 func ServerVersionNum(ctx context.Context, pool *pgxpool.Pool) (int, error) {
 	var num int

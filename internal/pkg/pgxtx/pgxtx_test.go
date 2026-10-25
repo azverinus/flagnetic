@@ -299,3 +299,25 @@ func TestLocalKeepsAValueForTheTransactionsLife(t *testing.T) {
 		t.Errorf("outside a transaction = %v, %v, want a fresh value not kept", v, ok)
 	}
 }
+
+func TestOutsideReadsWhatIsCommittedOnAnotherConnection(t *testing.T) {
+	pool := pgtest.Pool(t)
+	tx := pgxtx.New(pool)
+	k := key()
+	err := tx.Within(t.Context(), func(ctx context.Context) error {
+		insert(ctx, t, pool, k)
+		return tx.Snapshot(pgxtx.Outside(ctx), func(outside context.Context) error {
+			var found bool
+			if err := pgxtx.Querier(outside, pool).QueryRow(outside, `SELECT EXISTS (SELECT 1 FROM note WHERE key = $1)`, k).Scan(&found); err != nil {
+				return err
+			}
+			if found {
+				t.Error("a read outside the transaction sees its uncommitted write")
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

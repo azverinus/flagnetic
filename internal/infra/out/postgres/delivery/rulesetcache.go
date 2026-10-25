@@ -1,6 +1,7 @@
 package delivery
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	appdelivery "github.com/azverinus/flagnetic/internal/app/delivery"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/metrics"
+	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	"github.com/azverinus/flagnetic/internal/pkg/safego"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -46,10 +48,12 @@ const (
 // that lost recent writes, so the replica never waits for a version the
 // database no longer has.
 type RulesetCache struct {
-	load  appdelivery.Rulesets
-	clock clock.Clock
-	log   *slog.Logger
-	fault *RulesetLoadFault
+	load appdelivery.Rulesets
+	// committedLoad materializes the rulesets CommittedRuleset misses.
+	committedLoad appdelivery.Rulesets
+	clock         clock.Clock
+	log           *slog.Logger
+	fault         *RulesetLoadFault
 
 	materializations prometheus.Counter
 	propagation      *prometheus.HistogramVec
@@ -98,8 +102,11 @@ type rulesetLoad struct {
 // RulesetCacheOptions are what a RulesetCache runs on.
 type RulesetCacheOptions struct {
 	// Load materializes a ruleset from the database.
-	Load  appdelivery.Rulesets
-	Clock clock.Clock
+	Load appdelivery.Rulesets
+	// CommittedLoad materializes a ruleset from the database for
+	// CommittedRuleset, on connections no write holds; Load when nil.
+	CommittedLoad appdelivery.Rulesets
+	Clock         clock.Clock
 	// Registerer receives the cache's metrics.
 	Registerer prometheus.Registerer
 	Logger     *slog.Logger
@@ -111,7 +118,7 @@ type RulesetCacheOptions struct {
 // listener reports itself up, and registers its metrics.
 func NewRulesetCache(o RulesetCacheOptions) *RulesetCache {
 	c := &RulesetCache{
-		load: o.Load, clock: o.Clock, log: o.Logger, fault: o.Fault,
+		load: o.Load, committedLoad: cmp.Or[appdelivery.Rulesets](o.CommittedLoad, o.Load), clock: o.Clock, log: o.Logger, fault: o.Fault,
 		materializations: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: metrics.Namespace, Subsystem: "ruleset", Name: "materializations_total",
 			Help: "Rulesets this replica materialized from the database.",
@@ -172,8 +179,12 @@ func (c *RulesetCache) Unmeasured() appdelivery.Rulesets { return unmeasuredRule
 // CommittedRuleset returns the ruleset of environment at version, a
 // version known to be committed and perhaps not yet announced to this
 // replica: from memory when it holds that version, otherwise from a
-// materialization of what the database has committed. The protection guard
-// reads what a write's environment serves before it through it. A ruleset
+// materialization through the options' CommittedLoad, which keeps it for
+// the requests after. The protection guard reads what a write's
+// environment serves before it through it. The guard's write holds a
+// connection of the replica's pool while it waits, as may every write
+// queued behind its project's row, so the load never takes a connection
+// from that pool: it could wait for one the queued writes hold. A ruleset
 // at another version is an error: the caller holds the project row every
 // bump of environment takes, so the committed version cannot have moved.
 // The answer does not count towards the propagation, which is to SDKs.
@@ -181,13 +192,28 @@ func (c *RulesetCache) CommittedRuleset(ctx context.Context, environment workspa
 	c.mu.Lock()
 	e := c.entry(environment)
 	e.latest = max(e.latest, version)
+	if c.listening && e.doc != nil && e.doc.Version == version {
+		rs := *e.doc
+		c.mu.Unlock()
+		return rs, nil
+	}
+	generation := c.generation
 	c.mu.Unlock()
-	rs, err := c.ruleset(ctx, environment, false)
+	// The caller waits inside its write's transaction; the load reads what
+	// is committed, in a snapshot of its own.
+	rs, err := c.committedLoad.Ruleset(pgxtx.Outside(ctx), environment)
 	if err != nil {
 		return appdelivery.Ruleset{}, err
 	}
 	if rs.Version != version {
 		return appdelivery.Ruleset{}, fmt.Errorf("the committed ruleset of %s is at version %d, want %d", environment, rs.Version, version)
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// Kept on the terms a shared load is kept on (finish).
+	if c.listening && c.generation == generation && c.entries[environment] == e && rs.Version >= e.latest &&
+		(e.doc == nil || rs.Version >= e.doc.Version) {
+		e.doc = &rs
 	}
 	return rs, nil
 }

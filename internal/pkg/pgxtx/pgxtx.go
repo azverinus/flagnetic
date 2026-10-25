@@ -35,7 +35,7 @@ type DB interface {
 // statement of a repository goes through it, so the repository takes part in
 // whatever unit of work its caller began.
 func Querier(ctx context.Context, pool *pgxpool.Pool) DB {
-	if c, ok := ctx.Value(txKey{}).(*current); ok {
+	if c, ok := ctx.Value(txKey{}).(*current); ok && c != nil {
 		return c.tx
 	}
 	return pool
@@ -66,7 +66,7 @@ type current struct {
 // replica's cache learning the version it just wrote. fn runs on the
 // committing goroutine and must return promptly.
 func AfterCommit(ctx context.Context, fn func()) {
-	if c, ok := ctx.Value(txKey{}).(*current); ok {
+	if c, ok := ctx.Value(txKey{}).(*current); ok && c != nil {
 		c.afterCommit = append(c.afterCommit, fn)
 		return
 	}
@@ -81,7 +81,7 @@ func AfterCommit(ctx context.Context, fn func()) {
 // transaction there is nothing to remember: it returns init() and false.
 func Local[T any](ctx context.Context, key any, init func() T) (T, bool) {
 	c, ok := ctx.Value(txKey{}).(*current)
-	if !ok {
+	if !ok || c == nil {
 		return init(), false
 	}
 	if v, ok := c.locals[key]; ok {
@@ -94,6 +94,15 @@ func Local[T any](ctx context.Context, key any, init func() T) (T, bool) {
 	v := init()
 	c.locals[key] = v
 	return v, true
+}
+
+// Outside returns ctx without the transaction it carries, keeping its
+// deadline and values otherwise: statements under it run on the pool, and a
+// Within or Snapshot under it begins a transaction of its own. Code waiting
+// inside a unit of work for what other transactions committed reads under
+// it, on another connection.
+func Outside(ctx context.Context) context.Context {
+	return context.WithValue(ctx, txKey{}, (*current)(nil))
 }
 
 // Transactor begins transactions on a pool.
@@ -142,7 +151,7 @@ func (t *Transactor) Snapshot(ctx context.Context, fn func(ctx context.Context) 
 }
 
 func (t *Transactor) run(ctx context.Context, m mode, opts pgx.TxOptions, fn func(context.Context) error) (err error) {
-	if c, ok := ctx.Value(txKey{}).(*current); ok {
+	if c, ok := ctx.Value(txKey{}).(*current); ok && c != nil {
 		if c.mode != m {
 			panic(fmt.Sprintf("pgxtx: a %s cannot run inside a %s", m, c.mode))
 		}

@@ -6,7 +6,7 @@ Governance is how a team controls changes to what its SDKs receive: which enviro
 
 An environment is protected when what its SDKs receive should change only through a reviewed change request. An owner protects an environment or stops protecting it with `PUT /projects/{project}/environments/{environment}/protection` and `{"protected": true}` or `false`, under `If-Match` on the environment's version; it needs `environment.protect`, which only owners hold and no project token exercises, so a pipeline cannot unprotect an environment, write it and protect it again. Asking for the protection an environment already has changes nothing. Each change is recorded in the audit log as `environment.protected` or `environment.unprotected`, and `protected` is part of every environment the API answers.
 
-The production environment of a project created from v0.3.0 on starts protected; the other environments, and every environment that existed before the upgrade, start unprotected, so an upgrade does not stop a script writing production directly. Protect production yourself where you want its changes reviewed.
+The production environment of a project created from this release on starts protected; the other environments, and every environment that existed before the upgrade, start unprotected, so an upgrade does not stop a script writing production directly. Protect production yourself where you want its changes reviewed.
 
 SDKs read the protection from their ruleset and evaluate answers (`environment.protected`), and a server SDK ignores local overrides in a protected environment. Protecting or unprotecting an environment moves its ruleset version, so SDKs learn it at once.
 
@@ -33,4 +33,4 @@ The kill switch is the one direct write to a protected environment: `POST /flags
 
 ### What protection costs
 
-A write that changes no ruleset pays nothing. A write that changes a ruleset pays, for each protected environment it reaches, one build of that environment's ruleset inside its transaction, compared with the ruleset the replica already holds in memory. `flagnetic_protection_guard_seconds` measures it per write (see [Operations](operations.md#metrics)).
+A write that changes no ruleset pays nothing. A write that changes a ruleset pays, for each protected environment it reaches, one build of that environment's ruleset inside its transaction, compared with the ruleset the replica already holds in memory. When the replica does not hold it yet, it reads it on two PostgreSQL connections of its own, outside its pool, so writes waiting for each other never wait for a connection too. `flagnetic_protection_guard_seconds` measures it per write (see [Operations](operations.md#metrics)).
