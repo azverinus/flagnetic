@@ -142,9 +142,13 @@ type ChangeRequest struct {
 	Approval  *Decision
 	Rejection *Decision
 	Applied   *Application
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Version   int64
+	// SupersededBy is the audit entry of the write that moved what the
+	// change request was based on and so superseded it; zero when no write
+	// did, as when it was found moved only on approval or application.
+	SupersededBy EntryID
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Version      int64
 }
 
 // Decision is an approval or a rejection: the member who took it, when, and
