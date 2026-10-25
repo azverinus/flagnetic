@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createClient } from "../src/client.js";
 import { FlagneticProvider, useFlag, useFlagDetail, useFlagnetic, useStage, type FlagneticClient } from "../src/react.js";
 import { createServer } from "../src/server.js";
-import { MockNetwork } from "./support/mock-network.js";
+import { MockNetwork, type Pending } from "./support/mock-network.js";
 import { ruleset, valuesFor } from "./support/flags-fixture.js";
 import { VirtualClock } from "./support/virtual-clock.js";
 
@@ -44,11 +44,23 @@ afterEach(async () => {
 });
 
 /** Lets the client's promises settle inside React's act scope. */
+// Engines differ in how many turns a mocked response takes to reach the
+// client (Firefox reads a body a task later than Chromium), so settling
+// lets a few tasks pass, not only the microtasks queued so far.
 async function settle(): Promise<void> {
   await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
   });
+}
+
+/** The remote evaluation the client is waiting on, once it has been made. */
+async function waitingEvaluation(): Promise<Pending> {
+  for (let i = 0; i < 20; i++) {
+    const pending = network.waiting("/sdk/v1/evaluate")[0];
+    if (pending) return pending;
+    await settle();
+  }
+  throw new Error("no remote evaluation is waiting");
 }
 
 /** Applies a change inside React's act scope, letting its effects flush. */
@@ -61,8 +73,7 @@ async function step(fn: () => void): Promise<void> {
 
 /** Answers the remote evaluation the client is waiting on with a values document. */
 async function serve(values: Record<string, unknown>): Promise<void> {
-  const pending = network.waiting("/sdk/v1/evaluate")[0];
-  if (!pending) throw new Error("no remote evaluation is waiting");
+  const pending = await waitingEvaluation();
   pending.answer({ status: 200, headers: json, body: JSON.stringify(values) });
   await settle();
 }
@@ -195,8 +206,7 @@ describe("a detail's stage", () => {
 
     // The server is out. The values keep serving, and the component says
     // so: the detail reports where the fallback chain stands.
-    const pending = network.waiting("/sdk/v1/evaluate")[0];
-    if (!pending) throw new Error("no remote evaluation is waiting");
+    const pending = await waitingEvaluation();
     pending.answer({ status: 503 });
     await settle();
 
@@ -354,14 +364,13 @@ describe("unmounting", () => {
     });
     await settle();
     const before = renders.checkout;
-    const waiting = network.waiting("/sdk/v1/evaluate")[0];
-    expect(waiting).toBeDefined();
+    const waiting = await waitingEvaluation();
 
     await step(() => { root?.unmount(); });
     root = undefined;
 
     // The answer the client was waiting on lands after the tree is gone.
-    waiting?.answer({ status: 200, headers: json, body: JSON.stringify(valuesFor({ checkout: true }, 8)) });
+    waiting.answer({ status: 200, headers: json, body: JSON.stringify(valuesFor({ checkout: true }, 8)) });
     await settle();
 
     expect(renders.checkout).toBe(before);
