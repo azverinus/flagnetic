@@ -107,6 +107,14 @@ export function problemMessage(i18n: I18n, error: ApiError): string {
       );
     case "traffic_allocation_decrease":
       return i18n._(msg`A running experiment's traffic allocation can only grow.`);
+    case "not_running":
+      return i18n._(msg`Only a running experiment can be stopped.`);
+    case "running":
+      return i18n._(msg`A running experiment is stopped with a decision before it is archived.`);
+    case "not_stopped":
+      return i18n._(msg`Only a stopped experiment has a decision note.`);
+    case "experiment_not_ready":
+      return i18n._(msg`The experiment is not ready to start.`);
     case "not_a_rollout":
       return i18n._(msg`Only a rule serving a rollout has a salt.`);
     case "key_immutable":

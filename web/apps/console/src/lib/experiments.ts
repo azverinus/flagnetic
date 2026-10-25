@@ -157,7 +157,8 @@ const everyField: readonly ExperimentField[] = [
 /**
  * The fields an experiment's status no longer lets change: a draft
  * changes freely; a running experiment keeps what its comparison rests on,
- * its traffic allocation only growing; a stopped one keeps all but its
+ * its traffic allocation growing only through its own confirmation, which
+ * names the rulesets it changes; a stopped one keeps all but its
  * description; an archived one keeps everything.
  */
 export function lockedFields(status: ExperimentStatus): ReadonlySet<ExperimentField> {
@@ -165,7 +166,7 @@ export function lockedFields(status: ExperimentStatus): ReadonlySet<ExperimentFi
     case "draft":
       return new Set();
     case "running":
-      return new Set(["flag", "unit_type", "variations"]);
+      return new Set(["flag", "unit_type", "variations", "traffic_allocation"]);
     case "stopped":
       return new Set(["flag", "unit_type", "variations", "traffic_allocation", "expected_end_at"]);
     case "archived":
@@ -180,7 +181,7 @@ export function lockReason(i18n: I18n, status: ExperimentStatus): string | undef
       return undefined;
     case "running":
       return i18n._(
-        msg`The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid, and its traffic allocation can only grow, so no included unit ever leaves.`,
+        msg`The experiment is running: its flag, unit type and weights stay as they started, so the comparison stays valid. Its traffic allocation only grows, through Grow allocation above, so no included unit ever leaves.`,
       );
     case "stopped":
       return i18n._(
@@ -358,8 +359,7 @@ export type ExperimentIssues = {
  * What keeps the form from being saved: everything the server refuses
  * and everything a start needs, so a saved draft can always start. A
  * field the experiment's status locks is not judged, since it is not
- * sent; an experiment already saved (`base`) has a key that never changes,
- * and while it runs its traffic allocation can only grow.
+ * sent; an experiment already saved (`base`) has a key that never changes.
  */
 export function experimentIssues(
   i18n: I18n,
@@ -410,14 +410,6 @@ export function experimentIssues(
       fields.set(
         "traffic_allocation",
         i18n._(msg`Enter a percentage from 0 to 100, at most two decimals.`),
-      );
-    } else if (base?.status === "running" && allocation < base.traffic_allocation) {
-      const from = percentText(i18n, base.traffic_allocation);
-      fields.set(
-        "traffic_allocation",
-        i18n._(
-          msg`While the experiment runs its traffic allocation can only grow, from ${from} %.`,
-        ),
       );
     }
   }
