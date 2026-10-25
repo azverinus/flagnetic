@@ -74,7 +74,7 @@ func (e Experiment) Start(f StartFacts, now time.Time) (Experiment, error) {
 func (e Experiment) frozen(ch Change) (Change, error) {
 	detail := "a running experiment's flag, unit type and weights do not change"
 	if e.Status == StatusStopped {
-		detail = "a stopped experiment changes only its name, hypothesis, owner, tags and decision note"
+		detail = "a stopped experiment changes only its name, hypothesis, owner and tags; its decision note changes through its decision"
 	}
 	var violations []apperrors.Violation
 	freeze := func(pointer string) {

@@ -318,7 +318,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		// the flags context, each as a configuration write of its own.
 		StopExperiment: appexperiments.NewStopExperiment(appexperiments.StopExperimentDeps{
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
-			Rules: appflags.NewResolveExperimentRules(appflags.ResolveExperimentRulesDeps{
+			Rules: appflags.NewApplyExperimentDecision(appflags.ApplyExperimentDecisionDeps{
 				Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 			}),
 		}),

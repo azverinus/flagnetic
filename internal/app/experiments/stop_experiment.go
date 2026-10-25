@@ -13,13 +13,13 @@ import (
 
 // ExperimentRules rewrites the rules serving an experiment.
 type ExperimentRules interface {
-	// ResolveExperiment makes every rule of project's flag keyed flag
+	// ApplyDecision makes every rule of project's flag keyed flag
 	// serving the experiment keyed experiment serve the variation winner,
 	// or deletes it when winner is "", in every environment, each
 	// configuration it changes written and recorded on its own and its
 	// ruleset moved on, as the member by (nil for a project token) at now in
 	// req, in the unit of work ctx carries.
-	ResolveExperiment(ctx context.Context, project workspace.ProjectID, flag, experiment, winner string,
+	ApplyDecision(ctx context.Context, project workspace.ProjectID, flag, experiment, winner string,
 		by *access.MemberID, now time.Time, req governance.Request) error
 }
 
@@ -77,7 +77,7 @@ func (h *StopExperiment) Handle(ctx context.Context, cmd StopExperimentCommand) 
 		if err = h.d.Store.UpdateExperiment(ctx, after); err != nil {
 			return err
 		}
-		if err = h.d.Rules.ResolveExperiment(ctx, c.Project, after.FlagKey, after.Key, after.Decision.WinnerVariation,
+		if err = h.d.Rules.ApplyDecision(ctx, c.Project, after.FlagKey, after.Key, after.Decision.WinnerVariation,
 			cmd.Caller, now, c.Request); err != nil {
 			return err
 		}

@@ -115,7 +115,7 @@ func TestRolloutsCarryAGeneratedSaltOnlyRegenerationChanges(t *testing.T) {
 	}
 }
 
-func TestResolvingAnExperimentRewritesOrDeletesTheRulesServingIt(t *testing.T) {
+func TestApplyingADecisionRewritesOrDeletesTheRulesServingIt(t *testing.T) {
 	in := base()
 	in.Rules = []flags.RuleInput{
 		{Description: "Staff", Conditions: []flags.Condition{cond("os", "eq", `"linux"`)}, Serve: experimentServe("running_title")},
@@ -126,7 +126,7 @@ func TestResolvingAnExperimentRewritesOrDeletesTheRulesServingIt(t *testing.T) {
 	c := mustReplace(t, initial(), in)
 	w := flags.Write{By: &bob, Now: now.Add(3 * time.Hour)}
 
-	won, changed := c.ResolveExperiment("running_title", "b", w)
+	won, changed := c.ApplyDecision("running_title", "b", w)
 	if !changed.Any || !changed.Ruleset || won.Version != c.Version+1 || won.UpdatedAt != w.Now || len(won.Rules) != 4 {
 		t.Fatalf("won = %+v, %+v", won, changed)
 	}
@@ -141,13 +141,13 @@ func TestResolvingAnExperimentRewritesOrDeletesTheRulesServingIt(t *testing.T) {
 		t.Errorf("rules = %+v, want the others as they were", won.Rules)
 	}
 
-	removed, changed := c.ResolveExperiment("running_title", "", w)
+	removed, changed := c.ApplyDecision("running_title", "", w)
 	if !changed.Ruleset || len(removed.Rules) != 2 || removed.Rules[0].ID != c.Rules[1].ID || removed.Rules[1].ID != c.Rules[3].ID {
 		t.Errorf("removed = %+v, want the experiment's rules gone", removed.Rules)
 	}
 
-	same, changed := c.ResolveExperiment("stopped_title", "b", w)
+	same, changed := c.ApplyDecision("stopped_title", "b", w)
 	if changed.Any || same.Version != c.Version {
-		t.Errorf("resolving an experiment no rule serves = %+v, want nothing changed", changed)
+		t.Errorf("applying a decision on an experiment no rule serves = %+v, want nothing changed", changed)
 	}
 }

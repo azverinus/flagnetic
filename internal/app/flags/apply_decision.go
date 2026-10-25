@@ -18,23 +18,23 @@ type ExperimentRuleStore interface {
 	UpdateConfiguration(ctx context.Context, c flags.Configuration) error
 }
 
-// ResolveExperimentRulesDeps are what ResolveExperimentRules runs on.
-type ResolveExperimentRulesDeps struct {
+// ApplyExperimentDecisionDeps are what ApplyExperimentDecision runs on.
+type ApplyExperimentDecisionDeps struct {
 	Store    ExperimentRuleStore
 	Rulesets Rulesets
 	Recorder Recorder
 }
 
-// ResolveExperimentRules rewrites the rules serving an experiment as its
+// ApplyExperimentDecision rewrites the rules serving an experiment as its
 // stop decided.
-type ResolveExperimentRules struct{ d ResolveExperimentRulesDeps }
+type ApplyExperimentDecision struct{ d ApplyExperimentDecisionDeps }
 
-// NewResolveExperimentRules returns the handler.
-func NewResolveExperimentRules(d ResolveExperimentRulesDeps) *ResolveExperimentRules {
-	return &ResolveExperimentRules{d: d}
+// NewApplyExperimentDecision returns the handler.
+func NewApplyExperimentDecision(d ApplyExperimentDecisionDeps) *ApplyExperimentDecision {
+	return &ApplyExperimentDecision{d: d}
 }
 
-// ResolveExperiment makes every rule of project's flag keyed flag serving the
+// ApplyDecision makes every rule of project's flag keyed flag serving the
 // experiment keyed experiment serve the variation winner, or deletes it when
 // winner is "", in every environment, as the member by (nil for a project
 // token) at now in req. An experiment's rules are all its flag's, since a
@@ -42,11 +42,11 @@ func NewResolveExperimentRules(d ResolveExperimentRulesDeps) *ResolveExperimentR
 //
 // Each configuration it changes is a configuration write of its own, at its
 // next version, recorded as flag.configuration_updated with the experiment
-// it resolved, so a revert finds the version and later readers of the audit
+// its stop decided, so a revert finds the version and later readers of the audit
 // log see the write as any other; the environment's ruleset moves on with
 // it. It runs in the unit of work ctx carries, under the project's lock its
 // caller took, so the stop and every rewrite commit together.
-func (h *ResolveExperimentRules) ResolveExperiment(ctx context.Context, project workspace.ProjectID, flag, experiment,
+func (h *ApplyExperimentDecision) ApplyDecision(ctx context.Context, project workspace.ProjectID, flag, experiment,
 	winner string, by *access.MemberID, now time.Time, req governance.Request,
 ) error {
 	f, err := h.d.Store.FlagByKey(ctx, project, flag)
@@ -59,7 +59,7 @@ func (h *ResolveExperimentRules) ResolveExperiment(ctx context.Context, project 
 	}
 	for _, ec := range configurations {
 		before := ec.Configuration
-		after, changed := before.ResolveExperiment(experiment, winner, flags.Write{By: by, Now: now})
+		after, changed := before.ApplyDecision(experiment, winner, flags.Write{By: by, Now: now})
 		if !changed.Any {
 			continue
 		}
