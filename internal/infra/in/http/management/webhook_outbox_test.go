@@ -341,3 +341,26 @@ func TestTheDeliveryLogIsFilteredAndPaged(t *testing.T) {
 		t.Errorf("GET deliveries under another project = %d, want 404", res.StatusCode())
 	}
 }
+
+func TestADeletedEnvironmentReachesOnlyItsOwnFilter(t *testing.T) {
+	srv := testkit.StartServer(t)
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	staging := subscribe(t, admin, p.Key, "staging", []string{governance.EventAuditEntry}, "staging")
+	development := subscribe(t, admin, p.Key, "development", []string{governance.EventAuditEntry}, "development")
+
+	if res := do(admin.DeleteEnvironmentWithResponse(t.Context(), p.Key, "development",
+		&management.DeleteEnvironmentParams{IfMatch: ifMatch(1)})); res.StatusCode() != http.StatusNoContent {
+		t.Fatalf("DELETE environment = %d: %s", res.StatusCode(), res.Body)
+	}
+	fanOut(t, srv)
+
+	// Each receives the project-level entries of the subscriptions' creation
+	// from its own on; only the development filter receives the deletion.
+	if got := deliveredTypes(t, admin, p.Key, staging.Id); len(got) != 2 {
+		t.Errorf("staging deliveries %v, want the two creations and not the deletion", got)
+	}
+	if got := deliveredTypes(t, admin, p.Key, development.Id); len(got) != 2 {
+		t.Errorf("development deliveries %v, want its creation and the deletion", got)
+	}
+}

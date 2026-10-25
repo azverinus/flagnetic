@@ -100,6 +100,14 @@ func (r *Record) emit(ctx context.Context, e governance.Entry) error {
 	if err != nil {
 		return err
 	}
+	// An environment's deletion is recorded after its row is gone; the entry
+	// names it, so the event still carries its key and reaches only the
+	// subscriptions filtered to it, not every filter as an event of no
+	// environment would.
+	if environmentKey == "" && !e.Environment.IsZero() && e.Entity.Kind == "environment" &&
+		e.Entity.ID == e.Environment.String() {
+		environmentKey = e.Entity.Key
+	}
 	queued := make([]governance.QueuedEvent, len(derived))
 	for i, d := range derived {
 		event := governance.EntryEvent(id.New[governance.Event](r.ids), e, d, projectKey, environmentKey)
