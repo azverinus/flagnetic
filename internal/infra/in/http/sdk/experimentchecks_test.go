@@ -90,7 +90,9 @@ func (f *sampleRatioFixture) stop(t *testing.T, stop management.ExperimentStop) 
 	return f.exp
 }
 
-func date(at time.Time) *openapi_types.Date { return &openapi_types.Date{Time: at.UTC().Truncate(24 * time.Hour)} }
+func date(at time.Time) *openapi_types.Date {
+	return &openapi_types.Date{Time: at.UTC().Truncate(24 * time.Hour)}
+}
 
 // A day without exposures raises an alert in each environment holding the
 // rule, not at 23 hours 59; the next exposure clears it, an override's
