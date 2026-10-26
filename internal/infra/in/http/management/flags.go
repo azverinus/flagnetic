@@ -293,15 +293,21 @@ func flagOut(v appflags.FlagView) Flag {
 		Lifetime: d.Lifetime, ExpectedRemovalAt: d.ExpectedRemovalAt, AutomaticExposure: d.AutomaticExposure,
 		Variations: d.Variations, ArchivedAt: d.ArchivedAt, CreatedBy: d.CreatedBy, CreatedAt: d.CreatedAt,
 		UpdatedAt: d.UpdatedAt, Version: d.Version,
-		Environments: each(v.Configurations, configurationOut),
-		LastEvaluated: each(v.Configurations, func(c flags.EnvironmentConfiguration) FlagLastEvaluated {
-			out := FlagLastEvaluated{Environment: c.Environment}
-			if at, ok := v.LastEvaluated[c.Environment]; ok {
-				out.LastEvaluatedAt = &at
-			}
-			return out
-		}),
+		Environments:  each(v.Configurations, configurationOut),
+		LastEvaluated: lastEvaluatedOut(v),
 	}
+}
+
+// lastEvaluatedOut returns when v was last evaluated in each environment, by
+// the environments' order.
+func lastEvaluatedOut(v appflags.FlagView) []FlagLastEvaluated {
+	return each(v.Configurations, func(c flags.EnvironmentConfiguration) FlagLastEvaluated {
+		out := FlagLastEvaluated{Environment: c.Environment}
+		if at, ok := v.LastEvaluated[c.Environment]; ok {
+			out.LastEvaluatedAt = &at
+		}
+		return out
+	})
 }
 
 // flagCommand returns the command naming flag of the request's project,

@@ -2139,6 +2139,64 @@ export type FlagEvaluationDay = {
  */
 export type EvaluationSource = "sdk" | "remote_evaluation";
 
+/**
+ * Why a flag is stale; the operation listing stale flags defines each.
+ */
+export type StaleReason =
+  | "lifetime_exceeded"
+  | "not_evaluated"
+  | "owner_inactive"
+  | "finished_rollout"
+  | "experiment_overdue";
+
+/**
+ * A stale flag with why it is stale.
+ */
+export type StaleFlag = {
+  key: string;
+  name: Name;
+  /**
+   * The member accountable for the flag.
+   */
+  owner: string;
+  lifetime: Lifetime;
+  /**
+   * When a temporary flag is expected to be removed; null for a permanent one.
+   */
+  expected_removal_at: string | null;
+  /**
+   * Every reason the flag is stale for, in the order
+   * `lifetime_exceeded`, `not_evaluated`, `owner_inactive`,
+   * `finished_rollout`, `experiment_overdue`.
+   *
+   */
+  reasons: Array<StaleReason>;
+  /**
+   * When an SDK last evaluated the flag in each environment, by the environments' order.
+   */
+  last_evaluated: Array<FlagLastEvaluated>;
+  experiment?: StaleExperiment;
+};
+
+/**
+ * The running experiment past its expected end that makes the flag
+ * stale as `experiment_overdue`, present with that reason only. When
+ * several are, the one due earliest, then the first by key.
+ *
+ */
+export type StaleExperiment = {
+  key: string;
+  expected_end_at: string;
+};
+
+export type StaleFlagList = {
+  items: Array<StaleFlag>;
+  /**
+   * Pass as `cursor` for the next page; null on the last.
+   */
+  next_cursor: string | null;
+};
+
 export type FlagLastEvaluated = {
   environment: Key;
   last_evaluated_at: LastEvaluatedAt;
@@ -7860,6 +7918,74 @@ export type GetExperimentAssignmentResponses = {
 
 export type GetExperimentAssignmentResponse =
   GetExperimentAssignmentResponses[keyof GetExperimentAssignmentResponses];
+
+export type ListStaleFlagsData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+  };
+  query?: {
+    /**
+     * Lists only the flags stale for one of these reasons; absent for every stale flag.
+     */
+    reason?: Array<StaleReason>;
+    /**
+     * The `next_cursor` of the previous page.
+     */
+    cursor?: string;
+    /**
+     * How many entries a page holds at most.
+     */
+    limit?: number;
+  };
+  url: "/projects/{project}/stale-flags";
+};
+
+export type ListStaleFlagsErrors = {
+  /**
+   * `invalid_request`: a parameter that is malformed or out of its range, such as a cursor this API did not return.
+   */
+  400: Problem;
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+};
+
+export type ListStaleFlagsError = ListStaleFlagsErrors[keyof ListStaleFlagsErrors];
+
+export type ListStaleFlagsResponses = {
+  /**
+   * One page of stale flags.
+   */
+  200: StaleFlagList;
+};
+
+export type ListStaleFlagsResponse = ListStaleFlagsResponses[keyof ListStaleFlagsResponses];
 
 export type CheckHashUniformityData = {
   body: HashCheckRequest;

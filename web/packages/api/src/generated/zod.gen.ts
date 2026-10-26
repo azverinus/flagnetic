@@ -1357,6 +1357,28 @@ export const zFlagEvaluations = z.object({
 });
 
 /**
+ * Why a flag is stale; the operation listing stale flags defines each.
+ */
+export const zStaleReason = z.enum([
+  "lifetime_exceeded",
+  "not_evaluated",
+  "owner_inactive",
+  "finished_rollout",
+  "experiment_overdue",
+]);
+
+/**
+ * The running experiment past its expected end that makes the flag
+ * stale as `experiment_overdue`, present with that reason only. When
+ * several are, the one due earliest, then the first by key.
+ *
+ */
+export const zStaleExperiment = z.object({
+  key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
+  expected_end_at: z.iso.date(),
+});
+
+/**
  * When an SDK last evaluated the flag in the environment, by the end of
  * the interval its evaluation summary covers or the time of an
  * exposure it recorded, never later than the server received them;
@@ -1395,6 +1417,25 @@ export const zFlagList = z.object({
 export const zFlagLastEvaluated = z.object({
   environment: zKey,
   last_evaluated_at: zLastEvaluatedAt,
+});
+
+/**
+ * A stale flag with why it is stale.
+ */
+export const zStaleFlag = z.object({
+  key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/),
+  name: zName,
+  owner: z.uuid(),
+  lifetime: zLifetime,
+  expected_removal_at: z.iso.datetime().nullable(),
+  reasons: z.array(zStaleReason).min(1),
+  last_evaluated: z.array(zFlagLastEvaluated),
+  experiment: zStaleExperiment.optional(),
+});
+
+export const zStaleFlagList = z.object({
+  items: z.array(zStaleFlag),
+  next_cursor: z.string().nullable(),
 });
 
 export const zFlagCreate = z.object({
@@ -2941,6 +2982,21 @@ export const zGetExperimentAssignmentQuery = z.object({
  * The unit's buckets, inclusion and variation, and the query recomputing them.
  */
 export const zGetExperimentAssignmentResponse = zExperimentAssignment;
+
+export const zListStaleFlagsPath = z.object({
+  project: z.string(),
+});
+
+export const zListStaleFlagsQuery = z.object({
+  reason: z.array(zStaleReason).optional(),
+  cursor: z.string().optional(),
+  limit: z.int().gte(1).lte(200).optional().default(50),
+});
+
+/**
+ * One page of stale flags.
+ */
+export const zListStaleFlagsResponse = zStaleFlagList;
 
 export const zCheckHashUniformityBody = zHashCheckRequest;
 

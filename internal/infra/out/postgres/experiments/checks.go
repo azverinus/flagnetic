@@ -355,3 +355,22 @@ func (s *Store) AlertOf(ctx context.Context, experiment experiments.ExperimentID
 	}
 	return v, nil
 }
+
+// RunningExperimentsOf returns project's running experiments.
+func (s *Store) RunningExperimentsOf(ctx context.Context, project workspace.ProjectID) ([]experiments.Experiment, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT `+columns+from+` WHERE e.project_id = $1 AND e.status = 'running' ORDER BY e.id`,
+		project.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("listing running experiments: %w", err)
+	}
+	defer rows.Close()
+	out := []experiments.Experiment{}
+	for rows.Next() {
+		e, err := scan(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}

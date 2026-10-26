@@ -200,3 +200,46 @@ func (s *Store) flags(ctx context.Context, sql string, args ...any) ([]flags.Fla
 	}
 	return out, rows.Err()
 }
+
+// UnarchivedFlags returns up to limit of project's flags that are not
+// archived, each with its configuration in every environment by the
+// environments' order, by key in byte order, those whose key is greater
+// than after when it is not "": two queries whatever the limit.
+func (s *Store) UnarchivedFlags(ctx context.Context, project workspace.ProjectID, after string, limit int) ([]appflags.FlagView, error) {
+	fs, err := s.flags(ctx, `SELECT `+flagColumns+` FROM flags
+		WHERE project_id = $1 AND archived_at IS NULL AND ($2 = '' OR key COLLATE "C" > $2)
+		ORDER BY key COLLATE "C" LIMIT $3`, project.Bytes(), after, limit)
+	if err != nil || len(fs) == 0 {
+		return []appflags.FlagView{}, err
+	}
+	ids := make([][16]byte, len(fs))
+	for i, f := range fs {
+		ids[i] = f.ID.Bytes()
+	}
+	rows, err := s.db(ctx).Query(ctx, configurationSelect+`
+		WHERE c.flag_id = ANY($1)
+		ORDER BY e.sort_order, e.key COLLATE "C"`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("reading configurations: %w", err)
+	}
+	defer rows.Close()
+	configs := map[flags.FlagID][]flags.EnvironmentConfiguration{}
+	for rows.Next() {
+		ec, err := scanConfiguration(rows)
+		if err != nil {
+			return nil, err
+		}
+		configs[ec.Configuration.Flag] = append(configs[ec.Configuration.Flag], ec)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("reading configurations: %w", err)
+	}
+	out := make([]appflags.FlagView, len(fs))
+	for i, f := range fs {
+		out[i] = appflags.FlagView{Flag: f, Configurations: configs[f.ID]}
+		if out[i].Configurations == nil {
+			out[i].Configurations = []flags.EnvironmentConfiguration{}
+		}
+	}
+	return out, nil
+}

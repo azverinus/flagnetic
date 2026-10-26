@@ -210,3 +210,25 @@ func (s *Store) LastEvaluated(ctx context.Context, fs []flags.FlagID) (map[flags
 	}
 	return out, nil
 }
+
+// LastSummaryDay returns the latest UTC day project received an SDK's
+// evaluation summary, nil for never. The daily event counts hold only the
+// summaries SDKs sent, never the remote evaluations the server answered.
+func (s *Store) LastSummaryDay(ctx context.Context, project workspace.ProjectID) (*time.Time, error) {
+	var day *time.Time
+	err := s.db(ctx).QueryRow(ctx, `
+		SELECT max(day) FROM event_counts_daily
+		WHERE project_id = $1 AND event_type = 'evaluation_summary' AND count > 0`, project.Bytes()).Scan(&day)
+	if err != nil {
+		return nil, fmt.Errorf("reading when the project last received a summary: %w", err)
+	}
+	return utcDay(day), nil
+}
+
+func utcDay(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	u := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+	return &u
+}

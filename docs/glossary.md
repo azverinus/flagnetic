@@ -177,7 +177,7 @@ What a flag's configuration in one environment serves at a glance: on or off, an
 _Avoid_: status, flag summary (summary is the evaluation summary)
 
 **Stale flag**:
-A flag past its expected lifetime, one that is no longer evaluated by any SDK, one whose owner is deactivated or holds no role in its project (nobody is left to ask before deleting it), or one bound to an overdue experiment.
+A flag past its expected lifetime, one that is no longer evaluated by any SDK, one whose owner is deactivated or holds no role in its project (nobody is left to ask before deleting it), one serving the same variation to everyone in every environment (a finished rollout), or one bound to an overdue experiment.
 _Avoid_: dead flag, zombie, tech debt flag
 
 **Stale-flag digest**:

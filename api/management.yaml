@@ -2874,6 +2874,64 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/stale-flags:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+    get:
+      operationId: listStaleFlags
+      summary: The project's stale flags
+      description: |
+        The project's stale flags with their reasons, by key in byte order
+        (capitals before lower case), to clean up. Archived flags are never
+        listed. A flag is stale for each of these reasons:
+
+        - `lifetime_exceeded`: a temporary flag past its expected removal.
+        - `not_evaluated`: no SDK evaluated the flag or recorded an exposure
+          of it in any environment for 30 days. Judged only when the project
+          received an SDK's evaluation summary on one of those days, and only
+          for a flag created more than 30 days ago. Remote evaluations the
+          server answered do not count.
+        - `owner_inactive`: the owner is deactivated, or is neither an
+          instance admin nor holding a grant in the project.
+        - `finished_rollout`: every environment is on and serves the same
+          variation to everyone, with no prerequisite and no override,
+          either through no rule at all or through a first rule without
+          conditions serving a rollout at 100 %. An environment switched
+          off is never finished.
+        - `experiment_overdue`: a running experiment on the flag is past its
+          expected end, from the UTC day after it; `experiment` names it.
+
+        Page with `cursor` set to the `next_cursor` of the previous page,
+        under the same filters.
+      x-permission: project.read
+      tags: [flags]
+      parameters:
+        - name: reason
+          in: query
+          description: Lists only the flags stale for one of these reasons; absent for every stale flag.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/StaleReason"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of stale flags.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaleFlagList"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/hash-check:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -7921,6 +7979,73 @@ components:
         or the server counting every flag of every remote evaluation it
         answered (`remote_evaluation`).
       enum: [sdk, remote_evaluation]
+    StaleReason:
+      type: string
+      enum: [lifetime_exceeded, not_evaluated, owner_inactive, finished_rollout, experiment_overdue]
+      description: Why a flag is stale; the operation listing stale flags defines each.
+    StaleFlag:
+      type: object
+      description: A stale flag with why it is stale.
+      required: [key, name, owner, lifetime, expected_removal_at, reasons, last_evaluated]
+      properties:
+        key:
+          type: string
+          pattern: "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"
+        name:
+          $ref: "#/components/schemas/Name"
+        owner:
+          type: string
+          format: uuid
+          description: The member accountable for the flag.
+        lifetime:
+          $ref: "#/components/schemas/Lifetime"
+        expected_removal_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When a temporary flag is expected to be removed; null for a permanent one.
+        reasons:
+          type: array
+          minItems: 1
+          description: |
+            Every reason the flag is stale for, in the order
+            `lifetime_exceeded`, `not_evaluated`, `owner_inactive`,
+            `finished_rollout`, `experiment_overdue`.
+          items:
+            $ref: "#/components/schemas/StaleReason"
+        last_evaluated:
+          type: array
+          description: When an SDK last evaluated the flag in each environment, by the environments' order.
+          items:
+            $ref: "#/components/schemas/FlagLastEvaluated"
+        experiment:
+          $ref: "#/components/schemas/StaleExperiment"
+    StaleExperiment:
+      type: object
+      description: |
+        The running experiment past its expected end that makes the flag
+        stale as `experiment_overdue`, present with that reason only. When
+        several are, the one due earliest, then the first by key.
+      required: [key, expected_end_at]
+      properties:
+        key:
+          type: string
+          pattern: "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"
+        expected_end_at:
+          type: string
+          format: date
+    StaleFlagList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaleFlag"
+        next_cursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` for the next page; null on the last.
     FlagLastEvaluated:
       type: object
       required: [environment, last_evaluated_at]
