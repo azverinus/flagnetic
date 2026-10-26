@@ -162,6 +162,20 @@ SDKs report how often they evaluated each flag in [evaluation summaries](sdks/ev
 
 Both lag the SDKs by the rollup's round of 10 seconds, and by as long as a transaction left open in the database holds the rollups back ([Operations](operations.md#raw-events)). A summary row naming a flag deleted since counts in no flag's evaluations.
 
+## Stale flags
+
+`GET /stale-flags` lists the project's stale flags, the ones to clean up, by key in byte order, `limit` per page (50 by default, at most 200) and `cursor` set to the previous page's `next_cursor`. Each item carries the flag's `key`, `name`, `owner`, `lifetime`, `expected_removal_at`, `last_evaluated` in every environment, and its `reasons`, in this order:
+
+| Reason | When |
+| --- | --- |
+| `lifetime_exceeded` | A temporary flag past its expected removal. |
+| `not_evaluated` | No SDK evaluated the flag or recorded an exposure of it in any environment for 30 days. Judged only when the project received an SDK's evaluation summary on one of those days, since an application whose SDKs send none would look unevaluated whatever it reads, and only for a flag created more than 30 days ago, which may not be deployed yet. Remote evaluations do not count (see [Evaluations](#evaluations)). |
+| `owner_inactive` | The owner is deactivated, or is neither an instance admin nor holding a grant in the project: nobody is left to ask before deleting the flag. |
+| `finished_rollout` | Every environment is on and serves the same variation to everyone, with no prerequisite and no override: through no rule at all, or through a first rule without conditions serving a rollout at 100 %. An environment switched off never counts, so a flag never switched on is not a finished rollout. The code can keep that one variation's branch. |
+| `experiment_overdue` | A running experiment on the flag is past its expected end, from the UTC day after it. The item's `experiment` names it with its `expected_end_at`; when several are, the one due earliest. |
+
+`reason` (repeatable) lists only the flags stale for one of the reasons given. Archived flags are never listed. The report reads `last_evaluated_at`, so it lags the SDKs as evaluations do.
+
 ## Trying a configuration
 
 `POST /environments/{environment}/evaluate` evaluates flags for a context as the environment's SDKs would, with the full reason of each result: the served value and variation, the reason, the rule that served, an error code, and for a rollout the unit's bucket and the rollout's salt. It evaluates every flag that is not archived, or those `flags` names. With a `draft` (`{flag, configuration}`) it evaluates that flag's unsaved configuration in place of its saved one, validated as a replace would be and never stored. It answers the environment's `ruleset_version` beside the results (every write that changes a ruleset moves its version to the greater of the previous version plus one and the server clock in milliseconds, so versions only increase and a version is never handed out twice, even after a database failover or restore that lost recent writes), needs only `project.read`, and records no exposure.

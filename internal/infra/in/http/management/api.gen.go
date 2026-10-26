@@ -574,6 +574,33 @@ func (e SessionMethod) Valid() bool {
 	}
 }
 
+// Defines values for StaleReason.
+const (
+	StaleReasonExperimentOverdue StaleReason = "experiment_overdue"
+	StaleReasonFinishedRollout   StaleReason = "finished_rollout"
+	StaleReasonLifetimeExceeded  StaleReason = "lifetime_exceeded"
+	StaleReasonNotEvaluated      StaleReason = "not_evaluated"
+	StaleReasonOwnerInactive     StaleReason = "owner_inactive"
+)
+
+// Valid indicates whether the value is a known member of the StaleReason enum.
+func (e StaleReason) Valid() bool {
+	switch e {
+	case StaleReasonExperimentOverdue:
+		return true
+	case StaleReasonFinishedRollout:
+		return true
+	case StaleReasonLifetimeExceeded:
+		return true
+	case StaleReasonNotEvaluated:
+		return true
+	case StaleReasonOwnerInactive:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WebhookCreatorKind.
 const (
 	WebhookCreatorKindMember WebhookCreatorKind = "member"
@@ -2907,6 +2934,52 @@ type SignInRequest struct {
 	Password string `json:"password"`
 }
 
+// StaleExperiment The running experiment past its expected end that makes the flag
+// stale as `experiment_overdue`, present with that reason only. When
+// several are, the one due earliest, then the first by key.
+type StaleExperiment struct {
+	ExpectedEndAt openapi_types.Date `json:"expected_end_at"`
+	Key           string             `json:"key"`
+}
+
+// StaleFlag A stale flag with why it is stale.
+type StaleFlag struct {
+	// ExpectedRemovalAt When a temporary flag is expected to be removed; null for a permanent one.
+	ExpectedRemovalAt *time.Time `json:"expected_removal_at"`
+
+	// Experiment The running experiment past its expected end that makes the flag
+	// stale as `experiment_overdue`, present with that reason only. When
+	// several are, the one due earliest, then the first by key.
+	Experiment *StaleExperiment `json:"experiment,omitempty"`
+	Key        string           `json:"key"`
+
+	// LastEvaluated When an SDK last evaluated the flag in each environment, by the environments' order.
+	LastEvaluated []FlagLastEvaluated `json:"last_evaluated"`
+
+	// Lifetime A temporary flag is meant to be removed by its expected removal date; a permanent one stays.
+	Lifetime Lifetime `json:"lifetime"`
+	Name     Name     `json:"name"`
+
+	// Owner The member accountable for the flag.
+	Owner openapi_types.UUID `json:"owner"`
+
+	// Reasons Every reason the flag is stale for, in the order
+	// `lifetime_exceeded`, `not_evaluated`, `owner_inactive`,
+	// `finished_rollout`, `experiment_overdue`.
+	Reasons []StaleReason `json:"reasons"`
+}
+
+// StaleFlagList defines model for StaleFlagList.
+type StaleFlagList struct {
+	Items []StaleFlag `json:"items"`
+
+	// NextCursor Pass as `cursor` for the next page; null on the last.
+	NextCursor *string `json:"next_cursor"`
+}
+
+// StaleReason Why a flag is stale; the operation listing stale flags defines each.
+type StaleReason string
+
 // UnitType defines model for UnitType.
 type UnitType struct {
 	Description Description        `json:"description"`
@@ -3925,6 +3998,18 @@ type UpdateSegmentParams struct {
 	// the current one `412 version_mismatch`, both judged after the request
 	// is validated.
 	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListStaleFlagsParams defines parameters for ListStaleFlags.
+type ListStaleFlagsParams struct {
+	// Reason Lists only the flags stale for one of these reasons; absent for every stale flag.
+	Reason *[]StaleReason `form:"reason,omitempty" json:"reason,omitempty"`
+
+	// Cursor The `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit How many entries a page holds at most.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // StreamProjectChangesParams defines parameters for StreamProjectChanges.
@@ -6406,6 +6491,34 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 	ListSegmentUsages(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListStaleFlags The project's stale flags
+	//
+	// The project's stale flags with their reasons, by key in byte order
+	// (capitals before lower case), to clean up. Archived flags are never
+	// listed. A flag is stale for each of these reasons:
+	//
+	// - `lifetime_exceeded`: a temporary flag past its expected removal.
+	// - `not_evaluated`: no SDK evaluated the flag or recorded an exposure
+	//   of it in any environment for 30 days. Judged only when the project
+	//   received an SDK's evaluation summary on one of those days, and only
+	//   for a flag created more than 30 days ago. Remote evaluations the
+	//   server answered do not count.
+	// - `owner_inactive`: the owner is deactivated, or is neither an
+	//   instance admin nor holding a grant in the project.
+	// - `finished_rollout`: every environment is on and serves the same
+	//   variation to everyone, with no prerequisite and no override,
+	//   either through no rule at all or through a first rule without
+	//   conditions serving a rollout at 100 %. An environment switched
+	//   off is never finished.
+	// - `experiment_overdue`: a running experiment on the flag is past its
+	//   expected end, from the UTC day after it; `experiment` names it.
+	//
+	// Page with `cursor` set to the `next_cursor` of the previous page,
+	// under the same filters.
+	//
+	// Corresponds with GET /projects/{project}/stale-flags (the `ListStaleFlags` operationId).
+	ListStaleFlags(ctx context.Context, project ProjectKey, params *ListStaleFlagsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StreamProjectChanges The project's change stream
 	//
@@ -10257,6 +10370,44 @@ func (c *Client) UpdateSegment(ctx context.Context, project ProjectKey, segment 
 // Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 func (c *Client) ListSegmentUsages(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListSegmentUsagesRequest(c.Server, project, segment)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListStaleFlags The project's stale flags
+//
+// The project's stale flags with their reasons, by key in byte order
+// (capitals before lower case), to clean up. Archived flags are never
+// listed. A flag is stale for each of these reasons:
+//
+//   - `lifetime_exceeded`: a temporary flag past its expected removal.
+//   - `not_evaluated`: no SDK evaluated the flag or recorded an exposure
+//     of it in any environment for 30 days. Judged only when the project
+//     received an SDK's evaluation summary on one of those days, and only
+//     for a flag created more than 30 days ago. Remote evaluations the
+//     server answered do not count.
+//   - `owner_inactive`: the owner is deactivated, or is neither an
+//     instance admin nor holding a grant in the project.
+//   - `finished_rollout`: every environment is on and serves the same
+//     variation to everyone, with no prerequisite and no override,
+//     either through no rule at all or through a first rule without
+//     conditions serving a rollout at 100 %. An environment switched
+//     off is never finished.
+//   - `experiment_overdue`: a running experiment on the flag is past its
+//     expected end, from the UTC day after it; `experiment` names it.
+//
+// Page with `cursor` set to the `next_cursor` of the previous page,
+// under the same filters.
+//
+// Corresponds with GET /projects/{project}/stale-flags (the `ListStaleFlags` operationId).
+func (c *Client) ListStaleFlags(ctx context.Context, project ProjectKey, params *ListStaleFlagsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListStaleFlagsRequest(c.Server, project, params)
 	if err != nil {
 		return nil, err
 	}
@@ -17145,6 +17296,91 @@ func NewListSegmentUsagesRequest(server string, project ProjectKey, segment Segm
 	return req, nil
 }
 
+// NewListStaleFlagsRequest constructs an http.Request for the ListStaleFlags method
+func NewListStaleFlagsRequest(server string, project ProjectKey, params *ListStaleFlagsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/stale-flags", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Reason != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "reason", *params.Reason, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewStreamProjectChangesRequest constructs an http.Request for the StreamProjectChanges method
 func NewStreamProjectChangesRequest(server string, project ProjectKey, params *StreamProjectChangesParams) (*http.Request, error) {
 	var err error
@@ -20350,6 +20586,36 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/segments/{segment}/usages (the `ListSegmentUsages` operationId).
 	ListSegmentUsagesWithResponse(ctx context.Context, project ProjectKey, segment SegmentKey, reqEditors ...RequestEditorFn) (*ListSegmentUsagesResponse, error)
+
+	// ListStaleFlagsWithResponse The project's stale flags
+	//
+	// The project's stale flags with their reasons, by key in byte order
+	// (capitals before lower case), to clean up. Archived flags are never
+	// listed. A flag is stale for each of these reasons:
+	//
+	// - `lifetime_exceeded`: a temporary flag past its expected removal.
+	// - `not_evaluated`: no SDK evaluated the flag or recorded an exposure
+	//   of it in any environment for 30 days. Judged only when the project
+	//   received an SDK's evaluation summary on one of those days, and only
+	//   for a flag created more than 30 days ago. Remote evaluations the
+	//   server answered do not count.
+	// - `owner_inactive`: the owner is deactivated, or is neither an
+	//   instance admin nor holding a grant in the project.
+	// - `finished_rollout`: every environment is on and serves the same
+	//   variation to everyone, with no prerequisite and no override,
+	//   either through no rule at all or through a first rule without
+	//   conditions serving a rollout at 100 %. An environment switched
+	//   off is never finished.
+	// - `experiment_overdue`: a running experiment on the flag is past its
+	//   expected end, from the UTC day after it; `experiment` names it.
+	//
+	// Page with `cursor` set to the `next_cursor` of the previous page,
+	// under the same filters.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /projects/{project}/stale-flags (the `ListStaleFlags` operationId).
+	ListStaleFlagsWithResponse(ctx context.Context, project ProjectKey, params *ListStaleFlagsParams, reqEditors ...RequestEditorFn) (*ListStaleFlagsResponse, error)
 
 	// StreamProjectChangesWithResponse The project's change stream
 	//
@@ -30196,6 +30462,82 @@ func (r ListSegmentUsagesResponse) ContentType() string {
 	return ""
 }
 
+// ListStaleFlagsResponse401Headers the declared response headers of an HTTP 401 response for ListStaleFlags
+type ListStaleFlagsResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListStaleFlagsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *StaleFlagList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListStaleFlagsResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListStaleFlagsResponse) GetJSON200() *StaleFlagList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListStaleFlagsResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListStaleFlagsResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListStaleFlagsResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListStaleFlagsResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListStaleFlagsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListStaleFlagsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListStaleFlagsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListStaleFlagsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // StreamProjectChangesResponse200Headers the declared response headers of an HTTP 200 response for StreamProjectChanges
 type StreamProjectChangesResponse200Headers struct {
 	CacheControl    *string
@@ -34853,6 +35195,42 @@ func (c *ClientWithResponses) ListSegmentUsagesWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseListSegmentUsagesResponse(rsp)
+}
+
+// ListStaleFlagsWithResponse The project's stale flags
+//
+// The project's stale flags with their reasons, by key in byte order
+// (capitals before lower case), to clean up. Archived flags are never
+// listed. A flag is stale for each of these reasons:
+//
+//   - `lifetime_exceeded`: a temporary flag past its expected removal.
+//   - `not_evaluated`: no SDK evaluated the flag or recorded an exposure
+//     of it in any environment for 30 days. Judged only when the project
+//     received an SDK's evaluation summary on one of those days, and only
+//     for a flag created more than 30 days ago. Remote evaluations the
+//     server answered do not count.
+//   - `owner_inactive`: the owner is deactivated, or is neither an
+//     instance admin nor holding a grant in the project.
+//   - `finished_rollout`: every environment is on and serves the same
+//     variation to everyone, with no prerequisite and no override,
+//     either through no rule at all or through a first rule without
+//     conditions serving a rollout at 100 %. An environment switched
+//     off is never finished.
+//   - `experiment_overdue`: a running experiment on the flag is past its
+//     expected end, from the UTC day after it; `experiment` names it.
+//
+// Page with `cursor` set to the `next_cursor` of the previous page,
+// under the same filters.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /projects/{project}/stale-flags (the `ListStaleFlags` operationId).
+func (c *ClientWithResponses) ListStaleFlagsWithResponse(ctx context.Context, project ProjectKey, params *ListStaleFlagsParams, reqEditors ...RequestEditorFn) (*ListStaleFlagsResponse, error) {
+	rsp, err := c.ListStaleFlags(ctx, project, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListStaleFlagsResponse(rsp)
 }
 
 // StreamProjectChangesWithResponse The project's change stream
@@ -44042,6 +44420,73 @@ func ParseListSegmentUsagesResponse(rsp *http.Response) (*ListSegmentUsagesRespo
 	return response, nil
 }
 
+// ParseListStaleFlagsResponse parses an HTTP response from a ListStaleFlagsWithResponse call
+func ParseListStaleFlagsResponse(rsp *http.Response) (*ListStaleFlagsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListStaleFlagsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest StaleFlagList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListStaleFlagsResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseStreamProjectChangesResponse parses an HTTP response from a StreamProjectChangesWithResponse call
 func ParseStreamProjectChangesResponse(rsp *http.Response) (*StreamProjectChangesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -45787,6 +46232,9 @@ type ServerInterface interface {
 	// ListSegmentUsages Where a segment is used
 	// (GET /projects/{project}/segments/{segment}/usages)
 	ListSegmentUsages(w http.ResponseWriter, r *http.Request, project ProjectKey, segment SegmentKey)
+	// ListStaleFlags The project's stale flags
+	// (GET /projects/{project}/stale-flags)
+	ListStaleFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListStaleFlagsParams)
 	// StreamProjectChanges The project's change stream
 	// (GET /projects/{project}/stream)
 	StreamProjectChanges(w http.ResponseWriter, r *http.Request, project ProjectKey, params StreamProjectChangesParams)
@@ -51056,6 +51504,74 @@ func (siw *ServerInterfaceWrapper) ListSegmentUsages(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListStaleFlags operation middleware
+func (siw *ServerInterfaceWrapper) ListStaleFlags(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListStaleFlagsParams
+
+	// ------------- Optional query parameter "reason" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "reason", r.URL.Query(), &params.Reason, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "reason"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reason", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListStaleFlags(w, r, project, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StreamProjectChanges operation middleware
 func (siw *ServerInterfaceWrapper) StreamProjectChanges(w http.ResponseWriter, r *http.Request) {
 
@@ -52043,6 +52559,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/archive", wrapper.ArchiveExperiment)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/clone", wrapper.CloneExperiment)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/assignment", wrapper.GetExperimentAssignment)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/stale-flags", wrapper.ListStaleFlags)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/hash-check", wrapper.CheckHashUniformity)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/exposures", wrapper.GetExperimentExposures)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/experiments/{experiment}/exposures/timeline", wrapper.GetExperimentExposureTimeline)
@@ -64151,6 +64668,96 @@ func (response ListSegmentUsages404ApplicationProblemPlusJSONResponse) VisitList
 	return err
 }
 
+type ListStaleFlagsRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Params  ListStaleFlagsParams
+}
+
+type ListStaleFlagsResponseObject interface {
+	VisitListStaleFlagsResponse(w http.ResponseWriter) error
+}
+
+type ListStaleFlags200JSONResponse StaleFlagList
+
+func (response ListStaleFlags200JSONResponse) VisitListStaleFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListStaleFlags400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListStaleFlags400ApplicationProblemPlusJSONResponse) VisitListStaleFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListStaleFlags401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListStaleFlags401ApplicationProblemPlusJSONResponse) VisitListStaleFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListStaleFlags403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListStaleFlags403ApplicationProblemPlusJSONResponse) VisitListStaleFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListStaleFlags404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListStaleFlags404ApplicationProblemPlusJSONResponse) VisitListStaleFlagsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type StreamProjectChangesRequestObject struct {
 	Project ProjectKey `json:"project"`
 	Params  StreamProjectChangesParams
@@ -66371,6 +66978,9 @@ type StrictServerInterface interface {
 	// ListSegmentUsages Where a segment is used
 	// (GET /projects/{project}/segments/{segment}/usages)
 	ListSegmentUsages(ctx context.Context, request ListSegmentUsagesRequestObject) (ListSegmentUsagesResponseObject, error)
+	// ListStaleFlags The project's stale flags
+	// (GET /projects/{project}/stale-flags)
+	ListStaleFlags(ctx context.Context, request ListStaleFlagsRequestObject) (ListStaleFlagsResponseObject, error)
 	// StreamProjectChanges The project's change stream
 	// (GET /projects/{project}/stream)
 	StreamProjectChanges(ctx context.Context, request StreamProjectChangesRequestObject) (StreamProjectChangesResponseObject, error)
@@ -69809,6 +70419,33 @@ func (sh *strictHandler) ListSegmentUsages(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListSegmentUsagesResponseObject); ok {
 		if err := validResponse.VisitListSegmentUsagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListStaleFlags operation middleware
+func (sh *strictHandler) ListStaleFlags(w http.ResponseWriter, r *http.Request, project ProjectKey, params ListStaleFlagsParams) {
+	var request ListStaleFlagsRequestObject
+
+	request.Project = project
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListStaleFlags(ctx, request.(ListStaleFlagsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListStaleFlags")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListStaleFlagsResponseObject); ok {
+		if err := validResponse.VisitListStaleFlagsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

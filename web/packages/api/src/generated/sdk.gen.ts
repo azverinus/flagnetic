@@ -277,6 +277,9 @@ import type {
   ListSegmentUsagesData,
   ListSegmentUsagesErrors,
   ListSegmentUsagesResponses,
+  ListStaleFlagsData,
+  ListStaleFlagsErrors,
+  ListStaleFlagsResponses,
   ListUnitTypesData,
   ListUnitTypesErrors,
   ListUnitTypesResponses,
@@ -2576,6 +2579,49 @@ export const getExperimentAssignment = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/experiments/{experiment}/assignment",
+    ...options,
+  });
+
+/**
+ * The project's stale flags
+ *
+ * The project's stale flags with their reasons, by key in byte order
+ * (capitals before lower case), to clean up. Archived flags are never
+ * listed. A flag is stale for each of these reasons:
+ *
+ * - `lifetime_exceeded`: a temporary flag past its expected removal.
+ * - `not_evaluated`: no SDK evaluated the flag or recorded an exposure
+ * of it in any environment for 30 days. Judged only when the project
+ * received an SDK's evaluation summary on one of those days, and only
+ * for a flag created more than 30 days ago. Remote evaluations the
+ * server answered do not count.
+ * - `owner_inactive`: the owner is deactivated, or is neither an
+ * instance admin nor holding a grant in the project.
+ * - `finished_rollout`: every environment is on and serves the same
+ * variation to everyone, with no prerequisite and no override,
+ * either through no rule at all or through a first rule without
+ * conditions serving a rollout at 100 %. An environment switched
+ * off is never finished.
+ * - `experiment_overdue`: a running experiment on the flag is past its
+ * expected end, from the UTC day after it; `experiment` names it.
+ *
+ * Page with `cursor` set to the `next_cursor` of the previous page,
+ * under the same filters.
+ *
+ */
+export const listStaleFlags = <ThrowOnError extends boolean = false>(
+  options: Options<ListStaleFlagsData, ThrowOnError>,
+): RequestResult<ListStaleFlagsResponses, ListStaleFlagsErrors, ThrowOnError> =>
+  (options.client ?? client).get<ListStaleFlagsResponses, ListStaleFlagsErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/stale-flags",
     ...options,
   });
 

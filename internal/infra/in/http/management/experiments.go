@@ -42,7 +42,7 @@ func (a *api) ListExperiments(ctx context.Context, req ListExperimentsRequestObj
 		page.Limit = *l
 	}
 	if c := req.Params.Cursor; c != nil {
-		after, err := decodeExperimentCursor(*c)
+		after, err := decodeKeyCursor(*c)
 		if err != nil {
 			return nil, err
 		}
@@ -54,21 +54,21 @@ func (a *api) ListExperiments(ctx context.Context, req ListExperimentsRequestObj
 	}
 	out := ListExperiments200JSONResponse{Items: each(list, experimentOut)}
 	if next != nil {
-		cursor := encodeExperimentCursor(*next)
+		cursor := encodeKeyCursor(*next)
 		out.NextCursor = &cursor
 	}
 	return out, nil
 }
 
-// encodeExperimentCursor returns the cursor of the page starting after the
-// experiment keyed key. It is opaque, so the order a page follows can change
+// encodeKeyCursor returns the cursor of the page starting after the
+// entity keyed key, in a list ordered by key. It is opaque, so the order a page follows can change
 // without breaking a client that only passes it back.
-func encodeExperimentCursor(key string) string {
+func encodeKeyCursor(key string) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(key))
 }
 
-// decodeExperimentCursor reads cursor, refusing one this API did not return.
-func decodeExperimentCursor(cursor string) (string, error) {
+// decodeKeyCursor reads cursor, refusing one this API did not return.
+func decodeKeyCursor(cursor string) (string, error) {
 	b, err := base64.RawURLEncoding.DecodeString(cursor)
 	if err != nil || len(b) == 0 || !utf8.Valid(b) {
 		return "", flaghttp.InvalidRequest("cursor is not a next_cursor this API returned")

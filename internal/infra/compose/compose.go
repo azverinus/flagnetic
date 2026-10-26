@@ -325,7 +325,13 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
 			Tx: tx, Projects: flagStore, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		GetFlag:    appflags.NewGetFlag(tx, flagStore, eventStore),
+		GetFlag: appflags.NewGetFlag(tx, flagStore, eventStore),
+		// Stale flags are judged from what the events context counts and
+		// the experiments context's running experiments.
+		ListStaleFlags: appflags.NewListStaleFlags(appflags.StaleDeps{
+			Snapshots: tx, Store: flagStore, Evaluations: eventStore, Summaries: eventStore, Experiments: experimentStore,
+			Owners: owners, Clock: d.Clock,
+		}),
 		UpdateFlag: updateFlag,
 
 		ArchiveFlag: appflags.NewArchiveFlag(appflags.ArchiveFlagDeps{
