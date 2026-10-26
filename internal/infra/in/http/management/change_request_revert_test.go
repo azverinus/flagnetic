@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
@@ -193,5 +194,40 @@ func TestRebaseAndCopyOfARevertKeepItsTarget(t *testing.T) {
 	gone := rebaseChangeRequest(t, c, key, rebased)
 	if got := violationsOf(t, "rebasing onto a variation gone", gone.StatusCode(), gone.Body, "invalid_configuration"); len(got) == 0 {
 		t.Errorf("rebasing onto a variation gone = %d: %s", gone.StatusCode(), gone.Body)
+	}
+}
+
+func TestTheSchedulerAppliesARevertChangeRequestAsARevertByTheSystem(t *testing.T) {
+	f := startSchedules(t)
+	key := f.project.Key
+	v2 := mustPut(t, f.admin, key, "checkout_title", "production", 1, targeting())
+	cleared := asPut(v2)
+	*cleared.Rules = (*cleared.Rules)[:1]
+	mustPut(t, f.admin, key, "checkout_title", "production", 2, cleared)
+	setProtected(t, f.admin, key, "production", true)
+
+	at := f.clock.Now().Add(time.Hour)
+	body := revertRequest("production", 2)
+	body.Open, body.ApplyAt = ptr(true), &at
+	cr := mustApprove(t, f.maintainer.ClientWithResponses, key, createChangeRequest(t, f.dev.ClientWithResponses, key, body))
+
+	f.clock.Advance(time.Hour)
+	mustTick(t, f.srv)
+	if got := getChangeRequest(t, f.admin, key, cr); got.State != management.ChangeRequestStateApplied ||
+		got.AppliedBy == nil || got.AppliedBy.Kind != management.ChangeRequestApplierKindSystem {
+		t.Fatalf("at its time: %+v applied by %+v", got, got.AppliedBy)
+	}
+	if got := getConfiguration(t, f.admin, key, "checkout_title", "production"); got.Version != 4 || !sameTargeting(got, v2) {
+		t.Errorf("configuration = %+v\nwant version 2 whole = %+v", got, v2)
+	}
+	var actions []string
+	for _, e := range applicationEntries(t, f.srv, cr) {
+		actions = append(actions, e.Action)
+		if e.Actor.Kind != management.ActorKindSystem {
+			t.Errorf("%s by %+v, want the system", e.Action, e.Actor)
+		}
+	}
+	if !slices.Equal(actions, []string{"change_request.applied", "flag.reverted"}) {
+		t.Errorf("entries of the application = %v", actions)
 	}
 }
