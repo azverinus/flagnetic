@@ -243,12 +243,21 @@ func (e EventType) Valid() bool {
 
 // Defines values for ExperimentAlertKind.
 const (
-	ExperimentAlertKindSrm ExperimentAlertKind = "srm"
+	ExperimentAlertKindExposureConflicts ExperimentAlertKind = "exposure_conflicts"
+	ExperimentAlertKindNoExposures       ExperimentAlertKind = "no_exposures"
+	ExperimentAlertKindPastExpectedEnd   ExperimentAlertKind = "past_expected_end"
+	ExperimentAlertKindSrm               ExperimentAlertKind = "srm"
 )
 
 // Valid indicates whether the value is a known member of the ExperimentAlertKind enum.
 func (e ExperimentAlertKind) Valid() bool {
 	switch e {
+	case ExperimentAlertKindExposureConflicts:
+		return true
+	case ExperimentAlertKindNoExposures:
+		return true
+	case ExperimentAlertKindPastExpectedEnd:
+		return true
 	case ExperimentAlertKindSrm:
 		return true
 	default:
@@ -1400,17 +1409,28 @@ type ExperimentAlert struct {
 	Environment *string            `json:"environment"`
 	Id          openapi_types.UUID `json:"id"`
 
-	// Kind `srm`: the sample-ratio check found first exposures out of line with the weights.
+	// Kind `srm`: the sample-ratio check found first exposures out of line
+	// with the weights. `no_exposures`: no exposure for 24 hours in an
+	// environment holding the rule. `exposure_conflicts`: too many units
+	// exposed to another variation than their first one.
+	// `past_expected_end`: the experiment runs past its expected end.
 	Kind     ExperimentAlertKind `json:"kind"`
 	RaisedAt time.Time           `json:"raised_at"`
 }
 
 // ExperimentAlertDetails What the check found when it raised the alert; the block of the alert's kind is set, every other one is null.
 type ExperimentAlertDetails struct {
-	SampleRatio *SampleRatioAlertDetails `json:"sample_ratio"`
+	ExposureConflicts *ExposureConflictsAlertDetails `json:"exposure_conflicts"`
+	NoExposures       *NoExposuresAlertDetails       `json:"no_exposures"`
+	PastExpectedEnd   *PastExpectedEndAlertDetails   `json:"past_expected_end"`
+	SampleRatio       *SampleRatioAlertDetails       `json:"sample_ratio"`
 }
 
-// ExperimentAlertKind `srm`: the sample-ratio check found first exposures out of line with the weights.
+// ExperimentAlertKind `srm`: the sample-ratio check found first exposures out of line
+// with the weights. `no_exposures`: no exposure for 24 hours in an
+// environment holding the rule. `exposure_conflicts`: too many units
+// exposed to another variation than their first one.
+// `past_expected_end`: the experiment runs past its expected end.
 type ExperimentAlertKind string
 
 // ExperimentAlertList defines model for ExperimentAlertList.
@@ -1590,6 +1610,21 @@ type ExposureConflict struct {
 // ExposureConflicts defines model for ExposureConflicts.
 type ExposureConflicts struct {
 	Items []ExposureConflict `json:"items"`
+}
+
+// ExposureConflictsAlertDetails defines model for ExposureConflictsAlertDetails.
+type ExposureConflictsAlertDetails struct {
+	// ConflictingUnits The units with at least one such exposure.
+	ConflictingUnits int64 `json:"conflicting_units"`
+
+	// Conflicts The exposures naming another variation than their unit's first exposure.
+	Conflicts int64 `json:"conflicts"`
+
+	// FirstExposures The first exposures in the environment.
+	FirstExposures int64 `json:"first_exposures"`
+
+	// Threshold `max(3, min(10, ceil(first_exposures / 1000)))`, which `conflicts` reached.
+	Threshold int64 `json:"threshold"`
 }
 
 // ExposureDay defines model for ExposureDay.
@@ -2140,6 +2175,15 @@ type MemberStatus string
 // Name defines model for Name.
 type Name = string
 
+// NoExposuresAlertDetails defines model for NoExposuresAlertDetails.
+type NoExposuresAlertDetails struct {
+	// LastExposureAt When the server last received an exposure in the environment, overrides aside; null when it never did.
+	LastExposureAt *time.Time `json:"last_exposure_at"`
+
+	// Since Since when no exposure came, the later of the start and the last exposure.
+	Since time.Time `json:"since"`
+}
+
 // Override A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
 type Override struct {
 	// AddedBy The member who last wrote the override; null when a project token did.
@@ -2178,6 +2222,12 @@ type PasswordChange struct {
 
 	// NewPassword 12 to 128 characters, or the instance's minimum length; not containing the part of the email before the @, nor a common password.
 	NewPassword string `json:"new_password"`
+}
+
+// PastExpectedEndAlertDetails defines model for PastExpectedEndAlertDetails.
+type PastExpectedEndAlertDetails struct {
+	// ExpectedEndAt The expected end the experiment passed.
+	ExpectedEndAt openapi_types.Date `json:"expected_end_at"`
 }
 
 // PatchOperation One operation of an RFC 6902 JSON Patch; `value` is absent from a `remove`.
@@ -3475,6 +3525,18 @@ type ListExperimentsParams struct {
 
 	// IncludeArchived Lists archived experiments too.
 	IncludeArchived *bool `form:"include_archived,omitempty" json:"include_archived,omitempty"`
+
+	// PastExpectedEnd `true` lists only running experiments past their expected end:
+	// from the UTC day after the `expected_end_at` date, as the
+	// `past_expected_end` alert. `false` or absent filters nothing.
+	PastExpectedEnd *bool `form:"past_expected_end,omitempty" json:"past_expected_end,omitempty"`
+
+	// AwaitingCodeRemoval `true` lists only stopped experiments whose flag SDKs still
+	// evaluate: in some environment, an SDK reported evaluations of
+	// the flag on one of the last 7 UTC days, today included, and
+	// evaluated it after the stop. Remote evaluations the server
+	// answered do not count. `false` or absent filters nothing.
+	AwaitingCodeRemoval *bool `form:"awaiting_code_removal,omitempty" json:"awaiting_code_removal,omitempty"`
 
 	// Cursor The `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -5191,10 +5253,28 @@ type ClientInterface interface {
 	// returning after it cleared raises a new alert. At most one alert of a
 	// kind is active per environment.
 	//
-	// `srm` is raised by the sample-ratio check in an environment holding
-	// the experiment's rule, at a p-value below 0.001, and cleared above
-	// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-	// the audit log as `experiment.alert_raised` and
+	// The checks run every 10 minutes over every running experiment.
+	//
+	// - `srm` is raised by the sample-ratio check in an environment
+	//   holding the experiment's rule, at a p-value below 0.001, and
+	//   cleared above 0.01 (see `GET .../exposures`).
+	// - `no_exposures` is raised in an environment holding the rule once
+	//   the server received no exposure there, overrides aside, for 24
+	//   hours since the start or since the last one; it clears with the
+	//   next exposure, when the environment stops holding the rule, and
+	//   at the stop.
+	// - `exposure_conflicts` is raised in an environment holding the rule
+	//   once the exposures naming another variation than their unit's
+	//   first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+	//   and cleared when they fall below it as first exposures grow.
+	// - `past_expected_end`, about the experiment as a whole
+	//   (`environment` null), is raised from the UTC day after the
+	//   expected end, once until it clears: when the expected end moves
+	//   to today or later, and at the stop.
+	//
+	// A stop leaves `srm` and `exposure_conflicts` active: they are what
+	// the exposures came to. Raising and clearing are recorded in the
+	// audit log as `experiment.alert_raised` and
 	// `experiment.alert_cleared` by the system.
 	//
 	// Corresponds with GET /projects/{project}/experiments/{experiment}/alerts (the `ListExperimentAlerts` operationId).
@@ -8432,10 +8512,28 @@ func (c *Client) UpdateExperiment(ctx context.Context, project ProjectKey, exper
 // returning after it cleared raises a new alert. At most one alert of a
 // kind is active per environment.
 //
-// `srm` is raised by the sample-ratio check in an environment holding
-// the experiment's rule, at a p-value below 0.001, and cleared above
-// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-// the audit log as `experiment.alert_raised` and
+// The checks run every 10 minutes over every running experiment.
+//
+//   - `srm` is raised by the sample-ratio check in an environment
+//     holding the experiment's rule, at a p-value below 0.001, and
+//     cleared above 0.01 (see `GET .../exposures`).
+//   - `no_exposures` is raised in an environment holding the rule once
+//     the server received no exposure there, overrides aside, for 24
+//     hours since the start or since the last one; it clears with the
+//     next exposure, when the environment stops holding the rule, and
+//     at the stop.
+//   - `exposure_conflicts` is raised in an environment holding the rule
+//     once the exposures naming another variation than their unit's
+//     first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+//     and cleared when they fall below it as first exposures grow.
+//   - `past_expected_end`, about the experiment as a whole
+//     (`environment` null), is raised from the UTC day after the
+//     expected end, once until it clears: when the expected end moves
+//     to today or later, and at the stop.
+//
+// A stop leaves `srm` and `exposure_conflicts` active: they are what
+// the exposures came to. Raising and clearing are recorded in the
+// audit log as `experiment.alert_raised` and
 // `experiment.alert_cleared` by the system.
 //
 // Corresponds with GET /projects/{project}/experiments/{experiment}/alerts (the `ListExperimentAlerts` operationId).
@@ -13917,6 +14015,30 @@ func NewListExperimentsRequest(server string, project ProjectKey, params *ListEx
 
 		}
 
+		if params.PastExpectedEnd != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "past_expected_end", *params.PastExpectedEnd, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AwaitingCodeRemoval != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "awaiting_code_removal", *params.AwaitingCodeRemoval, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Cursor != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
@@ -18877,10 +18999,28 @@ type ClientWithResponsesInterface interface {
 	// returning after it cleared raises a new alert. At most one alert of a
 	// kind is active per environment.
 	//
-	// `srm` is raised by the sample-ratio check in an environment holding
-	// the experiment's rule, at a p-value below 0.001, and cleared above
-	// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-	// the audit log as `experiment.alert_raised` and
+	// The checks run every 10 minutes over every running experiment.
+	//
+	// - `srm` is raised by the sample-ratio check in an environment
+	//   holding the experiment's rule, at a p-value below 0.001, and
+	//   cleared above 0.01 (see `GET .../exposures`).
+	// - `no_exposures` is raised in an environment holding the rule once
+	//   the server received no exposure there, overrides aside, for 24
+	//   hours since the start or since the last one; it clears with the
+	//   next exposure, when the environment stops holding the rule, and
+	//   at the stop.
+	// - `exposure_conflicts` is raised in an environment holding the rule
+	//   once the exposures naming another variation than their unit's
+	//   first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+	//   and cleared when they fall below it as first exposures grow.
+	// - `past_expected_end`, about the experiment as a whole
+	//   (`environment` null), is raised from the UTC day after the
+	//   expected end, once until it clears: when the expected end moves
+	//   to today or later, and at the stop.
+	//
+	// A stop leaves `srm` and `exposure_conflicts` active: they are what
+	// the exposures came to. Raising and clearing are recorded in the
+	// audit log as `experiment.alert_raised` and
 	// `experiment.alert_cleared` by the system.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -32971,10 +33111,28 @@ func (c *ClientWithResponses) UpdateExperimentWithResponse(ctx context.Context, 
 // returning after it cleared raises a new alert. At most one alert of a
 // kind is active per environment.
 //
-// `srm` is raised by the sample-ratio check in an environment holding
-// the experiment's rule, at a p-value below 0.001, and cleared above
-// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-// the audit log as `experiment.alert_raised` and
+// The checks run every 10 minutes over every running experiment.
+//
+//   - `srm` is raised by the sample-ratio check in an environment
+//     holding the experiment's rule, at a p-value below 0.001, and
+//     cleared above 0.01 (see `GET .../exposures`).
+//   - `no_exposures` is raised in an environment holding the rule once
+//     the server received no exposure there, overrides aside, for 24
+//     hours since the start or since the last one; it clears with the
+//     next exposure, when the environment stops holding the rule, and
+//     at the stop.
+//   - `exposure_conflicts` is raised in an environment holding the rule
+//     once the exposures naming another variation than their unit's
+//     first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+//     and cleared when they fall below it as first exposures grow.
+//   - `past_expected_end`, about the experiment as a whole
+//     (`environment` null), is raised from the UTC day after the
+//     expected end, once until it clears: when the expected end moves
+//     to today or later, and at the stop.
+//
+// A stop leaves `srm` and `exposure_conflicts` active: they are what
+// the exposures came to. Raising and clearing are recorded in the
+// audit log as `experiment.alert_raised` and
 // `experiment.alert_cleared` by the system.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -47958,6 +48116,32 @@ func (siw *ServerInterfaceWrapper) ListExperiments(w http.ResponseWriter, r *htt
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "include_archived"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_archived", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "past_expected_end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "past_expected_end", r.URL.Query(), &params.PastExpectedEnd, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "past_expected_end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "past_expected_end", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "awaiting_code_removal" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "awaiting_code_removal", r.URL.Query(), &params.AwaitingCodeRemoval, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "awaiting_code_removal"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "awaiting_code_removal", Err: err})
 		}
 		return
 	}

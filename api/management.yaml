@@ -2360,6 +2360,26 @@ paths:
           schema:
             type: boolean
             default: false
+        - name: past_expected_end
+          in: query
+          description: |
+            `true` lists only running experiments past their expected end:
+            from the UTC day after the `expected_end_at` date, as the
+            `past_expected_end` alert. `false` or absent filters nothing.
+          schema:
+            type: boolean
+            default: false
+        - name: awaiting_code_removal
+          in: query
+          description: |
+            `true` lists only stopped experiments whose flag SDKs still
+            evaluate: in some environment, an SDK reported evaluations of
+            the flag on one of the last 7 UTC days, today included, and
+            evaluated it after the stop. Remote evaluations the server
+            answered do not count. `false` or absent filters nothing.
+          schema:
+            type: boolean
+            default: false
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -3060,10 +3080,28 @@ paths:
         returning after it cleared raises a new alert. At most one alert of a
         kind is active per environment.
 
-        `srm` is raised by the sample-ratio check in an environment holding
-        the experiment's rule, at a p-value below 0.001, and cleared above
-        0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-        the audit log as `experiment.alert_raised` and
+        The checks run every 10 minutes over every running experiment.
+
+        - `srm` is raised by the sample-ratio check in an environment
+          holding the experiment's rule, at a p-value below 0.001, and
+          cleared above 0.01 (see `GET .../exposures`).
+        - `no_exposures` is raised in an environment holding the rule once
+          the server received no exposure there, overrides aside, for 24
+          hours since the start or since the last one; it clears with the
+          next exposure, when the environment stops holding the rule, and
+          at the stop.
+        - `exposure_conflicts` is raised in an environment holding the rule
+          once the exposures naming another variation than their unit's
+          first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+          and cleared when they fall below it as first exposures grow.
+        - `past_expected_end`, about the experiment as a whole
+          (`environment` null), is raised from the UTC day after the
+          expected end, once until it clears: when the expected end moves
+          to today or later, and at the stop.
+
+        A stop leaves `srm` and `exposure_conflicts` active: they are what
+        the exposures came to. Raising and clearing are recorded in the
+        audit log as `experiment.alert_raised` and
         `experiment.alert_cleared` by the system.
       x-permission: project.read
       tags: [experiments]
@@ -6768,8 +6806,13 @@ components:
             $ref: "#/components/schemas/ExperimentAlert"
     ExperimentAlertKind:
       type: string
-      enum: [srm]
-      description: "`srm`: the sample-ratio check found first exposures out of line with the weights."
+      enum: [srm, no_exposures, exposure_conflicts, past_expected_end]
+      description: |
+        `srm`: the sample-ratio check found first exposures out of line
+        with the weights. `no_exposures`: no exposure for 24 hours in an
+        environment holding the rule. `exposure_conflicts`: too many units
+        exposed to another variation than their first one.
+        `past_expected_end`: the experiment runs past its expected end.
     ExperimentAlert:
       type: object
       required: [id, kind, environment, raised_at, cleared_at, acknowledged_at, details]
@@ -6801,12 +6844,65 @@ components:
     ExperimentAlertDetails:
       type: object
       description: What the check found when it raised the alert; the block of the alert's kind is set, every other one is null.
-      required: [sample_ratio]
+      required: [sample_ratio, no_exposures, exposure_conflicts, past_expected_end]
       properties:
         sample_ratio:
           allOf:
             - $ref: "#/components/schemas/SampleRatioAlertDetails"
           nullable: true
+        no_exposures:
+          allOf:
+            - $ref: "#/components/schemas/NoExposuresAlertDetails"
+          nullable: true
+        exposure_conflicts:
+          allOf:
+            - $ref: "#/components/schemas/ExposureConflictsAlertDetails"
+          nullable: true
+        past_expected_end:
+          allOf:
+            - $ref: "#/components/schemas/PastExpectedEndAlertDetails"
+          nullable: true
+    NoExposuresAlertDetails:
+      type: object
+      required: [last_exposure_at, since]
+      properties:
+        last_exposure_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the server last received an exposure in the environment, overrides aside; null when it never did.
+        since:
+          type: string
+          format: date-time
+          description: Since when no exposure came, the later of the start and the last exposure.
+    ExposureConflictsAlertDetails:
+      type: object
+      required: [conflicts, conflicting_units, first_exposures, threshold]
+      properties:
+        conflicts:
+          type: integer
+          format: int64
+          description: The exposures naming another variation than their unit's first exposure.
+        conflicting_units:
+          type: integer
+          format: int64
+          description: The units with at least one such exposure.
+        first_exposures:
+          type: integer
+          format: int64
+          description: The first exposures in the environment.
+        threshold:
+          type: integer
+          format: int64
+          description: "`max(3, min(10, ceil(first_exposures / 1000)))`, which `conflicts` reached."
+    PastExpectedEndAlertDetails:
+      type: object
+      required: [expected_end_at]
+      properties:
+        expected_end_at:
+          type: string
+          format: date
+          description: The expected end the experiment passed.
     SampleRatioAlertDetails:
       type: object
       required: [n, chi_square, p_value, variations]

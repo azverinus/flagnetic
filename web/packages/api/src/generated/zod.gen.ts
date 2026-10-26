@@ -854,9 +854,63 @@ export const zSampleRatioCheck = z.object({
 });
 
 /**
- * `srm`: the sample-ratio check found first exposures out of line with the weights.
+ * `srm`: the sample-ratio check found first exposures out of line
+ * with the weights. `no_exposures`: no exposure for 24 hours in an
+ * environment holding the rule. `exposure_conflicts`: too many units
+ * exposed to another variation than their first one.
+ * `past_expected_end`: the experiment runs past its expected end.
+ *
  */
-export const zExperimentAlertKind = z.enum(["srm"]);
+export const zExperimentAlertKind = z.enum([
+  "srm",
+  "no_exposures",
+  "exposure_conflicts",
+  "past_expected_end",
+]);
+
+export const zNoExposuresAlertDetails = z.object({
+  last_exposure_at: z.iso.datetime().nullable(),
+  since: z.iso.datetime(),
+});
+
+export const zExposureConflictsAlertDetails = z.object({
+  conflicts: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  conflicting_units: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  first_exposures: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  threshold: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zPastExpectedEndAlertDetails = z.object({
+  expected_end_at: z.iso.date(),
+});
 
 export const zSampleRatioVariation = z.object({
   variation: z.string(),
@@ -892,6 +946,9 @@ export const zSampleRatioAlertDetails = z.object({
  */
 export const zExperimentAlertDetails = z.object({
   sample_ratio: zSampleRatioAlertDetails.nullable(),
+  no_exposures: zNoExposuresAlertDetails.nullable(),
+  exposure_conflicts: zExposureConflictsAlertDetails.nullable(),
+  past_expected_end: zPastExpectedEndAlertDetails.nullable(),
 });
 
 export const zExperimentAlert = z.object({
@@ -2649,6 +2706,8 @@ export const zListExperimentsQuery = z.object({
   owner: z.uuid().optional(),
   tag: z.string().optional(),
   include_archived: z.boolean().optional().default(false),
+  past_expected_end: z.boolean().optional().default(false),
+  awaiting_code_removal: z.boolean().optional().default(false),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });

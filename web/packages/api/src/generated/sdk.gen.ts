@@ -2764,10 +2764,28 @@ export const getExperimentConflicts = <ThrowOnError extends boolean = false>(
  * returning after it cleared raises a new alert. At most one alert of a
  * kind is active per environment.
  *
- * `srm` is raised by the sample-ratio check in an environment holding
- * the experiment's rule, at a p-value below 0.001, and cleared above
- * 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
- * the audit log as `experiment.alert_raised` and
+ * The checks run every 10 minutes over every running experiment.
+ *
+ * - `srm` is raised by the sample-ratio check in an environment
+ * holding the experiment's rule, at a p-value below 0.001, and
+ * cleared above 0.01 (see `GET .../exposures`).
+ * - `no_exposures` is raised in an environment holding the rule once
+ * the server received no exposure there, overrides aside, for 24
+ * hours since the start or since the last one; it clears with the
+ * next exposure, when the environment stops holding the rule, and
+ * at the stop.
+ * - `exposure_conflicts` is raised in an environment holding the rule
+ * once the exposures naming another variation than their unit's
+ * first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+ * and cleared when they fall below it as first exposures grow.
+ * - `past_expected_end`, about the experiment as a whole
+ * (`environment` null), is raised from the UTC day after the
+ * expected end, once until it clears: when the expected end moves
+ * to today or later, and at the stop.
+ *
+ * A stop leaves `srm` and `exposure_conflicts` active: they are what
+ * the exposures came to. Raising and clearing are recorded in the
+ * audit log as `experiment.alert_raised` and
  * `experiment.alert_cleared` by the system.
  *
  */

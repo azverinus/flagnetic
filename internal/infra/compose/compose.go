@@ -358,7 +358,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RotateSDKKey: appdelivery.NewRotateSDKKey(sdkKeys),
 		RevokeSDKKey: appdelivery.NewRevokeSDKKey(sdkKeys),
 
-		ListExperiments: appexperiments.NewListExperiments(experimentStore),
+		ListExperiments: appexperiments.NewListExperiments(experimentStore, d.Clock),
 		CreateExperiment: appexperiments.NewCreateExperiment(appexperiments.CreateExperimentDeps{
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Rollouts: flagStore,
 			Owners: owners, Recorder: experimentRec,
@@ -505,7 +505,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.ProjectPurge(appworkspace.NewPurgeDeletedProjects(tx, ws)),
 			worker.ExperimentChecks(appexperiments.CheckInterval, appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
 				Tx: tx, Lock: experimentStore, Running: experimentStore, Projects: experimentStore, Store: experimentStore,
-				Holders: flagStore, FirstExposures: eventStore, Checks: experimentStore, Recorder: experimentRec,
+				Holders: flagStore, FirstExposures: eventStore, Exposures: eventStore, Checks: experimentStore, Recorder: experimentRec,
 			}).Handle),
 		},
 		Listeners: []Listener{

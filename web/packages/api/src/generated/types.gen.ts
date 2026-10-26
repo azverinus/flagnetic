@@ -1280,9 +1280,15 @@ export type ExperimentAlertList = {
 };
 
 /**
- * `srm`: the sample-ratio check found first exposures out of line with the weights.
+ * `srm`: the sample-ratio check found first exposures out of line
+ * with the weights. `no_exposures`: no exposure for 24 hours in an
+ * environment holding the rule. `exposure_conflicts`: too many units
+ * exposed to another variation than their first one.
+ * `past_expected_end`: the experiment runs past its expected end.
+ *
  */
-export type ExperimentAlertKind = "srm";
+export type ExperimentAlertKind =
+  "srm" | "no_exposures" | "exposure_conflicts" | "past_expected_end";
 
 export type ExperimentAlert = {
   id: string;
@@ -1308,6 +1314,46 @@ export type ExperimentAlert = {
  */
 export type ExperimentAlertDetails = {
   sample_ratio: SampleRatioAlertDetails | null;
+  no_exposures: NoExposuresAlertDetails | null;
+  exposure_conflicts: ExposureConflictsAlertDetails | null;
+  past_expected_end: PastExpectedEndAlertDetails | null;
+};
+
+export type NoExposuresAlertDetails = {
+  /**
+   * When the server last received an exposure in the environment, overrides aside; null when it never did.
+   */
+  last_exposure_at: string | null;
+  /**
+   * Since when no exposure came, the later of the start and the last exposure.
+   */
+  since: string;
+};
+
+export type ExposureConflictsAlertDetails = {
+  /**
+   * The exposures naming another variation than their unit's first exposure.
+   */
+  conflicts: number;
+  /**
+   * The units with at least one such exposure.
+   */
+  conflicting_units: number;
+  /**
+   * The first exposures in the environment.
+   */
+  first_exposures: number;
+  /**
+   * `max(3, min(10, ceil(first_exposures / 1000)))`, which `conflicts` reached.
+   */
+  threshold: number;
+};
+
+export type PastExpectedEndAlertDetails = {
+  /**
+   * The expected end the experiment passed.
+   */
+  expected_end_at: string;
 };
 
 export type SampleRatioAlertDetails = {
@@ -6789,6 +6835,22 @@ export type ListExperimentsData = {
      * Lists archived experiments too.
      */
     include_archived?: boolean;
+    /**
+     * `true` lists only running experiments past their expected end:
+     * from the UTC day after the `expected_end_at` date, as the
+     * `past_expected_end` alert. `false` or absent filters nothing.
+     *
+     */
+    past_expected_end?: boolean;
+    /**
+     * `true` lists only stopped experiments whose flag SDKs still
+     * evaluate: in some environment, an SDK reported evaluations of
+     * the flag on one of the last 7 UTC days, today included, and
+     * evaluated it after the stop. Remote evaluations the server
+     * answered do not count. `false` or absent filters nothing.
+     *
+     */
+    awaiting_code_removal?: boolean;
     /**
      * The `next_cursor` of the previous page.
      */
