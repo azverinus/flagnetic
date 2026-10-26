@@ -23,6 +23,10 @@ const (
 	DeliveryRetention = 30 * 24 * time.Hour
 )
 
+// EventWebhookDisabled tells a project's subscriptions that the platform
+// disabled another of them.
+const EventWebhookDisabled = "webhook.disabled"
+
 // DisabledPersistentFailure is the reason of a subscription the platform
 // disabled for failing persistently.
 const DisabledPersistentFailure DisabledReason = "persistent_failure"
@@ -96,7 +100,7 @@ func (w Webhook) RotateSecret(sealed string, now time.Time, overlap time.Duratio
 func WebhookDisabledEvent(eventID EventID, w Webhook, projectKey string, last DeliveryAttempt, at time.Time) Event {
 	actor := WebhookPolicyActor
 	return Event{
-		ID: eventID, Type: "webhook.disabled", Project: w.Project, ProjectKey: projectKey, OccurredAt: at,
+		ID: eventID, Type: EventWebhookDisabled, Project: w.Project, ProjectKey: projectKey, OccurredAt: at,
 		Actor: &actor, Entity: &Entity{Kind: "webhook", ID: w.ID.String(), Key: w.Name},
 		Data: map[string]any{"subscription_id": w.ID.String(), "name": w.Name, "last_error": attemptError(last)},
 	}

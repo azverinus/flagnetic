@@ -90,6 +90,9 @@ type Options struct {
 	// WebhookTick is how often the replica fans the outbox out and sends the
 	// webhook deliveries that are due.
 	WebhookTick time.Duration
+	// WebhookSecretOverlap is how long a webhook subscription's rotated
+	// secret signs beside the new one.
+	WebhookSecretOverlap time.Duration
 	// Schedule is how change requests are scheduled and applied at their
 	// time.
 	Schedule Schedule
@@ -191,7 +194,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	webhookStore := pggovernance.NewWebhooks(d.Pool)
 	webhooks := appgovernance.WebhookDeps{
 		Tx: tx, Store: webhookStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
-		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets,
+		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets, SecretOverlap: o.WebhookSecretOverlap,
 	}
 	deliveryRequests := appgovernance.DeliveryRequestDeps{
 		Tx: tx, Webhooks: webhookStore, Deliveries: webhookStore, Queue: outbox, Clock: d.Clock, IDs: d.IDs,
@@ -457,6 +460,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		GetWebhookDelivery:    appgovernance.NewGetDelivery(webhookStore, webhookStore),
 		TestWebhook:           appgovernance.NewTestWebhook(deliveryRequests),
 		RedeliverWebhook:      appgovernance.NewRedeliver(deliveryRequests),
+		EnableWebhook:         appgovernance.NewEnableWebhook(webhooks),
+		RotateWebhookSecret:   appgovernance.NewRotateWebhookSecret(webhooks),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),
@@ -479,6 +484,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	sdkKeyUses := appdelivery.NewSDKKeyUses(deliveryStore)
 	// Every replica offers each new ruleset version to the streams it holds
 	// once it has loaded it, woken by the notification of each bump.
+	deliveryLog := pggovernance.NewDeliveries(d.Pool)
 	rulesetStream := pgdelivery.NewRulesetStream(rulesetCache, edge.Logger())
 	// Every replica counts the remote evaluations it answers and writes the
 	// counts in rounds, and once more when it stops.
@@ -518,9 +524,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 				appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention), edge.Logger(), reg),
 			worker.WebhookFanOut(appgovernance.NewRunFanOut(tx, outbox, d.Clock, d.IDs), o.WebhookTick, reg),
 			worker.WebhookDelivery(appgovernance.NewDeliver(appgovernance.DeliverDeps{
-				Tx: tx, Store: pggovernance.NewDeliveries(d.Pool), Sender: webhook.NewSender(o.WebhookTargets),
-				Opener: o.Keyring, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
+				Tx: tx, Store: deliveryLog, Sender: webhook.NewSender(o.WebhookTargets),
+				Opener: o.Keyring, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader, Audit: audit, Outbox: outbox,
 			}), o.WebhookTick, edge.Logger(), reg),
+			worker.WebhookRetention(appgovernance.NewRunWebhookRetention(tx, deliveryLog, d.Clock), reg),
 			worker.ProjectPurge(appworkspace.NewPurgeDeletedProjects(tx, ws)),
 			worker.ChangeRequestScheduler(o.Schedule.Tick,
 				appgovernance.NewRunScheduler(changeRequests, changeRequestStore, o.Schedule.MaxFailures).Handle),

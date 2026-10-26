@@ -23,6 +23,20 @@ The answer carries `secret`, 32 random bytes in base64url, which signs every cal
 
 `GET …/webhooks` lists a project's subscriptions, the oldest first, and `GET …/webhooks/{webhook}` reads one; neither carries the secret. `PATCH …/webhooks/{webhook}` changes the properties it names, under `If-Match` on the subscription's version; `DELETE …/webhooks/{webhook}` removes it, with no `If-Match`. Each write is audited as `webhook.created`, `webhook.updated` or `webhook.deleted`.
 
+### Rotating the secret
+
+`POST …/webhooks/{webhook}/rotate-secret` issues a new secret and answers it once, as creation does, audited as `webhook.secret_rotated` with both secrets `[redacted]`. The secret it replaces keeps signing beside the new one until `previous_secret_expires_at`, `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours) from the rotation: meanwhile each call carries two `v1=` signatures, one per secret, and a receiver holding either accepts it. Roll a receiver over by rotating, giving the receiver the new secret, and letting the overlap run out. Only two secrets sign at once: a rotation within the overlap of another drops the oldest. It takes no `If-Match` and needs `webhook.manage`.
+
+### When a subscription keeps failing
+
+The platform disables a subscription whose receiver is dead: once 25 attempts in a row have failed and none has succeeded for 24 hours, counted from its last success or from when it was last enabled, whichever is later. A short outage of a busy receiver fails 25 attempts in minutes and is retried; a day without one success is what disables. The subscription's `enabled` turns false with `disabled_reason: persistent_failure`, its pending deliveries are `dropped` and never sent, and the change is audited as `webhook.disabled` by the system. The project's other subscriptions naming `webhook.disabled` (or `*`) are sent it, with `audit_entry_id` null and `data` naming the subscription and why its last attempt failed, never its target:
+
+```json
+{"subscription_id": "0192…", "name": "Security channel", "last_error": "the receiver answered 503"}
+```
+
+A `PATCH` setting `enabled: true` on such a subscription is refused `409 webhook_disabled`. `POST …/webhooks/{webhook}/enable` enables it: `disabled_reason` cleared, `consecutive_failures` reset to 0 and the day counted again from now, audited as `webhook.enabled`. Events are queued for it from then on; the deliveries dropped stay dropped, and a delivery in the log can be redelivered. It enables a subscription a member disabled too, answers an enabled one as it is, takes no `If-Match` and needs `webhook.manage`.
+
 A subscription is refused with 422 and one of these codes:
 
 | Code | Why |
@@ -59,6 +73,8 @@ Every event is sent as one envelope, which every delivery of the event carries u
 ```
 
 `id` identifies the event; a receiver that may see one twice deduplicates on it. `environment` is null for an event of no environment, and `audit_entry_id` names the [audit entry](access.md#the-audit-log) the event comes from. `data` holds the entity's values `before` and `after` the change as the audit entry records them; `flag.rules_changed` adds `diff`, the JSON Patch (RFC 6902) from the rules before to those after, and `flag.kill_switch` adds the `reason`. The `segment.*` events leave out a private segment's conditions; `audit.entry` carries the entry as the audit log reads it, so a subscription naming it receives them as members of the project read them. A kill switch is one `flag.kill_switch` and never a `flag.switched_off` as well, while a write that switches a flag on and changes its rules is both a `flag.switched_on` and a `flag.rules_changed`, sharing their `audit_entry_id`. `audit.entry` carries the entry as `GET /api/v1/projects/{project}/audit/{entry}` reads it, for every change, those with no event of their own included.
+
+A delivery is kept in the log for 30 days after it was made, then pruned; a pending one is kept whatever its age, since it waits to be sent.
 
 `GET …/webhooks/{webhook}/deliveries` lists a subscription's deliveries, newest first, filtered by `status` (`pending`, `succeeded`, `failed`, `exhausted`, `dropped`), `event_type` and the time they were made (`from` and `to`, both included), a page of `limit` at a time with `cursor` set to the previous page's `next_cursor`. `GET …/webhooks/{webhook}/deliveries/{delivery}` reads one with every attempt made. Both need `webhook.manage`.
 
@@ -127,6 +143,6 @@ An attempt waits 10 seconds for the answer and follows no redirect. A `2xx` answ
 
 Delivery is at least once and in no particular order: a replica stopping in the middle of an attempt leaves the delivery to be attempted again a minute or so later, and a receiver may then see the event twice. Deduplicate on `X-Flagnetic-Event`. At most four deliveries of one subscription are attempted at once, counting every replica's, so a busy project never floods a receiver.
 
-Every attempt shows in the delivery log with its time, status code, latency, the first kibibyte of the answer and, when no answer came, why. A subscription counts its consecutive failed attempts and its last success. A disabled subscription is sent nothing: its pending deliveries wait until it is enabled again.
+Every attempt shows in the delivery log with its time, status code, latency, the first kibibyte of the answer and, when no answer came, why. A subscription counts its consecutive failed attempts and its last success, which [the disable policy](#when-a-subscription-keeps-failing) reads. A subscription a member disabled is sent nothing: its pending deliveries wait until it is enabled again.
 
 `POST …/webhooks/{webhook}/test` queues a `ping` for the subscription alone, whatever event types it names, and answers its pending delivery (`202`); the ping names the project and the caller, and its environment, entity and audit entry are null. `POST …/webhooks/{webhook}/deliveries/{delivery}/redeliver` queues the delivery's event again as a new delivery, the same event `id` and body byte for byte, and answers it (`202`); the delivery redelivered stays as it was. Both refuse a disabled subscription with `409 webhook_disabled` and need `webhook.manage`.

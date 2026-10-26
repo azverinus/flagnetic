@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/shared/secret"
@@ -59,6 +60,16 @@ type DeliveryStore interface {
 	// at: a success sets its last success and clears its consecutive
 	// failures, a failure adds one.
 	CountAttempt(ctx context.Context, webhook governance.WebhookID, succeeded bool, at time.Time) error
+	ProjectLocker
+	// SubscriptionOf returns the subscription with webhook, of whichever
+	// project, or ErrNotFound.
+	SubscriptionOf(ctx context.Context, webhook governance.WebhookID) (governance.Webhook, error)
+	// DisableWebhook stores w's disabling by the platform: its enabled flag,
+	// reason and version.
+	DisableWebhook(ctx context.Context, w governance.Webhook) error
+	// DropPending drops every pending delivery of webhook at now, releasing
+	// any lease, so an attempt in flight records nothing.
+	DropPending(ctx context.Context, webhook governance.WebhookID, now time.Time) error
 }
 
 // Sent is what came of one call to a receiver.
@@ -112,6 +123,11 @@ type DeliverDeps struct {
 	IDs    *id.Source
 	// Random draws the jitter of each retry's delay.
 	Random io.Reader
+	// Audit records the platform disabling a subscription.
+	Audit AuditLog
+	// Outbox takes the webhook.disabled event to the project's other
+	// subscriptions.
+	Outbox Outbox
 }
 
 // Deliver attempts the webhook deliveries that are due. A delivery is
@@ -156,6 +172,9 @@ type Attempted struct {
 	// Status is what the delivery stands at after it; empty when there was
 	// no attempt, the lease having gone before it.
 	Status governance.DeliveryStatus
+	// Disabled is set when the attempt was the failure that made the
+	// platform disable the subscription.
+	Disabled bool
 }
 
 // Attempt makes the next attempt at delivery under token and records it.
@@ -217,5 +236,110 @@ func (h *Deliver) Attempt(ctx context.Context, token LeaseToken, delivery govern
 	if err != nil {
 		return Attempted{}, err
 	}
-	return Attempted{Status: status}, nil
+	if a.Succeeded() {
+		return Attempted{Status: status}, nil
+	}
+	disabled, err := h.disableIfFailing(ctx, l.Delivery.Webhook, a)
+	return Attempted{Status: status, Disabled: disabled}, err
+}
+
+// disableIfFailing disables the subscription webhook when the failed attempt
+// a made it fail persistently, and reports whether it did. The counters are
+// judged first without a lock, so a failure far from the policy costs one
+// read. The disabling takes the project's lock before the subscription's,
+// as every edit of it does, in a transaction of its own after the one that
+// recorded a: taking the project's lock while holding the subscription's
+// would wait on an edit waiting on this.
+func (h *Deliver) disableIfFailing(ctx context.Context, webhook governance.WebhookID, a governance.DeliveryAttempt) (bool, error) {
+	now := h.now()
+	w, err := h.d.Store.SubscriptionOf(ctx, webhook)
+	if errors.Is(err, ErrNotFound) || (err == nil && !w.PersistentlyFailing(now)) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	disabled := false
+	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		var txErr error
+		disabled, txErr = h.disableLocked(ctx, w.Project, webhook, a, now)
+		return txErr
+	})
+	return disabled, err
+}
+
+// disableLocked takes the locks of project and webhook, reads the
+// subscription again under them, since a success, an enable or another
+// attempt's disabling may have come first, and disables it when it still
+// fails persistently.
+func (h *Deliver) disableLocked(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID,
+	a governance.DeliveryAttempt, now time.Time,
+) (bool, error) {
+	if !project.IsZero() {
+		// A project deleted meanwhile took the subscription with it.
+		err := h.d.Store.LockProject(ctx, project)
+		if errors.Is(err, ErrNotFound) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+	}
+	if err := h.d.Store.LockWebhook(ctx, webhook); err != nil {
+		return false, err
+	}
+	before, err := h.d.Store.SubscriptionOf(ctx, webhook)
+	if errors.Is(err, ErrNotFound) || (err == nil && !before.PersistentlyFailing(now)) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, h.disable(ctx, before, a, now)
+}
+
+// disable switches before off for persistent failure at now, after a failed:
+// its pending deliveries are dropped, including those another replica is
+// attempting, whose outcome then goes unrecorded; the audit log records it
+// as the platform's doing; and the project's other subscriptions wanting it
+// are sent webhook.disabled, which the subscription itself, no longer
+// enabled, is not.
+func (h *Deliver) disable(ctx context.Context, before governance.Webhook, a governance.DeliveryAttempt, now time.Time) error {
+	after := before.DisableForFailure(now)
+	if err := h.d.Store.DisableWebhook(ctx, after); err != nil {
+		return err
+	}
+	if err := h.d.Store.DropPending(ctx, after.ID, now); err != nil {
+		return err
+	}
+	req := governance.Request{Actor: governance.WebhookPolicyActor}
+	entry, err := governance.NewEntry(id.New[governance.Entry](h.d.IDs), now, req, governance.Record{
+		Project: after.Project, Action: "webhook.disabled",
+		Entity: governance.Entity{Kind: "webhook", ID: after.ID.String(), Key: after.Name},
+		Before: webhookValues(before), After: webhookValues(after),
+	})
+	if err != nil {
+		return err
+	}
+	if err = h.d.Audit.Record(ctx, entry); err != nil {
+		return err
+	}
+	if after.Project.IsZero() {
+		// The instance's subscriptions take audit.entry alone, which the
+		// entry above has already queued.
+		return nil
+	}
+	wanted, err := h.d.Outbox.WantedEventTypes(ctx, after.Project)
+	if err != nil || !governance.WantsEventType(wanted, governance.EventWebhookDisabled) {
+		return err
+	}
+	projectKey, _, err := h.d.Outbox.ScopeKeys(ctx, after.Project, workspace.EnvironmentID{})
+	if err != nil {
+		return err
+	}
+	e, err := governance.WebhookDisabledEvent(id.New[governance.Event](h.d.IDs), after, projectKey, a, now).Queue()
+	if err != nil {
+		return err
+	}
+	return h.d.Outbox.Enqueue(ctx, []governance.QueuedEvent{e})
 }

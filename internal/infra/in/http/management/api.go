@@ -168,6 +168,8 @@ type Handlers struct {
 	GetWebhookDelivery    *appgovernance.GetDelivery
 	TestWebhook           *appgovernance.TestWebhook
 	RedeliverWebhook      *appgovernance.Redeliver
+	EnableWebhook         *appgovernance.EnableWebhook
+	RotateWebhookSecret   *appgovernance.RotateWebhookSecret
 
 	ListSegments      *appflags.ListSegments
 	GetSegment        *appflags.GetSegment

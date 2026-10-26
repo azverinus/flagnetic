@@ -66,7 +66,7 @@ func TestThePlatformDisablesASubscriptionWithItsReason(t *testing.T) {
 
 func TestEnablingClearsTheReasonAndStartsTheWindowAgain(t *testing.T) {
 	at := occurred.Add(48 * time.Hour)
-	got, changed := failing(25).DisableForFailure(occurred.Add(25*time.Hour)).Enable(at)
+	got, changed := failing(25).DisableForFailure(occurred.Add(25 * time.Hour)).Enable(at)
 	if !changed || !got.Enabled || got.DisabledReason != "" || got.ConsecutiveFailures != 0 || !got.EnabledAt.Equal(at) {
 		t.Errorf("enabled %+v", got)
 	}
