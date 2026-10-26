@@ -357,7 +357,7 @@ func (s *ChangeRequests) ChangeRequests(ctx context.Context, f appgovernance.Cha
 }
 
 // Waiting returns project's open and approved change requests moved may
-// move: those naming its flag, its environment or its segment and, when it
+// move: those naming its flag, its deleted environment or its segment and, when it
 // moved configurations, those to a segment's definition, which the flag may
 // name. It reads under the project's row lock the writing transaction
 // holds, so none is approved or applied meanwhile.
@@ -367,7 +367,9 @@ func (s *ChangeRequests) Waiting(ctx context.Context, project workspace.ProjectI
 	if !moved.Flag.IsZero() {
 		flag = moved.Flag.Bytes()
 	}
-	if !moved.Environment.IsZero() {
+	// A write to a configuration moves change requests of its flag alone;
+	// only deleting an environment moves every one naming it.
+	if moved.EnvironmentDeleted {
 		environment = moved.Environment.Bytes()
 	}
 	if !moved.Segment.IsZero() {
