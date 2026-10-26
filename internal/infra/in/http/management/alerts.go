@@ -47,6 +47,17 @@ func alertOf(v appexperiments.AlertView) ExperimentAlert {
 			}),
 		}
 	}
+	if r := v.Details.NoExposures; r != nil {
+		out.Details.NoExposures = &NoExposuresAlertDetails{LastExposureAt: r.LastExposureAt, Since: r.Since}
+	}
+	if r := v.Details.ExposureConflicts; r != nil {
+		out.Details.ExposureConflicts = &ExposureConflictsAlertDetails{
+			Conflicts: r.Conflicts, ConflictingUnits: r.ConflictingUnits, FirstExposures: r.FirstExposures, Threshold: r.Threshold,
+		}
+	}
+	if r := v.Details.PastExpectedEnd; r != nil {
+		out.Details.PastExpectedEnd = &PastExpectedEndAlertDetails{ExpectedEndAt: openapi_types.Date{Time: r.ExpectedEndAt}}
+	}
 	return out
 }
 

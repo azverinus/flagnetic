@@ -57,7 +57,8 @@ type StopExperimentCommand struct {
 // the same commit that records the decision. The final sample-ratio check is
 // taken there too, in the environments holding the experiment's rule until
 // the decision rewrites it; nothing checks the experiment again, so it is
-// the result the experiment keeps.
+// the result the experiment keeps. The stop clears the alerts it ends, past
+// the expected end and without exposures.
 func (h *StopExperiment) Handle(ctx context.Context, cmd StopExperimentCommand) (experiments.Experiment, error) {
 	now := h.d.Recorder.now()
 	c := cmd.Experiment
@@ -91,8 +92,11 @@ func (h *StopExperiment) Handle(ctx context.Context, cmd StopExperimentCommand) 
 			cmd.Caller, now, c.Request); err != nil {
 			return err
 		}
-		final := sampleRatioCheck{holders: h.d.Holders, counts: h.d.FirstExposures, store: h.d.Checks, recorder: h.d.Recorder}
-		if err = final.in(ctx, before, holders, now, c.Request); err != nil {
+		final := checker{holders: h.d.Holders, counts: h.d.FirstExposures, store: h.d.Checks, recorder: h.d.Recorder}
+		if err = final.sampleRatio(ctx, before, holders, now, c.Request); err != nil {
+			return err
+		}
+		if err = final.atStop(ctx, before, now, c.Request); err != nil {
 			return err
 		}
 		out = after

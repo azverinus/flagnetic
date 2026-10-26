@@ -155,7 +155,26 @@ type sampleRatioVariationDoc struct {
 // detailsDoc is an alert's details as stored: one block per kind, the
 // alert's own set.
 type detailsDoc struct {
-	SampleRatio *sampleRatioDoc `json:"sample_ratio"`
+	SampleRatio       *sampleRatioDoc       `json:"sample_ratio"`
+	NoExposures       *noExposuresDoc       `json:"no_exposures,omitempty"`
+	ExposureConflicts *exposureConflictsDoc `json:"exposure_conflicts,omitempty"`
+	PastExpectedEnd   *pastExpectedEndDoc   `json:"past_expected_end,omitempty"`
+}
+
+type noExposuresDoc struct {
+	LastExposureAt *time.Time `json:"last_exposure_at"`
+	Since          time.Time  `json:"since"`
+}
+
+type exposureConflictsDoc struct {
+	Conflicts        int64 `json:"conflicts"`
+	ConflictingUnits int64 `json:"conflicting_units"`
+	FirstExposures   int64 `json:"first_exposures"`
+	Threshold        int64 `json:"threshold"`
+}
+
+type pastExpectedEndDoc struct {
+	ExpectedEndAt string `json:"expected_end_at"`
 }
 
 func encodeDetails(d experiments.AlertDetails) ([]byte, error) {
@@ -165,6 +184,16 @@ func encodeDetails(d experiments.AlertDetails) ([]byte, error) {
 		for _, v := range r.Variations {
 			doc.SampleRatio.Variations = append(doc.SampleRatio.Variations, sampleRatioVariationDoc(v))
 		}
+	}
+	if r := d.NoExposures; r != nil {
+		doc.NoExposures = &noExposuresDoc{LastExposureAt: r.LastExposureAt, Since: r.Since}
+	}
+	if r := d.ExposureConflicts; r != nil {
+		c := exposureConflictsDoc(*r)
+		doc.ExposureConflicts = &c
+	}
+	if r := d.PastExpectedEnd; r != nil {
+		doc.PastExpectedEnd = &pastExpectedEndDoc{ExpectedEndAt: r.ExpectedEndAt.Format(time.DateOnly)}
 	}
 	return json.Marshal(doc)
 }
@@ -180,6 +209,20 @@ func decodeDetails(b []byte) (experiments.AlertDetails, error) {
 		for _, v := range r.Variations {
 			d.SampleRatio.Variations = append(d.SampleRatio.Variations, experiments.SampleRatioVariation(v))
 		}
+	}
+	if r := doc.NoExposures; r != nil {
+		d.NoExposures = &experiments.NoExposures{LastExposureAt: utc(r.LastExposureAt), Since: r.Since.UTC()}
+	}
+	if r := doc.ExposureConflicts; r != nil {
+		c := experiments.ExposureConflicts(*r)
+		d.ExposureConflicts = &c
+	}
+	if r := doc.PastExpectedEnd; r != nil {
+		end, err := time.Parse(time.DateOnly, r.ExpectedEndAt)
+		if err != nil {
+			return experiments.AlertDetails{}, fmt.Errorf("decoding an alert's details: %w", err)
+		}
+		d.PastExpectedEnd = &experiments.PastExpectedEnd{ExpectedEndAt: end}
 	}
 	return d, nil
 }
@@ -254,6 +297,28 @@ func (s *Store) ActiveAlert(ctx context.Context, experiment experiments.Experime
 		return nil, fmt.Errorf("reading an active alert: %w", err)
 	}
 	return &v.Alert, nil
+}
+
+// ActiveAlerts returns the active alerts of kind of experiment, in every
+// environment, locked until the unit of work ends.
+func (s *Store) ActiveAlerts(ctx context.Context, experiment experiments.ExperimentID, kind experiments.AlertKind,
+) ([]experiments.Alert, error) {
+	rows, err := s.db(ctx).Query(ctx, `SELECT `+alertColumns+alertFrom+`
+		WHERE a.experiment_id = $1 AND a.kind = $2 AND a.cleared_at IS NULL
+		ORDER BY a.id FOR UPDATE OF a`, experiment.Bytes(), string(kind))
+	if err != nil {
+		return nil, fmt.Errorf("reading active alerts: %w", err)
+	}
+	defer rows.Close()
+	var out []experiments.Alert
+	for rows.Next() {
+		v, err := scanAlert(rows)
+		if err != nil {
+			return nil, fmt.Errorf("reading active alerts: %w", err)
+		}
+		out = append(out, v.Alert)
+	}
+	return out, rows.Err()
 }
 
 // Alerts returns experiment's alerts, the most recently raised first; active,

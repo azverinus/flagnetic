@@ -2,10 +2,12 @@ package experiments
 
 import (
 	"context"
+	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	"github.com/azverinus/flagnetic/internal/shared/clock"
 )
 
 // GetExperiment reads an experiment.
@@ -33,7 +35,20 @@ type ExperimentFilter struct {
 	// IncludeArchived lists archived experiments too. They are hidden
 	// otherwise, unless Status asks for them.
 	IncludeArchived bool
+	// PastExpectedEnd lists only the running experiments past their
+	// expected end, from the UTC day after it.
+	PastExpectedEnd bool
+	// AwaitingCodeRemoval lists only the stopped experiments whose flag an
+	// SDK evaluated after the stop, on one of the last
+	// AwaitingCodeRemovalDays UTC days, in some environment.
+	AwaitingCodeRemoval bool
 }
+
+// AwaitingCodeRemovalDays is how many UTC days, today included, an SDK's
+// evaluation of a stopped experiment's flag keeps it awaiting code removal: a
+// week covers a release cycle, so code that is gone from every deployed
+// version stops being reported within one.
+const AwaitingCodeRemovalDays = 7
 
 // ExperimentPage asks for one page of a project's experiments, by key in
 // byte order.
@@ -47,23 +62,27 @@ type ExperimentPage struct {
 // ExperimentLister lists experiments.
 type ExperimentLister interface {
 	// Experiments returns up to limit experiments of project matching
-	// filter, ordered by key in byte order, whose key is greater than after
-	// when it is not "".
-	Experiments(ctx context.Context, project workspace.ProjectID, filter ExperimentFilter, after string, limit int) ([]experiments.Experiment, error)
+	// filter at now, ordered by key in byte order, whose key is greater
+	// than after when it is not "".
+	Experiments(ctx context.Context, project workspace.ProjectID, filter ExperimentFilter, now time.Time, after string, limit int,
+	) ([]experiments.Experiment, error)
 }
 
 // ListExperiments lists a project's experiments.
-type ListExperiments struct{ store ExperimentLister }
+type ListExperiments struct {
+	store ExperimentLister
+	clock clock.Clock
+}
 
 // NewListExperiments returns the handler.
-func NewListExperiments(store ExperimentLister) *ListExperiments {
-	return &ListExperiments{store: store}
+func NewListExperiments(store ExperimentLister, c clock.Clock) *ListExperiments {
+	return &ListExperiments{store: store, clock: c}
 }
 
 // Handle returns one page of project's experiments, and the key to start the
 // next page after, nil on the last page.
 func (h *ListExperiments) Handle(ctx context.Context, project workspace.ProjectID, page ExperimentPage) ([]experiments.Experiment, *string, error) {
-	list, err := h.store.Experiments(ctx, project, page.ExperimentFilter, page.After, page.Limit+1)
+	list, err := h.store.Experiments(ctx, project, page.ExperimentFilter, h.clock.Now().UTC(), page.After, page.Limit+1)
 	if err != nil {
 		return nil, nil, err
 	}

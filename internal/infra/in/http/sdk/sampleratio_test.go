@@ -1,6 +1,7 @@
 package sdk_test
 
 import (
+	"context"
 	"math"
 	"net/http"
 	"strconv"
@@ -64,6 +65,21 @@ func startSampleRatio(t *testing.T, srv *testkit.Server, c *clock.Fake, weightTr
 		t.Fatalf("start = %d: %s", started.StatusCode(), started.Body)
 	}
 	f.exp = *started.JSON200
+	// The package's tests share one schema and the checks go over every
+	// running experiment, each test on a clock of its own: one left running
+	// would be checked at another test's time, earlier than its alerts.
+	t.Cleanup(func() {
+		got := do(p.admin.GetExperimentWithResponse(context.Background(), p.key, "checkout_test"))
+		if got.JSON200 == nil || got.JSON200.Status != management.ExperimentStatusRunning {
+			return
+		}
+		res := do(p.admin.StopExperimentWithResponse(context.Background(), p.key, "checkout_test",
+			&management.StopExperimentParams{IfMatch: ptr(strconv.Quote(strconv.FormatInt(got.JSON200.Version, 10)))},
+			management.ExperimentStop{Outcome: "removed"}))
+		if res.JSON200 == nil {
+			t.Errorf("stopping checkout_test = %d: %s", res.StatusCode(), res.Body)
+		}
+	})
 	return f
 }
 

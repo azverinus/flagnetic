@@ -26,6 +26,8 @@ func (a *api) ListExperiments(ctx context.Context, req ListExperimentsRequestObj
 	page := appexperiments.ExperimentPage{Limit: defaultExperimentLimit}
 	page.Flag, page.Tag = valueOf(req.Params.Flag), valueOf(req.Params.Tag)
 	page.IncludeArchived = valueOr(req.Params.IncludeArchived, false)
+	page.PastExpectedEnd = valueOr(req.Params.PastExpectedEnd, false)
+	page.AwaitingCodeRemoval = valueOr(req.Params.AwaitingCodeRemoval, false)
 	page.Owner = ownerOf(req.Params.Owner)
 	if st := req.Params.Status; st != nil {
 		page.Status = experiments.Status(*st)

@@ -504,6 +504,28 @@ func (s *Store) ConflictTotals(ctx context.Context, environment workspace.Enviro
 	return total, units, nil
 }
 
+// LastExposureAt returns when the server last received, at or before at, an
+// exposure of experiment in environment that no override decided; nil when it
+// never did. It reads the raw exposures, which hold what the rollups have
+// not read yet too, so an exposure counts as soon as it is received; the
+// latest are found through the experiment's index by receipt, newest first.
+func (s *Store) LastExposureAt(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID,
+	at time.Time,
+) (*time.Time, error) {
+	var last *time.Time
+	err := s.db(ctx).QueryRow(ctx, `SELECT received_at FROM exposure_events
+		WHERE experiment_id = $1 AND environment_id = $2 AND NOT override AND received_at <= $3
+		ORDER BY received_at DESC LIMIT 1`, experiment.Bytes(), environment.Bytes(), at).Scan(&last)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading the last exposure: %w", err)
+	}
+	t := last.UTC()
+	return &t, nil
+}
+
 // Conflicts returns up to limit units of experiment in environment that
 // conflicted, the most recent conflict first.
 func (s *Store) Conflicts(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID, limit int,
