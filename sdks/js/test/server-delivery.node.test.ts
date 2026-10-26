@@ -9,6 +9,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import type { Timing } from "../src/server/delivery.js";
 import { createServerWith } from "../src/server/client.js";
 import type { FlagneticServer, LogEvent, LogLevel, ServerOptions, Stage } from "../src/server.js";
+import { VERSION } from "../src/version.js";
 import { MockPlatform, rulesetOf } from "./support/mock-platform.js";
 
 const key = "fn_srv_0123456789abcdefghijklmnopqrstuvwxyzABCD";
@@ -130,7 +131,7 @@ describe("the ruleset fetch", () => {
     const [first] = p.rulesetRequests();
     expect(first?.headers).toMatchObject({
       authorization: `Bearer ${key}`,
-      "user-agent": "flagnetic-js/0.0.0 (node)",
+      "user-agent": `flagnetic-js/${VERSION} (node)`,
       "flagnetic-schema-version": "1",
       accept: "application/json",
     });
@@ -151,7 +152,7 @@ describe("the ruleset fetch", () => {
     const p = await platform(rulesetOf(1, {}));
     const h = start(p, { platform: "linux", stream: false });
     await expect(h.client.ready(2000)).resolves.toBe("fresh");
-    expect(p.rulesetRequests()[0]?.headers["user-agent"]).toBe("flagnetic-js/0.0.0 (linux)");
+    expect(p.rulesetRequests()[0]?.headers["user-agent"]).toBe(`flagnetic-js/${VERSION} (linux)`);
   });
 
   test("the initial fetch times out, ready resolves built_in at its timeout, a later 200 moves to fresh", async () => {
