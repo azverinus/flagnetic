@@ -165,9 +165,14 @@ type ChangeRequest struct {
 	// change request was based on and so superseded it; zero when no write
 	// did, as when it was found moved only on approval or application.
 	SupersededBy EntryID
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Version      int64
+	// ApplyAt is when the system applies the change request once it is
+	// approved, nil when it is applied by hand; ScheduleFailure is why the
+	// last scheduled application failed, nil when none did.
+	ApplyAt         *time.Time
+	ScheduleFailure *ScheduleFailure
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Version         int64
 }
 
 // Decision is an approval or a rejection: the member who took it, when, and
@@ -191,6 +196,44 @@ type Application struct {
 	System bool
 }
 
+// MaxScheduleLead is how far ahead a change request may be scheduled: a
+// release planned further out is proposed closer to its time, against what
+// the entity is then.
+const MaxScheduleLead = 365 * 24 * time.Hour
+
+// ScheduleFailure is why the system failed to apply a scheduled change
+// request: when it last failed, the code and message of that refusal, how
+// many attempts in a row failed, and whether the system stopped trying.
+type ScheduleFailure struct {
+	At       time.Time
+	Code     string
+	Message  string
+	Attempts int
+	Stopped  bool
+}
+
+// checkApplyAt returns at in UTC to the microsecond the database keeps, or
+// the violation of an apply time sooner than minLead from now or further
+// than MaxScheduleLead. A time inside the lead could pass before anyone
+// approves the change request, which would then apply the moment it is
+// approved, unreviewed by the clock it named.
+func checkApplyAt(at, now time.Time, minLead time.Duration) (time.Time, *apperrors.Violation) {
+	at = at.UTC().Truncate(time.Microsecond)
+	switch lead := at.Sub(now); {
+	case lead < minLead:
+		return at, &apperrors.Violation{
+			Pointer: "/apply_at", Code: "too_soon", Detail: "an apply time is at least " + minLead.String() + " ahead",
+			Params: map[string]any{"min_lead_seconds": int64(minLead / time.Second)},
+		}
+	case lead > MaxScheduleLead:
+		return at, &apperrors.Violation{
+			Pointer: "/apply_at", Code: "too_late", Detail: "an apply time is at most 365 days ahead",
+			Params: map[string]any{"max_days": int64(MaxScheduleLead / (24 * time.Hour))},
+		}
+	}
+	return at, nil
+}
+
 // Proposal is what an author writes of a change request: its title and
 // description, and the document proposed, already checked by the context
 // owning the entity.
@@ -210,13 +253,23 @@ type NewChangeRequestInput struct {
 	// rather than drafted.
 	Open   bool
 	Author Author
-	Now    time.Time
+	// ApplyAt schedules the change request, nil for none; MinLead is how
+	// far ahead of Now it must be at least.
+	ApplyAt *time.Time
+	MinLead time.Duration
+	Now     time.Time
 }
 
 // NewChangeRequest returns the change request in describes, drafted or
 // opened, at version 1; or invalid_change_request naming every field to fix.
 func NewChangeRequest(in NewChangeRequestInput) (ChangeRequest, error) {
 	title, description, err := checkProposal(in.Proposal)
+	var applyAt *time.Time
+	if in.ApplyAt != nil {
+		at, violation := checkApplyAt(*in.ApplyAt, in.Now, in.MinLead)
+		applyAt = &at
+		err = withViolation(err, violation)
+	}
 	if err != nil {
 		return ChangeRequest{}, err
 	}
@@ -227,7 +280,7 @@ func NewChangeRequest(in NewChangeRequestInput) (ChangeRequest, error) {
 	}
 	return ChangeRequest{
 		ID: in.ID, Project: in.Project, Subject: in.Subject, State: state, Title: title, Description: description,
-		Proposed: in.Proposed, Diff: diff, Author: in.Author, CreatedAt: in.Now, UpdatedAt: in.Now, Version: 1,
+		Proposed: in.Proposed, Diff: diff, Author: in.Author, ApplyAt: applyAt, CreatedAt: in.Now, UpdatedAt: in.Now, Version: 1,
 	}, nil
 }
 
@@ -256,6 +309,23 @@ func checkProposal(p Proposal) (string, string, error) {
 		return "", "", apperrors.Invalid("invalid_change_request", "the change request is not valid", violations...)
 	}
 	return title, description, nil
+}
+
+// withViolation returns err, an invalid_change_request or nil, with v added
+// to its violations when v is not nil, so every field to fix is named at
+// once.
+func withViolation(err error, v *apperrors.Violation) error {
+	if v == nil {
+		return err
+	}
+	violations := []apperrors.Violation{}
+	if e, ok := apperrors.From(err); ok {
+		violations = append(violations, e.Violations...)
+	} else if err != nil {
+		return err
+	}
+	violations = append(violations, *v)
+	return apperrors.Invalid("invalid_change_request", "the change request is not valid", violations...)
 }
 
 // Transition is a move of a change request from one state to another, or
@@ -400,7 +470,14 @@ type Edit struct {
 	// Proposed is the document now proposed, checked by the context owning
 	// the entity; nil leaves it as it is.
 	Proposed Document
+	// Schedule sets or clears the apply time; nil leaves it as it is.
+	// MinLead is how far ahead of the edit a new apply time must be.
+	Schedule *ScheduleEdit
+	MinLead  time.Duration
 }
+
+// ScheduleEdit is the apply time an edit leaves: At, or none when nil.
+type ScheduleEdit struct{ At *time.Time }
 
 // Edit returns cr edited by by at now, its diff recomputed against its base,
 // its version incremented, and whether anything changed; cr itself when
@@ -421,10 +498,17 @@ func (cr ChangeRequest) Edit(by Taker, e Edit, now time.Time) (ChangeRequest, bo
 		p.Proposed = e.Proposed
 	}
 	title, description, err := checkProposal(p)
+	out := cr
+	if e.Schedule != nil {
+		out.ApplyAt = nil
+		if e.Schedule.At != nil {
+			at, violation := checkApplyAt(*e.Schedule.At, now, e.MinLead)
+			out.ApplyAt, err = &at, withViolation(err, violation)
+		}
+	}
 	if err != nil {
 		return cr, false, err
 	}
-	out := cr
 	out.Title, out.Description, out.Proposed = title, description, p.Proposed
 	out.Diff = Diff(cr.Base, p.Proposed)
 	return cr.changedTo(out, now)
@@ -467,7 +551,10 @@ func (cr ChangeRequest) Cancel(by Taker, now time.Time) (ChangeRequest, error) {
 	if err != nil {
 		return cr, err
 	}
-	return cr.moved(state, now), nil
+	out := cr.moved(state, now)
+	// Nothing will try to apply it again.
+	out.ScheduleFailure = nil
+	return out, nil
 }
 
 // Current is what a change request is judged against when it is approved
@@ -530,6 +617,9 @@ func (cr ChangeRequest) Apply(by Taker, current Current, now time.Time) (ChangeR
 	if err != nil {
 		return cr, err
 	}
+	if cr.ApplyAt != nil && !by.System {
+		return cr, errScheduled
+	}
 	if current.Version != cr.BaseVersion {
 		return cr.moved(StateSuperseded, now), baseMoved(cr.BaseVersion, current.Version)
 	}
@@ -543,6 +633,7 @@ func (cr ChangeRequest) Apply(by Taker, current Current, now time.Time) (ChangeR
 		}
 	}
 	out := cr.moved(state, now)
+	out.ScheduleFailure = nil
 	out.Applied = &Application{At: now, System: by.System}
 	if !by.System {
 		out.Applied.By = by.As
@@ -559,6 +650,35 @@ func (cr ChangeRequest) Covers() []workspace.EnvironmentID {
 		return []workspace.EnvironmentID{cr.Environment.ID}
 	}
 	return cr.ApprovalCovers
+}
+
+// errScheduled refuses applying a scheduled change request by hand: the
+// schedule is the one path, so what was approved goes live when it said.
+var errScheduled = apperrors.Conflict("scheduled",
+	"the change request is applied by the system at its apply time; cancel it and copy it to apply it now")
+
+// Due reports whether the system applies cr at now: it is approved, its
+// apply time has come, late included, and its failures have not stopped
+// the system trying.
+func (cr ChangeRequest) Due(now time.Time) bool {
+	return cr.State == StateApproved && cr.ApplyAt != nil && !cr.ApplyAt.After(now) &&
+		(cr.ScheduleFailure == nil || !cr.ScheduleFailure.Stopped)
+}
+
+// FailSchedule returns cr with a failed scheduled application recorded: at
+// now, refused with code and message, one more attempt in a row, stopped
+// once attempts reach maxFailures, so a change that keeps failing is not
+// tried forever. Its state, version and update time stay: nothing about
+// what it proposes or who decided it changed.
+func (cr ChangeRequest) FailSchedule(code, message string, now time.Time, maxFailures int) ChangeRequest {
+	attempts := 1
+	if cr.ScheduleFailure != nil {
+		attempts = cr.ScheduleFailure.Attempts + 1
+	}
+	cr.ScheduleFailure = &ScheduleFailure{
+		At: now, Code: code, Message: message, Attempts: attempts, Stopped: attempts >= maxFailures,
+	}
+	return cr
 }
 
 // baseMoved refuses to approve or apply a change request whose base moved.
@@ -595,7 +715,8 @@ func (cr ChangeRequest) moved(state ChangeRequestState, now time.Time) ChangeReq
 // changedTo returns out as the next version of cr at now, and whether
 // anything changed; cr itself when nothing did.
 func (cr ChangeRequest) changedTo(out ChangeRequest, now time.Time) (ChangeRequest, bool, error) {
-	if out.Title == cr.Title && out.Description == cr.Description && out.BaseVersion == cr.BaseVersion &&
+	sameSchedule := (out.ApplyAt == nil) == (cr.ApplyAt == nil) && (out.ApplyAt == nil || out.ApplyAt.Equal(*cr.ApplyAt))
+	if sameSchedule && out.Title == cr.Title && out.Description == cr.Description && out.BaseVersion == cr.BaseVersion &&
 		reflect.DeepEqual(out.Proposed, cr.Proposed) && reflect.DeepEqual(out.Base, cr.Base) &&
 		slices.Equal(out.BaseReferrers, cr.BaseReferrers) {
 		return cr, false, nil
