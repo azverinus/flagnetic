@@ -414,7 +414,7 @@ class Client:
     def _count(self, flag: str, variation: str, reason: str) -> None:
         """Counts one served value in the evaluation summary, or in the recorder of an offline client."""
         if self._recorder is not None:
-            self._recorder.count(flag, variation, reason)
+            self._recorder._count(flag, variation, reason)
         elif self._summaries is not None:
             self._summaries.count(flag, variation, reason)
 
@@ -444,7 +444,7 @@ class Client:
         self, loaded: _Loaded | None, context: Context, key: str, requested: str, default: Any
     ) -> Detail:
         flag_type = _NUMBER if requested == _INT64 else requested
-        local = self._overrides.by_key.get(key) if self._overrides.by_key else None
+        local = self._overrides._by_key.get(key) if self._overrides._by_key else None
         if local is not None and not (loaded is not None and loaded.ruleset.protected):
             return self._local(loaded, key, local, requested, default)
         if loaded is None:
@@ -606,7 +606,7 @@ class Client:
         try:
             if not self._send_exposures:
                 return
-            if key in self._overrides.by_key and not self._protected():
+            if key in self._overrides._by_key and not self._protected():
                 self._log(logging.DEBUG, _events.EXPOSURE_SKIPPED, flag=key, cause="local_override")
                 return
             served = self._served.recall(key, _fingerprint(context))
@@ -667,9 +667,9 @@ class Client:
     def _record(self, event: Any) -> None:
         """Hands an exposure or an alias to the queue, or to the recorder of an offline client."""
         if self._recorder is not None:
-            self._recorder.record(event)
+            self._recorder._record(event)
         elif self._queue is not None:
-            self._queue.record(event.wire())
+            self._queue.record(event._wire())
 
     def flush(self, timeout: float | None = DEFAULT_CLOSE_TIMEOUT) -> None:
         """Reports the evaluation summary so far and sends the queued exposures and aliases.
@@ -755,7 +755,7 @@ class Client:
             self._ready.set()
         self._exposed = ExposureSuppressor(_EXPOSURE_MEMORY)
         self._served = ServedDetails(_DETAIL_MEMORY)
-        self._overrides.after_fork()
+        self._overrides._after_fork()
         self._delivery.abandon()
         self._start()
 
@@ -830,7 +830,7 @@ class Client:
         )
         self._report_unsupported(ruleset)
         changed = changed_flags(None if previous is None else previous.document, raw)
-        dropped = self._overrides.refuse(ruleset)
+        dropped = self._overrides._refuse(ruleset)
         return sorted(set(changed) | set(dropped)) if dropped else changed
 
     def _report_unsupported(self, ruleset: Ruleset) -> None:
