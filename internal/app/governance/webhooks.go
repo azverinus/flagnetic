@@ -185,25 +185,43 @@ func NewListWebhookEventTypes() *ListWebhookEventTypes { return &ListWebhookEven
 func (*ListWebhookEventTypes) Handle() []governance.EventType { return governance.EventCatalogue() }
 
 // ListWebhooks answers a project's subscriptions.
-type ListWebhooks struct{ store WebhookStore }
+type ListWebhooks struct {
+	store WebhookStore
+	clock clock.Clock
+}
 
-// NewListWebhooks returns the query.
-func NewListWebhooks(store WebhookStore) *ListWebhooks { return &ListWebhooks{store: store} }
+// NewListWebhooks returns the query, judging rotations' overlaps by c.
+func NewListWebhooks(store WebhookStore, c clock.Clock) *ListWebhooks {
+	return &ListWebhooks{store: store, clock: c}
+}
 
-// Handle returns project's subscriptions, the oldest first.
+// Handle returns project's subscriptions, the oldest first, as they stand
+// now.
 func (h *ListWebhooks) Handle(ctx context.Context, project workspace.ProjectID) ([]governance.Webhook, error) {
-	return h.store.Webhooks(ctx, project)
+	list, err := h.store.Webhooks(ctx, project)
+	now := h.clock.Now()
+	for i := range list {
+		list[i] = list[i].Presented(now)
+	}
+	return list, err
 }
 
 // GetWebhook answers one subscription.
-type GetWebhook struct{ store WebhookStore }
+type GetWebhook struct {
+	store WebhookStore
+	clock clock.Clock
+}
 
-// NewGetWebhook returns the query.
-func NewGetWebhook(store WebhookStore) *GetWebhook { return &GetWebhook{store: store} }
+// NewGetWebhook returns the query, judging rotations' overlaps by c.
+func NewGetWebhook(store WebhookStore, c clock.Clock) *GetWebhook {
+	return &GetWebhook{store: store, clock: c}
+}
 
-// Handle returns project's subscription with webhook, or not_found.
+// Handle returns project's subscription with webhook as it stands now, or
+// not_found.
 func (h *GetWebhook) Handle(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID) (governance.Webhook, error) {
-	return webhookOf(ctx, h.store, project, webhook)
+	w, err := webhookOf(ctx, h.store, project, webhook)
+	return w.Presented(h.clock.Now()), err
 }
 
 // CreateWebhookCommand asks for a subscription of Project.
@@ -319,12 +337,13 @@ func (h *UpdateWebhook) Handle(ctx context.Context, cmd UpdateWebhookCommand) (g
 		}
 	}
 	var out governance.Webhook
+	now := h.d.now()
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var txErr error
-		out, txErr = h.update(ctx, cmd, h.d.now())
+		out, txErr = h.update(ctx, cmd, now)
 		return txErr
 	})
-	return out, err
+	return out.Presented(now), err
 }
 
 // update applies cmd's change under the project's lock. The target is the
@@ -441,7 +460,7 @@ func (h *EnableWebhook) Handle(ctx context.Context, cmd WebhookCommand) (governa
 		out, err = webhookOf(ctx, h.d.Store, cmd.Project, cmd.Webhook)
 		return err
 	})
-	return out, err
+	return out.Presented(now), err
 }
 
 // RotateWebhookSecret issues a webhook subscription a new secret.

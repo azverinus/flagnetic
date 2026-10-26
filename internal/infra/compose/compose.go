@@ -451,9 +451,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CopyChangeRequest:    appgovernance.NewCopyChangeRequest(changeRequests),
 
 		ListWebhookEventTypes: appgovernance.NewListWebhookEventTypes(),
-		ListWebhooks:          appgovernance.NewListWebhooks(webhookStore),
+		ListWebhooks:          appgovernance.NewListWebhooks(webhookStore, d.Clock),
 		CreateWebhook:         appgovernance.NewCreateWebhook(webhooks),
-		GetWebhook:            appgovernance.NewGetWebhook(webhookStore),
+		GetWebhook:            appgovernance.NewGetWebhook(webhookStore, d.Clock),
 		UpdateWebhook:         appgovernance.NewUpdateWebhook(webhooks),
 		DeleteWebhook:         appgovernance.NewDeleteWebhook(webhooks),
 		ListWebhookDeliveries: appgovernance.NewListDeliveries(webhookStore, webhookStore),

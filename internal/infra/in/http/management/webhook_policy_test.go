@@ -220,6 +220,9 @@ func TestARotatedSecretSignsBesideTheNewOneUntilTheOverlapEnds(t *testing.T) {
 	}
 
 	c.Advance(24*time.Hour + time.Second)
+	if w := subscription(t, admin, p.Key, created.Id); w.PreviousSecretExpiresAt != nil {
+		t.Errorf("after the overlap previous_secret_expires_at = %v, want null", w.PreviousSecretExpiresAt)
+	}
 	ping(t, admin, p.Key, created.Id)
 	deliver(t, srv)
 	after2 := r.Calls()[1]

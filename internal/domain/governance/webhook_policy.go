@@ -117,3 +117,13 @@ func attemptError(a DeliveryAttempt) string {
 	}
 	return ""
 }
+
+// Presented returns w as it stands at now: a previous secret whose overlap
+// is over no longer signs, so it is left out until the retention round
+// forgets it.
+func (w Webhook) Presented(now time.Time) Webhook {
+	if w.PreviousSecretExpiresAt != nil && !w.PreviousSecretExpiresAt.After(now) {
+		w.PreviousSealedSecret, w.PreviousSecretExpiresAt = "", nil
+	}
+	return w
+}

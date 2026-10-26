@@ -147,3 +147,15 @@ func TestOtherSubscriptionsAreToldWhyOneWasDisabledButNotWhere(t *testing.T) {
 		})
 	}
 }
+
+func TestAPreviousSecretPastItsOverlapIsNotShown(t *testing.T) {
+	rotated := failing(0).RotateSecret("second", occurred, time.Hour)
+	if during := rotated.Presented(occurred.Add(59 * time.Minute)); during.PreviousSecretExpiresAt == nil ||
+		during.PreviousSealedSecret != rotated.PreviousSealedSecret {
+		t.Errorf("during the overlap %+v", during)
+	}
+	if after := rotated.Presented(occurred.Add(time.Hour)); after.PreviousSecretExpiresAt != nil || after.PreviousSealedSecret != "" ||
+		after.Version != rotated.Version {
+		t.Errorf("after the overlap %+v, want no previous secret at the same version", after)
+	}
+}
