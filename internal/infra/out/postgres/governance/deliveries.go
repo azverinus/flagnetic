@@ -98,7 +98,10 @@ func (s *Deliveries) ClaimDeliveries(ctx context.Context, token appgovernance.Le
 // RenewLease pushes token's lease on delivery to until and returns the
 // delivery with its subscription's target and secrets, the previous one
 // while its overlap lasts at now; false when token no longer holds a
-// pending delivery of an enabled subscription.
+// pending delivery of an enabled subscription. A lease that ran out is not
+// renewed even when no other replica took it yet: it no longer counts
+// towards the subscription's deliveries in flight, so renewing it could put
+// one more in flight than the claim allows.
 func (s *Deliveries) RenewLease(ctx context.Context, delivery governance.DeliveryID, token appgovernance.LeaseToken,
 	now, until time.Time,
 ) (appgovernance.Leased, bool, error) {
@@ -112,7 +115,8 @@ func (s *Deliveries) RenewLease(ctx context.Context, delivery governance.Deliver
 	err := s.db(ctx).QueryRow(ctx, `
 		UPDATE webhook_deliveries d SET lease_until = $4
 		FROM webhook_subscriptions s
-		WHERE d.id = $1 AND d.lease_token = $2 AND d.status = 'pending' AND s.id = d.subscription_id AND s.enabled
+		WHERE d.id = $1 AND d.lease_token = $2 AND d.lease_until > $3 AND d.status = 'pending' AND s.id = d.subscription_id
+		  AND s.enabled
 		RETURNING d.id, d.subscription_id, d.event_id, d.event_type, d.body, jsonb_array_length(d.attempts), s.url,
 		          s.secret_sealed, CASE WHEN s.previous_secret_expires_at > $3 THEN s.previous_secret_sealed END`,
 		delivery.Bytes(), token.Bytes(), now, until).

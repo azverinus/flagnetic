@@ -42,9 +42,9 @@ type DeliveryStore interface {
 	// leased.
 	ClaimDeliveries(ctx context.Context, token LeaseToken, now, until time.Time, limit int) ([]governance.DeliveryID, error)
 	// RenewLease pushes the lease token holds on delivery to until and
-	// returns the delivery as its attempt needs it; false when the lease is
-	// another's now, the delivery settled or its subscription is no longer
-	// enabled.
+	// returns the delivery as its attempt needs it; false when the lease ran
+	// out by now or is another's, the delivery settled or its subscription
+	// is no longer enabled.
 	RenewLease(ctx context.Context, delivery governance.DeliveryID, token LeaseToken, now, until time.Time) (Leased, bool, error)
 	// LockWebhook locks the subscription's row for the unit of work ctx
 	// carries, before any of its deliveries, as the claim does.
