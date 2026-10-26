@@ -163,3 +163,34 @@ func (e Experiment) RegenerateSalts(s Salts, now time.Time) (Experiment, error) 
 	out.UpdatedAt, out.Version = now, e.Version+1
 	return out, nil
 }
+
+// errNotRunningToGrow refuses to grow, as a transition of its own, the
+// traffic allocation of an experiment that is not running: a draft's is in
+// no ruleset and is edited with the rest of it, and a stopped one's is
+// frozen.
+var errNotRunningToGrow = apperrors.Conflict("not_running",
+	"only a running experiment's traffic allocation grows as a transition of its own; a draft's is edited directly")
+
+// GrowTrafficAllocation returns the running experiment with its traffic
+// allocation grown to to at now, its version incremented: the one change to
+// a running experiment that its holders' rulesets carry, and so the one a
+// change request proposes. Only a running experiment grows (not_running;
+// archived for an archived one); the allocation is checked as an edit
+// checks it, never shrinks (traffic_allocation_decrease), and the
+// allocation the experiment has already is no growth (invalid_experiment).
+func (e Experiment) GrowTrafficAllocation(to int, now time.Time) (Experiment, error) {
+	switch e.Status {
+	case StatusRunning:
+	case StatusArchived:
+		return e, errArchived
+	default:
+		return e, errNotRunningToGrow
+	}
+	out, changed, err := e.Change(Change{TrafficAllocation: &to}, now)
+	if err == nil && !changed {
+		c := newCheck()
+		c.add("/traffic_allocation", "unchanged", "the experiment allocates this traffic already", nil)
+		err = c.err()
+	}
+	return out, err
+}

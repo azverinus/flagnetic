@@ -3249,6 +3249,11 @@ paths:
           description: Only those naming the segment with this key.
           schema:
             type: string
+        - name: experiment
+          in: query
+          description: Only those proposing a transition of the experiment with this key.
+          schema:
+            type: string
         - name: kind
           in: query
           schema:
@@ -7513,8 +7518,10 @@ components:
         What a change request proposes: `flag_configuration`, a flag's
         configuration in one environment; `definition`, a flag's variations
         and automatic exposure, or a segment's conditions and private
-        switch, in every environment. `experiment` is to come. A client
-        reads `proposed` by the kind and the entity named.
+        switch, in every environment; `experiment`, an experiment's start,
+        stop with a decision or traffic allocation growth, in every
+        environment holding its rule. A client reads `proposed` by the kind
+        and the entity named.
       enum: [flag_configuration, definition, experiment]
     ChangeRequestState:
       type: string
@@ -7684,13 +7691,16 @@ components:
           $ref: "#/components/schemas/ChangeRequestKind"
         flag:
           type: string
-          description: The key of the flag proposed for.
+          description: The key of the flag proposed for; for an `experiment` change request, the experiment's flag.
         environment:
           type: string
           description: The key of the environment of a `flag_configuration` change request.
         segment:
           type: string
           description: The key of the segment of a segment's `definition`.
+        experiment:
+          type: string
+          description: The key of the experiment of an `experiment` change request.
         state:
           $ref: "#/components/schemas/ChangeRequestState"
         title:
@@ -7700,7 +7710,7 @@ components:
         base_version:
           type: integer
           format: int64
-          description: The version of the configuration, the flag or the segment the change request is based on.
+          description: The version of the configuration, the flag, the segment or the experiment the change request is based on.
         revert_to:
           type: integer
           format: int64
@@ -7713,14 +7723,22 @@ components:
             What the change request proposes, by its kind and the entity it
             names: a `ProposedConfiguration` for `flag_configuration`, a
             `ProposedFlagDefinition` for a flag's `definition`, a
-            `ProposedSegmentDefinition` for a segment's.
+            `ProposedSegmentDefinition` for a segment's, a
+            `ProposedExperimentTransition` for `experiment`.
           oneOf:
             - $ref: "#/components/schemas/ProposedConfiguration"
             - $ref: "#/components/schemas/ProposedFlagDefinition"
             - $ref: "#/components/schemas/ProposedSegmentDefinition"
+            - $ref: "#/components/schemas/ProposedExperimentTransition"
         diff:
           type: array
-          description: The RFC 6902 patch from the entity as the change request is based on it to `proposed`.
+          description: |
+            The RFC 6902 patch from the entity as the change request is
+            based on it to `proposed`. For an `experiment` change request,
+            from the experiment (`status`, `traffic_allocation`,
+            `decision`) and the rules serving it in each environment holding
+            one (`rules`, by environment key) to what the transition leaves
+            of them, so a stop shows each rule it rewrites or removes.
           items:
             $ref: "#/components/schemas/PatchOperation"
         author:
@@ -7753,8 +7771,11 @@ components:
             The audit entry of the write that superseded the change request by changing what it was based on: a direct
             write, an override, the kill switch, a copy, a revert, another change request's application, archiving or
             deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write
-            to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found
-            superseded only when it was approved or applied names none.
+            to the configuration of its flag or of a flag naming its segment, in any environment; for an experiment, any
+            write to the experiment, its deletion included, and a write to its flag's configuration in an environment that
+            held its rule when the change request was based on it. Null unless a write superseded it; a change request
+            found superseded only when it was opened, approved or applied names none, as when another environment has
+            started holding the experiment's rule since.
         apply_at:
           type: string
           format: date-time
@@ -7791,7 +7812,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [flag_configuration, definition]
+          enum: [flag_configuration, definition, experiment]
         flag:
           type: string
           description: The key of the flag, for a configuration or a flag's definition.
@@ -7801,6 +7822,9 @@ components:
         segment:
           type: string
           description: The key of the segment, for a segment's definition only.
+        experiment:
+          type: string
+          description: The key of the experiment, for an `experiment` change request only, which names no flag.
         title:
           type: string
         description:
@@ -7846,11 +7870,51 @@ components:
         read by the change request's kind and the entity it names: a
         `FlagConfigurationPut` for `flag_configuration`, a
         `FlagDefinitionPut` for a flag's `definition`, a
-        `SegmentDefinitionPut` for a segment's.
+        `SegmentDefinitionPut` for a segment's, an `ExperimentTransition`
+        for `experiment`.
       oneOf:
         - $ref: "#/components/schemas/FlagConfigurationPut"
         - $ref: "#/components/schemas/FlagDefinitionPut"
         - $ref: "#/components/schemas/SegmentDefinitionPut"
+        - $ref: "#/components/schemas/ExperimentTransition"
+    ExperimentTransition:
+      type: object
+      description: |
+        The transition an `experiment` change request proposes: `start` of
+        a draft; `stop` of a running experiment with `decision`, the body a
+        direct stop sends; or `set_traffic_allocation`, growing a running
+        experiment's traffic allocation to `traffic_allocation`, never
+        below the current value. It is checked when it is proposed as the
+        transition itself is, and applying it runs the transition exactly
+        as a direct call does.
+      required: [action]
+      properties:
+        action:
+          $ref: "#/components/schemas/ExperimentTransitionAction"
+        decision:
+          $ref: "#/components/schemas/ExperimentStop"
+        traffic_allocation:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          description: The traffic allocation to grow to, in basis points; for `set_traffic_allocation` only.
+    ExperimentTransitionAction:
+      type: string
+      enum: [start, stop, set_traffic_allocation]
+    ProposedExperimentTransition:
+      type: object
+      description: The transition of an experiment a change request proposes.
+      required: [action]
+      properties:
+        action:
+          $ref: "#/components/schemas/ExperimentTransitionAction"
+        decision:
+          description: A stop's decision; absent for any other transition.
+          allOf:
+            - $ref: "#/components/schemas/ExperimentDecision"
+        traffic_allocation:
+          type: integer
+          description: The traffic allocation a growth grows to; absent for any other transition.
     FlagDefinitionPut:
       type: object
       description: |

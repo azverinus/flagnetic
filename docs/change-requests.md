@@ -1,6 +1,6 @@
 # Change requests
 
-A change request proposes a change for someone to review before it is made: one [flag](flags.md)'s configuration in one environment, or a flag's or a [segment](segments.md)'s definition in every environment; what it would be, and the diff from what it is now. Proposing changes nothing any SDK receives; a member who is not the author approves it, and applying it makes the change.
+A change request proposes a change for someone to review before it is made: one [flag](flags.md)'s configuration in one environment, a flag's or a [segment](segments.md)'s definition in every environment, or an [experiment](experiments.md)'s start, stop or traffic allocation growth in every environment holding its rule; what it would be, and the diff from what it is now. Proposing changes nothing any SDK receives; a member who is not the author approves it, and applying it makes the change.
 
 Proposing and applying need the `change_request.propose` permission (token scope `flags:write`, developer and above); approving and rejecting need `change_request.approve` (maintainer and above, members only); reads need `project.read`. A project token proposes like a member of its role: it is the author of its change requests and acts on its own only, and it never decides one.
 
@@ -27,8 +27,8 @@ A change request may propose a change to any environment. In a [protected enviro
 
 | Field | |
 |---|---|
-| `kind` | `flag_configuration` or `definition`. |
-| `flag`, `environment`, `segment` | The keys of what it proposes for: a configuration names a `flag` and an `environment`; a definition names one `flag` or one `segment`, and no environment (`422 invalid_change_request` otherwise). |
+| `kind` | `flag_configuration`, `definition` or `experiment`. |
+| `flag`, `environment`, `segment`, `experiment` | The keys of what it proposes for: a configuration names a `flag` and an `environment`; a definition names one `flag` or one `segment`, and no environment; an experiment's transition names the `experiment` alone (`422 invalid_change_request` otherwise). |
 | `title` | 1 to 200 characters. |
 | `description` | At most 10,000 characters. |
 | `proposed` | What the change request proposes, by its kind and entity (below). |
@@ -40,12 +40,23 @@ A change request may propose a change to any environment. In a [protected enviro
 | A flag's configuration | The whole configuration, as `PUT …/flags/{flag}/environments/{environment}` takes it. |
 | A flag's definition | `automatic_exposure` and every one of its `variations`, in order, as `PATCH …/flags/{flag}` takes them. |
 | A segment's definition | Its `conditions` and `private`. |
+| An experiment's transition | `action` and what it needs: `start`; `stop` with `decision`, as a direct stop takes it; `set_traffic_allocation` with `traffic_allocation`. See [Experiments](#experiments). |
 
 A definition is what every environment's ruleset carries of the flag or the segment, so one change request covers every environment. A flag's name, description, owner, tags and lifetime, a variation's name and description when nothing else changes, and a segment's name and description change nothing SDKs receive: they are edited directly, in a protected environment too.
 
 `proposed` is checked exactly as writing it would be, with the same refusals, their fields under `/proposed` (`422 invalid_configuration`, `422 invalid_flag`, `422 invalid_segment`, `409 archived`, `409 in_use` for a variation something still serves). A change request is kept while others write the configuration, so it may name what the configuration no longer holds: a rule `id` the configuration has no rule with, and a rollout `salt` that is not that rule's, are left out, and the rule is a new one. New rules and rollouts are given an identifier and a salt, which `proposed` holds.
 
 The change request answers `proposed` as it would leave the configuration, the flag or the segment, and `diff`, the [RFC 6902](https://www.rfc-editor.org/rfc/rfc6902) JSON Patch from what it is based on (`base_version`, the version of the configuration, the flag or the segment) to `proposed`. A rule inserted or removed is one operation, and a field changed inside a rule is one operation on that field. Who wrote the configuration and when are not part of it.
+
+## Experiments
+
+An experiment's start, its stop with a decision, and the growth of a running experiment's traffic allocation change what every environment holding a rule that serves it receives, so in a protected holder they are refused directly (`403 change_request_required`) and proposed as a change request of kind `experiment` instead. Its other writes change no ruleset and stay direct.
+
+The change request names the experiment, and answers its flag too. It proposes the transition, not a document: `proposed` is `{"action": "start"}`, `{"action": "stop", "decision": {"outcome": "winner", "winner_variation": "b", "note": "…"}}` or `{"action": "set_traffic_allocation", "traffic_allocation": 9000}`. The transition is checked when it is proposed as the transition itself is, with the same refusals (`409 not_draft`, `409 not_running`, `409 traffic_allocation_decrease`, `422 experiment_not_ready`, `422 invalid_decision` and `422 invalid_experiment` with their fields under `/proposed`); growing to the allocation the experiment has already is no change (`422 invalid_experiment`, `unchanged` at `/proposed/traffic_allocation`).
+
+It is based on the experiment (`base_version` is the experiment's version) and on the environments whose configuration of its flag holds a rule serving it then. `diff` runs from the experiment's `status`, `traffic_allocation` and `decision` and the rules serving it in each holding environment (`rules`, by environment key, each a list) to what the transition leaves of them: a start replaces `/status`; a growth `/traffic_allocation`; a stop adds `/decision` and shows each rule it rewrites to serve the winner (`/rules/production/0/serve/…`), or each rule it removes when the decision names no winner. A reviewer reads what production will serve.
+
+Applying it runs the transition exactly as a direct call does, in one transaction with the change request's application: the experiment's entry (`experiment.started`, `experiment.stopped`, `experiment.traffic_allocation_changed`) and, for a stop, each configuration it rewrites carry the change request's identifier. Its approval covers the environments protected when it was given, as a definition's does. When other environments hold the experiment's rule than those it was based on, opening it is refused `409 base_moved` until it is rebased, and approving or applying it is refused `409 base_moved` and supersedes it.
 
 ## Its life
 
@@ -54,8 +65,8 @@ Each of these is a `POST` to `/projects/{project}/change-requests/{id}/…`, or 
 | Operation | From | |
 |---|---|---|
 | `PATCH` | `draft`, `open` | Changes `title`, `description`, `proposed` or `apply_at` (null removes it, see [Scheduled changes](#scheduled-changes)); what is absent stays. `diff` is recomputed against the same base. An edit that changes nothing records nothing. |
-| `/rebase` | `draft` | Bases the change request on the configuration, flag or segment as it is now: `base_version` moves, `diff` is recomputed, `proposed` stays; a revert's is filled again from `revert_to`. |
-| `/open` | `draft` | Offers it for review. Refused with `409 base_moved` when what it is based on was written since `base_version`, until it is rebased: a reviewer reads the diff against what is served now. |
+| `/rebase` | `draft` | Bases the change request on the configuration, flag, segment or experiment as it is now: `base_version` moves, `diff` is recomputed, `proposed` stays; a revert's is filled again from `revert_to`. |
+| `/open` | `draft` | Offers it for review. Refused with `409 base_moved` when what it is based on was written since `base_version`, or, for an experiment, when other environments hold its rule now, until it is rebased: a reviewer reads the diff against what is served now. |
 | `/cancel` | `draft`, `open`, `approved` | Abandons it. |
 | `/copy` | any | Copies any change request, whoever wrote it, into a new draft of the caller's with its title, description and proposal, based on its configuration, flag or segment as it is now and checked again; it is not scheduled. Needs no `If-Match`. |
 
@@ -97,17 +108,24 @@ A definition was reviewed with the configurations it changes what they serve, so
 
 Applying a definition supersedes no configuration's change request, since no configuration moved.
 
-The write and the supersede commit together. `superseded_by` names the audit entry of the write, and each change request it supersedes gets a `change_request.superseded` entry of its own, made by the writer in the same request, naming that entry in its `superseded_by`. A change request is never superseded by its own application, and a draft is never superseded: it opens only on the current configuration, after a rebase. Deleting an environment or a segment records the change requests it ends before they go with it, so their entries remain in the audit log.
+An experiment's transition was reviewed as changing the environments holding its rule, so it is superseded by:
+
+- any write to the experiment: an edit, its salts regenerated, a start, a stop, a growth, archiving it, or deleting it; its alerts and their acknowledgements do not count;
+- a write to its flag's configuration in an environment that held the experiment's rule when the change request was based on it, and archiving the flag.
+
+An environment that starts holding the rule after that is not one it was based on, so the write supersedes nothing; the change request is found moved at its next step instead, as described in [Experiments](#experiments). A stop rewrites its rules with one configuration write per holding environment, which supersede the configurations' change requests there.
+
+The write and the supersede commit together. `superseded_by` names the audit entry of the write, and each change request it supersedes gets a `change_request.superseded` entry of its own, made by the writer in the same request, naming that entry in its `superseded_by`. A change request is never superseded by its own application, and a draft is never superseded: it opens only on the current configuration, after a rebase. Deleting an environment, a segment or an experiment records the change requests it ends before they go with it, so their entries remain in the audit log.
 
 Every read and write of a configuration (`GET`, `PUT`, overrides, salts, the kill switch, revert and copy) answers `change_requests`, the change requests waiting on it: how many are `open`, how many `approved`, and `next_apply_at`, the earliest time one of them is scheduled to be applied, null when none is. A member about to write it sees what the write will supersede. A flag's detail does not count them.
 
 ## The audit log
 
-Every transition is recorded in the audit log as `change_request.drafted`, `opened`, `updated`, `rebased`, `cancelled`, `copied`, `approved`, `rejected`, `applied` or `superseded`, and a scheduler that stops trying a change request as `change_request.schedule_failed`. The entries an application writes, the configuration's, the flag's or the segment's, and `change_request.applied`, carry the change request's identifier as `change_request_id`, and the audit log's `change_request` filter lists them, so a change to production traces back to its approval.
+Every transition is recorded in the audit log as `change_request.drafted`, `opened`, `updated`, `rebased`, `cancelled`, `copied`, `approved`, `rejected`, `applied` or `superseded`, and a scheduler that stops trying a change request as `change_request.schedule_failed`. The entries an application writes, the configuration's, the flag's, the segment's or the experiment's, and `change_request.applied`, carry the change request's identifier as `change_request_id`, and the audit log's `change_request` filter lists them, so a change to production traces back to its approval.
 
 ## Reading
 
-`GET /projects/{project}/change-requests` lists them newest first, filtered by `flag`, `environment` and `segment` (keys), `kind`, `state`, `author` (a member's or a project token's identifier) and `scheduled` (`true` for those with an apply time, `false` for those without), and with `awaiting_my_decision=true` to the open change requests of others the caller may approve or reject (none for a caller without `change_request.approve`, a project token included), a page of `limit` (at most 200, 50 by default) at a time with `cursor`. `GET …/change-requests/{id}` reads one, its version as its `ETag`.
+`GET /projects/{project}/change-requests` lists them newest first, filtered by `flag`, `environment`, `segment` and `experiment` (keys; `flag` also finds the transitions of the flag's experiments), `kind`, `state`, `author` (a member's or a project token's identifier) and `scheduled` (`true` for those with an apply time, `false` for those without), and with `awaiting_my_decision=true` to the open change requests of others the caller may approve or reject (none for a caller without `change_request.approve`, a project token included), a page of `limit` (at most 200, 50 by default) at a time with `cursor`. `GET …/change-requests/{id}` reads one, its version as its `ETag`.
 
 ## In the console
 

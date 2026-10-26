@@ -12,6 +12,7 @@ import (
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -70,9 +71,12 @@ func (s *ChangeRequests) CreateChangeRequest(ctx context.Context, cr governance.
 	if err != nil {
 		return fmt.Errorf("encoding a change request: %w", err)
 	}
-	var flag, environment, segment any
+	var flag, environment, segment, experiment any
 	if cr.Flag != nil {
 		flag = cr.Flag.ID.Bytes()
+	}
+	if cr.Experiment != nil {
+		experiment = cr.Experiment.ID.Bytes()
 	}
 	if cr.Environment != nil {
 		environment = cr.Environment.ID.Bytes()
@@ -90,11 +94,11 @@ func (s *ChangeRequests) CreateChangeRequest(ctx context.Context, cr governance.
 	_, err = s.db(ctx).Exec(ctx, `
 		INSERT INTO change_requests (id, project_id, kind, flag_id, environment_id, segment_id, state, title, description,
 		    base, base_version, base_referrers, proposed, diff, author_id, author_token_id, created_at, updated_at, version,
-		    apply_at, revert_to)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+		    apply_at, revert_to, experiment_id, base_holders)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
 		cr.ID.Bytes(), cr.Project.Bytes(), string(cr.Kind), flag, environment, segment, string(cr.State), cr.Title,
 		cr.Description, base, cr.BaseVersion, referrersOf(cr), proposed, diff, member, token, cr.CreatedAt, cr.UpdatedAt,
-		cr.Version, cr.ApplyAt, cr.RevertTo)
+		cr.Version, cr.ApplyAt, cr.RevertTo, experiment, holdersOf(cr))
 	if err != nil {
 		return fmt.Errorf("creating a change request: %w", err)
 	}
@@ -110,6 +114,19 @@ func referrersOf(cr governance.ChangeRequest) any {
 	out := make([][16]byte, len(cr.BaseReferrers))
 	for i, f := range cr.BaseReferrers {
 		out[i] = f.Bytes()
+	}
+	return out
+}
+
+// holdersOf returns the environments holding cr's experiment's rule when it
+// was based on it, nil for a change request to anything else.
+func holdersOf(cr governance.ChangeRequest) any {
+	if cr.Experiment == nil {
+		return nil
+	}
+	out := make([][16]byte, len(cr.BaseHolders))
+	for i, e := range cr.BaseHolders {
+		out[i] = e.Bytes()
 	}
 	return out
 }
@@ -165,13 +182,14 @@ func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.
 		    updated_at = $10, version = $11, decision = $12, decided_by = $13, decided_at = $14, decision_comment = $15,
 		    applied_at = $16, applied_by_kind = $17, applied_by = $18, applied_by_token = $19, superseded_by = $20,
 		    base_referrers = $21, approval_covers = $22, apply_at = $23, schedule_failed_at = $24,
-		    schedule_failure_code = $25, schedule_failure_message = $26, schedule_failures = $27, schedule_stopped = $28
+		    schedule_failure_code = $25, schedule_failure_message = $26, schedule_failures = $27, schedule_stopped = $28,
+		    base_holders = $29
 		WHERE project_id = $1 AND id = $2`,
-		append([]any{
+		append(append([]any{
 			cr.Project.Bytes(), cr.ID.Bytes(), string(cr.State), cr.Title, cr.Description, base, cr.BaseVersion, proposed, diff,
 			cr.UpdatedAt, cr.Version, decision, decidedBy, decidedAt, comment, appliedAt, appliedKind, appliedBy, appliedT,
 			supersededBy, referrersOf(cr), coversOf(cr), cr.ApplyAt,
-		}, failureArgs(cr.ScheduleFailure)...)...)
+		}, failureArgs(cr.ScheduleFailure)...), holdersOf(cr))...)
 	if err != nil {
 		return fmt.Errorf("updating a change request: %w", err)
 	}
@@ -249,7 +267,7 @@ func decisionOf(cr governance.ChangeRequest) (*governance.Decision, string) {
 }
 
 // changeRequestColumns are a change request's with the keys of the flag,
-// environment and segment it names and the names of its author, of the member who
+// environment, segment and experiment it names and the names of its author, of the member who
 // decided it and of whoever applied it as they are now.
 const changeRequestColumns = `cr.id, cr.project_id, cr.kind, cr.flag_id, f.key, cr.environment_id, e.key, cr.state, cr.title,
 	cr.description, cr.base, cr.base_version, cr.proposed, cr.diff, cr.author_id, cr.author_token_id,
@@ -257,12 +275,14 @@ const changeRequestColumns = `cr.id, cr.project_id, cr.kind, cr.flag_id, f.key, 
 	cr.decision_comment, cr.applied_at, cr.applied_by_kind, cr.applied_by, cr.applied_by_token,
 	coalesce(am.display_name, ap.name, ''), cr.superseded_by, cr.created_at, cr.updated_at, cr.version, cr.segment_id,
 	s.key, cr.base_referrers, cr.approval_covers, cr.apply_at, cr.schedule_failed_at, cr.schedule_failure_code,
-	cr.schedule_failure_message, cr.schedule_failures, cr.schedule_stopped, cr.revert_to`
+	cr.schedule_failure_message, cr.schedule_failures, cr.schedule_stopped, cr.revert_to, cr.experiment_id, x.key,
+	cr.base_holders`
 
 const changeRequestFrom = ` FROM change_requests cr
 	LEFT JOIN flags f ON f.id = cr.flag_id
 	LEFT JOIN environments e ON e.id = cr.environment_id
 	LEFT JOIN segments s ON s.id = cr.segment_id
+	LEFT JOIN experiments x ON x.id = cr.experiment_id
 	LEFT JOIN members m ON m.id = cr.author_id
 	LEFT JOIN api_tokens t ON t.id = cr.author_token_id
 	LEFT JOIN members dm ON dm.id = cr.decided_by
@@ -281,7 +301,9 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 		decidedBy, appliedBy, appliedT *[16]byte
 		supersededBy, sk               *[16]byte
 		segmentKey                     *string
-		referrers, covers              [][16]byte
+		referrers, covers, holders     [][16]byte
+		xk                             *[16]byte
+		experimentKey                  *string
 		deciderName, applierName       string
 		decidedAt, appliedAt           *time.Time
 		applyAt, failedAt              *time.Time
@@ -293,7 +315,7 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 		&cr.BaseVersion, &proposed, &diff, &member, &token, &cr.Author.Name, &decision, &decidedBy, &deciderName, &decidedAt,
 		&comment, &appliedAt, &appliedKind, &appliedBy, &appliedT, &applierName, &supersededBy, &cr.CreatedAt, &cr.UpdatedAt,
 		&cr.Version, &sk, &segmentKey, &referrers, &covers, &applyAt, &failedAt, &failureCode, &failureMessage, &failures,
-		&stopped, &cr.RevertTo); err != nil {
+		&stopped, &cr.RevertTo, &xk, &experimentKey, &holders); err != nil {
 		return cr, err
 	}
 	if applyAt != nil {
@@ -340,6 +362,12 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 	}
 	if sk != nil {
 		cr.Segment = &governance.SegmentRef{ID: id.FromBytes[flags.Segment](*sk), Key: *segmentKey}
+	}
+	if xk != nil {
+		cr.Experiment = &governance.ExperimentRef{ID: id.FromBytes[experiments.Experiment](*xk), Key: *experimentKey}
+	}
+	for _, e := range holders {
+		cr.BaseHolders = append(cr.BaseHolders, id.FromBytes[workspace.Environment](e))
 	}
 	for _, f := range referrers {
 		cr.BaseReferrers = append(cr.BaseReferrers, id.FromBytes[flags.Flag](f))
@@ -415,10 +443,11 @@ func (s *ChangeRequests) ChangeRequests(ctx context.Context, f appgovernance.Cha
 		  AND ($9 = '' OR cr.author_id IS NULL OR cr.author_id::text <> $9)
 		  AND ($10 = '' OR s.key = $10)
 		  AND ($11::boolean IS NULL OR (cr.apply_at IS NOT NULL) = $11)
+		  AND ($12 = '' OR x.key = $12)
 		ORDER BY cr.id DESC
 		LIMIT $8`,
 		f.Project.Bytes(), f.Flag, f.Environment, string(f.Kind), string(f.State), f.Author, cursor, limit, f.NotAuthoredBy,
-		f.Segment, f.Scheduled)
+		f.Segment, f.Scheduled, f.Experiment)
 	if err != nil {
 		return nil, fmt.Errorf("listing change requests: %w", err)
 	}
@@ -435,13 +464,17 @@ func (s *ChangeRequests) ChangeRequests(ctx context.Context, f appgovernance.Cha
 }
 
 // Waiting returns project's open and approved change requests moved may
-// move: those naming its flag, its deleted environment or its segment and, when it
-// moved configurations, those to a segment's definition, which the flag may
-// name. It reads under the project's row lock the writing transaction
+// move: those naming its flag, its deleted environment, its segment or its
+// experiment and, when it moved configurations, those to a segment's
+// definition, which the flag may name. An experiment's change request names
+// the experiment's flag, so a write to the flag's configuration finds it. It reads under the project's row lock the writing transaction
 // holds, so none is approved or applied meanwhile.
 func (s *ChangeRequests) Waiting(ctx context.Context, project workspace.ProjectID, moved governance.Moved,
 ) ([]governance.ChangeRequest, error) {
-	var flag, environment, segment any
+	var flag, environment, segment, experiment any
+	if !moved.Experiment.IsZero() {
+		experiment = moved.Experiment.Bytes()
+	}
 	if !moved.Flag.IsZero() {
 		flag = moved.Flag.Bytes()
 	}
@@ -455,9 +488,10 @@ func (s *ChangeRequests) Waiting(ctx context.Context, project workspace.ProjectI
 	}
 	rows, err := s.db(ctx).Query(ctx, `SELECT `+changeRequestColumns+changeRequestFrom+`
 		WHERE cr.project_id = $1 AND cr.state IN ('open', 'approved')
-		  AND (cr.flag_id = $2 OR cr.environment_id = $3 OR cr.segment_id = $4 OR ($5 AND cr.segment_id IS NOT NULL))
+		  AND (cr.flag_id = $2 OR cr.environment_id = $3 OR cr.segment_id = $4 OR ($5 AND cr.segment_id IS NOT NULL)
+		       OR cr.experiment_id = $6)
 		ORDER BY cr.id`,
-		project.Bytes(), flag, environment, segment, moved.Configurations)
+		project.Bytes(), flag, environment, segment, moved.Configurations, experiment)
 	if err != nil {
 		return nil, fmt.Errorf("reading the waiting change requests: %w", err)
 	}

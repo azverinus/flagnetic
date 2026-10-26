@@ -1675,8 +1675,10 @@ export type FlagConfigurationRevert = {
  * What a change request proposes: `flag_configuration`, a flag's
  * configuration in one environment; `definition`, a flag's variations
  * and automatic exposure, or a segment's conditions and private
- * switch, in every environment. `experiment` is to come. A client
- * reads `proposed` by the kind and the entity named.
+ * switch, in every environment; `experiment`, an experiment's start,
+ * stop with a decision or traffic allocation growth, in every
+ * environment holding its rule. A client reads `proposed` by the kind
+ * and the entity named.
  *
  */
 export type ChangeRequestKind = "flag_configuration" | "definition" | "experiment";
@@ -1821,7 +1823,7 @@ export type ChangeRequest = {
   id: string;
   kind: ChangeRequestKind;
   /**
-   * The key of the flag proposed for.
+   * The key of the flag proposed for; for an `experiment` change request, the experiment's flag.
    */
   flag?: string;
   /**
@@ -1832,11 +1834,15 @@ export type ChangeRequest = {
    * The key of the segment of a segment's `definition`.
    */
   segment?: string;
+  /**
+   * The key of the experiment of an `experiment` change request.
+   */
+  experiment?: string;
   state: ChangeRequestState;
   title: string;
   description: string;
   /**
-   * The version of the configuration, the flag or the segment the change request is based on.
+   * The version of the configuration, the flag, the segment or the experiment the change request is based on.
    */
   base_version: number;
   /**
@@ -1847,12 +1853,23 @@ export type ChangeRequest = {
    * What the change request proposes, by its kind and the entity it
    * names: a `ProposedConfiguration` for `flag_configuration`, a
    * `ProposedFlagDefinition` for a flag's `definition`, a
-   * `ProposedSegmentDefinition` for a segment's.
+   * `ProposedSegmentDefinition` for a segment's, a
+   * `ProposedExperimentTransition` for `experiment`.
    *
    */
-  proposed: ProposedConfiguration | ProposedFlagDefinition | ProposedSegmentDefinition;
+  proposed:
+    | ProposedConfiguration
+    | ProposedFlagDefinition
+    | ProposedSegmentDefinition
+    | ProposedExperimentTransition;
   /**
-   * The RFC 6902 patch from the entity as the change request is based on it to `proposed`.
+   * The RFC 6902 patch from the entity as the change request is
+   * based on it to `proposed`. For an `experiment` change request,
+   * from the experiment (`status`, `traffic_allocation`,
+   * `decision`) and the rules serving it in each environment holding
+   * one (`rules`, by environment key) to what the transition leaves
+   * of them, so a stop shows each rule it rewrites or removes.
+   *
    */
   diff: Array<PatchOperation>;
   author: ChangeRequestAuthor;
@@ -1873,7 +1890,7 @@ export type ChangeRequest = {
    */
   applied_by: ChangeRequestApplier | null;
   /**
-   * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
+   * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment; for an experiment, any write to the experiment, its deletion included, and a write to its flag's configuration in an environment that held its rule when the change request was based on it. Null unless a write superseded it; a change request found superseded only when it was opened, approved or applied names none, as when another environment has started holding the experiment's rule since.
    */
   superseded_by: string | null;
   /**
@@ -1898,7 +1915,7 @@ export type ChangeRequestList = {
 };
 
 export type ChangeRequestCreate = {
-  kind: "flag_configuration" | "definition";
+  kind: "flag_configuration" | "definition" | "experiment";
   /**
    * The key of the flag, for a configuration or a flag's definition.
    */
@@ -1911,6 +1928,10 @@ export type ChangeRequestCreate = {
    * The key of the segment, for a segment's definition only.
    */
   segment?: string;
+  /**
+   * The key of the experiment, for an `experiment` change request only, which names no flag.
+   */
+  experiment?: string;
   title: string;
   description?: string;
   proposed?: ProposedInput;
@@ -1943,10 +1964,48 @@ export type ChangeRequestPatch = {
  * read by the change request's kind and the entity it names: a
  * `FlagConfigurationPut` for `flag_configuration`, a
  * `FlagDefinitionPut` for a flag's `definition`, a
- * `SegmentDefinitionPut` for a segment's.
+ * `SegmentDefinitionPut` for a segment's, an `ExperimentTransition`
+ * for `experiment`.
  *
  */
-export type ProposedInput = FlagConfigurationPut | FlagDefinitionPut | SegmentDefinitionPut;
+export type ProposedInput =
+  FlagConfigurationPut | FlagDefinitionPut | SegmentDefinitionPut | ExperimentTransition;
+
+/**
+ * The transition an `experiment` change request proposes: `start` of
+ * a draft; `stop` of a running experiment with `decision`, the body a
+ * direct stop sends; or `set_traffic_allocation`, growing a running
+ * experiment's traffic allocation to `traffic_allocation`, never
+ * below the current value. It is checked when it is proposed as the
+ * transition itself is, and applying it runs the transition exactly
+ * as a direct call does.
+ *
+ */
+export type ExperimentTransition = {
+  action: ExperimentTransitionAction;
+  decision?: ExperimentStop;
+  /**
+   * The traffic allocation to grow to, in basis points; for `set_traffic_allocation` only.
+   */
+  traffic_allocation?: number;
+};
+
+export type ExperimentTransitionAction = "start" | "stop" | "set_traffic_allocation";
+
+/**
+ * The transition of an experiment a change request proposes.
+ */
+export type ProposedExperimentTransition = {
+  action: ExperimentTransitionAction;
+  /**
+   * A stop's decision; absent for any other transition.
+   */
+  decision?: ExperimentDecision;
+  /**
+   * The traffic allocation a growth grows to; absent for any other transition.
+   */
+  traffic_allocation?: number;
+};
 
 /**
  * A flag's definition as a change request proposes it: what every
@@ -8413,6 +8472,10 @@ export type ListChangeRequestsData = {
      * Only those naming the segment with this key.
      */
     segment?: string;
+    /**
+     * Only those proposing a transition of the experiment with this key.
+     */
+    experiment?: string;
     kind?: ChangeRequestKind;
     state?: ChangeRequestState;
     /**

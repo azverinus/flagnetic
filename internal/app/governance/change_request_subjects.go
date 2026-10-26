@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
@@ -51,6 +52,33 @@ type SegmentReferrers interface {
 	SegmentReferrers(ctx context.Context, project workspace.ProjectID, segment string) ([]flags.FlagID, error)
 }
 
+// Experiments is the experiments context's view of an experiment's
+// transitions, as a change request proposes and applies them.
+type Experiments interface {
+	// Propose returns project's experiment keyed experiment, or the refusal
+	// running t on it now would get, writing nothing.
+	Propose(ctx context.Context, project workspace.ProjectID, experiment string, t experiments.Transition,
+	) (experiments.Experiment, error)
+	// Current returns project's experiment keyed experiment, or not_found.
+	Current(ctx context.Context, project workspace.ProjectID, experiment string) (experiments.Experiment, error)
+	// Apply runs t on project's experiment keyed experiment, based on its
+	// version baseVersion, in the unit of work ctx carries, as the
+	// transition itself runs: a refusal rolls the application back. by is
+	// the member applying, nil for a project token or the system; req is who
+	// makes the change, for its audit entries.
+	Apply(ctx context.Context, project workspace.ProjectID, experiment string, t experiments.Transition, baseVersion int64,
+		by *access.MemberID, req governance.Request) error
+}
+
+// ExperimentHolders reads, from the flags context, where an experiment's
+// rules are.
+type ExperimentHolders interface {
+	// HoldingConfigurations returns the configurations of flag with a rule
+	// serving the experiment keyed experiment, by the environments' order,
+	// read in the unit of work ctx carries.
+	HoldingConfigurations(ctx context.Context, flag flags.FlagID, experiment string) ([]flags.EnvironmentConfiguration, error)
+}
+
 // ProtectedEnvironments reads which environments of a project are
 // protected.
 type ProtectedEnvironments interface {
@@ -70,6 +98,8 @@ type Proposed struct {
 	// Segment is a segment's definition: its conditions and private
 	// switch, and nothing else.
 	Segment *flags.SegmentChange
+	// Experiment is one transition of an experiment.
+	Experiment *experiments.Transition
 }
 
 // Target is what a change request proposes for: its kind, and the keys of
@@ -79,6 +109,7 @@ type Target struct {
 	Flag        string
 	Environment string
 	Segment     string
+	Experiment  string
 }
 
 // TargetOf returns what cr proposes for.
@@ -92,6 +123,9 @@ func TargetOf(cr governance.ChangeRequest) Target {
 	}
 	if cr.Segment != nil {
 		t.Segment = cr.Segment.Key
+	}
+	if cr.Experiment != nil {
+		t.Experiment = cr.Experiment.Key
 	}
 	return t
 }
@@ -124,6 +158,9 @@ func (t Target) check() error {
 		if t.Segment != "" {
 			notAllowed("segment", "a configuration is a flag's, not a segment's")
 		}
+		if t.Experiment != "" {
+			notAllowed("experiment", "a configuration is a flag's, not an experiment's")
+		}
 	case governance.KindDefinition:
 		switch {
 		case t.Flag == "" && t.Segment == "":
@@ -134,10 +171,29 @@ func (t Target) check() error {
 		if t.Environment != "" {
 			notAllowed("environment", "a definition is applied in every environment")
 		}
+		if t.Experiment != "" {
+			notAllowed("experiment", "a definition is a flag's or a segment's, not an experiment's")
+		}
+	case governance.KindExperiment:
+		if t.Experiment == "" {
+			required("experiment", "a transition is an experiment's")
+		}
+		if t.Flag != "" {
+			notAllowed("flag", "an experiment names its flag")
+		}
+		if t.Environment != "" {
+			notAllowed("environment", "a transition is applied in every environment holding the experiment's rule")
+		}
+		if t.Segment != "" {
+			notAllowed("segment", "a transition is an experiment's, not a segment's")
+		}
 	default:
 		violations = append(violations, apperrors.Violation{
-			Pointer: "/kind", Code: "invalid_value", Detail: "a change request proposes a flag configuration or a definition",
-			Params: map[string]any{"kinds": []string{string(governance.KindFlagConfiguration), string(governance.KindDefinition)}},
+			Pointer: "/kind", Code: "invalid_value",
+			Detail: "a change request proposes a flag configuration, a definition or an experiment's transition",
+			Params: map[string]any{"kinds": []string{
+				string(governance.KindFlagConfiguration), string(governance.KindDefinition), string(governance.KindExperiment),
+			}},
 		})
 	}
 	if violations != nil {
@@ -197,6 +253,25 @@ func (d ChangeRequestDeps) propose(ctx context.Context, project workspace.Projec
 		}
 		proposed, err := flagDefinitionDocument(after)
 		return subject, proposed, err
+	case t.Kind == governance.KindExperiment && in.Experiment != nil:
+		if err := checkTransition(*in.Experiment); err != nil {
+			return governance.Subject{}, nil, err
+		}
+		e, err := d.Experiments.Propose(ctx, project, t.Experiment, *in.Experiment)
+		if err != nil {
+			if in.Experiment.Action == experiments.ActionStart {
+				// What a start is refused for is the experiment, not the
+				// transition proposed.
+				return governance.Subject{}, nil, err
+			}
+			return governance.Subject{}, nil, under(err, "/proposed")
+		}
+		subject, err := d.experimentSubject(ctx, e)
+		if err != nil {
+			return subject, nil, err
+		}
+		proposed, err := transitionDocument(*in.Experiment)
+		return subject, proposed, err
 	}
 	return governance.Subject{}, nil, errNothingProposed
 }
@@ -244,6 +319,12 @@ func (d ChangeRequestDeps) current(ctx context.Context, cr governance.ChangeRequ
 			return governance.Subject{}, err
 		}
 		return d.segmentSubject(ctx, s)
+	case t.Kind == governance.KindExperiment:
+		e, err := d.Experiments.Current(ctx, cr.Project, t.Experiment)
+		if err != nil {
+			return governance.Subject{}, err
+		}
+		return d.experimentSubject(ctx, e)
 	default:
 		f, err := d.Definitions.CurrentFlag(ctx, cr.Project, t.Flag)
 		if err != nil {
@@ -254,14 +335,15 @@ func (d ChangeRequestDeps) current(ctx context.Context, cr governance.ChangeRequ
 }
 
 // judged returns what cr is judged against when it is approved or applied:
-// its entity's version now and, for a change request applied in every
-// environment, the environments protected now.
+// its entity's version now, for an experiment the environments holding its
+// rule now and, for a change request applied in every environment, the
+// environments protected now.
 func (d ChangeRequestDeps) judged(ctx context.Context, cr governance.ChangeRequest) (governance.Current, error) {
 	subject, err := d.current(ctx, cr)
 	if err != nil {
 		return governance.Current{}, err
 	}
-	c := governance.Current{Version: subject.BaseVersion}
+	c := governance.Current{Version: subject.BaseVersion, Holders: subject.BaseHolders}
 	if cr.Kind != governance.KindFlagConfiguration {
 		c.Protected, err = d.Environments.Protected(ctx, cr.Project)
 	}
@@ -292,6 +374,12 @@ func (d ChangeRequestDeps) write(ctx context.Context, cr governance.ChangeReques
 			return err
 		}
 		return d.Definitions.ApplySegment(ctx, cr.Project, t.Segment, change, cr.BaseVersion, req)
+	case t.Kind == governance.KindExperiment:
+		transition, err := experimentTransitionOf(cr.Proposed)
+		if err != nil {
+			return err
+		}
+		return d.Experiments.Apply(ctx, cr.Project, t.Experiment, transition, cr.BaseVersion, by, req)
 	default:
 		change, err := flagChangeOf(cr.Proposed)
 		if err != nil {
@@ -311,6 +399,9 @@ func proposedOf(cr governance.ChangeRequest) (Proposed, error) {
 	case t.segmentDefinition():
 		change, err := segmentChangeOf(cr.Proposed)
 		return Proposed{Segment: &change}, err
+	case t.Kind == governance.KindExperiment:
+		transition, err := experimentTransitionOf(cr.Proposed)
+		return Proposed{Experiment: &transition}, err
 	default:
 		change, err := flagChangeOf(cr.Proposed)
 		return Proposed{Flag: &change}, err

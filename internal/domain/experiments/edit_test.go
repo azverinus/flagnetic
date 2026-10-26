@@ -111,3 +111,39 @@ func TestRegeneratingSaltsReplacesBothAndBumpsTheVersion(t *testing.T) {
 		t.Errorf("RegenerateSalts = %+v, %v", got, err)
 	}
 }
+
+// A change request grows a running experiment's traffic allocation, the one
+// change to it a protected environment's ruleset reviews: a draft's is
+// edited directly, an allocation never shrinks, and the allocation it has
+// already is no change to propose.
+func TestARunningExperimentsTrafficAllocationGrows(t *testing.T) {
+	e := running(t)
+	e.TrafficAllocation = 7000
+	grown, err := e.GrowTrafficAllocation(e.TrafficAllocation+1000, later)
+	if err != nil || grown.TrafficAllocation != e.TrafficAllocation+1000 || grown.Version != e.Version+1 ||
+		!grown.UpdatedAt.Equal(later) {
+		t.Errorf("grown = %+v, %v", grown, err)
+	}
+	for name, tc := range map[string]struct {
+		e    experiments.Experiment
+		to   int
+		code string
+	}{
+		"a decrease":       {e, e.TrafficAllocation - 1, "traffic_allocation_decrease"},
+		"the same":         {e, e.TrafficAllocation, "invalid_experiment"},
+		"above everything": {e, experiments.TotalWeight + 1, "invalid_experiment"},
+		"a draft":          {draft(t), 5000, "not_running"},
+		"a stopped one":    {stopped(t), 5000, "not_running"},
+	} {
+		if _, err := tc.e.GrowTrafficAllocation(tc.to, later); codeOf(err) != tc.code {
+			t.Errorf("%s: %v, want %s", name, err, tc.code)
+		}
+	}
+}
+
+func codeOf(err error) string {
+	if e, ok := apperrors.From(err); ok {
+		return e.Code
+	}
+	return ""
+}

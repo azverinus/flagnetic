@@ -217,10 +217,31 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	revertConfiguration := appflags.NewRevertConfiguration(appflags.RevertConfigurationDeps{
 		Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, History: auditLog, Rulesets: rulesets, Recorder: flagRec,
 	})
+	updateExperiment := appexperiments.NewUpdateExperiment(appexperiments.UpdateExperimentDeps{
+		Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Owners: owners,
+		Holders: flagStore, Rulesets: rulesets, Recorder: experimentRec,
+	})
+	// A start moves on the rulesets of the environments whose flag
+	// configurations hold the experiment, which the flags context reads.
+	startExperiment := appexperiments.NewStartExperiment(appexperiments.StartExperimentDeps{
+		Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws,
+		Holders: flagStore, Rulesets: rulesets, Recorder: experimentRec,
+	})
+	// A stop rewrites the rules serving the experiment, which belong to
+	// the flags context, each as a configuration write of its own.
+	stopExperiment := appexperiments.NewStopExperiment(appexperiments.StopExperimentDeps{
+		Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
+		Holders: flagStore, FirstExposures: eventStore, Checks: experimentStore,
+		Rules: appflags.NewApplyExperimentDecision(appflags.ApplyExperimentDecisionDeps{
+			Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+		}),
+	})
 	// A change request proposes a configuration or a definition the flags
 	// context checks as it would check writing it, and writes it when the
 	// change request is applied; a definition's approval covers the
-	// environments the workspace context says are protected.
+	// environments the workspace context says are protected. An
+	// experiment's transition is checked and run by the experiments
+	// context, based on the rules serving it the flags context reads.
 	changeRequests := appgovernance.ChangeRequestDeps{
 		Tx: tx, Projects: changeRequestStore, Store: changeRequestStore,
 		Configurations: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
@@ -229,6 +250,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		}),
 		Reverts:      revertConfiguration,
 		Definitions:  appflags.NewDefinitions(updateFlag, updateSegment, appflags.NewSegmentReferrers(flagStore)),
+		Experiments:  appexperiments.NewTransitions(experimentStore, startExperiment, stopExperiment, updateExperiment),
+		Holders:      appflags.NewExperimentHolders(flagStore),
 		Environments: appworkspace.NewProtectedEnvironments(ws),
 		Audit:        audit, Clock: d.Clock, IDs: d.IDs, MinLead: o.Schedule.MinLead,
 	}
@@ -393,26 +416,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Rollouts: flagStore,
 			Owners: owners, Recorder: experimentRec,
 		}),
-		GetExperiment: appexperiments.NewGetExperiment(experimentStore),
-		UpdateExperiment: appexperiments.NewUpdateExperiment(appexperiments.UpdateExperimentDeps{
-			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Owners: owners,
-			Holders: flagStore, Rulesets: rulesets, Recorder: experimentRec,
-		}),
-		// A start moves on the rulesets of the environments whose flag
-		// configurations hold the experiment, which the flags context reads.
-		StartExperiment: appexperiments.NewStartExperiment(appexperiments.StartExperimentDeps{
-			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws,
-			Holders: flagStore, Rulesets: rulesets, Recorder: experimentRec,
-		}),
-		// A stop rewrites the rules serving the experiment, which belong to
-		// the flags context, each as a configuration write of its own.
-		StopExperiment: appexperiments.NewStopExperiment(appexperiments.StopExperimentDeps{
-			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
-			Holders: flagStore, FirstExposures: eventStore, Checks: experimentStore,
-			Rules: appflags.NewApplyExperimentDecision(appflags.ApplyExperimentDecisionDeps{
-				Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
-			}),
-		}),
+		GetExperiment:    appexperiments.NewGetExperiment(experimentStore),
+		UpdateExperiment: updateExperiment,
+		StartExperiment:  startExperiment,
+		StopExperiment:   stopExperiment,
 		ArchiveExperiment: appexperiments.NewArchiveExperiment(appexperiments.ArchiveExperimentDeps{
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Recorder: experimentRec,
 		}),

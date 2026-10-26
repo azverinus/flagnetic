@@ -11,6 +11,7 @@ import (
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
@@ -29,6 +30,7 @@ func (a *api) ListChangeRequests(ctx context.Context, req ListChangeRequestsRequ
 	p := req.Params
 	f := appgovernance.ChangeRequestFilter{
 		Project: projectID(ctx), Flag: valueOf(p.Flag), Environment: valueOf(p.Environment), Segment: valueOf(p.Segment),
+		Experiment: valueOf(p.Experiment),
 	}
 	// An unknown kind or state would match nothing, which reads as no
 	// change request of it rather than as a filter misspelt.
@@ -102,7 +104,7 @@ func (a *api) CreateChangeRequest(ctx context.Context, req CreateChangeRequestRe
 	b := req.Body
 	target := appgovernance.Target{
 		Kind: governance.ChangeRequestKind(b.Kind), Flag: valueOf(b.Flag), Environment: valueOf(b.Environment),
-		Segment: valueOf(b.Segment),
+		Segment: valueOf(b.Segment), Experiment: valueOf(b.Experiment),
 	}
 	// A revert gives no proposal: the server fills it from revert_to.
 	var proposed appgovernance.Proposed
@@ -271,7 +273,7 @@ func (a *api) CopyChangeRequest(ctx context.Context, req CopyChangeRequestReques
 }
 
 // proposedIn reads in as the document t calls for: a configuration, a
-// flag's definition or a segment's. A target calling for none proposes
+// flag's definition or a segment's, or an experiment's transition. A target calling for none proposes
 // nothing, which the change request refuses as it refuses the target.
 func proposedIn(t appgovernance.Target, in ProposedInput) (appgovernance.Proposed, error) {
 	var out appgovernance.Proposed
@@ -299,6 +301,21 @@ func proposedIn(t appgovernance.Target, in ProposedInput) (appgovernance.Propose
 			return out, flaghttp.InvalidRequest("proposed is not a flag's definition")
 		}
 		out.Flag = &flags.FlagChange{AutomaticExposure: &d.AutomaticExposure, Variations: variationsIn(&d.Variations)}
+	case t.Kind == governance.KindExperiment:
+		tr, err := in.AsExperimentTransition()
+		if err != nil {
+			return out, flaghttp.InvalidRequest("proposed is not an experiment's transition")
+		}
+		transition := experiments.Transition{Action: string(tr.Action), TrafficAllocation: tr.TrafficAllocation}
+		if d := tr.Decision; d != nil {
+			if !d.Outcome.Valid() {
+				return out, flaghttp.InvalidRequest("proposed.decision.outcome must be winner or removed")
+			}
+			transition.Decision = &experiments.Decision{
+				Outcome: experiments.Outcome(d.Outcome), WinnerVariation: valueOr(d.WinnerVariation, ""), Note: valueOr(d.Note, ""),
+			}
+		}
+		out.Experiment = &transition
 	}
 	return out, nil
 }
@@ -408,6 +425,9 @@ func changeRequestOut(cr governance.ChangeRequest) (ChangeRequest, error) {
 	}
 	if cr.Segment != nil {
 		out.Segment = &cr.Segment.Key
+	}
+	if cr.Experiment != nil {
+		out.Experiment = &cr.Experiment.Key
 	}
 	for i, op := range cr.Diff {
 		out.Diff[i] = PatchOperation{Op: PatchOperationOp(op.Op), Path: op.Path}

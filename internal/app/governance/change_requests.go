@@ -115,6 +115,8 @@ type ChangeRequestDeps struct {
 	Proposals      ProposalApplier
 	Reverts        Reverts
 	Definitions    Definitions
+	Experiments    Experiments
+	Holders        ExperimentHolders
 	Environments   ProtectedEnvironments
 	Audit          AuditLog
 	Clock          clock.Clock
@@ -333,6 +335,9 @@ func changeRequestValues(cr governance.ChangeRequest) map[string]any {
 	if cr.RevertTo != nil {
 		out["revert_to"] = *cr.RevertTo
 	}
+	if cr.Experiment != nil {
+		out["experiment"] = cr.Experiment.Key
+	}
 	if !cr.SupersededBy.IsZero() {
 		out["superseded_by"] = cr.SupersededBy.String()
 	}
@@ -419,18 +424,7 @@ func configurationDocument(c flags.Configuration) (governance.Document, error) {
 		}
 	}
 	for i, r := range c.Rules {
-		rd := ruleDoc{
-			ID: r.ID.String(), Description: r.Description, Conditions: make([]conditionDoc, len(r.Conditions)),
-			Serve: serveDoc{Kind: r.Serve.Kind, Variation: r.Serve.Variation, Experiment: r.Serve.Experiment},
-		}
-		for j, cond := range r.Conditions {
-			rd.Conditions[j] = conditionDoc(cond)
-		}
-		if r.Serve.Kind == flags.ServeRollout {
-			percentage := r.Serve.Percentage
-			rd.Serve.UnitType, rd.Serve.Percentage, rd.Serve.Salt = r.Serve.UnitType, &percentage, r.Serve.Salt
-		}
-		d.Rules[i] = rd
+		d.Rules[i] = ruleDocOf(r)
 	}
 	b, err := json.Marshal(d)
 	if err != nil {
@@ -438,6 +432,22 @@ func configurationDocument(c flags.Configuration) (governance.Document, error) {
 	}
 	var out any
 	return out, json.Unmarshal(b, &out)
+}
+
+// ruleDocOf returns r as the documents of a change request hold it.
+func ruleDocOf(r flags.Rule) ruleDoc {
+	rd := ruleDoc{
+		ID: r.ID.String(), Description: r.Description, Conditions: make([]conditionDoc, len(r.Conditions)),
+		Serve: serveDoc{Kind: r.Serve.Kind, Variation: r.Serve.Variation, Experiment: r.Serve.Experiment},
+	}
+	for j, cond := range r.Conditions {
+		rd.Conditions[j] = conditionDoc(cond)
+	}
+	if r.Serve.Kind == flags.ServeRollout {
+		percentage := r.Serve.Percentage
+		rd.Serve.UnitType, rd.Serve.Percentage, rd.Serve.Salt = r.Serve.UnitType, &percentage, r.Serve.Salt
+	}
+	return rd
 }
 
 // configurationInputOf returns the configuration doc proposes as a write
