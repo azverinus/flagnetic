@@ -1,5 +1,10 @@
-/** The package version, reported in the User-Agent. Kept equal to package.json by a test. */
-export const VERSION = "0.0.0";
+/**
+ * The package version, reported in the User-Agent and every events envelope.
+ * release-please keeps it equal to package.json and to the release tag
+ * through the marker below, and tests check both; 0.0.0 is a build from the
+ * repository before the first release.
+ */
+export const VERSION = "0.0.0"; // x-release-please-version
 
 /**
  * The lowest `schema_version` of the documents this SDK reads. A document outside

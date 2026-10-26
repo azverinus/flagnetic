@@ -1,12 +1,14 @@
 // Checks the built package the way a consumer loads it: every entry point of
 // the exports map resolves through the package's own name from both ESM and
 // CommonJS, with type declarations beside it, the server entry evaluates a
-// flag in both formats, the browser entry never carries the evaluator, and
-// the package has no runtime dependencies. Runs with no dev dependencies,
+// flag in both formats, the browser entry never carries the evaluator,
+// the package has no runtime dependencies, and the tarball npm would publish
+// holds the built files and nothing else. Runs with no dev dependencies,
 // and CI runs it once more with `react` and the OpenFeature SDKs removed,
 // which is what proves the other entry points load without their optional
 // peer dependencies.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
@@ -120,6 +122,29 @@ for (const name of ["index", "client", "server", "react", "openfeature"]) {
 for (const file of ["dist/openfeature.d.ts", "dist/openfeature.d.cts"]) {
   assert.ok(read(file).includes("@openfeature/server-sdk") && read(file).includes("@openfeature/web-sdk"), `${file} does not type the providers by the OpenFeature SDKs`);
 }
+
+// What npm would publish: the built files and the documents npm always
+// includes, every file of the exports map among them, and nothing else, so
+// a stray file cannot ship and a missing build cannot pass.
+const packed = JSON.parse(
+  execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], { cwd: new URL("..", import.meta.url), encoding: "utf8" }),
+)[0];
+const files = packed.files.map((f) => f.path);
+for (const file of files) {
+  assert.ok(file.startsWith("dist/") || ["package.json", "README.md", "LICENSE", "CHANGELOG.md"].includes(file), `the package would publish ${file}`);
+}
+for (const file of ["package.json", "README.md", "LICENSE"]) {
+  assert.ok(files.includes(file), `the package would not publish ${file}`);
+}
+for (const entry of entries) {
+  for (const condition of ["import", "require"]) {
+    for (const file of Object.values(pkg.exports[entry][condition])) {
+      assert.ok(files.includes(file.slice(2)), `the package would not publish ${file}`);
+    }
+  }
+}
+assert.equal(packed.name, pkg.name);
+assert.equal(packed.version, pkg.version);
 
 const react = resolvable("react") ? "react installed" : "react absent";
 const openfeature = resolvable("@openfeature/server-sdk") || resolvable("@openfeature/web-sdk") ? "OpenFeature installed" : "OpenFeature absent";
