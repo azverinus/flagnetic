@@ -146,10 +146,6 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v${{ needs.playwright.outputs.version }}-noble
       options: --ipc=host
-      # Firefox refuses to start as root under a home directory root does
-      # not own, which the runner's /github/home is.
-      env:
-        HOME: /root
     strategy:
       fail-fast: false
       matrix:
@@ -170,3 +166,8 @@ jobs:
         run: pnpm test:browsers
         env:
           FLAGNETIC_BROWSERS: ${{ matrix.browser }}
+          # Firefox refuses to start as root under a home directory root does
+          # not own, which the runner's /github/home is. The runner sets HOME
+          # for every step, so it is overridden here rather than on the
+          # container.
+          HOME: /root

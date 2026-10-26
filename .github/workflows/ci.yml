@@ -293,6 +293,11 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
+      # The checkout belongs to the runner's user and the container runs as
+      # root, so git refuses the repository and go build cannot stamp the
+      # binary with its revision.
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Run the suite
         run: pnpm e2e
       - name: Keep the report
