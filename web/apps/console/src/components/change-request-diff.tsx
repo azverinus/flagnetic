@@ -1,4 +1,9 @@
-import type { ChangeRequest, FlagConfiguration, PatchOperation } from "@flagnetic/api";
+import type {
+  ChangeRequest,
+  FlagConfiguration,
+  PatchOperation,
+  ProposedConfiguration,
+} from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { ReactNode } from "react";
 
@@ -20,8 +25,14 @@ export function ChangeRequestDiff({
   /** The environment's configuration as it is now, once read. */
   current: FlagConfiguration | undefined;
 }) {
-  if (current !== undefined && diffBasis(changeRequest, current) === "current") {
-    return <ConfigurationDiff changes={diffConfigurations(current, changeRequest.proposed)} />;
+  if (
+    changeRequest.kind === "flag_configuration" &&
+    current !== undefined &&
+    diffBasis(changeRequest, current) === "current"
+  ) {
+    // A configuration's change request proposes a configuration.
+    const proposed = changeRequest.proposed as ProposedConfiguration;
+    return <ConfigurationDiff changes={diffConfigurations(current, proposed)} />;
   }
   return <PatchDiff diff={changeRequest.diff} />;
 }
