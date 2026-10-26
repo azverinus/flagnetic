@@ -235,7 +235,7 @@ func TestAScheduledChangeRequestOnAMovedBaseIsSupersededNotFailed(t *testing.T) 
 	f := startSchedules(t)
 	key := f.project.Key
 	cr := f.scheduled(t, proposedOn(), f.clock.Now().Add(time.Hour))
-	moveBehind(t, f, cr)
+	moveBehind(t, cr)
 	f.clock.Advance(time.Hour)
 	mustTick(t, f.srv)
 	got := getChangeRequest(t, f.admin, key, cr)
@@ -253,7 +253,7 @@ func TestAScheduledChangeRequestOnAMovedBaseIsSupersededNotFailed(t *testing.T) 
 // cr, as a write committed while cr was being applied would: the test
 // writes the version straight into the table, there being no API path that
 // moves a configuration and leaves its change requests approved.
-func moveBehind(t *testing.T, f scheduleFixture, cr management.ChangeRequest) {
+func moveBehind(t *testing.T, cr management.ChangeRequest) {
 	t.Helper()
 	if _, err := testkit.Pool(t).Exec(t.Context(), `
 		UPDATE flag_configurations SET version = version + 1

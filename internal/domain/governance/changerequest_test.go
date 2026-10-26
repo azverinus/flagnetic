@@ -513,15 +513,15 @@ func TestAnEditSetsOrClearsTheApplyTime(t *testing.T) {
 	if err != nil || !changed || scheduled.ApplyAt == nil || !scheduled.ApplyAt.Equal(at) || scheduled.Version != 2 {
 		t.Fatalf("scheduled = %+v, %v, %v", scheduled.ApplyAt, changed, err)
 	}
-	if _, changed, err := scheduled.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{At: &at}}, later); err != nil || changed {
-		t.Errorf("the same apply time again: changed %v, %v", changed, err)
+	if _, again, againErr := scheduled.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{At: &at}}, later); againErr != nil || again {
+		t.Errorf("the same apply time again: changed %v, %v", again, againErr)
 	}
 	// The lead is judged from the edit, not from when the change request
 	// was created.
 	soon := later.Add(30 * time.Second)
-	if _, _, err := scheduled.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{At: &soon}, MinLead: time.Minute},
-		later); codeOf(err) != "invalid_change_request" {
-		t.Errorf("an apply time inside the lead = %v", err)
+	if _, _, soonErr := scheduled.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{At: &soon}, MinLead: time.Minute},
+		later); codeOf(soonErr) != "invalid_change_request" {
+		t.Errorf("an apply time inside the lead = %v", soonErr)
 	}
 	cleared, changed, err := scheduled.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{}}, later)
 	if err != nil || !changed || cleared.ApplyAt != nil || cleared.Version != 3 {
