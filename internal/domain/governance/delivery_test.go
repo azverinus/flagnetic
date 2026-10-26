@@ -185,14 +185,14 @@ func TestARedeliveryIsTheSameEventUnderANewDelivery(t *testing.T) {
 		Attempts: []governance.DeliveryAttempt{{N: 1, At: occurred, StatusCode: code(400)}}, CreatedAt: occurred,
 	}
 	again := id.MustParse[governance.Delivery]("0190d2a0-0000-7000-8000-0000000000f4")
-	now := occurred.Add(time.Hour)
-	got := sent.Redeliver(again, now)
+	at := occurred.Add(time.Hour)
+	got := sent.Redeliver(again, at)
 	if got.ID != again || got.Webhook != sent.Webhook || got.Event != sent.Event || got.Type != sent.Type ||
 		!bytes.Equal(got.Body, sent.Body) {
 		t.Errorf("redelivery %+v of %+v", got, sent)
 	}
 	if got.Status != governance.DeliveryPending || len(got.Attempts) != 0 || got.NextAttemptAt == nil ||
-		!got.NextAttemptAt.Equal(now) || !got.CreatedAt.Equal(now) {
+		!got.NextAttemptAt.Equal(at) || !got.CreatedAt.Equal(at) {
 		t.Errorf("redelivery %+v, want pending, due now, with no attempts", got)
 	}
 }

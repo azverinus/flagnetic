@@ -170,11 +170,11 @@ func (h *Deliver) Attempt(ctx context.Context, token LeaseToken, delivery govern
 	}
 	secrets := make([]string, len(l.SealedSecrets))
 	for i, sealed := range l.SealedSecrets {
-		value, err := h.d.Opener.Open(secret.PurposeWebhookSecret, sealed)
-		if err != nil {
+		value, openErr := h.d.Opener.Open(secret.PurposeWebhookSecret, sealed)
+		if openErr != nil {
 			// The lease runs out and another round tries again: a key the
 			// operator restores lets it through.
-			return Attempted{}, fmt.Errorf("opening a webhook subscription's secret: %w", err)
+			return Attempted{}, fmt.Errorf("opening a webhook subscription's secret: %w", openErr)
 		}
 		secrets[i] = string(value)
 	}
@@ -201,12 +201,12 @@ func (h *Deliver) Attempt(ctx context.Context, token LeaseToken, delivery govern
 		// The subscription is locked before its delivery, as the claim locks
 		// them, so two attempts recorded at once never wait on each other
 		// in turn.
-		if err := h.d.Store.LockWebhook(ctx, l.Delivery.Webhook); err != nil {
-			return err
+		if txErr := h.d.Store.LockWebhook(ctx, l.Delivery.Webhook); txErr != nil {
+			return txErr
 		}
-		recorded, err := h.d.Store.RecordAttempt(ctx, delivery, token, a, status, next, h.now())
-		if err != nil {
-			return err
+		recorded, txErr := h.d.Store.RecordAttempt(ctx, delivery, token, a, status, next, h.now())
+		if txErr != nil {
+			return txErr
 		}
 		if !recorded {
 			return ErrLeaseLost
