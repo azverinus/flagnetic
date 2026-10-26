@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { commands } from "vitest/browser";
 import { anonymousId, createClient, type ClientOptions, type FlagneticClient } from "../src/client.js";
+import { VERSION } from "../src/version.js";
 
 interface SeenRequest {
   readonly method: string;
@@ -91,7 +92,7 @@ describe("a page on another origin", () => {
     expect(JSON.parse(evaluate?.body ?? "{}")).toStrictEqual({
       context: {
         units: { anonymous: "d-8f1c" },
-        attributes: { platform: "browser", app_version: "1.42.0", sdk: "flagnetic-js", sdk_version: "0.0.0", country: "DE" },
+        attributes: { platform: "browser", app_version: "1.42.0", sdk: "flagnetic-js", sdk_version: VERSION, country: "DE" },
       },
     });
   });
@@ -175,7 +176,7 @@ describe("a page on another origin", () => {
     await c.flush();
     const [events] = await requests("/sdk/v1/events", "POST");
     const body = JSON.parse(events?.body ?? "{}") as { sdk: unknown; events: { type: string }[] };
-    expect(body.sdk).toStrictEqual({ name: "flagnetic-js", version: "0.0.0", platform: "browser" });
+    expect(body.sdk).toStrictEqual({ name: "flagnetic-js", version: VERSION, platform: "browser" });
     expect(body.events.map((e) => e.type)).toStrictEqual(["alias"]);
   });
 
@@ -191,7 +192,7 @@ describe("a page on another origin", () => {
     expect(await requests("/sdk/v1/events", "OPTIONS"), "a beacon is a simple request").toHaveLength(0);
     const body = JSON.parse(beacon?.body ?? "{}") as { schema_version: number; sdk: unknown; events: { type: string }[] };
     expect(body.schema_version).toBe(1);
-    expect(body.sdk).toStrictEqual({ name: "flagnetic-js", version: "0.0.0", platform: "browser" });
+    expect(body.sdk).toStrictEqual({ name: "flagnetic-js", version: VERSION, platform: "browser" });
     expect(body.events.map((e) => e.type)).toStrictEqual(["alias"]);
   });
 });

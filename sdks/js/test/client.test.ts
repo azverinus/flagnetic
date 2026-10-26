@@ -14,6 +14,7 @@ import type { Page, PageHandlers } from "../src/client/page.js";
 import type { ClientOptions, ClientStore, Context, LogEvent } from "../src/client/types.js";
 import { MockNetwork, type Pending } from "./support/mock-network.js";
 import { VirtualClock } from "./support/virtual-clock.js";
+import { VERSION } from "../src/version.js";
 
 const key = "fn_cli_0123456789abcdefghijklmnopqrstuvwxyzABCD";
 const serverKey = "fn_srv_0123456789abcdefghijklmnopqrstuvwxyzABCD";
@@ -385,7 +386,7 @@ describe("remote evaluation", () => {
     expect(JSON.parse(req.body ?? "{}")).toStrictEqual({
       context: {
         units: { anonymous: "d-8f1c" },
-        attributes: { platform: "web", app_version: "1.42.0", sdk: "flagnetic-js", sdk_version: "0.0.0", country: "DE" },
+        attributes: { platform: "web", app_version: "1.42.0", sdk: "flagnetic-js", sdk_version: VERSION, country: "DE" },
       },
     });
   });
