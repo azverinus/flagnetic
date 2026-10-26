@@ -474,12 +474,14 @@ func (s *ChangeRequests) Waiting(ctx context.Context, project workspace.ProjectI
 
 // WaitingOn returns how many of the change requests on flag's
 // configuration in environment are open and how many approved, and the
-// earliest apply time among them.
+// earliest apply time among them that the scheduler will still act on: one
+// whose failures stopped it is applied at no time.
 func (s *ChangeRequests) WaitingOn(ctx context.Context, flag flags.FlagID, environment workspace.EnvironmentID,
 ) (governance.Waiting, error) {
 	var w governance.Waiting
 	err := s.db(ctx).QueryRow(ctx, `
-		SELECT count(*) FILTER (WHERE state = 'open'), count(*) FILTER (WHERE state = 'approved'), min(apply_at)
+		SELECT count(*) FILTER (WHERE state = 'open'), count(*) FILTER (WHERE state = 'approved'),
+		       min(apply_at) FILTER (WHERE NOT schedule_stopped)
 		FROM change_requests
 		WHERE flag_id = $1 AND environment_id = $2 AND state IN ('open', 'approved')`,
 		flag.Bytes(), environment.Bytes()).Scan(&w.Open, &w.Approved, &w.NextApplyAt)

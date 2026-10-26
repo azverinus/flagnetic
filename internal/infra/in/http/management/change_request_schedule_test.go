@@ -362,8 +362,14 @@ func TestAScheduleFailureIsRecordedAndTheSchedulerStopsAtTheLimit(t *testing.T) 
 	if stopped := getChangeRequest(t, f.admin, key, cr); *stopped.ScheduleFailure != *last.ScheduleFailure {
 		t.Errorf("a round after the stop changed the failure to %+v", stopped.ScheduleFailure)
 	}
-	if c := getConfiguration(t, f.admin, key, "checkout_title", "production"); c.Version != base.Version {
+	c := getConfiguration(t, f.admin, key, "checkout_title", "production")
+	if c.Version != base.Version {
 		t.Errorf("configuration moved to %d", c.Version)
+	}
+	// The stopped change request still waits approved, but nothing will
+	// apply it at its time.
+	if w := c.ChangeRequests; w == nil || w.Approved != 1 || w.NextApplyAt != nil {
+		t.Errorf("waiting on the configuration = %+v, want one approved and no apply time", w)
 	}
 	entries := auditOf(t, f.srv, "change_request.schedule_failed", cr.Id.String())
 	if len(entries) != 1 || entries[0].Actor.Kind != management.ActorKindSystem {
