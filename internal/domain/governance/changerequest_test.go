@@ -641,7 +641,7 @@ func TestARevertKeepsItsTargetAndNobodyEditsItsProposal(t *testing.T) {
 		e.Violations[0].Pointer != "/proposed" || e.Violations[0].Code != "not_allowed" {
 		t.Errorf("editing a revert's proposal = %v", err)
 	}
-	if _, _, err := cr.Edit(byBob, governance.Edit{Proposed: doc(t, `{"on":false}`)}, later); codeOf(err) != "not_author" {
+	if _, _, err = cr.Edit(byBob, governance.Edit{Proposed: doc(t, `{"on":false}`)}, later); codeOf(err) != "not_author" {
 		t.Errorf("another editing a revert's proposal = %v, want who may edit judged first", err)
 	}
 	renamed, changed, err := cr.Edit(byAda, governance.Edit{Title: ptrTo("Roll back")}, later)
