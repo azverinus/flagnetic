@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -244,12 +246,12 @@ func TestARebaseMovesTheBaseAndRecomputesTheDiff(t *testing.T) {
 	cr := newChangeRequest(t, proposal(t))
 	later := now.Add(time.Minute)
 
-	rebased, changed, err := cr.Rebase(byAda, doc(t, `{"on":true}`), 4, later)
+	rebased, changed, err := cr.Rebase(byAda, governance.Subject{Base: doc(t, `{"on":true}`), BaseVersion: 4}, later)
 	if err != nil || !changed || rebased.BaseVersion != 4 || rebased.Version != 2 || len(rebased.Diff) != 0 ||
 		!reflect.DeepEqual(rebased.Proposed, cr.Proposed) {
 		t.Errorf("rebased = %+v, %v, %v", rebased, changed, err)
 	}
-	same, changed, err := rebased.Rebase(byAda, doc(t, `{"on":true}`), 4, later.Add(time.Minute))
+	same, changed, err := rebased.Rebase(byAda, governance.Subject{Base: doc(t, `{"on":true}`), BaseVersion: 4}, later.Add(time.Minute))
 	if err != nil || changed || same.Version != 2 {
 		t.Errorf("rebasing on the same base = %+v, %v, %v; want nothing changed", same, changed, err)
 	}
@@ -309,20 +311,20 @@ func TestApprovingRecordsTheDeciderAndAnOptionalComment(t *testing.T) {
 	cr := inState(t, governance.StateOpen)
 	later := now.Add(time.Minute)
 
-	approved, err := cr.Approve(byDecider, "  Looks right  ", 3, later)
+	approved, err := cr.Approve(byDecider, "  Looks right  ", governance.Current{Version: 3}, later)
 	want := &governance.Decision{Member: bob, At: later, Comment: "Looks right"}
 	if err != nil || approved.State != governance.StateApproved || approved.Version != 2 || !approved.UpdatedAt.Equal(later) ||
 		!reflect.DeepEqual(approved.Approval, want) || approved.Rejection != nil {
 		t.Errorf("approved = %+v, %v", approved, err)
 	}
-	silent, err := cr.Approve(byDecider, " ", 3, later)
+	silent, err := cr.Approve(byDecider, " ", governance.Current{Version: 3}, later)
 	if err != nil || silent.Approval == nil || silent.Approval.Comment != "" {
 		t.Errorf("approved without a comment = %+v, %v", silent.Approval, err)
 	}
-	if _, err = cr.Approve(byDecider, strings.Repeat("é", 2_000), 3, later); err != nil {
+	if _, err = cr.Approve(byDecider, strings.Repeat("é", 2_000), governance.Current{Version: 3}, later); err != nil {
 		t.Errorf("a comment at the limit = %v", err)
 	}
-	_, err = cr.Approve(byDecider, strings.Repeat("é", 2_001), 3, later)
+	_, err = cr.Approve(byDecider, strings.Repeat("é", 2_001), governance.Current{Version: 3}, later)
 	if e, ok := apperrors.From(err); !ok || e.Code != "invalid_change_request" || len(e.Violations) != 1 ||
 		e.Violations[0].Pointer != "/comment" || e.Violations[0].Code != "too_long" {
 		t.Errorf("a comment over the limit = %v", err)
@@ -369,19 +371,19 @@ func TestApplyingRecordsWhoAppliedAndWhen(t *testing.T) {
 		if name == "the token as maker" {
 			applying.Author = governance.Author{Token: &pipeline}
 		}
-		applied, err := applying.Apply(tc.by, 3, later)
+		applied, err := applying.Apply(tc.by, governance.Current{Version: 3}, later)
 		if err != nil || applied.State != governance.StateApplied || applied.Version != 2 || applied.Applied == nil ||
 			!reflect.DeepEqual(*applied.Applied, tc.want) {
 			t.Errorf("applied by %s = %+v, %v", name, applied.Applied, err)
 		}
 	}
-	if _, err := cr.Apply(byBob, 3, later); codeOf(err) != "not_author" {
+	if _, err := cr.Apply(byBob, governance.Current{Version: 3}, later); codeOf(err) != "not_author" {
 		t.Errorf("applied by another member = %v", err)
 	}
 	// Whoever approved it applies it, even once they may no longer decide.
 	approvedByBob := cr
 	approvedByBob.Approval = &governance.Decision{Member: bob, At: now}
-	if applied, err := approvedByBob.Apply(byBob, 3, later); err != nil || applied.State != governance.StateApplied {
+	if applied, err := approvedByBob.Apply(byBob, governance.Current{Version: 3}, later); err != nil || applied.State != governance.StateApplied {
 		t.Errorf("applied by its approver = %v", err)
 	}
 }
@@ -393,9 +395,11 @@ func TestApprovingOrApplyingOnAMovedBaseSupersedes(t *testing.T) {
 	later := now.Add(time.Minute)
 	for name, decide := range map[string]func(governance.ChangeRequest) (governance.ChangeRequest, error){
 		"approve": func(cr governance.ChangeRequest) (governance.ChangeRequest, error) {
-			return cr.Approve(byDecider, "", 4, later)
+			return cr.Approve(byDecider, "", governance.Current{Version: 4}, later)
 		},
-		"apply": func(cr governance.ChangeRequest) (governance.ChangeRequest, error) { return cr.Apply(byAda, 4, later) },
+		"apply": func(cr governance.ChangeRequest) (governance.ChangeRequest, error) {
+			return cr.Apply(byAda, governance.Current{Version: 4}, later)
+		},
 	} {
 		from := governance.StateOpen
 		if name == "apply" {
@@ -411,10 +415,59 @@ func TestApprovingOrApplyingOnAMovedBaseSupersedes(t *testing.T) {
 		}
 	}
 	// Who may act and the state are answered before the base.
-	if _, err := inState(t, governance.StateOpen).Approve(byAda, "", 4, later); codeOf(err) != "author_cannot_approve" {
+	if _, err := inState(t, governance.StateOpen).Approve(byAda, "", governance.Current{Version: 4}, later); codeOf(err) != "author_cannot_approve" {
 		t.Errorf("the author approving on a moved base = %v", err)
 	}
-	if _, err := inState(t, governance.StateDraft).Apply(byAda, 4, later); codeOf(err) != "invalid_state" {
+	if _, err := inState(t, governance.StateDraft).Apply(byAda, governance.Current{Version: 4}, later); codeOf(err) != "invalid_state" {
 		t.Errorf("applying a draft on a moved base = %v", err)
+	}
+}
+
+// A definition is applied in every environment: its approval covers the
+// environments protected when it was given, and an environment protected
+// since was never approved to change, so applying it then supersedes it.
+func TestADefinitionsApprovalCoversTheEnvironmentsProtectedThen(t *testing.T) {
+	production := id.MustParse[workspace.Environment]("0190d2a0-0000-7000-8000-000000000e01")
+	staging := id.MustParse[workspace.Environment]("0190d2a0-0000-7000-8000-000000000e02")
+	later := now.Add(time.Minute)
+	cr := inState(t, governance.StateOpen)
+	cr.Kind, cr.Environment = governance.KindDefinition, nil
+
+	approved, err := cr.Approve(byDecider, "", governance.Current{Version: 3, Protected: []workspace.EnvironmentID{production}}, later)
+	if err != nil || !slices.Equal(approved.ApprovalCovers, []workspace.EnvironmentID{production}) ||
+		!slices.Equal(approved.Covers(), []workspace.EnvironmentID{production}) {
+		t.Fatalf("approved = %+v, %v; want covering production", approved, err)
+	}
+	// An environment no longer protected needs no cover.
+	if applied, err := approved.Apply(byAda, governance.Current{Version: 3}, later); err != nil || applied.State != governance.StateApplied {
+		t.Errorf("applied once production is unprotected = %+v, %v", applied, err)
+	}
+	superseded, err := approved.Apply(byAda, governance.Current{Version: 3, Protected: []workspace.EnvironmentID{production, staging}}, later)
+	if codeOf(err) != "base_moved" || superseded.State != governance.StateSuperseded || superseded.Applied != nil {
+		t.Errorf("applied once staging is protected = %+v, %v; want base_moved and superseded", superseded, err)
+	}
+
+	// A configuration's change request covers its environment, whatever is
+	// protected.
+	configuration := inState(t, governance.StateOpen)
+	configuration.Environment = &governance.EnvironmentRef{ID: staging, Key: "staging"}
+	approvedConfiguration, err := configuration.Approve(byDecider, "", governance.Current{Version: 3, Protected: []workspace.EnvironmentID{production}}, later)
+	if err != nil || approvedConfiguration.ApprovalCovers != nil || !slices.Equal(approvedConfiguration.Covers(), []workspace.EnvironmentID{staging}) {
+		t.Errorf("approved configuration = %+v, %v; want covering staging", approvedConfiguration, err)
+	}
+	if _, err := approvedConfiguration.Apply(byAda, governance.Current{Version: 3, Protected: []workspace.EnvironmentID{production, staging}}, later); err != nil {
+		t.Errorf("applying the configuration = %v", err)
+	}
+}
+
+// Rebasing a segment's definition takes the flags naming it now with the
+// segment as it is now.
+func TestARebaseTakesTheReferrersOfTheNewBase(t *testing.T) {
+	checkout := id.MustParse[flags.Flag]("0190d2a0-0000-7000-8000-000000000f01")
+	cr := newChangeRequest(t, proposal(t))
+	rebased, changed, err := cr.Rebase(byAda, governance.Subject{Base: cr.Base, BaseVersion: cr.BaseVersion,
+		BaseReferrers: []flags.FlagID{checkout}}, now)
+	if err != nil || !changed || !slices.Equal(rebased.BaseReferrers, []flags.FlagID{checkout}) {
+		t.Errorf("rebased = %+v, %v, %v; want checkout as its referrer", rebased, changed, err)
 	}
 }

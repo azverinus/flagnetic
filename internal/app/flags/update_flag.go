@@ -114,20 +114,8 @@ func (h *UpdateFlag) Handle(ctx context.Context, cmd UpdateFlagCommand) (FlagVie
 		if !changed.Any {
 			return nil
 		}
-		if len(changed.RemovedVariations) > 0 {
-			dependents, err := h.d.Store.Dependents(ctx, cmd.Project, before.Key)
-			if err != nil {
-				return err
-			}
-			experiments, err := h.d.Store.FlagExperiments(ctx, before.ID)
-			if err != nil {
-				return err
-			}
-			refs := flags.VariationReferences(before, changed.RemovedVariations, configs, dependents)
-			refs = append(refs, flags.ExperimentVariationReferences(experiments, changed.RemovedVariations)...)
-			if len(refs) > 0 {
-				return flags.ErrInUse(refs)
-			}
+		if err = h.unused(ctx, before, changed, configs); err != nil {
+			return err
 		}
 		if err := h.d.Store.UpdateFlag(ctx, after); err != nil {
 			return err
@@ -155,4 +143,71 @@ func (h *UpdateFlag) owner(ctx context.Context, cmd UpdateFlagCommand, f flags.F
 	}
 	eligible, err := h.d.Owners.MayOwn(ctx, cmd.Project, *cmd.Owner)
 	return &flags.Owner{Member: *cmd.Owner, Eligible: eligible}, err
+}
+
+// unused refuses a change removing a variation something still names: the
+// flag's configurations, other flags' prerequisites or an experiment's
+// weights.
+func (h *UpdateFlag) unused(ctx context.Context, before flags.Flag, changed flags.Changed,
+	configs []flags.EnvironmentConfiguration,
+) error {
+	if len(changed.RemovedVariations) == 0 {
+		return nil
+	}
+	dependents, err := h.d.Store.Dependents(ctx, before.Project, before.Key)
+	if err != nil {
+		return err
+	}
+	experiments, err := h.d.Store.FlagExperiments(ctx, before.ID)
+	if err != nil {
+		return err
+	}
+	refs := flags.VariationReferences(before, changed.RemovedVariations, configs, dependents)
+	refs = append(refs, flags.ExperimentVariationReferences(experiments, changed.RemovedVariations)...)
+	if len(refs) > 0 {
+		return flags.ErrInUse(refs)
+	}
+	return nil
+}
+
+// Propose returns project's flag keyed key, and the flag change would leave
+// it as, checked as Handle checks it, with the same refusals; it stores and
+// records nothing. It reads in the unit of work ctx carries, whose caller
+// holds the project's lock.
+func (h *UpdateFlag) Propose(ctx context.Context, project workspace.ProjectID, key string, change flags.FlagChange,
+) (flags.Flag, flags.Flag, error) {
+	before, err := h.d.Store.FlagByKey(ctx, project, key)
+	if err != nil {
+		return before, before, flagNotFound(err)
+	}
+	after, changed, err := before.Change(change, h.d.Recorder.now())
+	if err != nil || !changed.Any {
+		return before, after, err
+	}
+	configs, err := h.d.Store.Configurations(ctx, before.ID)
+	if err != nil {
+		return before, after, err
+	}
+	return before, after, h.unused(ctx, before, changed, configs)
+}
+
+// Current returns project's flag keyed key, or not_found.
+func (h *UpdateFlag) Current(ctx context.Context, project workspace.ProjectID, key string) (flags.Flag, error) {
+	f, err := h.d.Store.FlagByKey(ctx, project, key)
+	return f, flagNotFound(err)
+}
+
+// Apply makes change to project's flag keyed key, based on its version
+// baseVersion, in the unit of work ctx carries, which joins a change
+// request's application: checked again as Handle checks it, since what it
+// names may be gone since it was approved, and recorded as Handle records
+// it. Whether the write may change a protected environment is the bypass
+// ctx carries, as for every write.
+func (h *UpdateFlag) Apply(ctx context.Context, project workspace.ProjectID, key string, change flags.FlagChange,
+	baseVersion int64, req governance.Request,
+) error {
+	_, err := h.Handle(ctx, UpdateFlagCommand{
+		Project: project, Key: key, Change: change, Expected: precondition.On(baseVersion), Request: req,
+	})
+	return err
 }

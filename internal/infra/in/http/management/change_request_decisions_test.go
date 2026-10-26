@@ -70,7 +70,7 @@ func openedIn(t *testing.T, c *management.ClientWithResponses, project, env stri
 ) management.ChangeRequest {
 	t.Helper()
 	body := configurationRequest("Change the checkout title", proposed)
-	body.Environment, body.Open = env, ptr(true)
+	body.Environment, body.Open = ptr(env), ptr(true)
 	return createChangeRequest(t, c, project, body)
 }
 
@@ -192,7 +192,7 @@ func TestTheAuthorAppliesAnApprovedChangeRequestToAProtectedEnvironment(t *testi
 		Rules:     &[]management.RuleInput{{Serve: rolloutOf("user", "c", 0)}},
 	}
 	cr := openedIn(t, f.dev.ClientWithResponses, key, "production", proposed)
-	salt := valueOr(cr.Proposed.Rules[0].Serve.Salt)
+	salt := valueOr(proposedConfiguration(t, cr).Rules[0].Serve.Salt)
 	approved := mustApprove(t, maintainer.ClientWithResponses, key, cr)
 	before := rulesetVersions(t, f.project)
 
@@ -209,7 +209,7 @@ func TestTheAuthorAppliesAnApprovedChangeRequestToAProtectedEnvironment(t *testi
 	}
 	c := getConfiguration(t, f.admin, key, "checkout_title", "production")
 	if !c.On || c.Fallthrough != "b" || c.Version != cr.BaseVersion+1 || len(c.Rules) != 1 || valueOr(c.Rules[0].Serve.Salt) != salt ||
-		c.Rules[0].Id != cr.Proposed.Rules[0].Id {
+		c.Rules[0].Id != proposedConfiguration(t, cr).Rules[0].Id {
 		t.Errorf("configuration = %+v, want what was proposed, its rule as it was reviewed", c)
 	}
 	if len(c.Overrides) != 1 || c.Overrides[0].AddedBy == nil || *c.Overrides[0].AddedBy != devID {

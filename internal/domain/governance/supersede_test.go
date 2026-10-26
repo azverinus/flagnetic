@@ -17,6 +17,8 @@ var (
 	production = id.MustParse[workspace.Environment]("0190d2a0-0000-7000-8000-000000000e01")
 	staging    = id.MustParse[workspace.Environment]("0190d2a0-0000-7000-8000-000000000e02")
 	moving     = id.MustParse[governance.Entry]("0190d2a0-0000-7000-8000-0000000000a1")
+	employees  = id.MustParse[flags.Segment]("0190d2a0-0000-7000-8000-0000000000c1")
+	staff      = id.MustParse[flags.Segment]("0190d2a0-0000-7000-8000-0000000000c2")
 )
 
 // configurationRequest returns a change request in state proposing flag's
@@ -36,6 +38,32 @@ func flagEntry(action string, flag flags.FlagID, environment workspace.Environme
 	return governance.Entry{ID: moving, OccurredAt: now, Record: governance.Record{
 		Environment: environment, Action: action, Entity: governance.Entity{Kind: "flag", ID: flag.String(), Key: "flag"},
 	}}
+}
+
+func segmentEntry(action string, segment flags.SegmentID) governance.Entry {
+	return governance.Entry{ID: moving, OccurredAt: now, Record: governance.Record{
+		Action: action, Entity: governance.Entity{Kind: "segment", ID: segment.String(), Key: "segment"},
+	}}
+}
+
+// flagDefinitionRequest returns an open change request proposing flag's
+// definition.
+func flagDefinitionRequest(t *testing.T, n byte, flag flags.FlagID) governance.ChangeRequest {
+	t.Helper()
+	cr := inState(t, governance.StateOpen)
+	cr.ID = id.FromBytes[governance.ChangeRequest]([16]byte{0x01, 0x90, 15: n})
+	cr.Kind, cr.Flag = governance.KindDefinition, &governance.FlagRef{ID: flag, Key: "flag"}
+	return cr
+}
+
+// segmentDefinitionRequest returns an approved change request proposing
+// segment's definition, based on it while referrers named it.
+func segmentDefinitionRequest(t *testing.T, n byte, segment flags.SegmentID, referrers ...flags.FlagID) governance.ChangeRequest {
+	t.Helper()
+	cr := inState(t, governance.StateApproved)
+	cr.ID = id.FromBytes[governance.ChangeRequest]([16]byte{0x01, 0x90, 15: n})
+	cr.Kind, cr.Segment, cr.BaseReferrers = governance.KindDefinition, &governance.SegmentRef{ID: segment, Key: "segment"}, referrers
+	return cr
 }
 
 func idsOf(superseded []governance.Superseded) []governance.ChangeRequestID {
@@ -96,7 +124,7 @@ func TestAnEntryMovesTheWaitingChangeRequestsOnWhatItChanged(t *testing.T) {
 		}}, []governance.ChangeRequestID{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := idsOf(governance.Supersedes(tc.entry, candidates)); !slices.Equal(got, tc.want) {
+			if got := idsOf(governance.Supersedes(tc.entry, candidates, nil)); !slices.Equal(got, tc.want) {
 				t.Errorf("Supersedes = %v, want %v", got, tc.want)
 			}
 		})
@@ -108,7 +136,7 @@ func TestOnlyOpenAndApprovedChangeRequestsAreSuperseded(t *testing.T) {
 	for i, s := range governance.ChangeRequestStates() {
 		candidates = append(candidates, configurationRequest(t, byte(i+1), checkout, production, s))
 	}
-	got := governance.Supersedes(flagEntry("flag.killed", checkout, production), candidates)
+	got := governance.Supersedes(flagEntry("flag.killed", checkout, production), candidates, nil)
 	var states []governance.ChangeRequestState
 	for _, s := range got {
 		states = append(states, s.Before.State)
@@ -123,7 +151,7 @@ func TestTheChangeRequestBeingAppliedIsNotSupersededByItsOwnWrite(t *testing.T) 
 	other := configurationRequest(t, 2, checkout, production, governance.StateApproved)
 	e := flagEntry("flag.switched_on", checkout, production)
 	e.ChangeRequest = applying.ID
-	if got := idsOf(governance.Supersedes(e, []governance.ChangeRequest{applying, other})); !slices.Equal(got, []governance.ChangeRequestID{other.ID}) {
+	if got := idsOf(governance.Supersedes(e, []governance.ChangeRequest{applying, other}, nil)); !slices.Equal(got, []governance.ChangeRequestID{other.ID}) {
 		t.Errorf("Supersedes = %v, want only %v", got, other.ID)
 	}
 }
@@ -136,14 +164,23 @@ func TestWhatAnEntryMayMoveNarrowsTheChangeRequestsToRead(t *testing.T) {
 		ok    bool
 	}{
 		{"a configuration write", flagEntry("flag.killed", checkout, production),
-			governance.Moved{Flag: checkout, Environment: production}, true},
-		{"archiving a flag", flagEntry("flag.archived", checkout, workspace.EnvironmentID{}), governance.Moved{Flag: checkout}, true},
-		{"deleting a flag", flagEntry("flag.deleted", checkout, workspace.EnvironmentID{}), governance.Moved{Flag: checkout}, true},
+			governance.Moved{Flag: checkout, Environment: production, Configurations: true}, true},
+		{"archiving a flag", flagEntry("flag.archived", checkout, workspace.EnvironmentID{}),
+			governance.Moved{Flag: checkout, Configurations: true, Definition: true}, true},
+		{"deleting a flag", flagEntry("flag.deleted", checkout, workspace.EnvironmentID{}),
+			governance.Moved{Flag: checkout, Configurations: true, Definition: true}, true},
 		{"deleting an environment", governance.Entry{Record: governance.Record{
 			Environment: staging, Action: "environment.deleted",
 			Entity: governance.Entity{Kind: "environment", ID: staging.String(), Key: "staging"},
-		}}, governance.Moved{Environment: staging}, true},
-		{"a definition edit", flagEntry("flag.updated", checkout, workspace.EnvironmentID{}), governance.Moved{}, false},
+		}}, governance.Moved{Environment: staging, EnvironmentDeleted: true}, true},
+		{"a definition edit", flagEntry("flag.updated", checkout, workspace.EnvironmentID{}),
+			governance.Moved{Flag: checkout, Definition: true}, true},
+		{"restoring a flag", flagEntry("flag.restored", checkout, workspace.EnvironmentID{}),
+			governance.Moved{Flag: checkout, Definition: true}, true},
+		{"creating a flag", flagEntry("flag.created", checkout, workspace.EnvironmentID{}), governance.Moved{}, false},
+		{"a segment's edit", segmentEntry("segment.updated", employees), governance.Moved{Segment: employees, Definition: true}, true},
+		{"deleting a segment", segmentEntry("segment.deleted", employees), governance.Moved{Segment: employees, Definition: true}, true},
+		{"creating a segment", segmentEntry("segment.created", employees), governance.Moved{}, false},
 		{"a member's entry", governance.Entry{Record: governance.Record{
 			Action: "member.created", Entity: governance.Entity{Kind: "member", ID: "m", Key: "m"},
 		}}, governance.Moved{}, false},
@@ -172,5 +209,60 @@ func TestSupersedingNamesTheEntryOfTheMovingWrite(t *testing.T) {
 	}
 	if _, err := inState(t, governance.StateDraft).Supersede(moving, now); codeOf(err) != "invalid_state" {
 		t.Errorf("superseding a draft: %v, want invalid_state", err)
+	}
+}
+
+// A definition is reviewed with the configurations it changes what they
+// serve: a flag's is moved by any write to the flag, its configurations in
+// every environment included; a segment's by a write to the segment, or to
+// a configuration of a flag naming it, whether it named it when the change
+// request was based on it or names it now.
+func TestAnEntryMovesTheDefinitionsOfWhatItChanged(t *testing.T) {
+	onCheckout := flagDefinitionRequest(t, 1, checkout)
+	onBanner := flagDefinitionRequest(t, 2, banner)
+	namedByCheckout := segmentDefinitionRequest(t, 3, employees, checkout)
+	namedByNone := segmentDefinitionRequest(t, 4, staff)
+	onCheckoutProduction := configurationRequest(t, 5, checkout, production, governance.StateOpen)
+	candidates := []governance.ChangeRequest{onCheckout, onBanner, namedByCheckout, namedByNone, onCheckoutProduction}
+	// banner names staff now, since the write the entry records.
+	referrers := governance.Referrers{employees: {checkout}, staff: {banner}}
+
+	for _, tc := range []struct {
+		name  string
+		entry governance.Entry
+		want  []governance.ChangeRequestID
+	}{
+		{"a configuration write in another environment", flagEntry("flag.configuration_updated", checkout, staging),
+			[]governance.ChangeRequestID{onCheckout.ID, namedByCheckout.ID}},
+		{"the kill switch", flagEntry("flag.killed", checkout, production),
+			[]governance.ChangeRequestID{onCheckout.ID, namedByCheckout.ID, onCheckoutProduction.ID}},
+		{"a configuration starting to name a segment", flagEntry("flag.configuration_updated", banner, staging),
+			[]governance.ChangeRequestID{onBanner.ID, namedByNone.ID}},
+		{"a definition edit", flagEntry("flag.updated", checkout, workspace.EnvironmentID{}),
+			[]governance.ChangeRequestID{onCheckout.ID}},
+		{"restoring the flag", flagEntry("flag.restored", banner, workspace.EnvironmentID{}),
+			[]governance.ChangeRequestID{onBanner.ID}},
+		{"archiving the flag", flagEntry("flag.archived", checkout, workspace.EnvironmentID{}),
+			[]governance.ChangeRequestID{onCheckout.ID, namedByCheckout.ID, onCheckoutProduction.ID}},
+		{"a segment's edit", segmentEntry("segment.updated", employees), []governance.ChangeRequestID{namedByCheckout.ID}},
+		{"deleting a segment", segmentEntry("segment.deleted", staff), []governance.ChangeRequestID{namedByNone.ID}},
+		{"deleting an environment", governance.Entry{ID: moving, Record: governance.Record{
+			Environment: production, Action: "environment.deleted",
+			Entity: governance.Entity{Kind: "environment", ID: production.String(), Key: "production"},
+		}}, []governance.ChangeRequestID{onCheckoutProduction.ID}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := idsOf(governance.Supersedes(tc.entry, candidates, referrers)); !slices.Equal(got, tc.want) {
+				t.Errorf("Supersedes = %v, want %v", got, tc.want)
+			}
+		})
+	}
+
+	// A flag that named the segment when the change request was based on
+	// it still moves it once it stops naming it.
+	got := idsOf(governance.Supersedes(flagEntry("flag.configuration_updated", checkout, staging),
+		[]governance.ChangeRequest{namedByCheckout}, governance.Referrers{}))
+	if !slices.Equal(got, []governance.ChangeRequestID{namedByCheckout.ID}) {
+		t.Errorf("Supersedes once checkout stopped naming the segment = %v, want %v", got, namedByCheckout.ID)
 	}
 }

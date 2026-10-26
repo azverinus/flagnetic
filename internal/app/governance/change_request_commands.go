@@ -7,12 +7,11 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
-	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
-	"github.com/azverinus/flagnetic/internal/shared/protection"
 )
 
-// CreateChangeRequest proposes a flag's configuration in one environment.
+// CreateChangeRequest proposes a flag's configuration in one environment,
+// or a flag's or a segment's definition in every environment.
 type CreateChangeRequest struct{ d ChangeRequestDeps }
 
 // NewCreateChangeRequest returns the handler.
@@ -22,28 +21,24 @@ func NewCreateChangeRequest(d ChangeRequestDeps) *CreateChangeRequest {
 
 // CreateChangeRequestCommand is the change request to create.
 type CreateChangeRequestCommand struct {
-	Project     workspace.ProjectID
-	Kind        governance.ChangeRequestKind
-	Flag        string
-	Environment string
+	Project workspace.ProjectID
+	Target
 	Title       string
 	Description string
-	Proposed    flags.ConfigurationInput
+	Proposed    Proposed
 	// Open opens the change request for review at once.
 	Open    bool
 	Author  governance.Author
 	Request governance.Request
 }
 
-// Handle creates the change request, based on the configuration as it is
-// now, and returns it. The proposal is checked as replacing the
-// configuration would be, so a change request that could never be applied
-// is refused now and not at review.
+// Handle creates the change request, based on its entity as it is now, and
+// returns it. The kind and the entity named are checked first; the proposal
+// is checked as writing it would be, so a change request that could never
+// be applied is refused now and not at review.
 func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeRequestCommand) (governance.ChangeRequest, error) {
-	if cmd.Kind != governance.KindFlagConfiguration {
-		return governance.ChangeRequest{}, apperrors.Invalid("invalid_change_request", "the change request is not valid",
-			apperrors.Violation{Pointer: "/kind", Code: "invalid_value", Detail: "a change request proposes a flag configuration",
-				Params: map[string]any{"kinds": []string{string(governance.KindFlagConfiguration)}}})
+	if err := cmd.Target.check(); err != nil {
+		return governance.ChangeRequest{}, err
 	}
 	now := h.d.now()
 	var out governance.ChangeRequest
@@ -51,7 +46,7 @@ func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeReques
 		if err := h.d.lockProject(ctx, cmd.Project); err != nil {
 			return err
 		}
-		cr, err := propose(ctx, h.d, cmd.Project, cmd.Flag, cmd.Environment, cmd.Proposed, governance.Proposal{
+		cr, err := propose(ctx, h.d, cmd.Project, cmd.Target, cmd.Proposed, governance.Proposal{
 			Title: cmd.Title, Description: cmd.Description,
 		}, cmd.Open, cmd.Author, now)
 		if err != nil {
@@ -75,23 +70,16 @@ func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeReques
 	return out, err
 }
 
-// propose returns a new change request of author proposing in for
-// project's flag keyed flag in the environment keyed environment, based on
-// its configuration now.
-func propose(ctx context.Context, d ChangeRequestDeps, project workspace.ProjectID, flag, environment string,
-	in flags.ConfigurationInput, p governance.Proposal, open bool, author governance.Author, now time.Time,
+// propose returns a new change request of author proposing in for t in
+// project, based on its entity as it is now.
+func propose(ctx context.Context, d ChangeRequestDeps, project workspace.ProjectID, t Target, in Proposed,
+	p governance.Proposal, open bool, author governance.Author, now time.Time,
 ) (governance.ChangeRequest, error) {
-	f, saved, proposed, err := d.Configurations.Propose(ctx, project, flag, environment, in, nil)
-	if err != nil {
-		return governance.ChangeRequest{}, under(err, "/proposed")
-	}
-	subject, err := subjectOf(f, saved)
+	subject, proposed, err := d.propose(ctx, project, t, in, nil)
 	if err != nil {
 		return governance.ChangeRequest{}, err
 	}
-	if p.Proposed, err = configurationDocument(proposed); err != nil {
-		return governance.ChangeRequest{}, err
-	}
+	p.Proposed = proposed
 	return governance.NewChangeRequest(governance.NewChangeRequestInput{
 		ID: id.New[governance.ChangeRequest](d.IDs), Project: project, Subject: subject, Proposal: p, Open: open,
 		Author: author, Now: now,
@@ -113,15 +101,17 @@ type UpdateChangeRequestCommand struct {
 	ChangeRequestCommand
 	Title       *string
 	Description *string
-	Proposed    *flags.ConfigurationInput
+	// Proposed is the document now proposed, the one the change request's
+	// kind and entity call for.
+	Proposed *Proposed
 }
 
 // Handle edits the change request and returns it. A new proposal is checked
-// against the configuration as it is now, as replacing it would be, and the
-// diff recomputed from the base the change request keeps: an edit is no
-// rebase. Who may edit and the state are judged before the proposal, the
-// version the edit was based on after it; an edit that changes nothing
-// stores and records nothing.
+// against its entity as it is now, as writing it would be, and the diff
+// recomputed from the base the change request keeps: an edit is no rebase.
+// Who may edit and the state are judged before the proposal, the version
+// the edit was based on after it; an edit that changes nothing stores and
+// records nothing.
 func (h *UpdateChangeRequest) Handle(ctx context.Context, cmd UpdateChangeRequestCommand) (governance.ChangeRequest, error) {
 	return transition(ctx, h.d, cmd.ChangeRequestCommand, "change_request.updated",
 		func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
@@ -132,25 +122,18 @@ func (h *UpdateChangeRequest) Handle(ctx context.Context, cmd UpdateChangeReques
 			if cmd.Proposed != nil {
 				// The rules the change request proposes keep the
 				// identifiers and salts they were given when it was made.
-				held, err := configurationInputOf(cr.Proposed)
+				_, proposed, err := h.d.propose(ctx, cr.Project, TargetOf(cr), *cmd.Proposed, cr.Proposed)
 				if err != nil {
 					return cr, false, err
 				}
-				_, _, proposed, err := h.d.Configurations.Propose(ctx, cr.Project, cr.Flag.Key, cr.Environment.Key,
-					*cmd.Proposed, held.Rules)
-				if err != nil {
-					return cr, false, under(err, "/proposed")
-				}
-				if e.Proposed, err = configurationDocument(proposed); err != nil {
-					return cr, false, err
-				}
+				e.Proposed = proposed
 			}
 			return cr.Edit(cmd.By, e, now)
 		})
 }
 
-// RebaseChangeRequest bases a draft change request on the configuration as
-// it is now.
+// RebaseChangeRequest bases a draft change request on its entity as it is
+// now.
 type RebaseChangeRequest struct{ d ChangeRequestDeps }
 
 // NewRebaseChangeRequest returns the handler.
@@ -159,7 +142,7 @@ func NewRebaseChangeRequest(d ChangeRequestDeps) *RebaseChangeRequest {
 }
 
 // Handle rebases the change request and returns it: what it proposes stays,
-// and its diff is recomputed from the configuration now. Rebasing onto the
+// and its diff is recomputed from its entity now. Rebasing onto the
 // base it has already stores and records nothing.
 func (h *RebaseChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand) (governance.ChangeRequest, error) {
 	return transition(ctx, h.d, cmd, "change_request.rebased",
@@ -167,15 +150,11 @@ func (h *RebaseChangeRequest) Handle(ctx context.Context, cmd ChangeRequestComma
 			if _, err := cr.Next(governance.TransitionRebase, cmd.By); err != nil {
 				return cr, false, err
 			}
-			f, saved, err := h.d.Configurations.Current(ctx, cr.Project, cr.Flag.Key, cr.Environment.Key)
+			subject, err := h.d.current(ctx, cr)
 			if err != nil {
 				return cr, false, err
 			}
-			subject, err := subjectOf(f, saved)
-			if err != nil {
-				return cr, false, err
-			}
-			return cr.Rebase(cmd.By, subject.Base, subject.BaseVersion, now)
+			return cr.Rebase(cmd.By, subject, now)
 		})
 }
 
@@ -186,18 +165,18 @@ type OpenChangeRequest struct{ d ChangeRequestDeps }
 func NewOpenChangeRequest(d ChangeRequestDeps) *OpenChangeRequest { return &OpenChangeRequest{d: d} }
 
 // Handle opens the change request and returns it, or refuses it as
-// base_moved when the configuration was written since it was based on it.
+// base_moved when its entity was written since it was based on it.
 func (h *OpenChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand) (governance.ChangeRequest, error) {
 	return transition(ctx, h.d, cmd, "change_request.opened",
 		func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
 			if _, err := cr.Next(governance.TransitionOpen, cmd.By); err != nil {
 				return cr, false, err
 			}
-			_, saved, err := h.d.Configurations.Current(ctx, cr.Project, cr.Flag.Key, cr.Environment.Key)
+			subject, err := h.d.current(ctx, cr)
 			if err != nil {
 				return cr, false, err
 			}
-			opened, err := cr.Open(cmd.By, saved.Configuration.Version, now)
+			opened, err := cr.Open(cmd.By, subject.BaseVersion, now)
 			return opened, err == nil, err
 		})
 }
@@ -235,9 +214,8 @@ type CopyChangeRequestCommand struct {
 }
 
 // Handle copies the change request, whatever its state, into a new draft of
-// the caller's with its title, description and proposal, based on the
-// configuration as it is now and checked against it as a new change request
-// is: a rejected or abandoned proposal is resumed on the current base. The
+// the caller's with its title, description and proposal, based on its
+// entity as it is now and checked against it as a new change request is: a rejected or abandoned proposal is resumed on the current base. The
 // copy records the change request it was copied from.
 func (h *CopyChangeRequest) Handle(ctx context.Context, cmd CopyChangeRequestCommand) (governance.ChangeRequest, error) {
 	now := h.d.now()
@@ -250,11 +228,11 @@ func (h *CopyChangeRequest) Handle(ctx context.Context, cmd CopyChangeRequestCom
 		if err != nil {
 			return err
 		}
-		in, err := configurationInputOf(source.Proposed)
+		in, err := proposedOf(source)
 		if err != nil {
 			return err
 		}
-		cr, err := propose(ctx, h.d, cmd.Project, source.Flag.Key, source.Environment.Key, in, governance.Proposal{
+		cr, err := propose(ctx, h.d, cmd.Project, TargetOf(source), in, governance.Proposal{
 			Title: source.Title, Description: source.Description,
 		}, false, cmd.Author, now)
 		if err != nil {
@@ -316,10 +294,11 @@ func (h *CountWaitingChangeRequests) Handle(ctx context.Context, flag flags.Flag
 // narrows the selection.
 type ChangeRequestFilter struct {
 	Project workspace.ProjectID
-	// Flag and Environment select by the keys of the flag and the
-	// environment a change request names.
+	// Flag, Environment and Segment select by the keys of the flag, the
+	// environment and the segment a change request names.
 	Flag        string
 	Environment string
+	Segment     string
 	Kind        governance.ChangeRequestKind
 	State       governance.ChangeRequestState
 	// Author selects the change requests of a member or a project token,
@@ -385,21 +364,22 @@ func NewApproveChangeRequest(d ChangeRequestDeps) *ApproveChangeRequest {
 	return &ApproveChangeRequest{d: d}
 }
 
-// Handle approves the change request and returns it. When the
-// configuration was written since the change request was based on it, what
-// would be approved is not what was reviewed: the change request is
-// superseded and the approval refused as base_moved.
+// Handle approves the change request and returns it; a definition records
+// the environments protected now as those its approval covers. When its
+// entity was written since the change request was based on it, what would
+// be approved is not what was reviewed: the change request is superseded
+// and the approval refused as base_moved.
 func (h *ApproveChangeRequest) Handle(ctx context.Context, cmd DecideChangeRequestCommand) (governance.ChangeRequest, error) {
 	return transition(ctx, h.d, cmd.ChangeRequestCommand, "change_request.approved",
 		func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
 			if _, err := cr.Next(governance.TransitionApprove, cmd.By); err != nil {
 				return cr, false, err
 			}
-			_, saved, err := h.d.Configurations.Current(ctx, cr.Project, cr.Flag.Key, cr.Environment.Key)
+			current, err := h.d.judged(ctx, cr)
 			if err != nil {
 				return cr, false, err
 			}
-			approved, err := cr.Approve(cmd.By, cmd.Comment, saved.Configuration.Version, now)
+			approved, err := cr.Approve(cmd.By, cmd.Comment, current, now)
 			return supersededOr(cr, approved, err)
 		})
 }
@@ -430,12 +410,13 @@ func NewApplyChangeRequest(d ChangeRequestDeps) *ApplyChangeRequest {
 }
 
 // Handle applies the change request and returns it: under the project's
-// lock it re-reads the change request and the configuration, and when the
-// configuration is still the one the change request was based on, the flags
-// context writes the proposal in the same transaction, allowed to change the
-// environment the change request covers although it is protected, and its
-// entries carry the change request's identifier. When the configuration was
-// written since, the change request is superseded and the application
+// lock it re-reads the change request and its entity, and when the entity
+// is still the one the change request was based on, the context owning it
+// writes the proposal in the same transaction, allowed to change the
+// environments the change request covers although they are protected, and
+// its entries carry the change request's identifier. When the entity was
+// written since, or an environment its approval does not cover was
+// protected since, the change request is superseded and the application
 // refused as base_moved; when the write is refused, nothing is written and
 // the change request stays approved.
 func (h *ApplyChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand) (governance.ChangeRequest, error) {
@@ -444,23 +425,15 @@ func (h *ApplyChangeRequest) Handle(ctx context.Context, cmd ChangeRequestComman
 			if _, err := cr.Next(governance.TransitionApply, cmd.By); err != nil {
 				return cr, false, err
 			}
-			_, saved, err := h.d.Configurations.Current(ctx, cr.Project, cr.Flag.Key, cr.Environment.Key)
+			current, err := h.d.judged(ctx, cr)
 			if err != nil {
 				return cr, false, err
 			}
-			applied, err := cr.Apply(cmd.By, saved.Configuration.Version, now)
+			applied, err := cr.Apply(cmd.By, current, now)
 			if err != nil {
 				return supersededOr(cr, applied, err)
 			}
-			proposed, err := configurationInputOf(cr.Proposed)
-			if err != nil {
-				return cr, false, err
-			}
-			// The approval covered the change request's environment, and
-			// no other.
-			writing := applying(protection.Bypass(ctx, cr.Environment.ID), cr.ID)
-			if err = h.d.Proposals.Apply(writing, cr.Project, cr.Flag.Key, cr.Environment.Key, proposed, cr.BaseVersion,
-				cmd.By.As.Member, cmd.Request); err != nil {
+			if err = h.d.write(ctx, cr, cmd.By.As.Member, cmd.Request); err != nil {
 				return cr, false, under(err, "/proposed")
 			}
 			return applied, true, nil

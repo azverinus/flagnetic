@@ -128,7 +128,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// catalogue events they cause to the outbox and announces them to the
 	// management change streams.
 	changeRequestStore := pggovernance.NewChangeRequests(d.Pool)
-	audit := appgovernance.NewRecord(auditLog, changeRequestStore, d.IDs,
+	audit := appgovernance.NewRecord(auditLog, changeRequestStore, appflags.NewSegmentReferrers(pgflags.NewStore(d.Pool)), d.IDs,
 		appgovernance.WithOutbox(outbox, d.IDs), appgovernance.WithChangeStream(auditLog))
 	// Every replica offers the entries announced to the change streams it
 	// holds, reading them from the audit log.
@@ -184,16 +184,26 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	owners := appaccess.NewOwnership(accessStore)
 	experimentStore := pgexperiments.NewStore(d.Pool)
 	experimentRec := appexperiments.NewRecorder(audit, d.Clock, d.IDs)
-	// A change request proposes a configuration the flags context checks as
-	// it would check writing it, and writes it when the change request is
-	// applied.
+	updateFlag := appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
+		Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
+		Evaluations: eventStore,
+	})
+	updateSegment := appflags.NewUpdateSegment(appflags.UpdateSegmentDeps{
+		Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+	})
+	// A change request proposes a configuration or a definition the flags
+	// context checks as it would check writing it, and writes it when the
+	// change request is applied; a definition's approval covers the
+	// environments the workspace context says are protected.
 	changeRequests := appgovernance.ChangeRequestDeps{
 		Tx: tx, Projects: changeRequestStore, Store: changeRequestStore,
 		Configurations: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
 		Proposals: appflags.NewApplyProposal(appflags.ReplaceConfigurationDeps{
 			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		Audit: audit, Clock: d.Clock, IDs: d.IDs,
+		Definitions:  appflags.NewDefinitions(updateFlag, updateSegment, appflags.NewSegmentReferrers(flagStore)),
+		Environments: appworkspace.NewProtectedEnvironments(ws),
+		Audit:        audit, Clock: d.Clock, IDs: d.IDs,
 	}
 	// Deleting a unit type or attribute asks the flags context what still
 	// names it.
@@ -291,11 +301,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
 			Tx: tx, Projects: flagStore, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		GetFlag: appflags.NewGetFlag(tx, flagStore, eventStore),
-		UpdateFlag: appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
-			Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
-			Evaluations: eventStore,
-		}),
+		GetFlag:    appflags.NewGetFlag(tx, flagStore, eventStore),
+		UpdateFlag: updateFlag,
 
 		ArchiveFlag: appflags.NewArchiveFlag(appflags.ArchiveFlagDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec, Evaluations: eventStore,
@@ -433,9 +440,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateSegment: appflags.NewCreateSegment(appflags.CreateSegmentDeps{
 			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		UpdateSegment: appflags.NewUpdateSegment(appflags.UpdateSegmentDeps{
-			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
-		}),
+		UpdateSegment: updateSegment,
 		DeleteSegment: appflags.NewDeleteSegment(appflags.DeleteSegmentDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
@@ -567,6 +572,7 @@ func Console(edge *flaghttp.Server, defaultLocale string) (bool, error) {
 // record returns the audit port of a use case run from the command line,
 // recording through the governance context like every other.
 func record(d Deps) *appgovernance.Record {
-	return appgovernance.NewRecord(pggovernance.NewAuditLog(d.Pool), pggovernance.NewChangeRequests(d.Pool), d.IDs,
+	return appgovernance.NewRecord(pggovernance.NewAuditLog(d.Pool), pggovernance.NewChangeRequests(d.Pool),
+		appflags.NewSegmentReferrers(pgflags.NewStore(d.Pool)), d.IDs,
 		appgovernance.WithOutbox(pggovernance.NewOutbox(d.Pool), d.IDs))
 }
