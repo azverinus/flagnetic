@@ -14,8 +14,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/pkg/pgtest"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
@@ -67,5 +69,6 @@ func IDs(c clock.Clock) *id.Source { return id.NewDeterministicSource(c) }
 // Record returns the governance service every context records its audit
 // entries through, on pool, as the server wires it.
 func Record(pool *pgxpool.Pool) *appgovernance.Record {
-	return appgovernance.NewRecord(pggovernance.NewAuditLog(pool), pggovernance.NewChangeRequests(pool), id.NewSource(clock.System{}))
+	return appgovernance.NewRecord(pggovernance.NewAuditLog(pool), pggovernance.NewChangeRequests(pool),
+		appflags.NewSegmentReferrers(pgflags.NewStore(pool)), id.NewSource(clock.System{}))
 }

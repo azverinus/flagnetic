@@ -117,12 +117,15 @@ func (e ChangeRequestAuthorKind) Valid() bool {
 
 // Defines values for ChangeRequestCreateKind.
 const (
+	ChangeRequestCreateKindDefinition        ChangeRequestCreateKind = "definition"
 	ChangeRequestCreateKindFlagConfiguration ChangeRequestCreateKind = "flag_configuration"
 )
 
 // Valid indicates whether the value is a known member of the ChangeRequestCreateKind enum.
 func (e ChangeRequestCreateKind) Valid() bool {
 	switch e {
+	case ChangeRequestCreateKindDefinition:
+		return true
 	case ChangeRequestCreateKindFlagConfiguration:
 		return true
 	default:
@@ -900,12 +903,12 @@ type ChangeRequest struct {
 	// Author The member or the project token that proposed the change request.
 	Author ChangeRequestAuthor `json:"author"`
 
-	// BaseVersion The version of the configuration the change request is based on.
+	// BaseVersion The version of the configuration, the flag or the segment the change request is based on.
 	BaseVersion int64     `json:"base_version"`
 	CreatedAt   time.Time `json:"created_at"`
 	Description string    `json:"description"`
 
-	// Diff The RFC 6902 patch from the configuration the change request is based on to `proposed`.
+	// Diff The RFC 6902 patch from the entity as the change request is based on it to `proposed`.
 	Diff []PatchOperation `json:"diff"`
 
 	// Environment The key of the environment of a `flag_configuration` change request.
@@ -916,30 +919,44 @@ type ChangeRequest struct {
 	Id   openapi_types.UUID `json:"id"`
 
 	// Kind What a change request proposes: `flag_configuration`, a flag's
-	// configuration in one environment. Other kinds are to come; a client
-	// reads `proposed` by the kind.
+	// configuration in one environment; `definition`, a flag's variations
+	// and automatic exposure, or a segment's conditions and private
+	// switch, in every environment. `experiment` is to come. A client
+	// reads `proposed` by the kind and the entity named.
 	Kind ChangeRequestKind `json:"kind"`
 
-	// Proposed A flag configuration as a change request proposes it: what it serves
-	// and the notes and descriptions that stay on the server, without who
-	// wrote it or when.
-	Proposed ProposedConfiguration `json:"proposed"`
+	// Proposed What the change request proposes, by its kind and the entity it
+	// names: a `ProposedConfiguration` for `flag_configuration`, a
+	// `ProposedFlagDefinition` for a flag's `definition`, a
+	// `ProposedSegmentDefinition` for a segment's.
+	Proposed ChangeRequest_Proposed `json:"proposed"`
 
 	// Rejection Who rejected the change request, when and why; null unless it was rejected.
 	Rejection *ChangeRequestDecision `json:"rejection"`
+
+	// Segment The key of the segment of a segment's `definition`.
+	Segment *string `json:"segment,omitempty"`
 
 	// State `draft` (its author prepares it), `open` (offered for review),
 	// `approved`, `rejected`, `applied`, `cancelled`, `superseded` (what
 	// it was based on moved). The last four are final.
 	State ChangeRequestState `json:"state"`
 
-	// SupersededBy The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, or deleting its environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
+	// SupersededBy The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
 	SupersededBy *openapi_types.UUID `json:"superseded_by"`
 	Title        string              `json:"title"`
 	UpdatedAt    time.Time           `json:"updated_at"`
 
 	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
 	Version Version `json:"version"`
+}
+
+// ChangeRequest_Proposed What the change request proposes, by its kind and the entity it
+// names: a `ProposedConfiguration` for `flag_configuration`, a
+// `ProposedFlagDefinition` for a flag's `definition`, a
+// `ProposedSegmentDefinition` for a segment's.
+type ChangeRequest_Proposed struct {
+	union json.RawMessage
 }
 
 // ChangeRequestApplier The member or the project token that applied a change request, or the system at its scheduled time.
@@ -977,17 +994,26 @@ type ChangeRequestAuthorKind string
 type ChangeRequestCreate struct {
 	Description *string `json:"description,omitempty"`
 
-	// Environment The key of the environment.
-	Environment string `json:"environment"`
+	// Environment The key of the environment, for a configuration only.
+	Environment *string `json:"environment,omitempty"`
 
-	// Flag The key of the flag.
-	Flag string                  `json:"flag"`
+	// Flag The key of the flag, for a configuration or a flag's definition.
+	Flag *string                 `json:"flag,omitempty"`
 	Kind ChangeRequestCreateKind `json:"kind"`
 
 	// Open Open the change request for review at once instead of drafting it.
-	Open     *bool                `json:"open,omitempty"`
-	Proposed FlagConfigurationPut `json:"proposed"`
-	Title    string               `json:"title"`
+	Open *bool `json:"open,omitempty"`
+
+	// Proposed What a change request proposes, as a direct write would give it,
+	// read by the change request's kind and the entity it names: a
+	// `FlagConfigurationPut` for `flag_configuration`, a
+	// `FlagDefinitionPut` for a flag's `definition`, a
+	// `SegmentDefinitionPut` for a segment's.
+	Proposed ProposedInput `json:"proposed"`
+
+	// Segment The key of the segment, for a segment's definition only.
+	Segment *string `json:"segment,omitempty"`
+	Title   string  `json:"title"`
 }
 
 // ChangeRequestCreateKind defines model for ChangeRequestCreate.Kind.
@@ -1003,8 +1029,10 @@ type ChangeRequestDecision struct {
 }
 
 // ChangeRequestKind What a change request proposes: `flag_configuration`, a flag's
-// configuration in one environment. Other kinds are to come; a client
-// reads `proposed` by the kind.
+// configuration in one environment; `definition`, a flag's variations
+// and automatic exposure, or a segment's conditions and private
+// switch, in every environment. `experiment` is to come. A client
+// reads `proposed` by the kind and the entity named.
 type ChangeRequestKind string
 
 // ChangeRequestList defines model for ChangeRequestList.
@@ -1025,9 +1053,15 @@ type ChangeRequestMember struct {
 
 // ChangeRequestPatch defines model for ChangeRequestPatch.
 type ChangeRequestPatch struct {
-	Description *string               `json:"description,omitempty"`
-	Proposed    *FlagConfigurationPut `json:"proposed,omitempty"`
-	Title       *string               `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+
+	// Proposed What a change request proposes, as a direct write would give it,
+	// read by the change request's kind and the entity it names: a
+	// `FlagConfigurationPut` for `flag_configuration`, a
+	// `FlagDefinitionPut` for a flag's `definition`, a
+	// `SegmentDefinitionPut` for a segment's.
+	Proposed *ProposedInput `json:"proposed,omitempty"`
+	Title    *string        `json:"title,omitempty"`
 }
 
 // ChangeRequestReject defines model for ChangeRequestReject.
@@ -1802,6 +1836,16 @@ type FlagDefinition struct {
 	Version Version `json:"version"`
 }
 
+// FlagDefinitionPut A flag's definition as a change request proposes it: what every
+// environment's ruleset carries of the flag. Its other fields are
+// edited directly.
+type FlagDefinitionPut struct {
+	AutomaticExposure bool `json:"automatic_exposure"`
+
+	// Variations Every variation, in order, matched to the current ones by key.
+	Variations []VariationInput `json:"variations"`
+}
+
 // FlagEvaluationDay defines model for FlagEvaluationDay.
 type FlagEvaluationDay struct {
 	// Day The UTC day the evaluations were received.
@@ -2405,12 +2449,33 @@ type ProposedConfiguration struct {
 	Rules         []Rule             `json:"rules"`
 }
 
+// ProposedFlagDefinition A flag's definition as a change request proposes it.
+type ProposedFlagDefinition struct {
+	AutomaticExposure bool        `json:"automatic_exposure"`
+	Variations        []Variation `json:"variations"`
+}
+
+// ProposedInput What a change request proposes, as a direct write would give it,
+// read by the change request's kind and the entity it names: a
+// `FlagConfigurationPut` for `flag_configuration`, a
+// `FlagDefinitionPut` for a flag's `definition`, a
+// `SegmentDefinitionPut` for a segment's.
+type ProposedInput struct {
+	union json.RawMessage
+}
+
 // ProposedOverride defines model for ProposedOverride.
 type ProposedOverride struct {
 	Note      *string `json:"note"`
 	UnitId    string  `json:"unit_id"`
 	UnitType  string  `json:"unit_type"`
 	Variation string  `json:"variation"`
+}
+
+// ProposedSegmentDefinition A segment's definition as a change request proposes it.
+type ProposedSegmentDefinition struct {
+	Conditions []Condition `json:"conditions"`
+	Private    bool        `json:"private"`
 }
 
 // Reference defines model for Reference.
@@ -2685,6 +2750,14 @@ type SegmentCreate struct {
 	Key     Key   `json:"key"`
 	Name    Name  `json:"name"`
 	Private *bool `json:"private,omitempty"`
+}
+
+// SegmentDefinitionPut A segment's definition as a change request proposes it: what every
+// environment's ruleset carries of the segment. Its name and
+// description are edited directly.
+type SegmentDefinitionPut struct {
+	Conditions []Condition `json:"conditions"`
+	Private    bool        `json:"private"`
 }
 
 // SegmentList defines model for SegmentList.
@@ -3380,9 +3453,12 @@ type ListChangeRequestsParams struct {
 	Flag *string `form:"flag,omitempty" json:"flag,omitempty"`
 
 	// Environment Only those naming the environment with this key.
-	Environment *string             `form:"environment,omitempty" json:"environment,omitempty"`
-	Kind        *ChangeRequestKind  `form:"kind,omitempty" json:"kind,omitempty"`
-	State       *ChangeRequestState `form:"state,omitempty" json:"state,omitempty"`
+	Environment *string `form:"environment,omitempty" json:"environment,omitempty"`
+
+	// Segment Only those naming the segment with this key.
+	Segment *string             `form:"segment,omitempty" json:"segment,omitempty"`
+	Kind    *ChangeRequestKind  `form:"kind,omitempty" json:"kind,omitempty"`
+	State   *ChangeRequestState `form:"state,omitempty" json:"state,omitempty"`
 
 	// Author Only those authored by the member or the project token with this identifier.
 	Author *openapi_types.UUID `form:"author,omitempty" json:"author,omitempty"`
@@ -4002,6 +4078,182 @@ type CreateWebhookJSONRequestBody = WebhookCreate
 
 // UpdateWebhookJSONRequestBody defines body for UpdateWebhook for application/json ContentType.
 type UpdateWebhookJSONRequestBody = WebhookPatch
+
+// AsProposedConfiguration returns the union data inside the ChangeRequest_Proposed as a ProposedConfiguration
+func (t ChangeRequest_Proposed) AsProposedConfiguration() (ProposedConfiguration, error) {
+	var body ProposedConfiguration
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProposedConfiguration overwrites any union data inside the ChangeRequest_Proposed as the provided ProposedConfiguration
+func (t *ChangeRequest_Proposed) FromProposedConfiguration(v ProposedConfiguration) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProposedConfiguration performs a merge with any union data inside the ChangeRequest_Proposed, using the provided ProposedConfiguration
+func (t *ChangeRequest_Proposed) MergeProposedConfiguration(v ProposedConfiguration) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsProposedFlagDefinition returns the union data inside the ChangeRequest_Proposed as a ProposedFlagDefinition
+func (t ChangeRequest_Proposed) AsProposedFlagDefinition() (ProposedFlagDefinition, error) {
+	var body ProposedFlagDefinition
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProposedFlagDefinition overwrites any union data inside the ChangeRequest_Proposed as the provided ProposedFlagDefinition
+func (t *ChangeRequest_Proposed) FromProposedFlagDefinition(v ProposedFlagDefinition) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProposedFlagDefinition performs a merge with any union data inside the ChangeRequest_Proposed, using the provided ProposedFlagDefinition
+func (t *ChangeRequest_Proposed) MergeProposedFlagDefinition(v ProposedFlagDefinition) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsProposedSegmentDefinition returns the union data inside the ChangeRequest_Proposed as a ProposedSegmentDefinition
+func (t ChangeRequest_Proposed) AsProposedSegmentDefinition() (ProposedSegmentDefinition, error) {
+	var body ProposedSegmentDefinition
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProposedSegmentDefinition overwrites any union data inside the ChangeRequest_Proposed as the provided ProposedSegmentDefinition
+func (t *ChangeRequest_Proposed) FromProposedSegmentDefinition(v ProposedSegmentDefinition) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProposedSegmentDefinition performs a merge with any union data inside the ChangeRequest_Proposed, using the provided ProposedSegmentDefinition
+func (t *ChangeRequest_Proposed) MergeProposedSegmentDefinition(v ProposedSegmentDefinition) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ChangeRequest_Proposed) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ChangeRequest_Proposed) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsFlagConfigurationPut returns the union data inside the ProposedInput as a FlagConfigurationPut
+func (t ProposedInput) AsFlagConfigurationPut() (FlagConfigurationPut, error) {
+	var body FlagConfigurationPut
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFlagConfigurationPut overwrites any union data inside the ProposedInput as the provided FlagConfigurationPut
+func (t *ProposedInput) FromFlagConfigurationPut(v FlagConfigurationPut) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFlagConfigurationPut performs a merge with any union data inside the ProposedInput, using the provided FlagConfigurationPut
+func (t *ProposedInput) MergeFlagConfigurationPut(v FlagConfigurationPut) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsFlagDefinitionPut returns the union data inside the ProposedInput as a FlagDefinitionPut
+func (t ProposedInput) AsFlagDefinitionPut() (FlagDefinitionPut, error) {
+	var body FlagDefinitionPut
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFlagDefinitionPut overwrites any union data inside the ProposedInput as the provided FlagDefinitionPut
+func (t *ProposedInput) FromFlagDefinitionPut(v FlagDefinitionPut) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFlagDefinitionPut performs a merge with any union data inside the ProposedInput, using the provided FlagDefinitionPut
+func (t *ProposedInput) MergeFlagDefinitionPut(v FlagDefinitionPut) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSegmentDefinitionPut returns the union data inside the ProposedInput as a SegmentDefinitionPut
+func (t ProposedInput) AsSegmentDefinitionPut() (SegmentDefinitionPut, error) {
+	var body SegmentDefinitionPut
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSegmentDefinitionPut overwrites any union data inside the ProposedInput as the provided SegmentDefinitionPut
+func (t *ProposedInput) FromSegmentDefinitionPut(v SegmentDefinitionPut) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSegmentDefinitionPut performs a merge with any union data inside the ProposedInput, using the provided SegmentDefinitionPut
+func (t *ProposedInput) MergeSegmentDefinitionPut(v SegmentDefinitionPut) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ProposedInput) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ProposedInput) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -4688,18 +4940,23 @@ type ClientInterface interface {
 
 	// CreateChangeRequestWithBody Propose a change
 	//
-	// Proposes a flag's configuration in one environment as a change
-	// request, as a draft or, with `open`, opened for review at once. The
-	// caller, a member or a project token, is its author. It is based on
-	// the configuration as it is now, and `diff` is the RFC 6902 patch from
-	// that configuration to `proposed`. `proposed` is checked as replacing
-	// the configuration would be, with the same refusals under
-	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-	// configuration has no rule with, and a `salt` that is not that rule's,
-	// are left out, so the rule is a new one. New rules and rollouts are
-	// given an identifier and a salt, which `proposed` holds. A title of 1
-	// to 200 characters is required and a description has at most 10,000
-	// (`invalid_change_request`).
+	// Proposes a change as a change request, as a draft or, with `open`,
+	// opened for review at once. The caller, a member or a project token,
+	// is its author. A `flag_configuration` change request names a `flag`
+	// and an `environment` and proposes a `FlagConfigurationPut`; a
+	// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+	// one `segment`, proposing a `SegmentDefinitionPut`, and no
+	// environment, since a definition is applied in every environment
+	// (`invalid_change_request` naming the field otherwise). It is based on
+	// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+	// `proposed`. `proposed` is checked as writing it directly would be,
+	// with the same refusals under `/proposed` (`invalid_configuration`,
+	// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+	// configuration, a rule `id` the configuration has no rule with, and a
+	// `salt` that is not that rule's, are left out, so the rule is a new
+	// one; new rules and rollouts are given an identifier and a salt,
+	// which `proposed` holds. A title of 1 to 200 characters is required
+	// and a description has at most 10,000 (`invalid_change_request`).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4708,18 +4965,23 @@ type ClientInterface interface {
 
 	// CreateChangeRequest Propose a change
 	//
-	// Proposes a flag's configuration in one environment as a change
-	// request, as a draft or, with `open`, opened for review at once. The
-	// caller, a member or a project token, is its author. It is based on
-	// the configuration as it is now, and `diff` is the RFC 6902 patch from
-	// that configuration to `proposed`. `proposed` is checked as replacing
-	// the configuration would be, with the same refusals under
-	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-	// configuration has no rule with, and a `salt` that is not that rule's,
-	// are left out, so the rule is a new one. New rules and rollouts are
-	// given an identifier and a salt, which `proposed` holds. A title of 1
-	// to 200 characters is required and a description has at most 10,000
-	// (`invalid_change_request`).
+	// Proposes a change as a change request, as a draft or, with `open`,
+	// opened for review at once. The caller, a member or a project token,
+	// is its author. A `flag_configuration` change request names a `flag`
+	// and an `environment` and proposes a `FlagConfigurationPut`; a
+	// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+	// one `segment`, proposing a `SegmentDefinitionPut`, and no
+	// environment, since a definition is applied in every environment
+	// (`invalid_change_request` naming the field otherwise). It is based on
+	// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+	// `proposed`. `proposed` is checked as writing it directly would be,
+	// with the same refusals under `/proposed` (`invalid_configuration`,
+	// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+	// configuration, a rule `id` the configuration has no rule with, and a
+	// `salt` that is not that rule's, are left out, so the rule is a new
+	// one; new rules and rollouts are given an identifier and a salt,
+	// which `proposed` holds. A title of 1 to 200 characters is required
+	// and a description has at most 10,000 (`invalid_change_request`).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4735,10 +4997,11 @@ type ClientInterface interface {
 	//
 	// Changes the title, the description or what is proposed, each left
 	// as it is when absent. Only the author edits (`not_author`), a draft
-	// or an open change request (`invalid_state`). A new `proposed` is
-	// checked as on creation, against the configuration as it is now, and
-	// `diff` is recomputed from the configuration the change request is
-	// based on; a rebase moves that. An edit that changes nothing changes
+	// or an open change request (`invalid_state`). A new `proposed`, the
+	// document the change request's kind and entity call for, is checked
+	// as on creation, against the entity as it is now, and `diff` is
+	// recomputed from the entity as the change request is based on it; a
+	// rebase moves that. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type.
@@ -4750,10 +5013,11 @@ type ClientInterface interface {
 	//
 	// Changes the title, the description or what is proposed, each left
 	// as it is when absent. Only the author edits (`not_author`), a draft
-	// or an open change request (`invalid_state`). A new `proposed` is
-	// checked as on creation, against the configuration as it is now, and
-	// `diff` is recomputed from the configuration the change request is
-	// based on; a rebase moves that. An edit that changes nothing changes
+	// or an open change request (`invalid_state`). A new `proposed`, the
+	// document the change request's kind and entity call for, is checked
+	// as on creation, against the entity as it is now, and `diff` is
+	// recomputed from the entity as the change request is based on it; a
+	// rebase moves that. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type.
@@ -4763,15 +5027,18 @@ type ClientInterface interface {
 
 	// ApplyChangeRequest Apply an approved change request
 	//
-	// Writes the configuration proposed, in a protected environment too,
-	// as one write whose audit entries carry the change request's
-	// identifier. Its author or a member holding `change_request.approve`
-	// applies it (`not_author`), once approved (`invalid_state`). When the
-	// configuration was written since the change request was based on it,
-	// the change request is superseded and the application refused
-	// (`base_moved`). The configuration is checked again as a replace is,
-	// since what it names may be gone since the approval: a refusal
-	// writes nothing and leaves the change request approved.
+	// Writes what is proposed as one write whose audit entries carry the
+	// change request's identifier: a configuration in its environment,
+	// protected or not; a definition in every environment, changing the
+	// protected ones its approval covers. Its author or a member holding
+	// `change_request.approve` applies it (`not_author`), once approved
+	// (`invalid_state`). When the entity was written since the change
+	// request was based on it, or, for a definition, an environment was
+	// protected since it was approved, the change request is superseded
+	// and the application refused (`base_moved`). What is proposed is
+	// checked again as writing it directly is, since what it names may be
+	// gone since the approval: a refusal writes nothing and leaves the
+	// change request approved.
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/apply (the `ApplyChangeRequest` operationId).
 	ApplyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *ApplyChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4782,9 +5049,10 @@ type ClientInterface interface {
 	// request (`invalid_state`) with an optional comment of at most 2,000
 	// characters, unless they are its author (`author_cannot_approve`); a
 	// project token never decides one (`token_cannot_approve`). When the
-	// configuration was written since the change request was based on it,
-	// what would be approved is no longer what was reviewed: the change
-	// request is superseded and the approval refused (`base_moved`).
+	// entity was written since the change request was based on it, what
+	// would be approved is no longer what was reviewed: the change request
+	// is superseded and the approval refused (`base_moved`). A definition's
+	// approval covers the environments protected when it is given.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4797,9 +5065,10 @@ type ClientInterface interface {
 	// request (`invalid_state`) with an optional comment of at most 2,000
 	// characters, unless they are its author (`author_cannot_approve`); a
 	// project token never decides one (`token_cannot_approve`). When the
-	// configuration was written since the change request was based on it,
-	// what would be approved is no longer what was reviewed: the change
-	// request is superseded and the approval refused (`base_moved`).
+	// entity was written since the change request was based on it, what
+	// would be approved is no longer what was reviewed: the change request
+	// is superseded and the approval refused (`base_moved`). A definition's
+	// approval covers the environments protected when it is given.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4820,8 +5089,8 @@ type ClientInterface interface {
 	//
 	// Copies any change request, whatever its state and whoever wrote it,
 	// into a new draft of the caller's with the same title, description
-	// and proposal, based on the configuration as it is now and checked
-	// against it as a new change request is.
+	// and proposal, based on the entity as it is now and checked against
+	// it as a new change request is.
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
 	CopyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4829,17 +5098,18 @@ type ClientInterface interface {
 	// OpenChangeRequest Open a draft change request for review
 	//
 	// Only the author opens (`not_author`), and only a draft
-	// (`invalid_state`). When the configuration was written since the
-	// change request was based on it, its diff no longer shows what it
-	// would do, and opening is refused (`base_moved`) until it is rebased.
+	// (`invalid_state`). When its flag's configuration, its flag or its
+	// segment was written since the change request was based on it, its
+	// diff no longer shows what it would do, and opening is refused
+	// (`base_moved`) until it is rebased.
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/open (the `OpenChangeRequest` operationId).
 	OpenChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *OpenChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RebaseChangeRequest Base a draft change request on the configuration as it is now
 	//
-	// Keeps what is proposed and recomputes `diff` from the configuration
-	// as it is now, which becomes `base_version`. Only the author rebases
+	// Keeps what is proposed and recomputes `diff` from the entity as it
+	// is now, whose version becomes `base_version`. Only the author rebases
 	// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
 	// base it has changes nothing and records nothing.
 	//
@@ -7517,18 +7787,23 @@ func (c *Client) ListChangeRequests(ctx context.Context, project ProjectKey, par
 
 // CreateChangeRequestWithBody Propose a change
 //
-// Proposes a flag's configuration in one environment as a change
-// request, as a draft or, with `open`, opened for review at once. The
-// caller, a member or a project token, is its author. It is based on
-// the configuration as it is now, and `diff` is the RFC 6902 patch from
-// that configuration to `proposed`. `proposed` is checked as replacing
-// the configuration would be, with the same refusals under
-// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-// configuration has no rule with, and a `salt` that is not that rule's,
-// are left out, so the rule is a new one. New rules and rollouts are
-// given an identifier and a salt, which `proposed` holds. A title of 1
-// to 200 characters is required and a description has at most 10,000
-// (`invalid_change_request`).
+// Proposes a change as a change request, as a draft or, with `open`,
+// opened for review at once. The caller, a member or a project token,
+// is its author. A `flag_configuration` change request names a `flag`
+// and an `environment` and proposes a `FlagConfigurationPut`; a
+// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+// one `segment`, proposing a `SegmentDefinitionPut`, and no
+// environment, since a definition is applied in every environment
+// (`invalid_change_request` naming the field otherwise). It is based on
+// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+// `proposed`. `proposed` is checked as writing it directly would be,
+// with the same refusals under `/proposed` (`invalid_configuration`,
+// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+// configuration, a rule `id` the configuration has no rule with, and a
+// `salt` that is not that rule's, are left out, so the rule is a new
+// one; new rules and rollouts are given an identifier and a salt,
+// which `proposed` holds. A title of 1 to 200 characters is required
+// and a description has at most 10,000 (`invalid_change_request`).
 //
 // Takes any type of body and a specified content type.
 //
@@ -7547,18 +7822,23 @@ func (c *Client) CreateChangeRequestWithBody(ctx context.Context, project Projec
 
 // CreateChangeRequest Propose a change
 //
-// Proposes a flag's configuration in one environment as a change
-// request, as a draft or, with `open`, opened for review at once. The
-// caller, a member or a project token, is its author. It is based on
-// the configuration as it is now, and `diff` is the RFC 6902 patch from
-// that configuration to `proposed`. `proposed` is checked as replacing
-// the configuration would be, with the same refusals under
-// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-// configuration has no rule with, and a `salt` that is not that rule's,
-// are left out, so the rule is a new one. New rules and rollouts are
-// given an identifier and a salt, which `proposed` holds. A title of 1
-// to 200 characters is required and a description has at most 10,000
-// (`invalid_change_request`).
+// Proposes a change as a change request, as a draft or, with `open`,
+// opened for review at once. The caller, a member or a project token,
+// is its author. A `flag_configuration` change request names a `flag`
+// and an `environment` and proposes a `FlagConfigurationPut`; a
+// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+// one `segment`, proposing a `SegmentDefinitionPut`, and no
+// environment, since a definition is applied in every environment
+// (`invalid_change_request` naming the field otherwise). It is based on
+// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+// `proposed`. `proposed` is checked as writing it directly would be,
+// with the same refusals under `/proposed` (`invalid_configuration`,
+// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+// configuration, a rule `id` the configuration has no rule with, and a
+// `salt` that is not that rule's, are left out, so the rule is a new
+// one; new rules and rollouts are given an identifier and a salt,
+// which `proposed` holds. A title of 1 to 200 characters is required
+// and a description has at most 10,000 (`invalid_change_request`).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7594,10 +7874,11 @@ func (c *Client) GetChangeRequest(ctx context.Context, project ProjectKey, chang
 //
 // Changes the title, the description or what is proposed, each left
 // as it is when absent. Only the author edits (`not_author`), a draft
-// or an open change request (`invalid_state`). A new `proposed` is
-// checked as on creation, against the configuration as it is now, and
-// `diff` is recomputed from the configuration the change request is
-// based on; a rebase moves that. An edit that changes nothing changes
+// or an open change request (`invalid_state`). A new `proposed`, the
+// document the change request's kind and entity call for, is checked
+// as on creation, against the entity as it is now, and `diff` is
+// recomputed from the entity as the change request is based on it; a
+// rebase moves that. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes any type of body and a specified content type.
@@ -7619,10 +7900,11 @@ func (c *Client) UpdateChangeRequestWithBody(ctx context.Context, project Projec
 //
 // Changes the title, the description or what is proposed, each left
 // as it is when absent. Only the author edits (`not_author`), a draft
-// or an open change request (`invalid_state`). A new `proposed` is
-// checked as on creation, against the configuration as it is now, and
-// `diff` is recomputed from the configuration the change request is
-// based on; a rebase moves that. An edit that changes nothing changes
+// or an open change request (`invalid_state`). A new `proposed`, the
+// document the change request's kind and entity call for, is checked
+// as on creation, against the entity as it is now, and `diff` is
+// recomputed from the entity as the change request is based on it; a
+// rebase moves that. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes a body of the `application/json` content type.
@@ -7642,15 +7924,18 @@ func (c *Client) UpdateChangeRequest(ctx context.Context, project ProjectKey, ch
 
 // ApplyChangeRequest Apply an approved change request
 //
-// Writes the configuration proposed, in a protected environment too,
-// as one write whose audit entries carry the change request's
-// identifier. Its author or a member holding `change_request.approve`
-// applies it (`not_author`), once approved (`invalid_state`). When the
-// configuration was written since the change request was based on it,
-// the change request is superseded and the application refused
-// (`base_moved`). The configuration is checked again as a replace is,
-// since what it names may be gone since the approval: a refusal
-// writes nothing and leaves the change request approved.
+// Writes what is proposed as one write whose audit entries carry the
+// change request's identifier: a configuration in its environment,
+// protected or not; a definition in every environment, changing the
+// protected ones its approval covers. Its author or a member holding
+// `change_request.approve` applies it (`not_author`), once approved
+// (`invalid_state`). When the entity was written since the change
+// request was based on it, or, for a definition, an environment was
+// protected since it was approved, the change request is superseded
+// and the application refused (`base_moved`). What is proposed is
+// checked again as writing it directly is, since what it names may be
+// gone since the approval: a refusal writes nothing and leaves the
+// change request approved.
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/apply (the `ApplyChangeRequest` operationId).
 func (c *Client) ApplyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *ApplyChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7671,9 +7956,10 @@ func (c *Client) ApplyChangeRequest(ctx context.Context, project ProjectKey, cha
 // request (`invalid_state`) with an optional comment of at most 2,000
 // characters, unless they are its author (`author_cannot_approve`); a
 // project token never decides one (`token_cannot_approve`). When the
-// configuration was written since the change request was based on it,
-// what would be approved is no longer what was reviewed: the change
-// request is superseded and the approval refused (`base_moved`).
+// entity was written since the change request was based on it, what
+// would be approved is no longer what was reviewed: the change request
+// is superseded and the approval refused (`base_moved`). A definition's
+// approval covers the environments protected when it is given.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7696,9 +7982,10 @@ func (c *Client) ApproveChangeRequestWithBody(ctx context.Context, project Proje
 // request (`invalid_state`) with an optional comment of at most 2,000
 // characters, unless they are its author (`author_cannot_approve`); a
 // project token never decides one (`token_cannot_approve`). When the
-// configuration was written since the change request was based on it,
-// what would be approved is no longer what was reviewed: the change
-// request is superseded and the approval refused (`base_moved`).
+// entity was written since the change request was based on it, what
+// would be approved is no longer what was reviewed: the change request
+// is superseded and the approval refused (`base_moved`). A definition's
+// approval covers the environments protected when it is given.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7739,8 +8026,8 @@ func (c *Client) CancelChangeRequest(ctx context.Context, project ProjectKey, ch
 //
 // Copies any change request, whatever its state and whoever wrote it,
 // into a new draft of the caller's with the same title, description
-// and proposal, based on the configuration as it is now and checked
-// against it as a new change request is.
+// and proposal, based on the entity as it is now and checked against
+// it as a new change request is.
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
 func (c *Client) CopyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7758,9 +8045,10 @@ func (c *Client) CopyChangeRequest(ctx context.Context, project ProjectKey, chan
 // OpenChangeRequest Open a draft change request for review
 //
 // Only the author opens (`not_author`), and only a draft
-// (`invalid_state`). When the configuration was written since the
-// change request was based on it, its diff no longer shows what it
-// would do, and opening is refused (`base_moved`) until it is rebased.
+// (`invalid_state`). When its flag's configuration, its flag or its
+// segment was written since the change request was based on it, its
+// diff no longer shows what it would do, and opening is refused
+// (`base_moved`) until it is rebased.
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/open (the `OpenChangeRequest` operationId).
 func (c *Client) OpenChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *OpenChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7777,8 +8065,8 @@ func (c *Client) OpenChangeRequest(ctx context.Context, project ProjectKey, chan
 
 // RebaseChangeRequest Base a draft change request on the configuration as it is now
 //
-// Keeps what is proposed and recomputes `diff` from the configuration
-// as it is now, which becomes `base_version`. Only the author rebases
+// Keeps what is proposed and recomputes `diff` from the entity as it
+// is now, whose version becomes `base_version`. Only the author rebases
 // (`not_author`), and only a draft (`invalid_state`). Rebasing on the
 // base it has changes nothing and records nothing.
 //
@@ -12475,6 +12763,18 @@ func NewListChangeRequestsRequest(server string, project ProjectKey, params *Lis
 		if params.Environment != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "environment", *params.Environment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Segment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "segment", *params.Segment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -18396,18 +18696,23 @@ type ClientWithResponsesInterface interface {
 
 	// CreateChangeRequestWithBodyWithResponse Propose a change
 	//
-	// Proposes a flag's configuration in one environment as a change
-	// request, as a draft or, with `open`, opened for review at once. The
-	// caller, a member or a project token, is its author. It is based on
-	// the configuration as it is now, and `diff` is the RFC 6902 patch from
-	// that configuration to `proposed`. `proposed` is checked as replacing
-	// the configuration would be, with the same refusals under
-	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-	// configuration has no rule with, and a `salt` that is not that rule's,
-	// are left out, so the rule is a new one. New rules and rollouts are
-	// given an identifier and a salt, which `proposed` holds. A title of 1
-	// to 200 characters is required and a description has at most 10,000
-	// (`invalid_change_request`).
+	// Proposes a change as a change request, as a draft or, with `open`,
+	// opened for review at once. The caller, a member or a project token,
+	// is its author. A `flag_configuration` change request names a `flag`
+	// and an `environment` and proposes a `FlagConfigurationPut`; a
+	// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+	// one `segment`, proposing a `SegmentDefinitionPut`, and no
+	// environment, since a definition is applied in every environment
+	// (`invalid_change_request` naming the field otherwise). It is based on
+	// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+	// `proposed`. `proposed` is checked as writing it directly would be,
+	// with the same refusals under `/proposed` (`invalid_configuration`,
+	// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+	// configuration, a rule `id` the configuration has no rule with, and a
+	// `salt` that is not that rule's, are left out, so the rule is a new
+	// one; new rules and rollouts are given an identifier and a salt,
+	// which `proposed` holds. A title of 1 to 200 characters is required
+	// and a description has at most 10,000 (`invalid_change_request`).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18416,18 +18721,23 @@ type ClientWithResponsesInterface interface {
 
 	// CreateChangeRequestWithResponse Propose a change
 	//
-	// Proposes a flag's configuration in one environment as a change
-	// request, as a draft or, with `open`, opened for review at once. The
-	// caller, a member or a project token, is its author. It is based on
-	// the configuration as it is now, and `diff` is the RFC 6902 patch from
-	// that configuration to `proposed`. `proposed` is checked as replacing
-	// the configuration would be, with the same refusals under
-	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-	// configuration has no rule with, and a `salt` that is not that rule's,
-	// are left out, so the rule is a new one. New rules and rollouts are
-	// given an identifier and a salt, which `proposed` holds. A title of 1
-	// to 200 characters is required and a description has at most 10,000
-	// (`invalid_change_request`).
+	// Proposes a change as a change request, as a draft or, with `open`,
+	// opened for review at once. The caller, a member or a project token,
+	// is its author. A `flag_configuration` change request names a `flag`
+	// and an `environment` and proposes a `FlagConfigurationPut`; a
+	// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+	// one `segment`, proposing a `SegmentDefinitionPut`, and no
+	// environment, since a definition is applied in every environment
+	// (`invalid_change_request` naming the field otherwise). It is based on
+	// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+	// `proposed`. `proposed` is checked as writing it directly would be,
+	// with the same refusals under `/proposed` (`invalid_configuration`,
+	// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+	// configuration, a rule `id` the configuration has no rule with, and a
+	// `salt` that is not that rule's, are left out, so the rule is a new
+	// one; new rules and rollouts are given an identifier and a salt,
+	// which `proposed` holds. A title of 1 to 200 characters is required
+	// and a description has at most 10,000 (`invalid_change_request`).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18445,10 +18755,11 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes the title, the description or what is proposed, each left
 	// as it is when absent. Only the author edits (`not_author`), a draft
-	// or an open change request (`invalid_state`). A new `proposed` is
-	// checked as on creation, against the configuration as it is now, and
-	// `diff` is recomputed from the configuration the change request is
-	// based on; a rebase moves that. An edit that changes nothing changes
+	// or an open change request (`invalid_state`). A new `proposed`, the
+	// document the change request's kind and entity call for, is checked
+	// as on creation, against the entity as it is now, and `diff` is
+	// recomputed from the entity as the change request is based on it; a
+	// rebase moves that. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -18460,10 +18771,11 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes the title, the description or what is proposed, each left
 	// as it is when absent. Only the author edits (`not_author`), a draft
-	// or an open change request (`invalid_state`). A new `proposed` is
-	// checked as on creation, against the configuration as it is now, and
-	// `diff` is recomputed from the configuration the change request is
-	// based on; a rebase moves that. An edit that changes nothing changes
+	// or an open change request (`invalid_state`). A new `proposed`, the
+	// document the change request's kind and entity call for, is checked
+	// as on creation, against the entity as it is now, and `diff` is
+	// recomputed from the entity as the change request is based on it; a
+	// rebase moves that. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -18473,15 +18785,18 @@ type ClientWithResponsesInterface interface {
 
 	// ApplyChangeRequestWithResponse Apply an approved change request
 	//
-	// Writes the configuration proposed, in a protected environment too,
-	// as one write whose audit entries carry the change request's
-	// identifier. Its author or a member holding `change_request.approve`
-	// applies it (`not_author`), once approved (`invalid_state`). When the
-	// configuration was written since the change request was based on it,
-	// the change request is superseded and the application refused
-	// (`base_moved`). The configuration is checked again as a replace is,
-	// since what it names may be gone since the approval: a refusal
-	// writes nothing and leaves the change request approved.
+	// Writes what is proposed as one write whose audit entries carry the
+	// change request's identifier: a configuration in its environment,
+	// protected or not; a definition in every environment, changing the
+	// protected ones its approval covers. Its author or a member holding
+	// `change_request.approve` applies it (`not_author`), once approved
+	// (`invalid_state`). When the entity was written since the change
+	// request was based on it, or, for a definition, an environment was
+	// protected since it was approved, the change request is superseded
+	// and the application refused (`base_moved`). What is proposed is
+	// checked again as writing it directly is, since what it names may be
+	// gone since the approval: a refusal writes nothing and leaves the
+	// change request approved.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -18494,9 +18809,10 @@ type ClientWithResponsesInterface interface {
 	// request (`invalid_state`) with an optional comment of at most 2,000
 	// characters, unless they are its author (`author_cannot_approve`); a
 	// project token never decides one (`token_cannot_approve`). When the
-	// configuration was written since the change request was based on it,
-	// what would be approved is no longer what was reviewed: the change
-	// request is superseded and the approval refused (`base_moved`).
+	// entity was written since the change request was based on it, what
+	// would be approved is no longer what was reviewed: the change request
+	// is superseded and the approval refused (`base_moved`). A definition's
+	// approval covers the environments protected when it is given.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18509,9 +18825,10 @@ type ClientWithResponsesInterface interface {
 	// request (`invalid_state`) with an optional comment of at most 2,000
 	// characters, unless they are its author (`author_cannot_approve`); a
 	// project token never decides one (`token_cannot_approve`). When the
-	// configuration was written since the change request was based on it,
-	// what would be approved is no longer what was reviewed: the change
-	// request is superseded and the approval refused (`base_moved`).
+	// entity was written since the change request was based on it, what
+	// would be approved is no longer what was reviewed: the change request
+	// is superseded and the approval refused (`base_moved`). A definition's
+	// approval covers the environments protected when it is given.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18534,8 +18851,8 @@ type ClientWithResponsesInterface interface {
 	//
 	// Copies any change request, whatever its state and whoever wrote it,
 	// into a new draft of the caller's with the same title, description
-	// and proposal, based on the configuration as it is now and checked
-	// against it as a new change request is.
+	// and proposal, based on the entity as it is now and checked against
+	// it as a new change request is.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -18545,9 +18862,10 @@ type ClientWithResponsesInterface interface {
 	// OpenChangeRequestWithResponse Open a draft change request for review
 	//
 	// Only the author opens (`not_author`), and only a draft
-	// (`invalid_state`). When the configuration was written since the
-	// change request was based on it, its diff no longer shows what it
-	// would do, and opening is refused (`base_moved`) until it is rebased.
+	// (`invalid_state`). When its flag's configuration, its flag or its
+	// segment was written since the change request was based on it, its
+	// diff no longer shows what it would do, and opening is refused
+	// (`base_moved`) until it is rebased.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -18556,8 +18874,8 @@ type ClientWithResponsesInterface interface {
 
 	// RebaseChangeRequestWithResponse Base a draft change request on the configuration as it is now
 	//
-	// Keeps what is proposed and recomputes `diff` from the configuration
-	// as it is now, which becomes `base_version`. Only the author rebases
+	// Keeps what is proposed and recomputes `diff` from the entity as it
+	// is now, whose version becomes `base_version`. Only the author rebases
 	// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
 	// base it has changes nothing and records nothing.
 	//
@@ -32250,18 +32568,23 @@ func (c *ClientWithResponses) ListChangeRequestsWithResponse(ctx context.Context
 
 // CreateChangeRequestWithBodyWithResponse Propose a change
 //
-// Proposes a flag's configuration in one environment as a change
-// request, as a draft or, with `open`, opened for review at once. The
-// caller, a member or a project token, is its author. It is based on
-// the configuration as it is now, and `diff` is the RFC 6902 patch from
-// that configuration to `proposed`. `proposed` is checked as replacing
-// the configuration would be, with the same refusals under
-// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-// configuration has no rule with, and a `salt` that is not that rule's,
-// are left out, so the rule is a new one. New rules and rollouts are
-// given an identifier and a salt, which `proposed` holds. A title of 1
-// to 200 characters is required and a description has at most 10,000
-// (`invalid_change_request`).
+// Proposes a change as a change request, as a draft or, with `open`,
+// opened for review at once. The caller, a member or a project token,
+// is its author. A `flag_configuration` change request names a `flag`
+// and an `environment` and proposes a `FlagConfigurationPut`; a
+// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+// one `segment`, proposing a `SegmentDefinitionPut`, and no
+// environment, since a definition is applied in every environment
+// (`invalid_change_request` naming the field otherwise). It is based on
+// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+// `proposed`. `proposed` is checked as writing it directly would be,
+// with the same refusals under `/proposed` (`invalid_configuration`,
+// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+// configuration, a rule `id` the configuration has no rule with, and a
+// `salt` that is not that rule's, are left out, so the rule is a new
+// one; new rules and rollouts are given an identifier and a salt,
+// which `proposed` holds. A title of 1 to 200 characters is required
+// and a description has at most 10,000 (`invalid_change_request`).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32276,18 +32599,23 @@ func (c *ClientWithResponses) CreateChangeRequestWithBodyWithResponse(ctx contex
 
 // CreateChangeRequestWithResponse Propose a change
 //
-// Proposes a flag's configuration in one environment as a change
-// request, as a draft or, with `open`, opened for review at once. The
-// caller, a member or a project token, is its author. It is based on
-// the configuration as it is now, and `diff` is the RFC 6902 patch from
-// that configuration to `proposed`. `proposed` is checked as replacing
-// the configuration would be, with the same refusals under
-// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-// configuration has no rule with, and a `salt` that is not that rule's,
-// are left out, so the rule is a new one. New rules and rollouts are
-// given an identifier and a salt, which `proposed` holds. A title of 1
-// to 200 characters is required and a description has at most 10,000
-// (`invalid_change_request`).
+// Proposes a change as a change request, as a draft or, with `open`,
+// opened for review at once. The caller, a member or a project token,
+// is its author. A `flag_configuration` change request names a `flag`
+// and an `environment` and proposes a `FlagConfigurationPut`; a
+// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+// one `segment`, proposing a `SegmentDefinitionPut`, and no
+// environment, since a definition is applied in every environment
+// (`invalid_change_request` naming the field otherwise). It is based on
+// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+// `proposed`. `proposed` is checked as writing it directly would be,
+// with the same refusals under `/proposed` (`invalid_configuration`,
+// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+// configuration, a rule `id` the configuration has no rule with, and a
+// `salt` that is not that rule's, are left out, so the rule is a new
+// one; new rules and rollouts are given an identifier and a salt,
+// which `proposed` holds. A title of 1 to 200 characters is required
+// and a description has at most 10,000 (`invalid_change_request`).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32317,10 +32645,11 @@ func (c *ClientWithResponses) GetChangeRequestWithResponse(ctx context.Context, 
 //
 // Changes the title, the description or what is proposed, each left
 // as it is when absent. Only the author edits (`not_author`), a draft
-// or an open change request (`invalid_state`). A new `proposed` is
-// checked as on creation, against the configuration as it is now, and
-// `diff` is recomputed from the configuration the change request is
-// based on; a rebase moves that. An edit that changes nothing changes
+// or an open change request (`invalid_state`). A new `proposed`, the
+// document the change request's kind and entity call for, is checked
+// as on creation, against the entity as it is now, and `diff` is
+// recomputed from the entity as the change request is based on it; a
+// rebase moves that. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -32338,10 +32667,11 @@ func (c *ClientWithResponses) UpdateChangeRequestWithBodyWithResponse(ctx contex
 //
 // Changes the title, the description or what is proposed, each left
 // as it is when absent. Only the author edits (`not_author`), a draft
-// or an open change request (`invalid_state`). A new `proposed` is
-// checked as on creation, against the configuration as it is now, and
-// `diff` is recomputed from the configuration the change request is
-// based on; a rebase moves that. An edit that changes nothing changes
+// or an open change request (`invalid_state`). A new `proposed`, the
+// document the change request's kind and entity call for, is checked
+// as on creation, against the entity as it is now, and `diff` is
+// recomputed from the entity as the change request is based on it; a
+// rebase moves that. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -32357,15 +32687,18 @@ func (c *ClientWithResponses) UpdateChangeRequestWithResponse(ctx context.Contex
 
 // ApplyChangeRequestWithResponse Apply an approved change request
 //
-// Writes the configuration proposed, in a protected environment too,
-// as one write whose audit entries carry the change request's
-// identifier. Its author or a member holding `change_request.approve`
-// applies it (`not_author`), once approved (`invalid_state`). When the
-// configuration was written since the change request was based on it,
-// the change request is superseded and the application refused
-// (`base_moved`). The configuration is checked again as a replace is,
-// since what it names may be gone since the approval: a refusal
-// writes nothing and leaves the change request approved.
+// Writes what is proposed as one write whose audit entries carry the
+// change request's identifier: a configuration in its environment,
+// protected or not; a definition in every environment, changing the
+// protected ones its approval covers. Its author or a member holding
+// `change_request.approve` applies it (`not_author`), once approved
+// (`invalid_state`). When the entity was written since the change
+// request was based on it, or, for a definition, an environment was
+// protected since it was approved, the change request is superseded
+// and the application refused (`base_moved`). What is proposed is
+// checked again as writing it directly is, since what it names may be
+// gone since the approval: a refusal writes nothing and leaves the
+// change request approved.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -32384,9 +32717,10 @@ func (c *ClientWithResponses) ApplyChangeRequestWithResponse(ctx context.Context
 // request (`invalid_state`) with an optional comment of at most 2,000
 // characters, unless they are its author (`author_cannot_approve`); a
 // project token never decides one (`token_cannot_approve`). When the
-// configuration was written since the change request was based on it,
-// what would be approved is no longer what was reviewed: the change
-// request is superseded and the approval refused (`base_moved`).
+// entity was written since the change request was based on it, what
+// would be approved is no longer what was reviewed: the change request
+// is superseded and the approval refused (`base_moved`). A definition's
+// approval covers the environments protected when it is given.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32405,9 +32739,10 @@ func (c *ClientWithResponses) ApproveChangeRequestWithBodyWithResponse(ctx conte
 // request (`invalid_state`) with an optional comment of at most 2,000
 // characters, unless they are its author (`author_cannot_approve`); a
 // project token never decides one (`token_cannot_approve`). When the
-// configuration was written since the change request was based on it,
-// what would be approved is no longer what was reviewed: the change
-// request is superseded and the approval refused (`base_moved`).
+// entity was written since the change request was based on it, what
+// would be approved is no longer what was reviewed: the change request
+// is superseded and the approval refused (`base_moved`). A definition's
+// approval covers the environments protected when it is given.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32442,8 +32777,8 @@ func (c *ClientWithResponses) CancelChangeRequestWithResponse(ctx context.Contex
 //
 // Copies any change request, whatever its state and whoever wrote it,
 // into a new draft of the caller's with the same title, description
-// and proposal, based on the configuration as it is now and checked
-// against it as a new change request is.
+// and proposal, based on the entity as it is now and checked against
+// it as a new change request is.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -32459,9 +32794,10 @@ func (c *ClientWithResponses) CopyChangeRequestWithResponse(ctx context.Context,
 // OpenChangeRequestWithResponse Open a draft change request for review
 //
 // Only the author opens (`not_author`), and only a draft
-// (`invalid_state`). When the configuration was written since the
-// change request was based on it, its diff no longer shows what it
-// would do, and opening is refused (`base_moved`) until it is rebased.
+// (`invalid_state`). When its flag's configuration, its flag or its
+// segment was written since the change request was based on it, its
+// diff no longer shows what it would do, and opening is refused
+// (`base_moved`) until it is rebased.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -32476,8 +32812,8 @@ func (c *ClientWithResponses) OpenChangeRequestWithResponse(ctx context.Context,
 
 // RebaseChangeRequestWithResponse Base a draft change request on the configuration as it is now
 //
-// Keeps what is proposed and recomputes `diff` from the configuration
-// as it is now, which becomes `base_version`. Only the author rebases
+// Keeps what is proposed and recomputes `diff` from the entity as it
+// is now, whose version becomes `base_version`. Only the author rebases
 // (`not_author`), and only a draft (`invalid_state`). Rebasing on the
 // base it has changes nothing and records nothing.
 //
@@ -46809,6 +47145,19 @@ func (siw *ServerInterfaceWrapper) ListChangeRequests(w http.ResponseWriter, r *
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "environment"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "environment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "segment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "segment", r.URL.Query(), &params.Segment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "segment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "segment", Err: err})
 		}
 		return
 	}

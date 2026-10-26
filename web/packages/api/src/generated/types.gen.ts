@@ -1673,8 +1673,10 @@ export type FlagConfigurationRevert = {
 
 /**
  * What a change request proposes: `flag_configuration`, a flag's
- * configuration in one environment. Other kinds are to come; a client
- * reads `proposed` by the kind.
+ * configuration in one environment; `definition`, a flag's variations
+ * and automatic exposure, or a segment's conditions and private
+ * switch, in every environment. `experiment` is to come. A client
+ * reads `proposed` by the kind and the entity named.
  *
  */
 export type ChangeRequestKind = "flag_configuration" | "definition" | "experiment";
@@ -1797,16 +1799,27 @@ export type ChangeRequest = {
    * The key of the environment of a `flag_configuration` change request.
    */
   environment?: string;
+  /**
+   * The key of the segment of a segment's `definition`.
+   */
+  segment?: string;
   state: ChangeRequestState;
   title: string;
   description: string;
   /**
-   * The version of the configuration the change request is based on.
+   * The version of the configuration, the flag or the segment the change request is based on.
    */
   base_version: number;
-  proposed: ProposedConfiguration;
   /**
-   * The RFC 6902 patch from the configuration the change request is based on to `proposed`.
+   * What the change request proposes, by its kind and the entity it
+   * names: a `ProposedConfiguration` for `flag_configuration`, a
+   * `ProposedFlagDefinition` for a flag's `definition`, a
+   * `ProposedSegmentDefinition` for a segment's.
+   *
+   */
+  proposed: ProposedConfiguration | ProposedFlagDefinition | ProposedSegmentDefinition;
+  /**
+   * The RFC 6902 patch from the entity as the change request is based on it to `proposed`.
    */
   diff: Array<PatchOperation>;
   author: ChangeRequestAuthor;
@@ -1827,7 +1840,7 @@ export type ChangeRequest = {
    */
   applied_by: ChangeRequestApplier | null;
   /**
-   * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, or deleting its environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
+   * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
    */
   superseded_by: string | null;
   created_at: string;
@@ -1844,18 +1857,22 @@ export type ChangeRequestList = {
 };
 
 export type ChangeRequestCreate = {
-  kind: "flag_configuration";
+  kind: "flag_configuration" | "definition";
   /**
-   * The key of the flag.
+   * The key of the flag, for a configuration or a flag's definition.
    */
-  flag: string;
+  flag?: string;
   /**
-   * The key of the environment.
+   * The key of the environment, for a configuration only.
    */
-  environment: string;
+  environment?: string;
+  /**
+   * The key of the segment, for a segment's definition only.
+   */
+  segment?: string;
   title: string;
   description?: string;
-  proposed: FlagConfigurationPut;
+  proposed: ProposedInput;
   /**
    * Open the change request for review at once instead of drafting it.
    */
@@ -1865,7 +1882,58 @@ export type ChangeRequestCreate = {
 export type ChangeRequestPatch = {
   title?: string;
   description?: string;
-  proposed?: FlagConfigurationPut;
+  proposed?: ProposedInput;
+};
+
+/**
+ * What a change request proposes, as a direct write would give it,
+ * read by the change request's kind and the entity it names: a
+ * `FlagConfigurationPut` for `flag_configuration`, a
+ * `FlagDefinitionPut` for a flag's `definition`, a
+ * `SegmentDefinitionPut` for a segment's.
+ *
+ */
+export type ProposedInput = FlagConfigurationPut | FlagDefinitionPut | SegmentDefinitionPut;
+
+/**
+ * A flag's definition as a change request proposes it: what every
+ * environment's ruleset carries of the flag. Its other fields are
+ * edited directly.
+ *
+ */
+export type FlagDefinitionPut = {
+  automatic_exposure: boolean;
+  /**
+   * Every variation, in order, matched to the current ones by key.
+   */
+  variations: Array<VariationInput>;
+};
+
+/**
+ * A segment's definition as a change request proposes it: what every
+ * environment's ruleset carries of the segment. Its name and
+ * description are edited directly.
+ *
+ */
+export type SegmentDefinitionPut = {
+  conditions: Array<Condition>;
+  private: boolean;
+};
+
+/**
+ * A flag's definition as a change request proposes it.
+ */
+export type ProposedFlagDefinition = {
+  automatic_exposure: boolean;
+  variations: Array<Variation>;
+};
+
+/**
+ * A segment's definition as a change request proposes it.
+ */
+export type ProposedSegmentDefinition = {
+  conditions: Array<Condition>;
+  private: boolean;
 };
 
 export type FlagConfigurationCopy = {
@@ -8162,6 +8230,10 @@ export type ListChangeRequestsData = {
      * Only those naming the environment with this key.
      */
     environment?: string;
+    /**
+     * Only those naming the segment with this key.
+     */
+    segment?: string;
     kind?: ChangeRequestKind;
     state?: ChangeRequestState;
     /**

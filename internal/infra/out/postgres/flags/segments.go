@@ -161,3 +161,30 @@ func (s *Store) SegmentUsages(ctx context.Context, project workspace.ProjectID, 
 	}
 	return out, rows.Err()
 }
+
+// SegmentReferrers returns the flags of project whose rules have a condition
+// naming the segment key in some environment, archived flags included, by
+// identifier, each once.
+func (s *Store) SegmentReferrers(ctx context.Context, project workspace.ProjectID, key string) ([]flags.FlagID, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT DISTINCT f.id
+		FROM flag_configurations c
+		JOIN flags f ON f.id = c.flag_id
+		WHERE f.project_id = $1
+		  AND c.document @> jsonb_build_object('rules', jsonb_build_array(
+		      jsonb_build_object('conditions', jsonb_build_array(jsonb_build_object('segment', $2::text)))))
+		ORDER BY f.id`, project.Bytes(), key)
+	if err != nil {
+		return nil, fmt.Errorf("finding the flags naming a segment: %w", err)
+	}
+	defer rows.Close()
+	var out []flags.FlagID
+	for rows.Next() {
+		var f [16]byte
+		if err := rows.Scan(&f); err != nil {
+			return nil, err
+		}
+		out = append(out, id.FromBytes[flags.Flag](f))
+	}
+	return out, rows.Err()
+}

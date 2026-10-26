@@ -104,10 +104,18 @@ type Subject struct {
 	Flag *FlagRef
 	// Environment names a configuration's environment.
 	Environment *EnvironmentRef
+	// Segment names the segment of a segment's definition.
+	Segment *SegmentRef
 	// Base is the document of the entity as the change request was based
 	// on it, and BaseVersion that document's version.
 	Base        Document
 	BaseVersion int64
+	// BaseReferrers are, for a segment's definition, the flags whose
+	// configurations named the segment in some environment when the change
+	// request was based on it. A write to one of their configurations moves
+	// what the definition was reviewed with, even a write that stops naming
+	// the segment.
+	BaseReferrers []flags.FlagID
 }
 
 // FlagRef names a flag by identifier, and by the key it had when read.
@@ -120,6 +128,13 @@ type FlagRef struct {
 // when read.
 type EnvironmentRef struct {
 	ID  workspace.EnvironmentID
+	Key string
+}
+
+// SegmentRef names a segment by identifier, and by the key it had when
+// read.
+type SegmentRef struct {
+	ID  flags.SegmentID
 	Key string
 }
 
@@ -142,6 +157,10 @@ type ChangeRequest struct {
 	Approval  *Decision
 	Rejection *Decision
 	Applied   *Application
+	// ApprovalCovers are, for a change request applied in every
+	// environment, the environments protected when it was approved: its
+	// application changes them although they are protected, and no other.
+	ApprovalCovers []workspace.EnvironmentID
 	// SupersededBy is the audit entry of the write that moved what the
 	// change request was based on and so superseded it; zero when no write
 	// did, as when it was found moved only on approval or application.
@@ -411,17 +430,17 @@ func (cr ChangeRequest) Edit(by Taker, e Edit, now time.Time) (ChangeRequest, bo
 	return cr.changedTo(out, now)
 }
 
-// Rebase returns cr based on base, the entity's document as it is now at
-// version baseVersion, its diff recomputed from it to what cr proposes, and
-// whether anything changed. Only the author rebases, and only a draft: an
-// open change request is under review against the diff its reviewers see.
-func (cr ChangeRequest) Rebase(by Taker, base Document, baseVersion int64, now time.Time) (ChangeRequest, bool, error) {
+// Rebase returns cr based on current, the entity as it is now, its diff
+// recomputed from it to what cr proposes, and whether anything changed. Only
+// the author rebases, and only a draft: an open change request is under
+// review against the diff its reviewers see.
+func (cr ChangeRequest) Rebase(by Taker, current Subject, now time.Time) (ChangeRequest, bool, error) {
 	if _, err := cr.Next(TransitionRebase, by); err != nil {
 		return cr, false, err
 	}
 	out := cr
-	out.Base, out.BaseVersion = base, baseVersion
-	out.Diff = Diff(base, cr.Proposed)
+	out.Base, out.BaseVersion, out.BaseReferrers = current.Base, current.BaseVersion, current.BaseReferrers
+	out.Diff = Diff(current.Base, cr.Proposed)
 	return cr.changedTo(out, now)
 }
 
@@ -451,12 +470,21 @@ func (cr ChangeRequest) Cancel(by Taker, now time.Time) (ChangeRequest, error) {
 	return cr.moved(state, now), nil
 }
 
-// Approve returns cr approved by by at now with comment, which is
-// optional. currentVersion is the version of the entity now: when it is not
-// the one cr was based on, what would be approved is no longer what was
-// reviewed, and Approve answers base_moved with cr superseded, which the
-// caller stores although it refuses the approval.
-func (cr ChangeRequest) Approve(by Taker, comment string, currentVersion int64, now time.Time) (ChangeRequest, error) {
+// Current is what a change request is judged against when it is approved
+// or applied: the version of its entity now, and the environments of its
+// project protected now.
+type Current struct {
+	Version   int64
+	Protected []workspace.EnvironmentID
+}
+
+// Approve returns cr approved by by at now with comment, which is optional;
+// a change request applied in every environment records the environments
+// protected now as those its approval covers. When the entity's version now
+// is not the one cr was based on, what would be approved is no longer what
+// was reviewed, and Approve answers base_moved with cr superseded, which
+// the caller stores although it refuses the approval.
+func (cr ChangeRequest) Approve(by Taker, comment string, current Current, now time.Time) (ChangeRequest, error) {
 	state, err := cr.Next(TransitionApprove, by)
 	if err != nil {
 		return cr, err
@@ -465,11 +493,14 @@ func (cr ChangeRequest) Approve(by Taker, comment string, currentVersion int64, 
 	if err != nil {
 		return cr, err
 	}
-	if currentVersion != cr.BaseVersion {
-		return cr.moved(StateSuperseded, now), baseMoved(cr.BaseVersion, currentVersion)
+	if current.Version != cr.BaseVersion {
+		return cr.moved(StateSuperseded, now), baseMoved(cr.BaseVersion, current.Version)
 	}
 	out := cr.moved(state, now)
 	out.Approval = &Decision{Member: *by.As.Member, At: now, Comment: comment}
+	if cr.Kind != KindFlagConfiguration {
+		out.ApprovalCovers = slices.Clone(current.Protected)
+	}
 	return out, nil
 }
 
@@ -488,18 +519,28 @@ func (cr ChangeRequest) Reject(by Taker, comment string, now time.Time) (ChangeR
 	return out, nil
 }
 
-// Apply returns cr applied by by at now. currentVersion is the version of
-// the entity now: when it is not the one cr was based on, applying it would
-// write over a change nobody who approved it saw, and Apply answers
-// base_moved with cr superseded, which the caller stores although it
-// refuses the application.
-func (cr ChangeRequest) Apply(by Taker, currentVersion int64, now time.Time) (ChangeRequest, error) {
+// Apply returns cr applied by by at now. When the entity's version now is
+// not the one cr was based on, applying it would write over a change nobody
+// who approved it saw; when an environment protected now was not when cr
+// was approved, applying it would change that environment without anyone
+// having approved changing it. Either way Apply answers base_moved with cr
+// superseded, which the caller stores although it refuses the application.
+func (cr ChangeRequest) Apply(by Taker, current Current, now time.Time) (ChangeRequest, error) {
 	state, err := cr.Next(TransitionApply, by)
 	if err != nil {
 		return cr, err
 	}
-	if currentVersion != cr.BaseVersion {
-		return cr.moved(StateSuperseded, now), baseMoved(cr.BaseVersion, currentVersion)
+	if current.Version != cr.BaseVersion {
+		return cr.moved(StateSuperseded, now), baseMoved(cr.BaseVersion, current.Version)
+	}
+	if cr.Kind != KindFlagConfiguration {
+		for _, e := range current.Protected {
+			if !slices.Contains(cr.ApprovalCovers, e) {
+				return cr.moved(StateSuperseded, now), apperrors.Conflict("base_moved",
+					"an environment was protected since the change request was approved, so its approval does not cover it; "+
+						"copy it to propose it again")
+			}
+		}
 	}
 	out := cr.moved(state, now)
 	out.Applied = &Application{At: now, System: by.System}
@@ -507,6 +548,17 @@ func (cr ChangeRequest) Apply(by Taker, currentVersion int64, now time.Time) (Ch
 		out.Applied.By = by.As
 	}
 	return out, nil
+}
+
+// Covers returns the environments applying cr may change although they are
+// protected: a configuration's environment, whose protection is why it was
+// proposed; or, for a change request applied in every environment, those
+// protected when it was approved.
+func (cr ChangeRequest) Covers() []workspace.EnvironmentID {
+	if cr.Kind == KindFlagConfiguration && cr.Environment != nil {
+		return []workspace.EnvironmentID{cr.Environment.ID}
+	}
+	return cr.ApprovalCovers
 }
 
 // baseMoved refuses to approve or apply a change request whose base moved.
@@ -544,7 +596,8 @@ func (cr ChangeRequest) moved(state ChangeRequestState, now time.Time) ChangeReq
 // anything changed; cr itself when nothing did.
 func (cr ChangeRequest) changedTo(out ChangeRequest, now time.Time) (ChangeRequest, bool, error) {
 	if out.Title == cr.Title && out.Description == cr.Description && out.BaseVersion == cr.BaseVersion &&
-		reflect.DeepEqual(out.Proposed, cr.Proposed) && reflect.DeepEqual(out.Base, cr.Base) {
+		reflect.DeepEqual(out.Proposed, cr.Proposed) && reflect.DeepEqual(out.Base, cr.Base) &&
+		slices.Equal(out.BaseReferrers, cr.BaseReferrers) {
 		return cr, false, nil
 	}
 	out.UpdatedAt, out.Version = now, cr.Version+1

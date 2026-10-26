@@ -20,7 +20,7 @@ func openedOn(t *testing.T, c *management.ClientWithResponses, project, flag, en
 ) management.ChangeRequest {
 	t.Helper()
 	body := configurationRequest("Change "+flag, proposed)
-	body.Flag, body.Environment, body.Open = flag, env, ptr(true)
+	body.Flag, body.Environment, body.Open = ptr(flag), ptr(env), ptr(true)
 	return createChangeRequest(t, c, project, body)
 }
 

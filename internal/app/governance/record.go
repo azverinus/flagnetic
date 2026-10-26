@@ -17,8 +17,9 @@ type AuditAppender interface {
 // WaitingChangeRequests reads and supersedes the change requests an audit
 // entry may move.
 type WaitingChangeRequests interface {
-	// Waiting returns project's open and approved change requests naming
-	// what moved names.
+	// Waiting returns project's open and approved change requests moved
+	// may move: those naming its flag, its environment or its segment, and
+	// when it moved configurations, those to a segment's definition.
 	Waiting(ctx context.Context, project workspace.ProjectID, moved governance.Moved) ([]governance.ChangeRequest, error)
 	// UpdateChangeRequest stores cr in place of the change request with
 	// its identifier.
@@ -50,6 +51,7 @@ type Outbox interface {
 type Record struct {
 	log            AuditAppender
 	changeRequests WaitingChangeRequests
+	referrers      SegmentReferrers
 	outbox         Outbox
 	ids            *id.Source
 	announcer      ChangeAnnouncer
@@ -71,9 +73,12 @@ func WithChangeStream(announcer ChangeAnnouncer) RecordOption {
 }
 
 // NewRecord returns the service appending to log and superseding the change
-// requests of changeRequests, its entries identified from ids.
-func NewRecord(log AuditAppender, changeRequests WaitingChangeRequests, ids *id.Source, opts ...RecordOption) *Record {
-	r := &Record{log: log, changeRequests: changeRequests, ids: ids}
+// requests of changeRequests, judging those to segments' definitions by the
+// flags referrers says name the segments, its entries identified from ids.
+func NewRecord(log AuditAppender, changeRequests WaitingChangeRequests, referrers SegmentReferrers, ids *id.Source,
+	opts ...RecordOption,
+) *Record {
+	r := &Record{log: log, changeRequests: changeRequests, referrers: referrers, ids: ids}
 	for _, o := range opts {
 		o(r)
 	}
@@ -128,7 +133,21 @@ func (r *Record) supersede(ctx context.Context, e governance.Entry) error {
 	if err != nil {
 		return err
 	}
-	for _, s := range governance.Supersedes(e, candidates) {
+	// The flags naming a segment are read after the write, so a write that
+	// starts naming it moves its definition as one that stops does.
+	referrers := governance.Referrers{}
+	for _, cr := range candidates {
+		if !moved.NeedsReferrers(cr) {
+			continue
+		}
+		if _, read := referrers[cr.Segment.ID]; read {
+			continue
+		}
+		if referrers[cr.Segment.ID], err = r.referrers.SegmentReferrers(ctx, cr.Project, cr.Segment.Key); err != nil {
+			return err
+		}
+	}
+	for _, s := range governance.Supersedes(e, candidates, referrers) {
 		if err = r.changeRequests.UpdateChangeRequest(ctx, s.After); err != nil {
 			return err
 		}

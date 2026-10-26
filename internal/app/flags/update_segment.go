@@ -87,3 +87,41 @@ func (h *UpdateSegment) Handle(ctx context.Context, cmd UpdateSegmentCommand) (f
 	})
 	return out, err
 }
+
+// Propose returns project's segment keyed key, and the segment change would
+// leave it as, checked as Handle checks it, with the same refusals; it
+// stores and records nothing. It reads in the unit of work ctx carries,
+// whose caller holds the project's lock.
+func (h *UpdateSegment) Propose(ctx context.Context, project workspace.ProjectID, key string, change flags.SegmentChange,
+) (flags.Segment, flags.Segment, error) {
+	before, err := h.d.Store.SegmentByKey(ctx, project, key)
+	if err != nil {
+		return before, before, segmentNotFound(err)
+	}
+	decl, err := declarationsOf(ctx, h.d.Declarations, project)
+	if err != nil {
+		return before, before, err
+	}
+	after, _, err := before.Change(change, decl, h.d.Recorder.now())
+	return before, after, err
+}
+
+// Current returns project's segment keyed key, or not_found.
+func (h *UpdateSegment) Current(ctx context.Context, project workspace.ProjectID, key string) (flags.Segment, error) {
+	s, err := h.d.Store.SegmentByKey(ctx, project, key)
+	return s, segmentNotFound(err)
+}
+
+// Apply makes change to project's segment keyed key, based on its version
+// baseVersion, in the unit of work ctx carries, which joins a change
+// request's application: checked again as Handle checks it and recorded as
+// Handle records it. Whether the write may change a protected environment
+// is the bypass ctx carries, as for every write.
+func (h *UpdateSegment) Apply(ctx context.Context, project workspace.ProjectID, key string, change flags.SegmentChange,
+	baseVersion int64, req governance.Request,
+) error {
+	_, err := h.Handle(ctx, UpdateSegmentCommand{
+		Project: project, Key: key, Change: change, Expected: precondition.On(baseVersion), Request: req,
+	})
+	return err
+}

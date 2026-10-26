@@ -129,8 +129,8 @@ func matrix(t *testing.T) []matrixRow {
 			// No flag has the key, so a caller holding the permission is
 			// answered not_found, and one lacking it forbidden first.
 			res := do(c.CreateChangeRequestWithResponse(t.Context(), p.Key, management.ChangeRequestCreate{
-				Kind: management.ChangeRequestCreateKindFlagConfiguration, Flag: "absent", Environment: "production",
-				Title: "Matrix", Proposed: management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a"},
+				Kind: management.ChangeRequestCreateKindFlagConfiguration, Flag: ptr("absent"), Environment: ptr("production"),
+				Title: "Matrix", Proposed: configurationInput(management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a"}),
 			}))
 			return res.StatusCode(), res.Body
 		}},

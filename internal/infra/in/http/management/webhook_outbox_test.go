@@ -11,11 +11,13 @@ import (
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 	"github.com/azverinus/flagnetic/internal/infra/in/worker"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -89,7 +91,8 @@ func TestARolledBackWriteLeavesNoEvent(t *testing.T) {
 	everything := subscribe(t, admin, p.Key, "everything", []string{"*"})
 	pool := testkit.Pool(t)
 	ids := id.NewSource(clock.System{})
-	record := appgovernance.NewRecord(pggovernance.NewAuditLog(pool), pggovernance.NewChangeRequests(pool), ids, appgovernance.WithOutbox(pggovernance.NewOutbox(pool), ids))
+	record := appgovernance.NewRecord(pggovernance.NewAuditLog(pool), pggovernance.NewChangeRequests(pool),
+		appflags.NewSegmentReferrers(pgflags.NewStore(pool)), ids, appgovernance.WithOutbox(pggovernance.NewOutbox(pool), ids))
 	write := func(key string, fail error) error {
 		e, err := governance.NewEntry(id.New[governance.Entry](ids), time.Now().UTC(), governance.Request{Actor: governance.CLIActor("test")},
 			governance.Record{
