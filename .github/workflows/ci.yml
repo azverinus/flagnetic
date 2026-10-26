@@ -212,13 +212,13 @@ jobs:
           fi
       # The Python SDK: its sources, the conformance suite its evaluator must
       # pass, the SDK contract, the Go release the Unicode tables come from,
-      # and the workflows that run it.
+      # the pages its tests compare with, and the workflows that run it.
       - id: sdk-python
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/python/|conformance/|api/sdk\.yaml$|go\.mod$|\.github/workflows/(ci|sdk-python)\.yml$)'; then
+            grep -qE '^(sdks/python/|conformance/|api/sdk\.yaml$|go\.mod$|docs/sdks/(behaviour-matrix|compatibility)\.md$|\.github/scripts/behaviour-matrix\.sh$|\.github/workflows/(ci|sdk-python)\.yml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"

@@ -24,6 +24,8 @@ from enum import Enum
 from typing import Any
 from urllib.parse import urlsplit
 
+from ._delivery import API_PATH
+
 #: This SDK's name in the envelope and in the SDK inventory, as the User-Agent names it.
 SDK_NAME = "flagnetic-python"
 
@@ -113,7 +115,7 @@ class Ingest:
         self._secure = parts.scheme == "https"
         self._host = parts.hostname or ""
         self._port = parts.port
-        self._path = f"{parts.path.rstrip('/')}/sdk/v1/events"
+        self._path = f"{parts.path.rstrip('/')}{API_PATH}/events"
         self._sdk_key = sdk_key
         self._agent = agent
         self._identity = {"name": SDK_NAME, "version": version, "platform": platform}
