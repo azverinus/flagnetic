@@ -100,10 +100,15 @@ def unlike(case: Mapping[str, Any]) -> Any:
             return {"not": value}
 
 
-def report(milliseconds: int) -> None:
-    """Prints the kill switch's propagation as one JSON line, and adds it to the CI job's summary."""
+def report(milliseconds: int, capsys: pytest.CaptureFixture[str]) -> None:
+    """Prints the kill switch's propagation as one JSON line, and adds it to the CI job's summary.
+
+    Capture is suspended for the print: pytest otherwise swallows the output of a passing test,
+    and the line belongs in the job log whether or not the test passes.
+    """
     line = json.dumps({"sdk": "flagnetic-python", "kill_switch_ms": milliseconds}, separators=(",", ":"))
-    print(f"\n{line}")
+    with capsys.disabled():
+        print(f"\n{line}")
     summary = os.environ.get("GITHUB_STEP_SUMMARY", "")
     if summary:
         with open(summary, "a", encoding="utf-8") as f:
@@ -133,7 +138,7 @@ def test_the_private_segment_decides_the_value(clients: Any) -> None:
 
 
 def test_a_kill_switch_through_replica_a_reaches_the_sdk_streaming_from_replica_b_within_two_seconds(
-    clients: Any,
+    clients: Any, capsys: pytest.CaptureFixture[str]
 ) -> None:
     flag = SEED["flags"]["on"]
     context = unit(SEED["units"]["outside_rollout"])
@@ -160,7 +165,7 @@ def test_a_kill_switch_through_replica_a_reaches_the_sdk_streaming_from_replica_
         except queue.Empty:
             pytest.fail("the kill switch never reached the SDK")
         took = round((at - datetime.fromisoformat(killed["committed_at"]).timestamp()) * 1000)
-        report(took)
+        report(took, capsys)
         assert took <= 2000, f"the kill switch took {took} ms to reach the SDK"
         detail = client.get_detail(context, flag, True)
         assert (detail.value, detail.reason) == (False, "off")
