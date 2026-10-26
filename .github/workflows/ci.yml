@@ -543,9 +543,11 @@ jobs:
         if: env.SDK_JS == 'true'
         run: |
           go build -o "$RUNNER_TEMP/flagnetic-e2e" ./e2e/cmd/flagnetic-e2e
-          echo "FLAGNETIC_E2E_CMD=$RUNNER_TEMP/flagnetic-e2e" >> "$GITHUB_ENV"
-          echo "FLAGNETIC_E2E_SEED=$RUNNER_TEMP/seed.json" >> "$GITHUB_ENV"
-          echo "FLAGNETIC_E2E_LOGS=$RUNNER_TEMP/replicas.log" >> "$GITHUB_ENV"
+          {
+            echo "FLAGNETIC_E2E_CMD=$RUNNER_TEMP/flagnetic-e2e"
+            echo "FLAGNETIC_E2E_SEED=$RUNNER_TEMP/seed.json"
+            echo "FLAGNETIC_E2E_LOGS=$RUNNER_TEMP/replicas.log"
+          } >> "$GITHUB_ENV"
           export FLAGNETIC_E2E_SEED="$RUNNER_TEMP/seed.json" FLAGNETIC_E2E_LOGS="$RUNNER_TEMP/replicas.log"
           nohup "$RUNNER_TEMP/flagnetic-e2e" up > "$RUNNER_TEMP/up.log" 2>&1 &
           for _ in $(seq 150); do
@@ -578,7 +580,9 @@ jobs:
           pnpm test:e2e | tee "$RUNNER_TEMP/smoke.log"
           {
             echo "Kill-switch propagation of the JavaScript server mode (target 2000 ms):"
-            grep -o '^{"sdk":"flagnetic-js","kill_switch_ms":-\?[0-9]*}' "$RUNNER_TEMP/smoke.log"
+            # Not anchored: vitest colours its output in CI, so the line
+            # starts with escape sequences.
+            grep -o '{"sdk":"flagnetic-js","kill_switch_ms":-\?[0-9]*}' "$RUNNER_TEMP/smoke.log"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Keep the replicas' log
         if: failure() && env.SDK_JS == 'true'
