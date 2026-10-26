@@ -48,7 +48,7 @@ One JSON document. Read it by field name and ignore fields you do not know: fiel
 1. **Read the seed** from `FLAGNETIC_E2E_SEED`.
 2. **Ready.** Construct the client with replica A or B and the key of its mode (`server_key` for a server SDK, `client_key` for a client SDK; a language with both modes runs the list once per mode). Waiting for ready reaches the fresh stage, well within 10 seconds.
 3. **Every case.** Evaluate each case's `flag` for its `context` (a client SDK sets the context first) with a default of the case's `type` that the flag never serves. The value, the variation and the reason of the mode (`reason` or `client_reason`) must be the case's; none may come back as a fallback.
-4. **Kill switch.** With the SDK streaming from replica B, run `flagnetic-e2e kill <flags.on>`. It prints `committed_at`; measure from it until the SDK serves `false` with reason `off` (a client SDK after its change notification or a refresh), assert at most 2000 ms for a server SDK, and print the measurement as one JSON line, `{"kill_switch_ms": 312}`. Run `flagnetic-e2e restore` afterwards.
+4. **Kill switch.** With the SDK streaming from replica B, run `flagnetic-e2e kill <flags.on>`. It prints `committed_at`; measure from it until the SDK serves `false` with reason `off` (a client SDK after its change notification or a refresh), assert at most 2000 ms for a server SDK, and print the measurement as one JSON line naming the SDK as the inventory does, `{"sdk": "flagnetic-ruby", "kill_switch_ms": 312}`, to stdout and, in CI, to the job summary. Run `flagnetic-e2e restore` afterwards.
 5. **Inventory.** Once the SDK has made requests, `flagnetic-e2e inventory` must list an entry whose `sdk_name` and `sdk_version` are the SDK's own within 90 seconds: each replica writes the SDKs it saw once a minute.
 6. **Revocation**, last, since it ends the key: `flagnetic-e2e revoke server` (or `client`) and assert that the SDK is refused on replica B within a few seconds: a new client against B stays at built-in defaults.
 
@@ -66,4 +66,4 @@ Each reads the state `up` wrote (`FLAGNETIC_E2E_STATE`, a file in the system tem
 
 ## In CI
 
-The `sdk-e2e` job of `.github/workflows/ci.yml` runs on every pull request against a PostgreSQL service and runs this module's test, which brings the instance up in-process and also exercises the command. A language adds steps that start `flagnetic-e2e up` in the background with `FLAGNETIC_E2E_SEED` set, wait for the seed file, and run its smoke.
+The `sdk-e2e` job of `.github/workflows/ci.yml` runs on every pull request against a PostgreSQL service and runs this module's test, which brings the instance up in-process and also exercises the command. A language adds steps that start `flagnetic-e2e up` in the background with `FLAGNETIC_E2E_SEED` set, wait for the seed file, and run its smoke, as the Ruby SDK's steps do.
