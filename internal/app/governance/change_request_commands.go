@@ -7,6 +7,7 @@ import (
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
+	apperrors "github.com/azverinus/flagnetic/internal/shared/errors"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
@@ -26,6 +27,9 @@ type CreateChangeRequestCommand struct {
 	Title       string
 	Description string
 	Proposed    Proposed
+	// RevertTo, in place of Proposed, proposes reverting a flag's
+	// configuration to this version of it; nil for any other change.
+	RevertTo *int64
 	// Open opens the change request for review at once.
 	Open bool
 	// ApplyAt schedules the change request, nil for none.
@@ -48,7 +52,7 @@ func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeReques
 		if err := h.d.lockProject(ctx, cmd.Project); err != nil {
 			return err
 		}
-		cr, err := propose(ctx, h.d, cmd.Project, cmd.Target, cmd.Proposed, governance.Proposal{
+		cr, err := propose(ctx, h.d, cmd.Project, cmd.Target, cmd.Proposed, cmd.RevertTo, governance.Proposal{
 			Title: cmd.Title, Description: cmd.Description,
 		}, cmd.Open, cmd.ApplyAt, cmd.Author, now)
 		if err != nil {
@@ -72,20 +76,60 @@ func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeReques
 	return out, err
 }
 
+// check returns invalid_change_request naming every field of cmd to fix:
+// those of its target, and a revert's target version given with a proposal,
+// which the server fills from it, or for anything but a flag's
+// configuration.
+func (cmd CreateChangeRequestCommand) check() error {
+	err := cmd.Target.check()
+	if cmd.RevertTo == nil {
+		return err
+	}
+	var violations []apperrors.Violation
+	if e, ok := apperrors.From(err); ok {
+		violations = e.Violations
+	} else if err != nil {
+		return err
+	}
+	switch {
+	case cmd.Kind != governance.KindFlagConfiguration:
+		violations = append(violations, apperrors.Violation{
+			Pointer: "/revert_to", Code: "not_allowed", Detail: "a revert returns a flag's configuration to an earlier version",
+		})
+	case cmd.Proposed != (Proposed{}):
+		violations = append(violations, apperrors.Violation{
+			Pointer: "/revert_to", Code: "not_allowed", Detail: "a revert proposes the version it returns to, not a proposal of its own",
+		})
+	}
+	if violations != nil {
+		return apperrors.Invalid("invalid_change_request", "the change request is not valid", violations...)
+	}
+	return nil
+}
+
 // propose returns a new change request of author proposing in for t in
-// project, based on its entity as it is now, to be applied at applyAt unless
-// nil.
-func propose(ctx context.Context, d ChangeRequestDeps, project workspace.ProjectID, t Target, in Proposed,
+// project, or reverting t to revertTo unless nil, based on its entity as it
+// is now, to be applied at applyAt unless nil.
+func propose(ctx context.Context, d ChangeRequestDeps, project workspace.ProjectID, t Target, in Proposed, revertTo *int64,
 	p governance.Proposal, open bool, applyAt *time.Time, author governance.Author, now time.Time,
 ) (governance.ChangeRequest, error) {
-	subject, proposed, err := d.propose(ctx, project, t, in, nil)
+	var (
+		subject  governance.Subject
+		proposed governance.Document
+		err      error
+	)
+	if revertTo != nil {
+		subject, proposed, err = d.proposeRevert(ctx, project, t, *revertTo)
+	} else {
+		subject, proposed, err = d.propose(ctx, project, t, in, nil)
+	}
 	if err != nil {
 		return governance.ChangeRequest{}, err
 	}
 	p.Proposed = proposed
 	return governance.NewChangeRequest(governance.NewChangeRequestInput{
-		ID: id.New[governance.ChangeRequest](d.IDs), Project: project, Subject: subject, Proposal: p, Open: open,
-		Author: author, ApplyAt: applyAt, MinLead: d.MinLead, Now: now,
+		ID: id.New[governance.ChangeRequest](d.IDs), Project: project, Subject: subject, Proposal: p, RevertTo: revertTo,
+		Open: open, Author: author, ApplyAt: applyAt, MinLead: d.MinLead, Now: now,
 	})
 }
 
@@ -123,6 +167,11 @@ func (h *UpdateChangeRequest) Handle(ctx context.Context, cmd UpdateChangeReques
 			if _, err := cr.Next(governance.TransitionEdit, cmd.By); err != nil {
 				return cr, false, err
 			}
+			if cr.RevertTo != nil && cmd.Proposed != nil {
+				// What a revert proposes is the server's: the domain
+				// refuses it before anything is checked against it.
+				return cr.Edit(cmd.By, governance.Edit{Proposed: cr.Proposed}, now)
+			}
 			e := governance.Edit{Title: cmd.Title, Description: cmd.Description, Schedule: cmd.Schedule, MinLead: h.d.MinLead}
 			if cmd.Proposed != nil {
 				// The rules the change request proposes keep the
@@ -147,13 +196,22 @@ func NewRebaseChangeRequest(d ChangeRequestDeps) *RebaseChangeRequest {
 }
 
 // Handle rebases the change request and returns it: what it proposes stays,
-// and its diff is recomputed from its entity now. Rebasing onto the
-// base it has already stores and records nothing.
+// and its diff is recomputed from its entity now; a revert's proposal is
+// filled again from the version it returns to, checked as reverting to it
+// now would be. Rebasing onto the base it has already stores and records
+// nothing.
 func (h *RebaseChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand) (governance.ChangeRequest, error) {
 	return transition(ctx, h.d, cmd, "change_request.rebased",
 		func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
 			if _, err := cr.Next(governance.TransitionRebase, cmd.By); err != nil {
 				return cr, false, err
+			}
+			if cr.RevertTo != nil {
+				subject, proposed, err := h.d.proposeRevert(ctx, cr.Project, TargetOf(cr), *cr.RevertTo)
+				if err != nil {
+					return cr, false, err
+				}
+				return cr.RebaseRevert(cmd.By, subject, proposed, now)
 			}
 			subject, err := h.d.current(ctx, cr)
 			if err != nil {
@@ -222,7 +280,8 @@ type CopyChangeRequestCommand struct {
 // the caller's with its title, description and proposal, unscheduled, since
 // the time it named may have passed, based on its entity as it is now and
 // checked against it as a new change request is: a rejected or abandoned
-// proposal is resumed on the current base. The
+// proposal is resumed on the current base. A revert's copy reverts to the
+// same version, its proposal filled from it again. The
 // copy records the change request it was copied from.
 func (h *CopyChangeRequest) Handle(ctx context.Context, cmd CopyChangeRequestCommand) (governance.ChangeRequest, error) {
 	now := h.d.now()
@@ -235,11 +294,13 @@ func (h *CopyChangeRequest) Handle(ctx context.Context, cmd CopyChangeRequestCom
 		if err != nil {
 			return err
 		}
-		in, err := proposedOf(source)
-		if err != nil {
-			return err
+		var in Proposed
+		if source.RevertTo == nil {
+			if in, err = proposedOf(source); err != nil {
+				return err
+			}
 		}
-		cr, err := propose(ctx, h.d, cmd.Project, TargetOf(source), in, governance.Proposal{
+		cr, err := propose(ctx, h.d, cmd.Project, TargetOf(source), in, source.RevertTo, governance.Proposal{
 			Title: source.Title, Description: source.Description,
 		}, false, nil, cmd.Author, now)
 		if err != nil {

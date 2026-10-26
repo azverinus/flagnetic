@@ -130,7 +130,7 @@ func matrix(t *testing.T) []matrixRow {
 			// answered not_found, and one lacking it forbidden first.
 			res := do(c.CreateChangeRequestWithResponse(t.Context(), p.Key, management.ChangeRequestCreate{
 				Kind: management.ChangeRequestCreateKindFlagConfiguration, Flag: ptr("absent"), Environment: ptr("production"),
-				Title: "Matrix", Proposed: configurationInput(management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a"}),
+				Title: "Matrix", Proposed: ptr(configurationInput(management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a"})),
 			}))
 			return res.StatusCode(), res.Body
 		}},

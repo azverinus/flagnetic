@@ -201,6 +201,20 @@ func (d ChangeRequestDeps) propose(ctx context.Context, project workspace.Projec
 	return governance.Subject{}, nil, errNothingProposed
 }
 
+// proposeRevert returns the subject of a change request reverting t, a
+// flag's configuration, to version, based on the configuration as it is
+// now, and the document reverting to it would write: the version whole,
+// rule identifiers and salts included, checked and refused as a direct
+// revert is.
+func (d ChangeRequestDeps) proposeRevert(ctx context.Context, project workspace.ProjectID, t Target, version int64,
+) (governance.Subject, governance.Document, error) {
+	f, saved, proposed, err := d.Reverts.ProposeRevert(ctx, project, t.Flag, t.Environment, version)
+	if err != nil {
+		return governance.Subject{}, nil, under(err, "/proposed")
+	}
+	return configurationProposal(f, saved, proposed)
+}
+
 // configurationProposal returns the subject of a configuration change
 // request on f's saved configuration, and proposed as its document.
 func configurationProposal(f flags.Flag, saved flags.EnvironmentConfiguration, proposed flags.Configuration,
@@ -264,6 +278,8 @@ func (d ChangeRequestDeps) write(ctx context.Context, cr governance.ChangeReques
 	ctx = applying(protection.Bypass(ctx, cr.Covers()...), cr.ID)
 	t := TargetOf(cr)
 	switch {
+	case cr.RevertTo != nil:
+		return d.Reverts.ApplyRevert(ctx, cr.Project, t.Flag, t.Environment, *cr.RevertTo, cr.BaseVersion, by, req)
 	case t.Kind == governance.KindFlagConfiguration:
 		proposed, err := configurationInputOf(cr.Proposed)
 		if err != nil {

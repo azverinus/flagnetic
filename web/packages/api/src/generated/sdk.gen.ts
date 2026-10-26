@@ -2897,6 +2897,15 @@ export const listChangeRequests = <ThrowOnError extends boolean = false>(
  * most 365 days ahead (`invalid_change_request`, `too_soon` or
  * `too_late` under `/apply_at`), and answered in UTC.
  *
+ * A `flag_configuration` change request given `revert_to`, a version
+ * of the configuration, instead of `proposed` proposes reverting to
+ * it: the server fills `proposed` with the configuration that version
+ * was, whole, rule identifiers and salts included, as a direct revert
+ * writes it, with the same refusals (`version_not_found`;
+ * `experiment_rules_changed`, 409; `invalid_configuration` under
+ * `/proposed`). Giving both, neither, or `revert_to` on another kind
+ * is `invalid_change_request`.
+ *
  */
 export const createChangeRequest = <ThrowOnError extends boolean = false>(
   options: Options<CreateChangeRequestData, ThrowOnError>,
@@ -2952,7 +2961,10 @@ export const getChangeRequest = <ThrowOnError extends boolean = false>(
  * recomputed from the entity as the change request is based on it; a
  * rebase moves that. `apply_at` sets the apply time, judged
  * from now as on creation, and null removes it. An edit that changes nothing changes
- * nothing and records nothing.
+ * nothing and records nothing. The proposal of a revert, which the
+ * server fills from `revert_to`, is edited by nobody
+ * (`invalid_change_request`, `not_allowed` under `/proposed`); its
+ * title, description and apply time are.
  *
  */
 export const updateChangeRequest = <ThrowOnError extends boolean = false>(
@@ -3014,8 +3026,10 @@ export const openChangeRequest = <ThrowOnError extends boolean = false>(
  *
  * Keeps what is proposed and recomputes `diff` from the entity as it
  * is now, whose version becomes `base_version`. Only the author rebases
- * (`not_author`), and only a draft (`invalid_state`). Rebasing on the
- * base it has changes nothing and records nothing.
+ * (`not_author`), and only a draft (`invalid_state`). A revert keeps
+ * its `revert_to` and fills `proposed` from it again against the
+ * configuration as it is now, with the refusals of its creation.
+ * Rebasing on the base it has changes nothing and records nothing.
  *
  */
 export const rebaseChangeRequest = <ThrowOnError extends boolean = false>(
@@ -3073,7 +3087,8 @@ export const cancelChangeRequest = <ThrowOnError extends boolean = false>(
  * Copies any change request, whatever its state and whoever wrote it,
  * into a new draft of the caller's with the same title, description
  * and proposal, based on the entity as it is now and checked against
- * it as a new change request is.
+ * it as a new change request is. A revert's copy keeps its
+ * `revert_to` and fills `proposed` from it again.
  *
  */
 export const copyChangeRequest = <ThrowOnError extends boolean = false>(
@@ -3183,7 +3198,10 @@ export const rejectChangeRequest = <ThrowOnError extends boolean = false>(
  * checked again as writing it directly is, since what it names may be
  * gone since the approval: a refusal writes nothing and leaves the
  * change request approved. A change request with an apply time is
- * applied by the system alone (`scheduled`).
+ * applied by the system alone (`scheduled`). A revert is applied as a
+ * direct revert to `revert_to` is, audited `flag.reverted`: the
+ * version's rule identifiers and salts, override notes and authors
+ * are restored whole.
  *
  */
 export const applyChangeRequest = <ThrowOnError extends boolean = false>(

@@ -47,6 +47,23 @@ A change request may instead name an apply time, `apply_at`, when it is proposed
 
 A change request is based on the configuration, flag or segment as it was proposed. If anything writes it before the change request is applied, or archives or deletes its flag, deletes its segment or deletes its environment, it is [superseded](change-requests.md#superseded) by that write at once, since what was reviewed is no longer what would be written; copy it to propose it again. A change request may be proposed for any environment, protected or not.
 
+## Reverting a protected environment
+
+A [revert](flags.md#revert) of a protected environment is refused `403 change_request_required` like any other write: an earlier configuration reaches production only after a review. It is proposed as a configuration change request that names the version instead of a proposal, `revert_to`:
+
+```json
+{"kind": "flag_configuration", "flag": "checkout", "environment": "production",
+ "title": "Roll the checkout back", "revert_to": 4, "open": true}
+```
+
+- The server fills `proposed` with the configuration as that version was, whole: rule identifiers and salts, override notes and authors, so the same units fall in every rollout again. An ordinary change request leaves out identifiers and salts the configuration no longer holds; a revert keeps them.
+- It is refused as a direct revert is: `404 version_not_found` for a version not in the history of this flag in this environment, `409 experiment_rules_changed` when it would change which rules serve an experiment, `422 invalid_configuration` under `/proposed` when a variation, segment, attribute or flag it names is gone. Giving both `revert_to` and `proposed`, or `revert_to` on a definition, is `422 invalid_change_request`.
+- Nobody edits what a revert proposes (`422 invalid_change_request`, `not_allowed` under `/proposed`), so whoever may propose a revert cannot slip another change in under its name; its title, description and apply time are edited as usual.
+- A rebase or a copy keeps `revert_to` and fills `proposed` from it again against the configuration as it is now, with the same refusals.
+- Applying it reverts the configuration as a direct revert does, recorded as `flag.reverted` with the version returned to and the change request's identifier.
+
+The change request answers `revert_to`, null for any other change request.
+
 ## Pipelines and change requests
 
 A project token proposes, edits, opens, cancels and applies its own change requests like a member of its role, so a pipeline holding a token with `flags:write` can propose a production change and apply it once approved. It never approves or rejects one, whatever its role (`403 token_cannot_approve`), and never cancels or applies another author's: deciding is a member's. A typical pipeline:

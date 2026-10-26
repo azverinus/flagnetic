@@ -620,3 +620,48 @@ func TestAScheduleFailureIsClearedOnApplicationAndCancellationAndKeptOnSupersede
 		t.Errorf("superseded by a write = %+v, %v; want the failure kept", superseded.ScheduleFailure, err)
 	}
 }
+
+func revertProposal(t *testing.T) governance.NewChangeRequestInput {
+	t.Helper()
+	in := proposal(t)
+	version := int64(2)
+	in.RevertTo = &version
+	return in
+}
+
+func TestARevertKeepsItsTargetAndNobodyEditsItsProposal(t *testing.T) {
+	cr := newChangeRequest(t, revertProposal(t))
+	later := now.Add(time.Minute)
+	if cr.RevertTo == nil || *cr.RevertTo != 2 {
+		t.Fatalf("revert_to = %v, want 2", cr.RevertTo)
+	}
+
+	_, _, err := cr.Edit(byAda, governance.Edit{Proposed: doc(t, `{"on":false}`)}, later)
+	if e, ok := apperrors.From(err); !ok || e.Code != "invalid_change_request" || len(e.Violations) != 1 ||
+		e.Violations[0].Pointer != "/proposed" || e.Violations[0].Code != "not_allowed" {
+		t.Errorf("editing a revert's proposal = %v", err)
+	}
+	if _, _, err = cr.Edit(byBob, governance.Edit{Proposed: doc(t, `{"on":false}`)}, later); codeOf(err) != "not_author" {
+		t.Errorf("another editing a revert's proposal = %v, want who may edit judged first", err)
+	}
+	renamed, changed, err := cr.Edit(byAda, governance.Edit{Title: ptrTo("Roll back")}, later)
+	if err != nil || !changed || renamed.Title != "Roll back" || *renamed.RevertTo != 2 {
+		t.Errorf("renaming a revert = %+v, %v, %v", renamed, changed, err)
+	}
+}
+
+func TestARevertIsRebasedWithItsProposalFilledAgain(t *testing.T) {
+	cr := newChangeRequest(t, revertProposal(t))
+	later := now.Add(time.Minute)
+
+	rebased, changed, err := cr.RebaseRevert(byAda, governance.Subject{Base: doc(t, `{"on":true}`), BaseVersion: 4},
+		doc(t, `{"on":false}`), later)
+	if err != nil || !changed || rebased.BaseVersion != 4 || rebased.Version != 2 || *rebased.RevertTo != 2 ||
+		!reflect.DeepEqual(rebased.Proposed, doc(t, `{"on":false}`)) ||
+		!reflect.DeepEqual(rebased.Diff, []governance.PatchOperation{{Op: "replace", Path: "/on", Value: false}}) {
+		t.Errorf("rebased = %+v, %v, %v", rebased, changed, err)
+	}
+	if _, _, err := cr.RebaseRevert(byBob, governance.Subject{}, nil, later); codeOf(err) != "not_author" {
+		t.Errorf("rebase by another = %v", err)
+	}
+}

@@ -122,6 +122,7 @@ Each environment has a **ruleset**: its flags, segments and declarations as SDKs
 - The configuration is validated as a replace would be, so a variation, segment, attribute or flag removed since refuses the revert, its violations pointing into the configuration it would write.
 - A revert that would add or remove a rule serving an experiment, or change which experiment a rule serves, is refused `409 experiment_rules_changed` (see [Experiments](experiments.md#reverts-and-copies-keep-experiment-rules)).
 - It is a new change, recorded as `flag.reverted` with the version returned to: the history keeps both what was reverted and the revert. Reverting to what the configuration already is changes nothing and records nothing.
+- In a protected environment it is proposed as a change request instead (see [Reverting a protected environment](governance.md#reverting-a-protected-environment)).
 - It leaves the flag's definition and the project's segments as they are now.
 
 ## Copy and compare

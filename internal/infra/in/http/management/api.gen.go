@@ -937,6 +937,9 @@ type ChangeRequest struct {
 	// Rejection Who rejected the change request, when and why; null unless it was rejected.
 	Rejection *ChangeRequestDecision `json:"rejection"`
 
+	// RevertTo For a revert, the version of the configuration it returns to, from which the server fills `proposed`; null for any other change request.
+	RevertTo *int64 `json:"revert_to"`
+
 	// ScheduleFailure Why the last scheduled application failed; null when none did.
 	ScheduleFailure *ScheduleFailure `json:"schedule_failure"`
 
@@ -1017,7 +1020,10 @@ type ChangeRequestCreate struct {
 	// `FlagConfigurationPut` for `flag_configuration`, a
 	// `FlagDefinitionPut` for a flag's `definition`, a
 	// `SegmentDefinitionPut` for a segment's.
-	Proposed ProposedInput `json:"proposed"`
+	Proposed *ProposedInput `json:"proposed,omitempty"`
+
+	// RevertTo Propose reverting a `flag_configuration` to this version of it instead of giving `proposed`, which the server fills.
+	RevertTo *int64 `json:"revert_to,omitempty"`
 
 	// Segment The key of the segment, for a segment's definition only.
 	Segment *string `json:"segment,omitempty"`
@@ -4996,6 +5002,15 @@ type ClientInterface interface {
 	// most 365 days ahead (`invalid_change_request`, `too_soon` or
 	// `too_late` under `/apply_at`), and answered in UTC.
 	//
+	// A `flag_configuration` change request given `revert_to`, a version
+	// of the configuration, instead of `proposed` proposes reverting to
+	// it: the server fills `proposed` with the configuration that version
+	// was, whole, rule identifiers and salts included, as a direct revert
+	// writes it, with the same refusals (`version_not_found`;
+	// `experiment_rules_changed`, 409; `invalid_configuration` under
+	// `/proposed`). Giving both, neither, or `revert_to` on another kind
+	// is `invalid_change_request`.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
@@ -5026,6 +5041,15 @@ type ClientInterface interface {
 	// most 365 days ahead (`invalid_change_request`, `too_soon` or
 	// `too_late` under `/apply_at`), and answered in UTC.
 	//
+	// A `flag_configuration` change request given `revert_to`, a version
+	// of the configuration, instead of `proposed` proposes reverting to
+	// it: the server fills `proposed` with the configuration that version
+	// was, whole, rule identifiers and salts included, as a direct revert
+	// writes it, with the same refusals (`version_not_found`;
+	// `experiment_rules_changed`, 409; `invalid_configuration` under
+	// `/proposed`). Giving both, neither, or `revert_to` on another kind
+	// is `invalid_change_request`.
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
@@ -5046,7 +5070,10 @@ type ClientInterface interface {
 	// recomputed from the entity as the change request is based on it; a
 	// rebase moves that. `apply_at` sets the apply time, judged
 	// from now as on creation, and null removes it. An edit that changes nothing changes
-	// nothing and records nothing.
+	// nothing and records nothing. The proposal of a revert, which the
+	// server fills from `revert_to`, is edited by nobody
+	// (`invalid_change_request`, `not_allowed` under `/proposed`); its
+	// title, description and apply time are.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -5063,7 +5090,10 @@ type ClientInterface interface {
 	// recomputed from the entity as the change request is based on it; a
 	// rebase moves that. `apply_at` sets the apply time, judged
 	// from now as on creation, and null removes it. An edit that changes nothing changes
-	// nothing and records nothing.
+	// nothing and records nothing. The proposal of a revert, which the
+	// server fills from `revert_to`, is edited by nobody
+	// (`invalid_change_request`, `not_allowed` under `/proposed`); its
+	// title, description and apply time are.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5084,7 +5114,10 @@ type ClientInterface interface {
 	// checked again as writing it directly is, since what it names may be
 	// gone since the approval: a refusal writes nothing and leaves the
 	// change request approved. A change request with an apply time is
-	// applied by the system alone (`scheduled`).
+	// applied by the system alone (`scheduled`). A revert is applied as a
+	// direct revert to `revert_to` is, audited `flag.reverted`: the
+	// version's rule identifiers and salts, override notes and authors
+	// are restored whole.
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/apply (the `ApplyChangeRequest` operationId).
 	ApplyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *ApplyChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5136,7 +5169,8 @@ type ClientInterface interface {
 	// Copies any change request, whatever its state and whoever wrote it,
 	// into a new draft of the caller's with the same title, description
 	// and proposal, based on the entity as it is now and checked against
-	// it as a new change request is.
+	// it as a new change request is. A revert's copy keeps its
+	// `revert_to` and fills `proposed` from it again.
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
 	CopyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -5156,8 +5190,10 @@ type ClientInterface interface {
 	//
 	// Keeps what is proposed and recomputes `diff` from the entity as it
 	// is now, whose version becomes `base_version`. Only the author rebases
-	// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
-	// base it has changes nothing and records nothing.
+	// (`not_author`), and only a draft (`invalid_state`). A revert keeps
+	// its `revert_to` and fills `proposed` from it again against the
+	// configuration as it is now, with the refusals of its creation.
+	// Rebasing on the base it has changes nothing and records nothing.
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/rebase (the `RebaseChangeRequest` operationId).
 	RebaseChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *RebaseChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7856,6 +7892,15 @@ func (c *Client) ListChangeRequests(ctx context.Context, project ProjectKey, par
 // most 365 days ahead (`invalid_change_request`, `too_soon` or
 // `too_late` under `/apply_at`), and answered in UTC.
 //
+// A `flag_configuration` change request given `revert_to`, a version
+// of the configuration, instead of `proposed` proposes reverting to
+// it: the server fills `proposed` with the configuration that version
+// was, whole, rule identifiers and salts included, as a direct revert
+// writes it, with the same refusals (`version_not_found`;
+// `experiment_rules_changed`, 409; `invalid_configuration` under
+// `/proposed`). Giving both, neither, or `revert_to` on another kind
+// is `invalid_change_request`.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
@@ -7895,6 +7940,15 @@ func (c *Client) CreateChangeRequestWithBody(ctx context.Context, project Projec
 // least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
 // most 365 days ahead (`invalid_change_request`, `too_soon` or
 // `too_late` under `/apply_at`), and answered in UTC.
+//
+// A `flag_configuration` change request given `revert_to`, a version
+// of the configuration, instead of `proposed` proposes reverting to
+// it: the server fills `proposed` with the configuration that version
+// was, whole, rule identifiers and salts included, as a direct revert
+// writes it, with the same refusals (`version_not_found`;
+// `experiment_rules_changed`, 409; `invalid_configuration` under
+// `/proposed`). Giving both, neither, or `revert_to` on another kind
+// is `invalid_change_request`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7936,7 +7990,10 @@ func (c *Client) GetChangeRequest(ctx context.Context, project ProjectKey, chang
 // recomputed from the entity as the change request is based on it; a
 // rebase moves that. `apply_at` sets the apply time, judged
 // from now as on creation, and null removes it. An edit that changes nothing changes
-// nothing and records nothing.
+// nothing and records nothing. The proposal of a revert, which the
+// server fills from `revert_to`, is edited by nobody
+// (`invalid_change_request`, `not_allowed` under `/proposed`); its
+// title, description and apply time are.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7963,7 +8020,10 @@ func (c *Client) UpdateChangeRequestWithBody(ctx context.Context, project Projec
 // recomputed from the entity as the change request is based on it; a
 // rebase moves that. `apply_at` sets the apply time, judged
 // from now as on creation, and null removes it. An edit that changes nothing changes
-// nothing and records nothing.
+// nothing and records nothing. The proposal of a revert, which the
+// server fills from `revert_to`, is edited by nobody
+// (`invalid_change_request`, `not_allowed` under `/proposed`); its
+// title, description and apply time are.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7994,7 +8054,10 @@ func (c *Client) UpdateChangeRequest(ctx context.Context, project ProjectKey, ch
 // checked again as writing it directly is, since what it names may be
 // gone since the approval: a refusal writes nothing and leaves the
 // change request approved. A change request with an apply time is
-// applied by the system alone (`scheduled`).
+// applied by the system alone (`scheduled`). A revert is applied as a
+// direct revert to `revert_to` is, audited `flag.reverted`: the
+// version's rule identifiers and salts, override notes and authors
+// are restored whole.
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/apply (the `ApplyChangeRequest` operationId).
 func (c *Client) ApplyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *ApplyChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8086,7 +8149,8 @@ func (c *Client) CancelChangeRequest(ctx context.Context, project ProjectKey, ch
 // Copies any change request, whatever its state and whoever wrote it,
 // into a new draft of the caller's with the same title, description
 // and proposal, based on the entity as it is now and checked against
-// it as a new change request is.
+// it as a new change request is. A revert's copy keeps its
+// `revert_to` and fills `proposed` from it again.
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
 func (c *Client) CopyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8126,8 +8190,10 @@ func (c *Client) OpenChangeRequest(ctx context.Context, project ProjectKey, chan
 //
 // Keeps what is proposed and recomputes `diff` from the entity as it
 // is now, whose version becomes `base_version`. Only the author rebases
-// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
-// base it has changes nothing and records nothing.
+// (`not_author`), and only a draft (`invalid_state`). A revert keeps
+// its `revert_to` and fills `proposed` from it again against the
+// configuration as it is now, with the refusals of its creation.
+// Rebasing on the base it has changes nothing and records nothing.
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/rebase (the `RebaseChangeRequest` operationId).
 func (c *Client) RebaseChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *RebaseChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18790,6 +18856,15 @@ type ClientWithResponsesInterface interface {
 	// most 365 days ahead (`invalid_change_request`, `too_soon` or
 	// `too_late` under `/apply_at`), and answered in UTC.
 	//
+	// A `flag_configuration` change request given `revert_to`, a version
+	// of the configuration, instead of `proposed` proposes reverting to
+	// it: the server fills `proposed` with the configuration that version
+	// was, whole, rule identifiers and salts included, as a direct revert
+	// writes it, with the same refusals (`version_not_found`;
+	// `experiment_rules_changed`, 409; `invalid_configuration` under
+	// `/proposed`). Giving both, neither, or `revert_to` on another kind
+	// is `invalid_change_request`.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
@@ -18820,6 +18895,15 @@ type ClientWithResponsesInterface interface {
 	// most 365 days ahead (`invalid_change_request`, `too_soon` or
 	// `too_late` under `/apply_at`), and answered in UTC.
 	//
+	// A `flag_configuration` change request given `revert_to`, a version
+	// of the configuration, instead of `proposed` proposes reverting to
+	// it: the server fills `proposed` with the configuration that version
+	// was, whole, rule identifiers and salts included, as a direct revert
+	// writes it, with the same refusals (`version_not_found`;
+	// `experiment_rules_changed`, 409; `invalid_configuration` under
+	// `/proposed`). Giving both, neither, or `revert_to` on another kind
+	// is `invalid_change_request`.
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
@@ -18842,7 +18926,10 @@ type ClientWithResponsesInterface interface {
 	// recomputed from the entity as the change request is based on it; a
 	// rebase moves that. `apply_at` sets the apply time, judged
 	// from now as on creation, and null removes it. An edit that changes nothing changes
-	// nothing and records nothing.
+	// nothing and records nothing. The proposal of a revert, which the
+	// server fills from `revert_to`, is edited by nobody
+	// (`invalid_change_request`, `not_allowed` under `/proposed`); its
+	// title, description and apply time are.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18859,7 +18946,10 @@ type ClientWithResponsesInterface interface {
 	// recomputed from the entity as the change request is based on it; a
 	// rebase moves that. `apply_at` sets the apply time, judged
 	// from now as on creation, and null removes it. An edit that changes nothing changes
-	// nothing and records nothing.
+	// nothing and records nothing. The proposal of a revert, which the
+	// server fills from `revert_to`, is edited by nobody
+	// (`invalid_change_request`, `not_allowed` under `/proposed`); its
+	// title, description and apply time are.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18880,7 +18970,10 @@ type ClientWithResponsesInterface interface {
 	// checked again as writing it directly is, since what it names may be
 	// gone since the approval: a refusal writes nothing and leaves the
 	// change request approved. A change request with an apply time is
-	// applied by the system alone (`scheduled`).
+	// applied by the system alone (`scheduled`). A revert is applied as a
+	// direct revert to `revert_to` is, audited `flag.reverted`: the
+	// version's rule identifiers and salts, override notes and authors
+	// are restored whole.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -18936,7 +19029,8 @@ type ClientWithResponsesInterface interface {
 	// Copies any change request, whatever its state and whoever wrote it,
 	// into a new draft of the caller's with the same title, description
 	// and proposal, based on the entity as it is now and checked against
-	// it as a new change request is.
+	// it as a new change request is. A revert's copy keeps its
+	// `revert_to` and fills `proposed` from it again.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -18960,8 +19054,10 @@ type ClientWithResponsesInterface interface {
 	//
 	// Keeps what is proposed and recomputes `diff` from the entity as it
 	// is now, whose version becomes `base_version`. Only the author rebases
-	// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
-	// base it has changes nothing and records nothing.
+	// (`not_author`), and only a draft (`invalid_state`). A revert keeps
+	// its `revert_to` and fills `proposed` from it again against the
+	// configuration as it is now, with the refusals of its creation.
+	// Rebasing on the base it has changes nothing and records nothing.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -24699,6 +24795,8 @@ type RebaseChangeRequestResponse struct {
 	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
 	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
 	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
 	ApplicationproblemJSON428 *PreconditionRequired
 	// Headers200 the parsed response headers for an HTTP 200 response
@@ -24735,6 +24833,11 @@ func (r RebaseChangeRequestResponse) GetApplicationproblemJSON409() *Conflict {
 // GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
 func (r RebaseChangeRequestResponse) GetApplicationproblemJSON412() *VersionMismatch {
 	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RebaseChangeRequestResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
 }
 
 // GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
@@ -32675,6 +32778,15 @@ func (c *ClientWithResponses) ListChangeRequestsWithResponse(ctx context.Context
 // most 365 days ahead (`invalid_change_request`, `too_soon` or
 // `too_late` under `/apply_at`), and answered in UTC.
 //
+// A `flag_configuration` change request given `revert_to`, a version
+// of the configuration, instead of `proposed` proposes reverting to
+// it: the server fills `proposed` with the configuration that version
+// was, whole, rule identifiers and salts included, as a direct revert
+// writes it, with the same refusals (`version_not_found`;
+// `experiment_rules_changed`, 409; `invalid_configuration` under
+// `/proposed`). Giving both, neither, or `revert_to` on another kind
+// is `invalid_change_request`.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
@@ -32711,6 +32823,15 @@ func (c *ClientWithResponses) CreateChangeRequestWithBodyWithResponse(ctx contex
 // most 365 days ahead (`invalid_change_request`, `too_soon` or
 // `too_late` under `/apply_at`), and answered in UTC.
 //
+// A `flag_configuration` change request given `revert_to`, a version
+// of the configuration, instead of `proposed` proposes reverting to
+// it: the server fills `proposed` with the configuration that version
+// was, whole, rule identifiers and salts included, as a direct revert
+// writes it, with the same refusals (`version_not_found`;
+// `experiment_rules_changed`, 409; `invalid_configuration` under
+// `/proposed`). Giving both, neither, or `revert_to` on another kind
+// is `invalid_change_request`.
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /projects/{project}/change-requests (the `CreateChangeRequest` operationId).
@@ -32745,7 +32866,10 @@ func (c *ClientWithResponses) GetChangeRequestWithResponse(ctx context.Context, 
 // recomputed from the entity as the change request is based on it; a
 // rebase moves that. `apply_at` sets the apply time, judged
 // from now as on creation, and null removes it. An edit that changes nothing changes
-// nothing and records nothing.
+// nothing and records nothing. The proposal of a revert, which the
+// server fills from `revert_to`, is edited by nobody
+// (`invalid_change_request`, `not_allowed` under `/proposed`); its
+// title, description and apply time are.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32768,7 +32892,10 @@ func (c *ClientWithResponses) UpdateChangeRequestWithBodyWithResponse(ctx contex
 // recomputed from the entity as the change request is based on it; a
 // rebase moves that. `apply_at` sets the apply time, judged
 // from now as on creation, and null removes it. An edit that changes nothing changes
-// nothing and records nothing.
+// nothing and records nothing. The proposal of a revert, which the
+// server fills from `revert_to`, is edited by nobody
+// (`invalid_change_request`, `not_allowed` under `/proposed`); its
+// title, description and apply time are.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32795,7 +32922,10 @@ func (c *ClientWithResponses) UpdateChangeRequestWithResponse(ctx context.Contex
 // checked again as writing it directly is, since what it names may be
 // gone since the approval: a refusal writes nothing and leaves the
 // change request approved. A change request with an apply time is
-// applied by the system alone (`scheduled`).
+// applied by the system alone (`scheduled`). A revert is applied as a
+// direct revert to `revert_to` is, audited `flag.reverted`: the
+// version's rule identifiers and salts, override notes and authors
+// are restored whole.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -32875,7 +33005,8 @@ func (c *ClientWithResponses) CancelChangeRequestWithResponse(ctx context.Contex
 // Copies any change request, whatever its state and whoever wrote it,
 // into a new draft of the caller's with the same title, description
 // and proposal, based on the entity as it is now and checked against
-// it as a new change request is.
+// it as a new change request is. A revert's copy keeps its
+// `revert_to` and fills `proposed` from it again.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -32911,8 +33042,10 @@ func (c *ClientWithResponses) OpenChangeRequestWithResponse(ctx context.Context,
 //
 // Keeps what is proposed and recomputes `diff` from the entity as it
 // is now, whose version becomes `base_version`. Only the author rebases
-// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
-// base it has changes nothing and records nothing.
+// (`not_author`), and only a draft (`invalid_state`). A revert keeps
+// its `revert_to` and fills `proposed` from it again against the
+// configuration as it is now, with the refusals of its creation.
+// Rebasing on the base it has changes nothing and records nothing.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -38982,6 +39115,13 @@ func ParseRebaseChangeRequestResponse(rsp *http.Response) (*RebaseChangeRequestR
 			return nil, err
 		}
 		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
 		var dest PreconditionRequired
@@ -57003,6 +57143,22 @@ func (response RebaseChangeRequest412ApplicationProblemPlusJSONResponse) VisitRe
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RebaseChangeRequest422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response RebaseChangeRequest422ApplicationProblemPlusJSONResponse) VisitRebaseChangeRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
