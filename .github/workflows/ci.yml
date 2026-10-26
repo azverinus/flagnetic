@@ -578,7 +578,7 @@ jobs:
           pnpm test:e2e | tee "$RUNNER_TEMP/smoke.log"
           {
             echo "Kill-switch propagation of the JavaScript server mode (target 2000 ms):"
-            grep -o '^{"kill_switch_ms":-\?[0-9]*}' "$RUNNER_TEMP/smoke.log"
+            grep -o '^{"sdk":"flagnetic-js","kill_switch_ms":-\?[0-9]*}' "$RUNNER_TEMP/smoke.log"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Keep the replicas' log
         if: failure() && env.SDK_JS == 'true'

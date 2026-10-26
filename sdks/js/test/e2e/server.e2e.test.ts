@@ -57,8 +57,9 @@ describe("server mode against two replicas", () => {
       const killed = JSON.parse(await harness("kill", seed.flags.on)) as Killed;
       const timeout = new Promise<number>((resolve) => setTimeout(() => { resolve(Number.POSITIVE_INFINITY); }, 10_000));
       const elapsed = (await Promise.race([off, timeout])) - Date.parse(killed.committed_at);
-      // One JSON line, which CI copies to the job summary.
-      console.log(JSON.stringify({ kill_switch_ms: elapsed }));
+      // One JSON line naming the SDK as the inventory does, which CI
+      // copies to the job summary beside the other SDKs' lines.
+      console.log(JSON.stringify({ sdk: "flagnetic-js", kill_switch_ms: elapsed }));
       expect(elapsed).toBeLessThanOrEqual(2_000);
       expect(client.getDetail(context, seed.flags.on, true)).toMatchObject({ value: false, reason: "off" });
     } finally {
