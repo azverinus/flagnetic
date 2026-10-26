@@ -25,8 +25,9 @@ One row per SDK line: an SDK major version, or the version within a major from w
 | SDK | Version | `schema_version` | SDK API path | Server |
 |---|---|---|---|---|
 | Go | 0.x | 1 | `/sdk/v1` | ≥ 0.1.0 |
+| JavaScript | 0.x | 1 | `/sdk/v1` | ≥ 0.1.0 |
 
-The table names the core module of each SDK. The Go OpenFeature provider and `flagnetictest` make no request of their own: they speak through the SDK they depend on, so its row is theirs. The evaluator module (`eval`) reads `schema_version` 1 and makes no request at all.
+The table names the core package of each SDK. The Go OpenFeature provider and `flagnetictest` make no request of their own: they speak through the SDK they depend on, so its row is theirs; so do the React bindings and OpenFeature providers inside the `flagnetic` npm package, whose server mode and browser client speak the same path and range. The evaluator module (`eval`) reads `schema_version` 1 and makes no request at all.
 
 ## What a key learns
 
@@ -44,11 +45,11 @@ A **client key** ships inside apps and browsers, so it never receives a ruleset:
 | `experiment` | a running experiment assigned the value |
 | `error` | the flag could not be evaluated; the SDK serves its built-in default as `fallback` |
 
-A client key never learns which rule, segment or prerequisite produced a value, nor a rule identifier. The Go SDK refuses a client key at construction.
+A client key never learns which rule, segment or prerequisite produced a value, nor a rule identifier. The Go SDK and the JavaScript server mode refuse a client key at construction, and the JavaScript browser client refuses a server key.
 
 ## Versioning policy
 
-- **Semantic versioning per SDK, independent numbers.** Each SDK releases on its own tag with its own version; the same number in two SDKs promises nothing about each other. The Go modules are tagged `eval/vX.Y.Z`, `sdks/go/vX.Y.Z` and `sdks/go-openfeature/vX.Y.Z`.
+- **Semantic versioning per SDK, independent numbers.** Each SDK releases on its own tag with its own version; the same number in two SDKs promises nothing about each other. The Go modules are tagged `eval/vX.Y.Z`, `sdks/go/vX.Y.Z` and `sdks/go-openfeature/vX.Y.Z`, the npm package `flagnetic` `sdks/js/vX.Y.Z`.
 - **A new SDK API path prefix is a new SDK major version.** An SDK moving from `/sdk/v1` to `/sdk/v2` releases a new major, and the table gains a row for it. The server serves `/sdk/v2` alongside `/sdk/v1` for as long as a released SDK speaks `/sdk/v1`.
 - **`schema_version` changes only when structure changes.** Within `/sdk/v1` every change is additive and leaves `schema_version` alone. A new `schema_version` appears only when a change cannot be read under the degradation rules below; an SDK that reads it widens its range and the table gains a row.
 - **What an SDK sends.** Every request for a document (the ruleset, remote evaluation) and every events batch carries `Flagnetic-Schema-Version` with the highest `schema_version` the SDK reads. The server answers with a document of that schema or a lower one it still produces, and 406 `schema_version_unsupported` when it produces none that low, so a new server keeps sending an old build the schema it asked for.
@@ -74,6 +75,12 @@ The same holds the other way round. The server ignores what it does not know in 
 ## What the Go SDK declares
 
 `sdks/go/version.go` holds `Version`, which every request's User-Agent (`flagnetic-go/<version> (<os>)`) and every events envelope report and which release-please keeps equal to the module's tag, and the unexported `schema_version` range and SDK API path the SDK uses for every request. A test of the SDK fails when the range is not the one the evaluator reads, and the release workflow checks `Version` against the tag.
+
+## What the JavaScript SDK declares
+
+`sdks/js/src/version.ts` holds `VERSION`, which the server mode's User-Agent (`flagnetic-js/<version> (<platform>)`), the browser client's context and every events envelope report and which release-please keeps equal to `package.json` and the tag, and `SCHEMA_VERSION_MIN`, `SCHEMA_VERSION_MAX` and `SDK_API_PATH`, exported from every entry point. A test of the SDK fails when the last JavaScript row of the table above is not that range and path, and the release workflow checks `VERSION` against the tag.
+
+## Adding a row
 
 When a release changes what an SDK reads or speaks, add its row here in the same change, with the first server release that serves it:
 
