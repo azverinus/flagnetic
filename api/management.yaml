@@ -4659,6 +4659,38 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/webhooks/{webhook}/test:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/WebhookID"
+    post:
+      operationId: testWebhook
+      summary: Send a test ping
+      description: |
+        Queues a `ping` event for this subscription alone, whatever event
+        types it names, and answers the pending delivery; the delivery
+        worker sends it within a few seconds, signed like every event, and
+        its attempts show in the delivery log. The ping names the project
+        and the caller; its environment, entity and audit entry are null.
+        A disabled subscription is refused `409 webhook_disabled`, since
+        the ping would wait unsent until it is enabled.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "202":
+          description: The ping's delivery, pending.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /projects/{project}/webhooks/{webhook}/deliveries:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -4742,6 +4774,43 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/WebhookID"
+      - name: delivery
+        in: path
+        required: true
+        description: The delivery whose event to send again.
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: redeliverWebhookDelivery
+      summary: Send a delivery's event again
+      description: |
+        Queues the delivery's event again as a new delivery, with the same
+        event `id` and body byte for byte, and answers it pending; the
+        delivery redelivered is left as it is. A receiver deduplicating on
+        the event `id` recognises it, and one that lost it takes it. A
+        disabled subscription is refused `409 webhook_disabled`.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "202":
+          description: The new delivery, pending.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 components:
   parameters:
     AuditActor:

@@ -259,6 +259,7 @@ func StartServer(t testing.TB, opts ...ServerOption) *Server {
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
 		WebhookTargets:        o.targets,
+		WebhookTick:           cfg.WebhookTick,
 	})
 	// Registered first, so it runs once the server below has stopped.
 	t.Cleanup(background.Close)

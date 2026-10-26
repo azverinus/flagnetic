@@ -104,6 +104,9 @@ type Config struct {
 	// WebhookAllowPrivateNetworks accepts webhook targets on loopback,
 	// private, link-local, unspecified and multicast addresses.
 	WebhookAllowPrivateNetworks bool
+	// WebhookTick is how often a replica fans the outbox out to webhook
+	// subscriptions and sends the deliveries that are due.
+	WebhookTick time.Duration
 }
 
 // RateLimits are the limits of the SDK API, each counted by every replica on
@@ -506,6 +509,16 @@ func Settings() []Setting {
 				"so that whoever manages webhooks cannot reach the network the instance runs in.",
 			Example: "true",
 			apply:   boolSetting(func(c *Config, b bool) { c.WebhookAllowPrivateNetworks = b }),
+		},
+		{
+			Name:    "FLAGNETIC_WEBHOOK_TICK",
+			Key:     "webhook_tick",
+			Default: "5s",
+			Unit:    "duration",
+			Description: "How often a replica turns new events into webhook deliveries and sends the deliveries that are due. " +
+				"An event reaches a receiver about this long after its change at the earliest.",
+			Example: "5s",
+			apply:   durationSetting(func(c *Config, d time.Duration) { c.WebhookTick = d }),
 		},
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "120", "requests per minute",
 			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP.",

@@ -11052,6 +11052,65 @@ export type UpdateWebhookResponses = {
 
 export type UpdateWebhookResponse = UpdateWebhookResponses[keyof UpdateWebhookResponses];
 
+export type TestWebhookData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The webhook subscription's identifier.
+     */
+    webhook: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks/{webhook}/test";
+};
+
+export type TestWebhookErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type TestWebhookError = TestWebhookErrors[keyof TestWebhookErrors];
+
+export type TestWebhookResponses = {
+  /**
+   * The ping's delivery, pending.
+   */
+  202: WebhookDelivery;
+};
+
+export type TestWebhookResponse = TestWebhookResponses[keyof TestWebhookResponses];
+
 export type ListWebhookDeliveriesData = {
   body?: never;
   path: {
@@ -11194,3 +11253,68 @@ export type GetWebhookDeliveryResponses = {
 
 export type GetWebhookDeliveryResponse =
   GetWebhookDeliveryResponses[keyof GetWebhookDeliveryResponses];
+
+export type RedeliverWebhookDeliveryData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The webhook subscription's identifier.
+     */
+    webhook: string;
+    /**
+     * The delivery whose event to send again.
+     */
+    delivery: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver";
+};
+
+export type RedeliverWebhookDeliveryErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type RedeliverWebhookDeliveryError =
+  RedeliverWebhookDeliveryErrors[keyof RedeliverWebhookDeliveryErrors];
+
+export type RedeliverWebhookDeliveryResponses = {
+  /**
+   * The new delivery, pending.
+   */
+  202: WebhookDelivery;
+};
+
+export type RedeliverWebhookDeliveryResponse =
+  RedeliverWebhookDeliveryResponses[keyof RedeliverWebhookDeliveryResponses];

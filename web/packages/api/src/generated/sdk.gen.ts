@@ -304,6 +304,9 @@ import type {
   RebaseChangeRequestData,
   RebaseChangeRequestErrors,
   RebaseChangeRequestResponses,
+  RedeliverWebhookDeliveryData,
+  RedeliverWebhookDeliveryErrors,
+  RedeliverWebhookDeliveryResponses,
   RegenerateExperimentSaltsData,
   RegenerateExperimentSaltsErrors,
   RegenerateExperimentSaltsResponses,
@@ -368,6 +371,9 @@ import type {
   StreamProjectChangesErrors,
   StreamProjectChangesResponse,
   StreamProjectChangesResponses,
+  TestWebhookData,
+  TestWebhookErrors,
+  TestWebhookResponses,
   UpdateAttributeData,
   UpdateAttributeErrors,
   UpdateAttributeResponses,
@@ -4121,6 +4127,34 @@ export const updateWebhook = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Send a test ping
+ *
+ * Queues a `ping` event for this subscription alone, whatever event
+ * types it names, and answers the pending delivery; the delivery
+ * worker sends it within a few seconds, signed like every event, and
+ * its attempts show in the delivery log. The ping names the project
+ * and the caller; its environment, entity and audit entry are null.
+ * A disabled subscription is refused `409 webhook_disabled`, since
+ * the ping would wait unsent until it is enabled.
+ *
+ */
+export const testWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<TestWebhookData, ThrowOnError>,
+): RequestResult<TestWebhookResponses, TestWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<TestWebhookResponses, TestWebhookErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}/test",
+    ...options,
+  });
+
+/**
  * A webhook subscription's delivery log
  *
  * Every event made a delivery to the subscription, newest first,
@@ -4170,5 +4204,35 @@ export const getWebhookDelivery = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}",
+    ...options,
+  });
+
+/**
+ * Send a delivery's event again
+ *
+ * Queues the delivery's event again as a new delivery, with the same
+ * event `id` and body byte for byte, and answers it pending; the
+ * delivery redelivered is left as it is. A receiver deduplicating on
+ * the event `id` recognises it, and one that lost it takes it. A
+ * disabled subscription is refused `409 webhook_disabled`.
+ *
+ */
+export const redeliverWebhookDelivery = <ThrowOnError extends boolean = false>(
+  options: Options<RedeliverWebhookDeliveryData, ThrowOnError>,
+): RequestResult<RedeliverWebhookDeliveryResponses, RedeliverWebhookDeliveryErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RedeliverWebhookDeliveryResponses,
+    RedeliverWebhookDeliveryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver",
     ...options,
   });
