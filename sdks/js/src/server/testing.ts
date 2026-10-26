@@ -20,7 +20,7 @@ export class TestServer extends FlagneticServer {
   private readonly holder: { doc: Doc };
   private readonly read: () => RulesetSource;
 
-  /** @internal Use testServer or testServerFromValues. */
+  /** Use testServer or testServerFromValues. */
   constructor(read: () => RulesetSource, options: Omit<ServerOptions, "offline">) {
     const holder = { doc: parse(read()) };
     super("", "", { ...options, offline: () => holder.doc }, {});

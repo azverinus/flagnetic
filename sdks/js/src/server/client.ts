@@ -164,7 +164,7 @@ export class FlagneticServer {
   /** @internal */
   localOverrides = new Map<string, { readonly type: FlagType; readonly value: JsonValue }>();
 
-  /** @internal Use createServer. */
+  /** Use createServer. */
   constructor(sdkKey: string, baseUrl: string, options: ServerOptions, internals: Internals) {
     this.logger = options.logger ?? consoleLogger("warn");
     this.allowOverrides = options.allowOverrides === true;
@@ -777,7 +777,7 @@ export class FlagneticServer {
  * `allowOverrides` option and are refused in a protected environment.
  */
 export class LocalOverrides {
-  /** @internal */
+  /** The client builds its own; applications reach it as `overrides`. */
   constructor(private readonly c: FlagneticServer) {}
 
   /**

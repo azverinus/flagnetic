@@ -194,7 +194,7 @@ export class FlagneticClient {
   /** @internal */
   localOverrides = new Map<string, { readonly type: FlagType; readonly value: JsonValue }>();
 
-  /** @internal Use createClient. */
+  /** Use createClient. */
   constructor(sdkKey: string, baseUrl: string, options: ClientOptions, internals: ClientInternals) {
     this.sdkKey = sdkKey;
     this.options = options;
@@ -954,7 +954,7 @@ export class FlagneticClient {
  * refused in a protected environment.
  */
 export class LocalOverrides {
-  /** @internal */
+  /** The client builds its own; applications reach it as `overrides`. */
   constructor(private readonly c: FlagneticClient) {}
 
   /**
@@ -1018,7 +1018,7 @@ export class LocalOverrides {
  * exposures and aliases recorded in memory.
  */
 export class OfflineMode {
-  /** @internal */
+  /** The client builds its own; applications reach it as `offline`. */
   constructor(
     private readonly c: FlagneticClient,
     private readonly source: ValuesSource | (() => ValuesSource),
