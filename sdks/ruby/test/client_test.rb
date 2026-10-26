@@ -193,6 +193,9 @@ class ClientTest < Minitest::Test
       @server.on_ruleset { |_| [200, {}, served] }
       @server.emit(2)
       eventually { c.stage == :fresh }
+      # The stage turns fresh before the delivery thread writes the store,
+      # which it does by rename, so the file is waited for whole.
+      eventually { File.read(path) == served }
       assert_equal served, File.read(path)
       assert_empty Dir.glob(File.join(dir, "*.tmp"))
     end
