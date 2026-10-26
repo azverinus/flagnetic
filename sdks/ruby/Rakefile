@@ -9,3 +9,10 @@ Rake::TestTask.new(:test) do |t|
 end
 
 task default: :test
+
+# The smoke against two real replicas: start `flagnetic-e2e up` first and
+# point FLAGNETIC_E2E_SEED at the seed it writes (e2e/README.md).
+Rake::TestTask.new(:e2e) do |t|
+  t.test_files = FileList["e2e/**/*_test.rb"]
+  t.warning = true
+end
