@@ -28,8 +28,9 @@ jobs:
 
   # The oldest Ruby the gem supports, the one before the newest and the
   # newest. The tests run every conformance fixture, the RE2 vectors and the
-  # OpenFeature reasons with no skip list, and the evaluation p99 test writes
-  # its figure to the job summary.
+  # OpenFeature reasons with no skip list, the evaluation p99 test writes
+  # its figure to the job summary, and the protocol runner's report must
+  # match the Ruby column of the behaviour matrix.
   test:
     name: ruby ${{ matrix.ruby }}
     runs-on: ubuntu-latest
@@ -48,7 +49,15 @@ jobs:
           bundler-cache: true
           working-directory: sdks/ruby
       - name: Test
+        env:
+          FLAGNETIC_SCENARIO_REPORT: ${{ runner.temp }}/scenarios.json
         run: bundle exec rake test
+      - name: Behaviour matrix
+        # The Ruby column of docs/sdks/behaviour-matrix.md is what the
+        # protocol runner reports as passed in the run above.
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/behaviour-matrix.sh" Ruby "$RUNNER_TEMP/scenarios.json"
+          git diff --exit-code -- "$GITHUB_WORKSPACE/docs/sdks/behaviour-matrix.md"
       - name: Gem builds
         run: gem build --strict flagnetic.gemspec
 

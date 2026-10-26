@@ -18,6 +18,7 @@ Metrics:
   Exclude:
     - "test/**/*"
     - "rails/test/**/*"
+    - "e2e/**/*"
 
 Metrics/MethodLength:
   Max: 30

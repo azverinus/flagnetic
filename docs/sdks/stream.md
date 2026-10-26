@@ -43,8 +43,8 @@ The declared propagation time of a server SDK, from the commit of a change until
 | The SDK | At most |
 |---|---|
 | holds the stream | 2 seconds at the 99th percentile |
-| does without it (switched off, or blocked by a proxy) | its safety poll: 30 seconds for the Go SDK |
+| does without it (switched off, or blocked by a proxy) | its safety poll: 30 seconds for the Go and Ruby SDKs |
 
-The first row holds while the replica holding the ruleset stream has its `rulesets` notification listener up, which needs a direct connection to PostgreSQL or a pooler in session mode. A kill switch is a change like any other and takes the same time. The end-to-end tests check the first row on every pull request to Flagnetic: a kill switch saved through one replica must reach a Go SDK streaming from another within 2 seconds.
+The first row holds while the replica holding the ruleset stream has its `rulesets` notification listener up, which needs a direct connection to PostgreSQL or a pooler in session mode. A kill switch is a change like any other and takes the same time. The end-to-end tests check the first row on every pull request to Flagnetic: a kill switch saved through one replica must reach a Go SDK streaming from another within 2 seconds, and on every pull request that changes the Ruby SDK the same holds for it.
 
-While its stream is connected, the Go SDK also polls every 5 minutes, which catches a version the ruleset stream missed, for example from a replica whose notification listener is down (see [Delivery across replicas](../operations.md#delivery-across-replicas)). `flagnetic_ruleset_propagation_seconds` measures the server's part, from the commit to each replica's first answer carrying the version. Client SDKs, which evaluate remotely, declare their own propagation time with their release.
+While their stream is connected, the Go and Ruby SDKs also poll every 5 minutes, which catches a version the ruleset stream missed, for example from a replica whose notification listener is down (see [Delivery across replicas](../operations.md#delivery-across-replicas)). `flagnetic_ruleset_propagation_seconds` measures the server's part, from the commit to each replica's first answer carrying the version. Client SDKs, which evaluate remotely, declare their own propagation time with their release.

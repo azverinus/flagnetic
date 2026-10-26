@@ -41,6 +41,7 @@ func TestProtocolStreamScenarios(t *testing.T) {
 		}
 		ran++
 		t.Run(sc.Name, func(t *testing.T) {
+			reportScenario(t, sc.Name)
 			runStreamScenario(t, file, sc.Given.Options.PollIntervalMS, sc.Steps)
 		})
 	}

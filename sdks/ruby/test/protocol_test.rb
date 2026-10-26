@@ -124,8 +124,26 @@ class ProtocolTest < Minitest::Test
 
   SERVER_SCENARIOS.each_with_index do |scenario, i|
     define_method(:"test_scenario_#{i}_#{scenario["name"].delete_prefix("server: ").gsub(/\W+/, "_")}") do
+      @scenario = scenario["name"]
       run_scenario(scenario)
     end
+  end
+
+  # PASSED holds the scenarios that passed in this run. When
+  # FLAGNETIC_SCENARIO_REPORT names a file, the run ends by writing them
+  # there, the report .github/scripts/behaviour-matrix.sh builds the Ruby
+  # column of docs/sdks/behaviour-matrix.md from.
+  PASSED = Queue.new
+  REPORT = ENV.fetch("FLAGNETIC_SCENARIO_REPORT", "")
+  unless REPORT.empty?
+    Minitest.after_run do
+      File.write(REPORT, JSON.generate(Array.new(PASSED.size) { PASSED.pop }.sort))
+    end
+  end
+
+  def after_teardown
+    super
+    PASSED << @scenario if @scenario && passed? && !skipped?
   end
 
   def test_the_scenarios_cover_events_and_experiments
