@@ -91,11 +91,36 @@ jobs:
       - name: Evaluation p99 over 1,000 flags
         run: pnpm test:p99
 
+  # The Playwright version the lockfile resolves, for the image the browser
+  # jobs run in.
+  playwright:
+    name: playwright version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            .github/scripts
+            sdks/js/pnpm-lock.yaml
+          sparse-checkout-cone-mode: false
+      - id: version
+        run: echo "version=$("$GITHUB_WORKSPACE/.github/scripts/playwright-version.sh" pnpm-lock.yaml)" >> "$GITHUB_OUTPUT"
+
   # The same suite in a browser, with the fixtures bundled: the evaluator's
-  # conformance and the browser client's unit and protocol tests.
+  # conformance and the browser client's unit and protocol tests. The
+  # Playwright image carries the browsers and their system libraries, so
+  # nothing is downloaded or installed through apt.
   browser:
     name: browser (chromium)
+    needs: playwright
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.playwright.outputs.version }}-noble
+      options: --ipc=host
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -108,8 +133,6 @@ jobs:
           cache-dependency-path: sdks/js/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
       - name: Conformance suite in Chromium
         run: pnpm test:browser
 
@@ -117,7 +140,16 @@ jobs:
   # bindings mounting and hydrating, in each engine.
   browsers:
     name: browser client (${{ matrix.browser }})
+    needs: playwright
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.playwright.outputs.version }}-noble
+      options: --ipc=host
+      # Firefox refuses to start as root under a home directory root does
+      # not own, which the runner's /github/home is.
+      env:
+        HOME: /root
     strategy:
       fail-fast: false
       matrix:
@@ -134,10 +166,6 @@ jobs:
           cache-dependency-path: sdks/js/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Install the browser
-        run: pnpm exec playwright install --with-deps "$FLAGNETIC_BROWSERS"
-        env:
-          FLAGNETIC_BROWSERS: ${{ matrix.browser }}
       - name: Browser client cross-origin, React in the DOM
         run: pnpm test:browsers
         env:
