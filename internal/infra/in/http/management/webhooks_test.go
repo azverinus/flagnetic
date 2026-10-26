@@ -259,12 +259,23 @@ func TestOnlyAMaintainerReadsAndManagesWebhookSubscriptions(t *testing.T) {
 			return res.StatusCode(), res.Body
 		},
 		"edit": func(c *management.ClientWithResponses) (int, []byte) {
-			res := do(c.UpdateWebhookWithResponse(t.Context(), p.Key, created.Id, &management.UpdateWebhookParams{IfMatch: ifMatch(1)},
-				management.WebhookPatch{}))
+			// Enabling and rotating move the version, in whichever order the
+			// operations run.
+			current := subscription(t, admin, p.Key, created.Id)
+			res := do(c.UpdateWebhookWithResponse(t.Context(), p.Key, created.Id,
+				&management.UpdateWebhookParams{IfMatch: ifMatch(current.Version)}, management.WebhookPatch{}))
 			return res.StatusCode(), res.Body
 		},
 		"test": func(c *management.ClientWithResponses) (int, []byte) {
 			res := do(c.TestWebhookWithResponse(t.Context(), p.Key, created.Id))
+			return res.StatusCode(), res.Body
+		},
+		"enable": func(c *management.ClientWithResponses) (int, []byte) {
+			res := do(c.EnableWebhookWithResponse(t.Context(), p.Key, created.Id))
+			return res.StatusCode(), res.Body
+		},
+		"rotate secret": func(c *management.ClientWithResponses) (int, []byte) {
+			res := do(c.RotateWebhookSecretWithResponse(t.Context(), p.Key, created.Id))
 			return res.StatusCode(), res.Body
 		},
 		"redeliver": func(c *management.ClientWithResponses) (int, []byte) {

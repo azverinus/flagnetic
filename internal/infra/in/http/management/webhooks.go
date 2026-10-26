@@ -48,15 +48,44 @@ func (a *api) CreateWebhook(ctx context.Context, req CreateWebhookRequestObject)
 	if err != nil {
 		return nil, err
 	}
-	w := webhookOut(created.Webhook)
 	return CreateWebhook201JSONResponse{
-		Body: WebhookWithSecret{
-			Id: w.Id, Name: w.Name, Url: w.Url, Events: w.Events, Environments: w.Environments, Enabled: w.Enabled,
-			DisabledReason: w.DisabledReason, CreatedBy: w.CreatedBy, LastSuccessAt: w.LastSuccessAt,
-			ConsecutiveFailures: w.ConsecutiveFailures, PreviousSecretExpiresAt: w.PreviousSecretExpiresAt,
-			CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt, Version: w.Version, Secret: created.Secret.Reveal(),
-		},
-		Headers: CreateWebhook201ResponseHeaders{ETag: etag(w.Version)},
+		Body: withSecret(created), Headers: CreateWebhook201ResponseHeaders{ETag: etag(created.Webhook.Version)},
+	}, nil
+}
+
+// withSecret answers a subscription with the secret just issued to it.
+func withSecret(issued appgovernance.CreatedWebhook) WebhookWithSecret {
+	w := webhookOut(issued.Webhook)
+	return WebhookWithSecret{
+		Id: w.Id, Name: w.Name, Url: w.Url, Events: w.Events, Environments: w.Environments, Enabled: w.Enabled,
+		DisabledReason: w.DisabledReason, CreatedBy: w.CreatedBy, LastSuccessAt: w.LastSuccessAt,
+		ConsecutiveFailures: w.ConsecutiveFailures, PreviousSecretExpiresAt: w.PreviousSecretExpiresAt,
+		CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt, Version: w.Version, Secret: issued.Secret.Reveal(),
+	}
+}
+
+// EnableWebhook enables a webhook subscription.
+func (a *api) EnableWebhook(ctx context.Context, req EnableWebhookRequestObject) (EnableWebhookResponseObject, error) {
+	w, err := a.h.EnableWebhook.Handle(ctx, appgovernance.WebhookCommand{
+		Project: projectID(ctx), Webhook: id.FromBytes[governance.Webhook](req.Webhook), Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return EnableWebhook200JSONResponse{Body: webhookOut(w), Headers: EnableWebhook200ResponseHeaders{ETag: etag(w.Version)}}, nil
+}
+
+// RotateWebhookSecret issues a webhook subscription a new secret and
+// answers it, this once.
+func (a *api) RotateWebhookSecret(ctx context.Context, req RotateWebhookSecretRequestObject) (RotateWebhookSecretResponseObject, error) {
+	rotated, err := a.h.RotateWebhookSecret.Handle(ctx, appgovernance.WebhookCommand{
+		Project: projectID(ctx), Webhook: id.FromBytes[governance.Webhook](req.Webhook), Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return RotateWebhookSecret200JSONResponse{
+		Body: withSecret(rotated), Headers: RotateWebhookSecret200ResponseHeaders{ETag: etag(rotated.Webhook.Version)},
 	}, nil
 }
 

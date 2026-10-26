@@ -62,6 +62,10 @@ func WebhookDelivery(d Deliverer, interval time.Duration, log *slog.Logger, reg 
 		case err == nil && done.Status != "" && done.Status != governance.DeliveryPending:
 			settled.WithLabelValues(string(done.Status)).Inc()
 		}
+		if done.Disabled {
+			log.WarnContext(ctx, "webhook subscription disabled for failing persistently",
+				"webhook", done.Webhook.String(), "delivery", delivery.String())
+		}
 	}
 	return Worker{
 		Name: WebhookDeliveryName, Interval: interval,

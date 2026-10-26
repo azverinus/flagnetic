@@ -107,6 +107,9 @@ type Config struct {
 	// WebhookTick is how often a replica fans the outbox out to webhook
 	// subscriptions and sends the deliveries that are due.
 	WebhookTick time.Duration
+	// WebhookSecretOverlap is how long the secret a rotation replaced keeps
+	// signing beside the new one.
+	WebhookSecretOverlap time.Duration
 	// ScheduleMinLead is how far ahead a change request's apply time must
 	// be at least.
 	ScheduleMinLead time.Duration
@@ -527,6 +530,16 @@ func Settings() []Setting {
 				"An event reaches a receiver about this long after its change at the earliest.",
 			Example: "5s",
 			apply:   durationSetting(func(c *Config, d time.Duration) { c.WebhookTick = d }),
+		},
+		{
+			Name:    "FLAGNETIC_WEBHOOK_SECRET_OVERLAP",
+			Key:     "webhook_secret_overlap",
+			Default: "24h",
+			Unit:    "duration",
+			Description: "How long the secret a webhook subscription's rotation replaced keeps signing beside the new one, " +
+				"so a receiver can take the new secret without refusing a single event.",
+			Example: "24h",
+			apply:   durationSetting(func(c *Config, d time.Duration) { c.WebhookSecretOverlap = d }),
 		},
 		{
 			Name:    "FLAGNETIC_SCHEDULE_MIN_LEAD",

@@ -6727,6 +6727,9 @@ type ClientInterface interface {
 	// Changes each property present and leaves the others as they are,
 	// with the refusals of creation; a new `url` is checked as on
 	// creation. An edit that changes nothing stores and records nothing.
+	// `enabled: true` on a subscription the platform disabled is refused
+	// `409 webhook_disabled`: `POST .../enable` enables it and resets its
+	// failures.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -6738,6 +6741,9 @@ type ClientInterface interface {
 	// Changes each property present and leaves the others as they are,
 	// with the refusals of creation; a new `url` is checked as on
 	// creation. An edit that changes nothing stores and records nothing.
+	// `enabled: true` on a subscription the platform disabled is refused
+	// `409 webhook_disabled`: `POST .../enable` enables it and resets its
+	// failures.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -6770,6 +6776,33 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverWebhookDelivery` operationId).
 	RedeliverWebhookDelivery(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableWebhook Enable a webhook subscription
+	//
+	// Enables a subscription the platform disabled for failing
+	// persistently, or one a member disabled: its `disabled_reason` is
+	// cleared, `consecutive_failures` reset, and the day without a success
+	// that disables it again counts from now. Events are queued for it from
+	// here on; deliveries dropped when it was disabled stay dropped. An
+	// enabled subscription is answered as it is, with no audit entry. It
+	// takes no `If-Match`: whatever the subscription became, the caller
+	// wants it sent events again.
+	//
+	// Corresponds with POST /projects/{project}/webhooks/{webhook}/enable (the `EnableWebhook` operationId).
+	EnableWebhook(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateWebhookSecret Rotate a webhook subscription's secret
+	//
+	// Issues the subscription a new secret, answered this once. The secret
+	// it replaces keeps signing beside the new one until
+	// `previous_secret_expires_at`, the operator's
+	// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+	// each call carries two `v1=` signatures meanwhile and a receiver
+	// holding either verifies. A secret an earlier rotation left signing is
+	// dropped at once: no more than two sign. It takes no `If-Match`.
+	//
+	// Corresponds with POST /projects/{project}/webhooks/{webhook}/rotate-secret (the `RotateWebhookSecret` operationId).
+	RotateWebhookSecret(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TestWebhook Send a test ping
 	//
@@ -10795,6 +10828,9 @@ func (c *Client) GetWebhook(ctx context.Context, project ProjectKey, webhook Web
 // Changes each property present and leaves the others as they are,
 // with the refusals of creation; a new `url` is checked as on
 // creation. An edit that changes nothing stores and records nothing.
+// `enabled: true` on a subscription the platform disabled is refused
+// `409 webhook_disabled`: `POST .../enable` enables it and resets its
+// failures.
 //
 // Takes any type of body and a specified content type.
 //
@@ -10816,6 +10852,9 @@ func (c *Client) UpdateWebhookWithBody(ctx context.Context, project ProjectKey, 
 // Changes each property present and leaves the others as they are,
 // with the refusals of creation; a new `url` is checked as on
 // creation. An edit that changes nothing stores and records nothing.
+// `enabled: true` on a subscription the platform disabled is refused
+// `409 webhook_disabled`: `POST .../enable` enables it and resets its
+// failures.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -10879,6 +10918,53 @@ func (c *Client) GetWebhookDelivery(ctx context.Context, project ProjectKey, web
 // Corresponds with POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverWebhookDelivery` operationId).
 func (c *Client) RedeliverWebhookDelivery(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRedeliverWebhookDeliveryRequest(c.Server, project, webhook, delivery)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableWebhook Enable a webhook subscription
+//
+// Enables a subscription the platform disabled for failing
+// persistently, or one a member disabled: its `disabled_reason` is
+// cleared, `consecutive_failures` reset, and the day without a success
+// that disables it again counts from now. Events are queued for it from
+// here on; deliveries dropped when it was disabled stay dropped. An
+// enabled subscription is answered as it is, with no audit entry. It
+// takes no `If-Match`: whatever the subscription became, the caller
+// wants it sent events again.
+//
+// Corresponds with POST /projects/{project}/webhooks/{webhook}/enable (the `EnableWebhook` operationId).
+func (c *Client) EnableWebhook(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableWebhookRequest(c.Server, project, webhook)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RotateWebhookSecret Rotate a webhook subscription's secret
+//
+// Issues the subscription a new secret, answered this once. The secret
+// it replaces keeps signing beside the new one until
+// `previous_secret_expires_at`, the operator's
+// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+// each call carries two `v1=` signatures meanwhile and a receiver
+// holding either verifies. A secret an earlier rotation left signing is
+// dropped at once: no more than two sign. It takes no `If-Match`.
+//
+// Corresponds with POST /projects/{project}/webhooks/{webhook}/rotate-secret (the `RotateWebhookSecret` operationId).
+func (c *Client) RotateWebhookSecret(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateWebhookSecretRequest(c.Server, project, webhook)
 	if err != nil {
 		return nil, err
 	}
@@ -18255,6 +18341,88 @@ func NewRedeliverWebhookDeliveryRequest(server string, project ProjectKey, webho
 	return req, nil
 }
 
+// NewEnableWebhookRequest constructs an http.Request for the EnableWebhook method
+func NewEnableWebhookRequest(server string, project ProjectKey, webhook WebhookID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/webhooks/%s/enable", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRotateWebhookSecretRequest constructs an http.Request for the RotateWebhookSecret method
+func NewRotateWebhookSecretRequest(server string, project ProjectKey, webhook WebhookID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/webhooks/%s/rotate-secret", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewTestWebhookRequest constructs an http.Request for the TestWebhook method
 func NewTestWebhookRequest(server string, project ProjectKey, webhook WebhookID) (*http.Request, error) {
 	var err error
@@ -20844,6 +21012,9 @@ type ClientWithResponsesInterface interface {
 	// Changes each property present and leaves the others as they are,
 	// with the refusals of creation; a new `url` is checked as on
 	// creation. An edit that changes nothing stores and records nothing.
+	// `enabled: true` on a subscription the platform disabled is refused
+	// `409 webhook_disabled`: `POST .../enable` enables it and resets its
+	// failures.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -20855,6 +21026,9 @@ type ClientWithResponsesInterface interface {
 	// Changes each property present and leaves the others as they are,
 	// with the refusals of creation; a new `url` is checked as on
 	// creation. An edit that changes nothing stores and records nothing.
+	// `enabled: true` on a subscription the platform disabled is refused
+	// `409 webhook_disabled`: `POST .../enable` enables it and resets its
+	// failures.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -20893,6 +21067,37 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverWebhookDelivery` operationId).
 	RedeliverWebhookDeliveryWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*RedeliverWebhookDeliveryResponse, error)
+
+	// EnableWebhookWithResponse Enable a webhook subscription
+	//
+	// Enables a subscription the platform disabled for failing
+	// persistently, or one a member disabled: its `disabled_reason` is
+	// cleared, `consecutive_failures` reset, and the day without a success
+	// that disables it again counts from now. Events are queued for it from
+	// here on; deliveries dropped when it was disabled stay dropped. An
+	// enabled subscription is answered as it is, with no audit entry. It
+	// takes no `If-Match`: whatever the subscription became, the caller
+	// wants it sent events again.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/webhooks/{webhook}/enable (the `EnableWebhook` operationId).
+	EnableWebhookWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*EnableWebhookResponse, error)
+
+	// RotateWebhookSecretWithResponse Rotate a webhook subscription's secret
+	//
+	// Issues the subscription a new secret, answered this once. The secret
+	// it replaces keeps signing beside the new one until
+	// `previous_secret_expires_at`, the operator's
+	// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+	// each call carries two `v1=` signatures meanwhile and a receiver
+	// holding either verifies. A secret an earlier rotation left signing is
+	// dropped at once: no more than two sign. It takes no `If-Match`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/webhooks/{webhook}/rotate-secret (the `RotateWebhookSecret` operationId).
+	RotateWebhookSecretWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*RotateWebhookSecretResponse, error)
 
 	// TestWebhookWithResponse Send a test ping
 	//
@@ -31578,6 +31783,8 @@ type UpdateWebhookResponse struct {
 	ApplicationproblemJSON403 *Forbidden
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
 	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
 	ApplicationproblemJSON412 *VersionMismatch
 	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
@@ -31613,6 +31820,11 @@ func (r UpdateWebhookResponse) GetApplicationproblemJSON403() *Forbidden {
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r UpdateWebhookResponse) GetApplicationproblemJSON404() *NotFound {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateWebhookResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
 }
 
 // GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
@@ -31874,6 +32086,158 @@ func (r RedeliverWebhookDeliveryResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RedeliverWebhookDeliveryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// EnableWebhookResponse200Headers the declared response headers of an HTTP 200 response for EnableWebhook
+type EnableWebhookResponse200Headers struct {
+	ETag *string
+}
+
+// EnableWebhookResponse401Headers the declared response headers of an HTTP 401 response for EnableWebhook
+type EnableWebhookResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type EnableWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Webhook
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *EnableWebhookResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *EnableWebhookResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r EnableWebhookResponse) GetJSON200() *Webhook {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r EnableWebhookResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r EnableWebhookResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r EnableWebhookResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r EnableWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EnableWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EnableWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EnableWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RotateWebhookSecretResponse200Headers the declared response headers of an HTTP 200 response for RotateWebhookSecret
+type RotateWebhookSecretResponse200Headers struct {
+	ETag *string
+}
+
+// RotateWebhookSecretResponse401Headers the declared response headers of an HTTP 401 response for RotateWebhookSecret
+type RotateWebhookSecretResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RotateWebhookSecretResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WebhookWithSecret
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RotateWebhookSecretResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RotateWebhookSecretResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RotateWebhookSecretResponse) GetJSON200() *WebhookWithSecret {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RotateWebhookSecretResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RotateWebhookSecretResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RotateWebhookSecretResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RotateWebhookSecretResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateWebhookSecretResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateWebhookSecretResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RotateWebhookSecretResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -35562,6 +35926,9 @@ func (c *ClientWithResponses) GetWebhookWithResponse(ctx context.Context, projec
 // Changes each property present and leaves the others as they are,
 // with the refusals of creation; a new `url` is checked as on
 // creation. An edit that changes nothing stores and records nothing.
+// `enabled: true` on a subscription the platform disabled is refused
+// `409 webhook_disabled`: `POST .../enable` enables it and resets its
+// failures.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -35579,6 +35946,9 @@ func (c *ClientWithResponses) UpdateWebhookWithBodyWithResponse(ctx context.Cont
 // Changes each property present and leaves the others as they are,
 // with the refusals of creation; a new `url` is checked as on
 // creation. An edit that changes nothing stores and records nothing.
+// `enabled: true` on a subscription the platform disabled is refused
+// `409 webhook_disabled`: `POST .../enable` enables it and resets its
+// failures.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -35640,6 +36010,49 @@ func (c *ClientWithResponses) RedeliverWebhookDeliveryWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseRedeliverWebhookDeliveryResponse(rsp)
+}
+
+// EnableWebhookWithResponse Enable a webhook subscription
+//
+// Enables a subscription the platform disabled for failing
+// persistently, or one a member disabled: its `disabled_reason` is
+// cleared, `consecutive_failures` reset, and the day without a success
+// that disables it again counts from now. Events are queued for it from
+// here on; deliveries dropped when it was disabled stay dropped. An
+// enabled subscription is answered as it is, with no audit entry. It
+// takes no `If-Match`: whatever the subscription became, the caller
+// wants it sent events again.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/webhooks/{webhook}/enable (the `EnableWebhook` operationId).
+func (c *ClientWithResponses) EnableWebhookWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*EnableWebhookResponse, error) {
+	rsp, err := c.EnableWebhook(ctx, project, webhook, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEnableWebhookResponse(rsp)
+}
+
+// RotateWebhookSecretWithResponse Rotate a webhook subscription's secret
+//
+// Issues the subscription a new secret, answered this once. The secret
+// it replaces keeps signing beside the new one until
+// `previous_secret_expires_at`, the operator's
+// `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+// each call carries two `v1=` signatures meanwhile and a receiver
+// holding either verifies. A secret an earlier rotation left signing is
+// dropped at once: no more than two sign. It takes no `If-Match`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/webhooks/{webhook}/rotate-secret (the `RotateWebhookSecret` operationId).
+func (c *ClientWithResponses) RotateWebhookSecretWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*RotateWebhookSecretResponse, error) {
+	rsp, err := c.RotateWebhookSecret(ctx, project, webhook, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateWebhookSecretResponse(rsp)
 }
 
 // TestWebhookWithResponse Send a test ping
@@ -45472,6 +45885,13 @@ func ParseUpdateWebhookResponse(rsp *http.Response) (*UpdateWebhookResponse, err
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
 		var dest VersionMismatch
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -45702,6 +46122,146 @@ func ParseRedeliverWebhookDeliveryResponse(rsp *http.Response) (*RedeliverWebhoo
 	switch {
 	case rsp.StatusCode == 401:
 		var headers RedeliverWebhookDeliveryResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseEnableWebhookResponse parses an HTTP response from a EnableWebhookWithResponse call
+func ParseEnableWebhookResponse(rsp *http.Response) (*EnableWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EnableWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Webhook
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers EnableWebhookResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers EnableWebhookResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRotateWebhookSecretResponse parses an HTTP response from a RotateWebhookSecretWithResponse call
+func ParseRotateWebhookSecretResponse(rsp *http.Response) (*RotateWebhookSecretResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateWebhookSecretResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WebhookWithSecret
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RotateWebhookSecretResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RotateWebhookSecretResponse401Headers
 		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -46286,6 +46846,12 @@ type ServerInterface interface {
 	// RedeliverWebhookDelivery Send a delivery's event again
 	// (POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver)
 	RedeliverWebhookDelivery(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID)
+	// EnableWebhook Enable a webhook subscription
+	// (POST /projects/{project}/webhooks/{webhook}/enable)
+	EnableWebhook(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID)
+	// RotateWebhookSecret Rotate a webhook subscription's secret
+	// (POST /projects/{project}/webhooks/{webhook}/rotate-secret)
+	RotateWebhookSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID)
 	// TestWebhook Send a test ping
 	// (POST /projects/{project}/webhooks/{webhook}/test)
 	TestWebhook(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID)
@@ -52299,6 +52865,76 @@ func (siw *ServerInterfaceWrapper) RedeliverWebhookDelivery(w http.ResponseWrite
 	handler.ServeHTTP(w, r)
 }
 
+// EnableWebhook operation middleware
+func (siw *ServerInterfaceWrapper) EnableWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableWebhook(w, r, project, webhook)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RotateWebhookSecret operation middleware
+func (siw *ServerInterfaceWrapper) RotateWebhookSecret(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateWebhookSecret(w, r, project, webhook)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // TestWebhook operation middleware
 func (siw *ServerInterfaceWrapper) TestWebhook(w http.ResponseWriter, r *http.Request) {
 
@@ -52614,6 +53250,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}", wrapper.GetWebhook)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}", wrapper.UpdateWebhook)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/test", wrapper.TestWebhook)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/enable", wrapper.EnableWebhook)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/rotate-secret", wrapper.RotateWebhookSecret)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries", wrapper.ListWebhookDeliveries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}", wrapper.GetWebhookDelivery)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver", wrapper.RedeliverWebhookDelivery)
@@ -66127,6 +66765,22 @@ func (response UpdateWebhook404ApplicationProblemPlusJSONResponse) VisitUpdateWe
 	return err
 }
 
+type UpdateWebhook409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateWebhook409ApplicationProblemPlusJSONResponse) VisitUpdateWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type UpdateWebhook412ApplicationProblemPlusJSONResponse struct {
 	VersionMismatchApplicationProblemPlusJSONResponse
 }
@@ -66428,6 +67082,174 @@ func (response RedeliverWebhookDelivery409ApplicationProblemPlusJSONResponse) Vi
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableWebhookRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Webhook WebhookID  `json:"webhook"`
+}
+
+type EnableWebhookResponseObject interface {
+	VisitEnableWebhookResponse(w http.ResponseWriter) error
+}
+
+type EnableWebhook200ResponseHeaders struct {
+	ETag *string
+}
+
+type EnableWebhook200JSONResponse struct {
+	Body    Webhook
+	Headers EnableWebhook200ResponseHeaders
+}
+
+func (response EnableWebhook200JSONResponse) VisitEnableWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableWebhook401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response EnableWebhook401ApplicationProblemPlusJSONResponse) VisitEnableWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableWebhook403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response EnableWebhook403ApplicationProblemPlusJSONResponse) VisitEnableWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableWebhook404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response EnableWebhook404ApplicationProblemPlusJSONResponse) VisitEnableWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateWebhookSecretRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Webhook WebhookID  `json:"webhook"`
+}
+
+type RotateWebhookSecretResponseObject interface {
+	VisitRotateWebhookSecretResponse(w http.ResponseWriter) error
+}
+
+type RotateWebhookSecret200ResponseHeaders struct {
+	ETag *string
+}
+
+type RotateWebhookSecret200JSONResponse struct {
+	Body    WebhookWithSecret
+	Headers RotateWebhookSecret200ResponseHeaders
+}
+
+func (response RotateWebhookSecret200JSONResponse) VisitRotateWebhookSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateWebhookSecret401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RotateWebhookSecret401ApplicationProblemPlusJSONResponse) VisitRotateWebhookSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateWebhookSecret403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RotateWebhookSecret403ApplicationProblemPlusJSONResponse) VisitRotateWebhookSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateWebhookSecret404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RotateWebhookSecret404ApplicationProblemPlusJSONResponse) VisitRotateWebhookSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -67032,6 +67854,12 @@ type StrictServerInterface interface {
 	// RedeliverWebhookDelivery Send a delivery's event again
 	// (POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver)
 	RedeliverWebhookDelivery(ctx context.Context, request RedeliverWebhookDeliveryRequestObject) (RedeliverWebhookDeliveryResponseObject, error)
+	// EnableWebhook Enable a webhook subscription
+	// (POST /projects/{project}/webhooks/{webhook}/enable)
+	EnableWebhook(ctx context.Context, request EnableWebhookRequestObject) (EnableWebhookResponseObject, error)
+	// RotateWebhookSecret Rotate a webhook subscription's secret
+	// (POST /projects/{project}/webhooks/{webhook}/rotate-secret)
+	RotateWebhookSecret(ctx context.Context, request RotateWebhookSecretRequestObject) (RotateWebhookSecretResponseObject, error)
 	// TestWebhook Send a test ping
 	// (POST /projects/{project}/webhooks/{webhook}/test)
 	TestWebhook(ctx context.Context, request TestWebhookRequestObject) (TestWebhookResponseObject, error)
@@ -70940,6 +71768,60 @@ func (sh *strictHandler) RedeliverWebhookDelivery(w http.ResponseWriter, r *http
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RedeliverWebhookDeliveryResponseObject); ok {
 		if err := validResponse.VisitRedeliverWebhookDeliveryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnableWebhook operation middleware
+func (sh *strictHandler) EnableWebhook(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID) {
+	var request EnableWebhookRequestObject
+
+	request.Project = project
+	request.Webhook = webhook
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EnableWebhook(ctx, request.(EnableWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EnableWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EnableWebhookResponseObject); ok {
+		if err := validResponse.VisitEnableWebhookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RotateWebhookSecret operation middleware
+func (sh *strictHandler) RotateWebhookSecret(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID) {
+	var request RotateWebhookSecretRequestObject
+
+	request.Project = project
+	request.Webhook = webhook
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RotateWebhookSecret(ctx, request.(RotateWebhookSecretRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RotateWebhookSecret")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RotateWebhookSecretResponseObject); ok {
+		if err := validResponse.VisitRotateWebhookSecretResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

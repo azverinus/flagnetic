@@ -12,16 +12,23 @@ import (
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/pkg/pgxtx"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
 // Deliveries is the repository the delivery worker leases deliveries from
 // and records their attempts in.
-type Deliveries struct{ pool *pgxpool.Pool }
+type Deliveries struct {
+	pool *pgxpool.Pool
+	// projects takes the project row lock the same way change requests do.
+	projects *ChangeRequests
+}
 
 // NewDeliveries returns the repository on pool.
-func NewDeliveries(pool *pgxpool.Pool) *Deliveries { return &Deliveries{pool: pool} }
+func NewDeliveries(pool *pgxpool.Pool) *Deliveries {
+	return &Deliveries{pool: pool, projects: NewChangeRequests(pool)}
+}
 
 var _ appgovernance.DeliveryStore = (*Deliveries)(nil)
 
@@ -178,6 +185,48 @@ func (s *Deliveries) CountAttempt(ctx context.Context, webhook governance.Webhoo
 	}
 	if _, err := s.db(ctx).Exec(ctx, query, args...); err != nil {
 		return fmt.Errorf("counting a delivery attempt: %w", err)
+	}
+	return nil
+}
+
+// LockProject locks project's row for the unit of work, or answers
+// appgovernance.ErrNotFound when there is none.
+func (s *Deliveries) LockProject(ctx context.Context, project workspace.ProjectID) error {
+	return s.projects.LockProject(ctx, project)
+}
+
+// SubscriptionOf returns the subscription with webhook, of whichever
+// project, or appgovernance.ErrNotFound.
+func (s *Deliveries) SubscriptionOf(ctx context.Context, webhook governance.WebhookID) (governance.Webhook, error) {
+	w, err := scanWebhook(s.db(ctx).QueryRow(ctx, `SELECT `+webhookColumns+webhookFrom+` WHERE w.id = $1`, webhook.Bytes()))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return w, appgovernance.ErrNotFound
+	}
+	if err != nil {
+		return w, fmt.Errorf("reading a webhook subscription: %w", err)
+	}
+	return w, nil
+}
+
+// DisableWebhook stores w's disabling by the platform.
+func (s *Deliveries) DisableWebhook(ctx context.Context, w governance.Webhook) error {
+	_, err := s.db(ctx).Exec(ctx, `
+		UPDATE webhook_subscriptions SET enabled = $2, disabled_reason = $3, updated_at = $4, version = $5 WHERE id = $1`,
+		w.ID.Bytes(), w.Enabled, reasonOf(w), w.UpdatedAt, w.Version)
+	if err != nil {
+		return fmt.Errorf("disabling a webhook subscription: %w", err)
+	}
+	return nil
+}
+
+// DropPending drops every pending delivery of webhook, leased or not.
+func (s *Deliveries) DropPending(ctx context.Context, webhook governance.WebhookID, now time.Time) error {
+	_, err := s.db(ctx).Exec(ctx, `
+		UPDATE webhook_deliveries
+		SET status = 'dropped', next_attempt_at = NULL, lease_until = NULL, lease_token = NULL, updated_at = $2
+		WHERE subscription_id = $1 AND status = 'pending'`, webhook.Bytes(), now)
+	if err != nil {
+		return fmt.Errorf("dropping a webhook subscription's pending deliveries: %w", err)
 	}
 	return nil
 }

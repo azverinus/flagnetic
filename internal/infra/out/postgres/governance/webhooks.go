@@ -197,3 +197,36 @@ func (s *Webhooks) DeleteWebhook(ctx context.Context, project workspace.ProjectI
 	}
 	return nil
 }
+
+// EnableWebhook stores w's enabling, which its caller read under the
+// project's lock: enabled, with no reason and no failures, its window
+// starting at its enable time.
+func (s *Webhooks) EnableWebhook(ctx context.Context, w governance.Webhook) error {
+	_, err := s.db(ctx).Exec(ctx, `
+		UPDATE webhook_subscriptions
+		SET enabled = $3, disabled_reason = $4, consecutive_failures = $5, enabled_at = $6, updated_at = $7, version = $8
+		WHERE project_id = $1 AND id = $2`,
+		w.Project.Bytes(), w.ID.Bytes(), w.Enabled, reasonOf(w), w.ConsecutiveFailures, w.EnabledAt, w.UpdatedAt, w.Version)
+	if err != nil {
+		return fmt.Errorf("enabling a webhook subscription: %w", err)
+	}
+	return nil
+}
+
+// RotateWebhookSecret stores w's secrets, which its caller read under the
+// project's lock.
+func (s *Webhooks) RotateWebhookSecret(ctx context.Context, w governance.Webhook) error {
+	var previous any
+	if w.PreviousSealedSecret != "" {
+		previous = w.PreviousSealedSecret
+	}
+	_, err := s.db(ctx).Exec(ctx, `
+		UPDATE webhook_subscriptions
+		SET secret_sealed = $3, previous_secret_sealed = $4, previous_secret_expires_at = $5, updated_at = $6, version = $7
+		WHERE project_id = $1 AND id = $2`,
+		w.Project.Bytes(), w.ID.Bytes(), w.SealedSecret, previous, w.PreviousSecretExpiresAt, w.UpdatedAt, w.Version)
+	if err != nil {
+		return fmt.Errorf("rotating a webhook subscription's secret: %w", err)
+	}
+	return nil
+}

@@ -3644,6 +3644,26 @@ export const zTestWebhookPath = z.object({
  */
 export const zTestWebhookResponse = zWebhookDelivery;
 
+export const zEnableWebhookPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+});
+
+/**
+ * The subscription, enabled.
+ */
+export const zEnableWebhookResponse = zWebhook;
+
+export const zRotateWebhookSecretPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+});
+
+/**
+ * The subscription with its new secret.
+ */
+export const zRotateWebhookSecretResponse = zWebhookWithSecret;
+
 export const zListWebhookDeliveriesPath = z.object({
   project: z.string(),
   webhook: z.uuid(),

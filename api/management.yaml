@@ -4751,6 +4751,9 @@ paths:
         Changes each property present and leaves the others as they are,
         with the refusals of creation; a new `url` is checked as on
         creation. An edit that changes nothing stores and records nothing.
+        `enabled: true` on a subscription the platform disabled is refused
+        `409 webhook_disabled`: `POST .../enable` enables it and resets its
+        failures.
       x-permission: webhook.manage
       tags: [webhooks]
       parameters:
@@ -4779,6 +4782,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "412":
           $ref: "#/components/responses/VersionMismatch"
         "422":
@@ -4835,6 +4840,73 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /projects/{project}/webhooks/{webhook}/enable:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/WebhookID"
+    post:
+      operationId: enableWebhook
+      summary: Enable a webhook subscription
+      description: |
+        Enables a subscription the platform disabled for failing
+        persistently, or one a member disabled: its `disabled_reason` is
+        cleared, `consecutive_failures` reset, and the day without a success
+        that disables it again counts from now. Events are queued for it from
+        here on; deliveries dropped when it was disabled stay dropped. An
+        enabled subscription is answered as it is, with no audit entry. It
+        takes no `If-Match`: whatever the subscription became, the caller
+        wants it sent events again.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "200":
+          description: The subscription, enabled.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /projects/{project}/webhooks/{webhook}/rotate-secret:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/WebhookID"
+    post:
+      operationId: rotateWebhookSecret
+      summary: Rotate a webhook subscription's secret
+      description: |
+        Issues the subscription a new secret, answered this once. The secret
+        it replaces keeps signing beside the new one until
+        `previous_secret_expires_at`, the operator's
+        `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+        each call carries two `v1=` signatures meanwhile and a receiver
+        holding either verifies. A secret an earlier rotation left signing is
+        dropped at once: no more than two sign. It takes no `If-Match`.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "200":
+          description: The subscription with its new secret.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookWithSecret"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /projects/{project}/webhooks/{webhook}/deliveries:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"

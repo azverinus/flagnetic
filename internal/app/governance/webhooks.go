@@ -32,6 +32,12 @@ type WebhookStore interface {
 	// DeleteWebhook deletes project's subscription with webhook, read under
 	// the project's lock.
 	DeleteWebhook(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID) error
+	// EnableWebhook stores w's enabling: its enabled flag, reason, failures,
+	// enable time and version, read under the project's lock.
+	EnableWebhook(ctx context.Context, w governance.Webhook) error
+	// RotateWebhookSecret stores w's secrets and version, read under the
+	// project's lock.
+	RotateWebhookSecret(ctx context.Context, w governance.Webhook) error
 }
 
 // Resolver resolves a target's host name to its addresses.
@@ -56,6 +62,8 @@ type WebhookDeps struct {
 	Resolver Resolver
 	// Targets is what the operator allows a target to be.
 	Targets governance.TargetPolicy
+	// SecretOverlap is how long a rotated secret signs beside the new one.
+	SecretOverlap time.Duration
 }
 
 // resolveTimeout bounds how long a write waits for a target's name to
@@ -177,25 +185,43 @@ func NewListWebhookEventTypes() *ListWebhookEventTypes { return &ListWebhookEven
 func (*ListWebhookEventTypes) Handle() []governance.EventType { return governance.EventCatalogue() }
 
 // ListWebhooks answers a project's subscriptions.
-type ListWebhooks struct{ store WebhookStore }
+type ListWebhooks struct {
+	store WebhookStore
+	clock clock.Clock
+}
 
-// NewListWebhooks returns the query.
-func NewListWebhooks(store WebhookStore) *ListWebhooks { return &ListWebhooks{store: store} }
+// NewListWebhooks returns the query, judging rotations' overlaps by c.
+func NewListWebhooks(store WebhookStore, c clock.Clock) *ListWebhooks {
+	return &ListWebhooks{store: store, clock: c}
+}
 
-// Handle returns project's subscriptions, the oldest first.
+// Handle returns project's subscriptions, the oldest first, as they stand
+// now.
 func (h *ListWebhooks) Handle(ctx context.Context, project workspace.ProjectID) ([]governance.Webhook, error) {
-	return h.store.Webhooks(ctx, project)
+	list, err := h.store.Webhooks(ctx, project)
+	now := h.clock.Now()
+	for i := range list {
+		list[i] = list[i].Presented(now)
+	}
+	return list, err
 }
 
 // GetWebhook answers one subscription.
-type GetWebhook struct{ store WebhookStore }
+type GetWebhook struct {
+	store WebhookStore
+	clock clock.Clock
+}
 
-// NewGetWebhook returns the query.
-func NewGetWebhook(store WebhookStore) *GetWebhook { return &GetWebhook{store: store} }
+// NewGetWebhook returns the query, judging rotations' overlaps by c.
+func NewGetWebhook(store WebhookStore, c clock.Clock) *GetWebhook {
+	return &GetWebhook{store: store, clock: c}
+}
 
-// Handle returns project's subscription with webhook, or not_found.
+// Handle returns project's subscription with webhook as it stands now, or
+// not_found.
 func (h *GetWebhook) Handle(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID) (governance.Webhook, error) {
-	return webhookOf(ctx, h.store, project, webhook)
+	w, err := webhookOf(ctx, h.store, project, webhook)
+	return w.Presented(h.clock.Now()), err
 }
 
 // CreateWebhookCommand asks for a subscription of Project.
@@ -298,6 +324,9 @@ func (h *UpdateWebhook) Handle(ctx context.Context, cmd UpdateWebhookCommand) (g
 	if err != nil {
 		return seen, err
 	}
+	if err = seen.CheckChange(cmd.Change); err != nil {
+		return seen, err
+	}
 	in, err := h.d.check(ctx, cmd.Project, seen.With(cmd.Change), keptEnvironments(seen, cmd.Change)...)
 	if err != nil {
 		return seen, err
@@ -308,12 +337,13 @@ func (h *UpdateWebhook) Handle(ctx context.Context, cmd UpdateWebhookCommand) (g
 		}
 	}
 	var out governance.Webhook
+	now := h.d.now()
 	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var txErr error
-		out, txErr = h.update(ctx, cmd, h.d.now())
+		out, txErr = h.update(ctx, cmd, now)
 		return txErr
 	})
-	return out, err
+	return out.Presented(now), err
 }
 
 // update applies cmd's change under the project's lock. The target is the
@@ -332,6 +362,10 @@ func (h *UpdateWebhook) update(ctx context.Context, cmd UpdateWebhookCommand, no
 		return before, err
 	}
 	if err = precondition.Check(cmd.Expected, before.Version); err != nil {
+		return before, err
+	}
+	// Checked again under the lock: the platform may have disabled it since.
+	if err = before.CheckChange(cmd.Change); err != nil {
 		return before, err
 	}
 	if in.Same(before.WebhookInput) {
@@ -381,4 +415,92 @@ func (h *DeleteWebhook) Handle(ctx context.Context, cmd DeleteWebhookCommand) er
 		}
 		return h.d.record(ctx, now, cmd.Request, "webhook.deleted", &before, nil)
 	})
+}
+
+// WebhookCommand names the subscription Webhook of Project, acted on in
+// Request.
+type WebhookCommand struct {
+	Project workspace.ProjectID
+	Webhook governance.WebhookID
+	Request governance.Request
+}
+
+// EnableWebhook enables a webhook subscription.
+type EnableWebhook struct{ d WebhookDeps }
+
+// NewEnableWebhook returns the handler.
+func NewEnableWebhook(d WebhookDeps) *EnableWebhook { return &EnableWebhook{d: d} }
+
+// Handle enables the subscription, whether the platform or a member
+// disabled it, clearing its reason and failures and starting its window
+// again, and records webhook.enabled. An enabled subscription is returned as
+// it is and nothing is recorded. The deliveries dropped when the platform
+// disabled it stay dropped.
+func (h *EnableWebhook) Handle(ctx context.Context, cmd WebhookCommand) (governance.Webhook, error) {
+	now := h.d.now()
+	var out governance.Webhook
+	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		if err := h.d.lockProject(ctx, cmd.Project); err != nil {
+			return err
+		}
+		before, err := webhookOf(ctx, h.d.Store, cmd.Project, cmd.Webhook)
+		if err != nil {
+			return err
+		}
+		after, changed := before.Enable(now)
+		if out = after; !changed {
+			return nil
+		}
+		if err = h.d.Store.EnableWebhook(ctx, after); err != nil {
+			return err
+		}
+		if err = h.d.record(ctx, now, cmd.Request, "webhook.enabled", &before, &after); err != nil {
+			return err
+		}
+		out, err = webhookOf(ctx, h.d.Store, cmd.Project, cmd.Webhook)
+		return err
+	})
+	return out.Presented(now), err
+}
+
+// RotateWebhookSecret issues a webhook subscription a new secret.
+type RotateWebhookSecret struct{ d WebhookDeps }
+
+// NewRotateWebhookSecret returns the handler.
+func NewRotateWebhookSecret(d WebhookDeps) *RotateWebhookSecret { return &RotateWebhookSecret{d: d} }
+
+// Handle draws the subscription a new secret, stores it sealed with the one
+// it replaces signing beside it for the overlap, and records
+// webhook.secret_rotated with both redacted. The new secret is returned this
+// once.
+func (h *RotateWebhookSecret) Handle(ctx context.Context, cmd WebhookCommand) (CreatedWebhook, error) {
+	value, err := governance.NewWebhookSecret(h.d.Random)
+	if err != nil {
+		return CreatedWebhook{}, err
+	}
+	sealed, err := h.d.Sealer.Seal(secret.PurposeWebhookSecret, []byte(value.Reveal()))
+	if err != nil {
+		return CreatedWebhook{}, err
+	}
+	now := h.d.now()
+	out := CreatedWebhook{Secret: value}
+	err = h.d.Tx.Within(ctx, func(ctx context.Context) error {
+		if txErr := h.d.lockProject(ctx, cmd.Project); txErr != nil {
+			return txErr
+		}
+		before, txErr := webhookOf(ctx, h.d.Store, cmd.Project, cmd.Webhook)
+		if txErr != nil {
+			return txErr
+		}
+		after := before.RotateSecret(sealed, now, h.d.SecretOverlap)
+		if txErr = h.d.Store.RotateWebhookSecret(ctx, after); txErr != nil {
+			return txErr
+		}
+		if txErr = h.d.record(ctx, now, cmd.Request, "webhook.secret_rotated", &before, &after); txErr != nil {
+			return txErr
+		}
+		out.Webhook, txErr = webhookOf(ctx, h.d.Store, cmd.Project, cmd.Webhook)
+		return txErr
+	})
+	return out, err
 }

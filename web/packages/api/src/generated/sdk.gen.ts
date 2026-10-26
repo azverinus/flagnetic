@@ -124,6 +124,9 @@ import type {
   DismissDiscoveredAttributeData,
   DismissDiscoveredAttributeErrors,
   DismissDiscoveredAttributeResponses,
+  EnableWebhookData,
+  EnableWebhookErrors,
+  EnableWebhookResponses,
   EvaluateData,
   EvaluateErrors,
   EvaluateResponses,
@@ -352,6 +355,9 @@ import type {
   RotateSdkKeyData,
   RotateSdkKeyErrors,
   RotateSdkKeyResponses,
+  RotateWebhookSecretData,
+  RotateWebhookSecretErrors,
+  RotateWebhookSecretResponses,
   SetEnvironmentProtectionData,
   SetEnvironmentProtectionErrors,
   SetEnvironmentProtectionResponses,
@@ -4204,6 +4210,9 @@ export const getWebhook = <ThrowOnError extends boolean = false>(
  * Changes each property present and leaves the others as they are,
  * with the refusals of creation; a new `url` is checked as on
  * creation. An edit that changes nothing stores and records nothing.
+ * `enabled: true` on a subscription the platform disabled is refused
+ * `409 webhook_disabled`: `POST .../enable` enables it and resets its
+ * failures.
  *
  */
 export const updateWebhook = <ThrowOnError extends boolean = false>(
@@ -4251,6 +4260,67 @@ export const testWebhook = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/webhooks/{webhook}/test",
+    ...options,
+  });
+
+/**
+ * Enable a webhook subscription
+ *
+ * Enables a subscription the platform disabled for failing
+ * persistently, or one a member disabled: its `disabled_reason` is
+ * cleared, `consecutive_failures` reset, and the day without a success
+ * that disables it again counts from now. Events are queued for it from
+ * here on; deliveries dropped when it was disabled stay dropped. An
+ * enabled subscription is answered as it is, with no audit entry. It
+ * takes no `If-Match`: whatever the subscription became, the caller
+ * wants it sent events again.
+ *
+ */
+export const enableWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<EnableWebhookData, ThrowOnError>,
+): RequestResult<EnableWebhookResponses, EnableWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<EnableWebhookResponses, EnableWebhookErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}/enable",
+    ...options,
+  });
+
+/**
+ * Rotate a webhook subscription's secret
+ *
+ * Issues the subscription a new secret, answered this once. The secret
+ * it replaces keeps signing beside the new one until
+ * `previous_secret_expires_at`, the operator's
+ * `FLAGNETIC_WEBHOOK_SECRET_OVERLAP` (24 hours unless set) from now, so
+ * each call carries two `v1=` signatures meanwhile and a receiver
+ * holding either verifies. A secret an earlier rotation left signing is
+ * dropped at once: no more than two sign. It takes no `If-Match`.
+ *
+ */
+export const rotateWebhookSecret = <ThrowOnError extends boolean = false>(
+  options: Options<RotateWebhookSecretData, ThrowOnError>,
+): RequestResult<RotateWebhookSecretResponses, RotateWebhookSecretErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RotateWebhookSecretResponses,
+    RotateWebhookSecretErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}/rotate-secret",
     ...options,
   });
 
