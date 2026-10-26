@@ -516,6 +516,14 @@ func TestAnEditSetsOrClearsTheApplyTime(t *testing.T) {
 	if _, again, againErr := scheduled.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{At: &at}}, later); againErr != nil || again {
 		t.Errorf("the same apply time again: changed %v, %v", again, againErr)
 	}
+	// An apply time sent back unchanged is not judged again, though it is
+	// now inside the lead.
+	near := at.Add(-30 * time.Second)
+	if kept, again, againErr := scheduled.Edit(byAda, governance.Edit{Title: ptrTo("Other"),
+		Schedule: &governance.ScheduleEdit{At: &at}, MinLead: time.Minute}, near); againErr != nil || !again ||
+		kept.ApplyAt == nil || !kept.ApplyAt.Equal(at) {
+		t.Errorf("the same apply time inside the lead: %v, changed %v, %v", kept.ApplyAt, again, againErr)
+	}
 	// The lead is judged from the edit, not from when the change request
 	// was created.
 	soon := later.Add(30 * time.Second)

@@ -501,9 +501,15 @@ func (cr ChangeRequest) Edit(by Taker, e Edit, now time.Time) (ChangeRequest, bo
 	out := cr
 	if e.Schedule != nil {
 		out.ApplyAt = nil
-		if e.Schedule.At != nil {
-			at, violation := checkApplyAt(*e.Schedule.At, now, e.MinLead)
-			out.ApplyAt, err = &at, withViolation(err, violation)
+		switch at := e.Schedule.At; {
+		case at != nil && cr.ApplyAt != nil && at.Equal(*cr.ApplyAt):
+			// The apply time sent back unchanged is not set again: a
+			// client resending the whole change request with an edit of
+			// its title is not refused because its time drew near.
+			out.ApplyAt = cr.ApplyAt
+		case at != nil:
+			checked, violation := checkApplyAt(*at, now, e.MinLead)
+			out.ApplyAt, err = &checked, withViolation(err, violation)
 		}
 	}
 	if err != nil {
