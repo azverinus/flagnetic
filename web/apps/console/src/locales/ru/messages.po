@@ -11,6 +11,12 @@ msgstr ""
 msgid "“{bad}” is not an origin. Use a scheme, a host and an optional port, such as https://app.example.com."
 msgstr "«{bad}» не источник. Укажите схему, хост и, при необходимости, порт, например https://app.example.com."
 
+#. placeholder {0}: exposure_conflicts.conflicts
+#. placeholder {1}: exposure_conflicts.conflicting_units
+#: src/components/experiment-alerts.tsx
+msgid "{0, plural, one {# conflicting exposure} other {# conflicting exposures}} {1, plural, one {from # unit} other {from # units}} reached the threshold, {threshold}; units first exposed: {units}."
+msgstr "{0, plural, one {# конфликтная экспозиция} few {# конфликтные экспозиции} many {# конфликтных экспозиций} other {# конфликтной экспозиции}} {1, plural, one {от # единицы} few {от # единиц} many {от # единиц} other {от # единицы}} достигли порога, {threshold}; впервые получили экспозицию: {units}."
+
 #: src/components/rule-editor.tsx
 msgid "{allocation}% of {unitType} units included"
 msgstr "Включено {allocation}% единиц {unitType}"
@@ -126,6 +132,10 @@ msgstr "{key} включён в окружении {name}"
 msgid "{key} was already off in {name}. Nothing changed."
 msgstr "{key} уже был выключен в окружении {name}. Ничего не изменилось."
 
+#: src/components/experiment-alerts.tsx
+msgid "{kind} in {environment}"
+msgstr "{kind}: {environment}"
+
 #: src/components/grant-form.tsx
 msgid "{label}: {status}"
 msgstr "{label}: {status}"
@@ -211,6 +221,14 @@ msgstr "{to} получает правила {source} с их идентифик
 msgid "{total, plural, one {# unit first exposed} other {# units first exposed}}"
 msgstr "{total, plural, one {Впервые получила экспозицию # единица} few {Впервые получили экспозицию # единицы} many {Впервые получили экспозицию # единиц} other {Впервые получили экспозицию # единицы}}"
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "{unacknowledged, plural, one {# alert} other {# alerts}}"
+msgstr "{unacknowledged, plural, one {# алерт} few {# алерта} many {# алертов} other {# алерта}}"
+
+#: src/components/experiment-alerts.tsx
+msgid "{variation} {seen}, expected {asked}"
+msgstr "{variation} {seen}, ожидалось {asked}"
+
 #: src/lib/conditions.ts
 msgid "{variation} to {percent}% of {unitType} units"
 msgstr "{variation} для {percent}% единиц {unitType}"
@@ -234,6 +252,10 @@ msgstr "{who} сохранил(а) изменение {when}, уже после 
 #: src/components/conflict-banner.tsx
 msgid "{who} saved this configuration on {when}, after this draft was loaded."
 msgstr "{who} сохранил(а) эту конфигурацию {when}, уже после загрузки этого черновика."
+
+#: src/lib/experiment-alerts.ts
+msgid "< {bound}"
+msgstr "< {bound}"
 
 #: src/components/experiment-assignment.tsx
 msgid "<0>{unit}</0> gets <1>{variation}</1>."
@@ -383,6 +405,10 @@ msgstr "В правиле — не более {maxConditionsText} условий
 msgid "A rule's rollout served: the unit's bucket is below its percentage."
 msgstr "Сработала раскатка правила: корзина единицы ниже её процента."
 
+#: src/components/experiment-alerts.tsx
+msgid "A running experiment is checked every 10 minutes for a sample-ratio mismatch, a day without exposures, conflicting exposures and running past its expected end. An alert stays active until its condition clears; one returning raises a new alert."
+msgstr "Запущенный эксперимент проверяется каждые 10 минут: на нарушение соотношения выборки, сутки без экспозиций, конфликтующие экспозиции и работу после ожидаемого окончания. Алерт действует, пока его условие не снято; вернувшееся условие поднимает новый алерт."
+
 #: src/lib/problem-messages.ts
 msgid "A running experiment is stopped with a decision before it is archived."
 msgstr "Запущенный эксперимент сначала останавливают с решением, а потом отправляют в архив."
@@ -477,6 +503,14 @@ msgstr "Принять приглашение"
 msgid "Accept your invitation"
 msgstr "Примите приглашение"
 
+#: src/components/experiment-alerts.tsx
+msgid "Acknowledge"
+msgstr "Подтвердить"
+
+#: src/components/experiment-alerts.tsx
+msgid "Acknowledged"
+msgstr "Подтверждён"
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Action"
@@ -487,11 +521,16 @@ msgstr "Действие"
 msgid "Actions"
 msgstr "Действия"
 
+#: src/components/experiment-alerts.tsx
 #: src/components/token-list.tsx
 #: src/lib/members.ts
 #: src/lib/sdk-keys.ts
 msgid "Active"
 msgstr "Действует"
+
+#: src/components/experiment-alerts.tsx
+msgid "Active alerts"
+msgstr "Действующие алерты"
 
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
@@ -570,6 +609,14 @@ msgstr "Администрировать экземпляр: проекты, у�
 #: src/components/audit-entry-sheet.tsx
 msgid "After"
 msgstr "После"
+
+#: src/components/experiment-alerts.tsx
+msgid "Alert"
+msgstr "Алерт"
+
+#: src/components/experiment-alerts.tsx
+msgid "Alerts"
+msgstr "Алерты"
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "All"
@@ -907,6 +954,10 @@ msgstr "Автоматическая экспозиция выключена."
 msgid "Automatic exposure switched on."
 msgstr "Автоматическая экспозиция включена."
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Awaiting code removal"
+msgstr "Ждут удаления кода"
+
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Awaiting my decision"
 msgstr "Ждут моего решения"
@@ -1054,6 +1105,10 @@ msgstr "Изменения сегмента"
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr "После смены пароля все остальные устройства выйдут из системы; на этом вход сохранится."
+
+#: src/components/experiment-exposures.tsx
+msgid "Checked <0/>."
+msgstr "Проверено <0/>."
 
 #: src/components/rule-editor.tsx
 msgid "Checked top to bottom; the first whose conditions all hold serves. Reorder by dragging, with the arrows, or with Alt+Arrow Up and Down."
@@ -1216,6 +1271,10 @@ msgstr "Выбранные теги"
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Clear filters"
 msgstr "Сбросить фильтры"
+
+#: src/components/experiment-alerts.tsx
+msgid "Cleared"
+msgstr "Снят"
 
 #: src/components/experiment-assignment.tsx
 msgid "ClickHouse query"
@@ -1856,6 +1915,7 @@ msgid "Entity"
 msgstr "Объект"
 
 #. A kind of entity in the audit log.
+#: src/components/experiment-alerts.tsx
 #: src/components/flag-history.tsx
 #: src/components/project-audit.tsx
 #: src/lib/audit.ts
@@ -2026,6 +2086,10 @@ msgstr "Ожидаемое удаление изменено: было {before},
 msgid "Expected share"
 msgstr "Ожидаемая доля"
 
+#: src/components/experiment-alerts.tsx
+msgid "Expected to end on {day}. Stop it with a decision, or move its expected end."
+msgstr "Ожидаемое окончание — {day}. Остановите его с решением или перенесите ожидаемое окончание."
+
 #: src/components/rule-editor.tsx
 #: src/lib/change-requests.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -2081,6 +2145,10 @@ msgstr "Истёк"
 msgid "Expires"
 msgstr "Истекает"
 
+#: src/lib/experiment-alerts.ts
+msgid "Exposure conflicts"
+msgstr "Конфликты экспозиций"
+
 #: src/components/experiment-exposures.tsx
 msgid "Exposures"
 msgstr "Экспозиции"
@@ -2122,6 +2190,10 @@ msgstr "Фильтр флагов"
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Filter the segments"
 msgstr "Фильтр сегментов"
+
+#: src/components/experiment-exposures.tsx
+msgid "Final check, taken at the stop on <0/>; it is never run again."
+msgstr "Последняя проверка, сделанная при остановке <0/>; больше она не запускается."
 
 #: src/components/experiment-exposures.tsx
 msgid "First exposed to"
@@ -2220,6 +2292,10 @@ msgstr "Отформатировать"
 #: src/components/variations-editor.tsx
 msgid "Format variation {n}"
 msgstr "Отформатировать вариант {n}"
+
+#: src/components/experiment-alerts.tsx
+msgid "Found"
+msgstr "Найдено"
 
 #: src/components/audit-log.tsx
 msgid "From"
@@ -2831,6 +2907,10 @@ msgstr "Принадлежность (условие {position})"
 msgid "Mine"
 msgstr "Мои"
 
+#: src/components/experiment-exposures.tsx
+msgid "Mismatch: the units first exposed are out of line with the weights, and a sample-ratio mismatch alert is active."
+msgstr "Несоответствие: первые экспозиции единиц расходятся с весами, действует алерт о нарушении соотношения выборки."
+
 #: src/components/experiment-transitions.tsx
 msgid "Missing to start"
 msgstr "Чего не хватает для запуска"
@@ -2877,6 +2957,10 @@ msgstr "Имя или адрес почты"
 #: src/components/experiment-fields.tsx
 msgid "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _. It never changes."
 msgstr "Имя эксперимента в правилах и в показах, которые присылают SDK: буквы, цифры, ., - и _. Никогда не меняется."
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Needs attention"
+msgstr "Требует внимания"
 
 #: src/lib/access.ts
 msgid "Needs the permission to {name}, held by {list}."
@@ -2965,6 +3049,10 @@ msgstr "Далее"
 msgid "No"
 msgstr "Нет"
 
+#: src/components/experiment-alerts.tsx
+msgid "No alert has been raised."
+msgstr "Алертов не было."
+
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "No change request awaits your decision."
 msgstr "Ни один запрос на изменение не ждёт вашего решения."
@@ -2988,6 +3076,18 @@ msgstr "Под эти фильтры не подходит ни один экс�
 #: src/components/experiment-exposures.tsx
 msgid "No exposure has been received in this environment yet."
 msgstr "В этом окружении ещё не получено ни одной экспозиции."
+
+#: src/components/experiment-alerts.tsx
+msgid "No exposure since <0/>."
+msgstr "Нет экспозиций с <0/>."
+
+#: src/components/experiment-alerts.tsx
+msgid "No exposure since the start, <0/>."
+msgstr "Нет экспозиций с запуска, <0/>."
+
+#: src/lib/experiment-alerts.ts
+msgid "No exposures"
+msgstr "Нет экспозиций"
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "No flag matches these filters."
@@ -3117,6 +3217,10 @@ msgstr "не выбран"
 #: src/lib/sdk-keys.ts
 msgid "None, end the old key now"
 msgstr "Нет, отключить старый ключ сразу"
+
+#: src/components/experiment-exposures.tsx
+msgid "Not checked yet: a running experiment is checked every 10 minutes in each environment holding its rule, and once more at its stop."
+msgstr "Ещё не проверено: запущенный эксперимент проверяется каждые 10 минут в каждом окружении с его правилом и ещё раз при остановке."
 
 #: src/components/experiment-exposures.tsx
 msgid "Not counted yet: the exposures are first counted within seconds of arriving."
@@ -3297,6 +3401,10 @@ msgstr "Оператор (условие {position})"
 msgid "Optional; the author and the audit log see it."
 msgstr "Необязательно; его увидят автор и журнал аудита."
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Overdue"
+msgstr "Просрочен"
+
 #: src/components/experiment-exposures.tsx
 msgid "Overridden"
 msgstr "Переопределено"
@@ -3362,6 +3470,14 @@ msgstr "Владелец"
 msgid "Owner changed from {before} to {after}."
 msgstr "Владелец изменён: был {before}, стал {after}."
 
+#: src/components/experiment-exposures.tsx
+msgid "p-value"
+msgstr "p-значение"
+
+#: src/components/experiment-alerts.tsx
+msgid "p-value {p}; units first exposed: {n} ({split})."
+msgstr "p-значение {p}; впервые получили экспозицию: {n} ({split})."
+
 #: src/components/not-found.tsx
 msgid "Page not found"
 msgstr "Страница не найдена"
@@ -3403,6 +3519,11 @@ msgstr "Пароль изменён"
 #: src/components/auth-settings-form.tsx
 msgid "Password minimum length"
 msgstr "Наименьшая длина пароля"
+
+#: src/lib/experiment-alerts.ts
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Past expected end"
+msgstr "После ожидаемого окончания"
 
 #: src/components/experiment-exposures.tsx
 msgid "Per day"
@@ -3554,6 +3675,14 @@ msgstr "Укажите его в настройках клиентского SDK
 #: src/components/sdk-keys.tsx
 msgid "Put it in the server SDK’s configuration, where only the service that uses it can read it. Never ship it in a browser or an app."
 msgstr "Укажите его в настройках серверного SDK, где его прочитает только использующий его сервис. Никогда не поставляйте его в браузере или приложении."
+
+#: src/components/experiment-alerts.tsx
+msgid "Raised"
+msgstr "Поднят"
+
+#: src/components/experiment-alerts.tsx
+msgid "Raised <0/>. Acknowledging hides it until it clears."
+msgstr "Поднят <0/>. Подтверждение скрывает его, пока он не снят."
 
 #: src/components/member-actions.tsx
 msgid "Reactivate"
@@ -3955,6 +4084,14 @@ msgstr "Соль (правило {position}): сервер назначит её
 msgid "Salt <0>{salt}</0>"
 msgstr "Соль <0>{salt}</0>"
 
+#: src/components/experiment-exposures.tsx
+msgid "Sample-ratio check"
+msgstr "Проверка соотношения выборки"
+
+#: src/lib/experiment-alerts.ts
+msgid "Sample-ratio mismatch"
+msgstr "Нарушение соотношения выборки"
+
 #: src/components/auth-settings-form.tsx
 #: src/components/change-request-actions.tsx
 #: src/components/member-actions.tsx
@@ -4201,6 +4338,14 @@ msgid "Skip to content"
 msgstr "Перейти к содержимому"
 
 #: src/components/experiment-exposures.tsx
+msgid "Skipped: a variation expects fewer than 5 units."
+msgstr "Пропущена: вариант ожидает меньше 5 единиц."
+
+#: src/components/experiment-exposures.tsx
+msgid "Skipped: the check needs 1,000 units first exposed; units first exposed so far: {n}."
+msgstr "Пропущена: проверке нужно 1 000 впервые получивших экспозицию единиц; пока их: {n}."
+
+#: src/components/experiment-exposures.tsx
 msgid "Some exposures were refused and are not counted above. An SDK sends exposures the experiment does not take:"
 msgstr "Часть экспозиций отклонена и не учтена выше. SDK присылает экспозиции, которые эксперимент не принимает:"
 
@@ -4422,6 +4567,10 @@ msgstr "Это устройство выйдет из системы при сл
 #: src/lib/problem-messages.ts
 msgid "That is not your current password."
 msgstr "Это не ваш текущий пароль."
+
+#: src/components/experiment-alerts.tsx
+msgid "The alert is acknowledged."
+msgstr "Алерт подтверждён."
 
 #: src/components/member-credentials.tsx
 msgid "The API tokens of {name}"
@@ -4992,6 +5141,10 @@ msgstr "Тип единицы {key} больше не объявлен, и ег�
 #: src/lib/experiment-transitions.ts
 msgid "The unit type {unitType} is not declared."
 msgstr "Тип единицы {unitType} не объявлен."
+
+#: src/components/experiment-exposures.tsx
+msgid "The units first exposed match the weights."
+msgstr "Первые экспозиции единиц соответствуют весам."
 
 #: src/components/tester-panel.tsx
 msgid "The unsaved draft cannot be evaluated as it is:"
@@ -5619,6 +5772,10 @@ msgstr "Какой вариант эксперимент даёт единице
 msgid "While the experiment is a draft, SDKs do not receive this rule: units continue to the next rule until it starts."
 msgstr "Пока эксперимент в черновике, SDK не получают это правило: единицы переходят к следующему правилу, пока он не запущен."
 
+#: src/components/experiment-alerts.tsx
+msgid "Whole experiment"
+msgstr "Весь эксперимент"
+
 #: src/components/experiment-fields.tsx
 msgid "Whose units are split: users, accounts, devices."
 msgstr "Чьи единицы делятся: пользователи, аккаунты, устройства."
@@ -5646,6 +5803,10 @@ msgstr "С"
 #: src/lib/experiments.ts
 msgid "Write the hypothesis: an experiment starts only with one."
 msgstr "Напишите гипотезу: без неё эксперимент не запустится."
+
+#: src/components/experiment-exposures.tsx
+msgid "X²"
+msgstr "X²"
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Yes"

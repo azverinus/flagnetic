@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ConflictBanner } from "@/components/conflict-banner";
+import { ExperimentAlertBanners, ExperimentAlertsSection } from "@/components/experiment-alerts";
 import { ExperimentAssignmentLookup } from "@/components/experiment-assignment";
 import { ExperimentExposuresSection } from "@/components/experiment-exposures";
 import { ExperimentFields } from "@/components/experiment-fields";
@@ -107,8 +108,9 @@ function ExperimentNotFound({ project }: { project: string }) {
 }
 
 /**
- * One experiment: its transitions, its overview, its exposures per
- * environment, the assignment lookup and its form, saved
+ * One experiment: its transitions, its active alerts, its overview, its
+ * exposures per environment, its alerts, the assignment lookup and its
+ * form, saved
  * under the version the form was filled from; fields its status locks are shown with the reason, and a
  * save that meets a newer version shows who saved it and what changed.
  */
@@ -220,6 +222,7 @@ function ExperimentPage({
           />
         }
       />
+      <ExperimentAlertBanners project={project} experiment={base} />
       {dirty && base.status !== "archived" ? (
         <p role="status" className="text-sm text-muted-foreground">
           <Trans>Save or discard your edits before changing the experiment's status.</Trans>
@@ -240,6 +243,7 @@ function ExperimentPage({
           void navigate({ search: (prev) => ({ ...prev, environment }), replace: true })
         }
       />
+      <ExperimentAlertsSection project={project} experiment={base} />
       <ExperimentAssignmentLookup project={project} experiment={base} />
       <h2 className="text-lg font-semibold">
         <Trans>Definition</Trans>

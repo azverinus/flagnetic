@@ -221,6 +221,10 @@ export type ExperimentsSearch = {
   owner?: string;
   tag?: string;
   archived?: true;
+  /** Running experiments past their expected end. */
+  past_expected_end?: true;
+  /** Stopped experiments whose flag SDKs still evaluate. */
+  awaiting_code_removal?: true;
   cursor?: string;
 };
 
@@ -241,7 +245,9 @@ export function validateExperimentsSearch(search: Record<string, unknown>): Expe
   }
   const status = zExperimentStatus.safeParse(search.status);
   if (status.success) out.status = status.data;
-  if (search.archived === true || search.archived === "true") out.archived = true;
+  for (const name of ["archived", "past_expected_end", "awaiting_code_removal"] as const) {
+    if (search[name] === true || search[name] === "true") out[name] = true;
+  }
   return out;
 }
 

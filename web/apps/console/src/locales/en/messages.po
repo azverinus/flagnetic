@@ -11,6 +11,12 @@ msgstr ""
 msgid "“{bad}” is not an origin. Use a scheme, a host and an optional port, such as https://app.example.com."
 msgstr "“{bad}” is not an origin. Use a scheme, a host and an optional port, such as https://app.example.com."
 
+#. placeholder {0}: exposure_conflicts.conflicts
+#. placeholder {1}: exposure_conflicts.conflicting_units
+#: src/components/experiment-alerts.tsx
+msgid "{0, plural, one {# conflicting exposure} other {# conflicting exposures}} {1, plural, one {from # unit} other {from # units}} reached the threshold, {threshold}; units first exposed: {units}."
+msgstr "{0, plural, one {# conflicting exposure} other {# conflicting exposures}} {1, plural, one {from # unit} other {from # units}} reached the threshold, {threshold}; units first exposed: {units}."
+
 #: src/components/rule-editor.tsx
 msgid "{allocation}% of {unitType} units included"
 msgstr "{allocation}% of {unitType} units included"
@@ -126,6 +132,10 @@ msgstr "{key} on in {name}"
 msgid "{key} was already off in {name}. Nothing changed."
 msgstr "{key} was already off in {name}. Nothing changed."
 
+#: src/components/experiment-alerts.tsx
+msgid "{kind} in {environment}"
+msgstr "{kind} in {environment}"
+
 #: src/components/grant-form.tsx
 msgid "{label}: {status}"
 msgstr "{label}: {status}"
@@ -211,6 +221,14 @@ msgstr "{to} takes the rules of {source} with their identifiers and salts, its p
 msgid "{total, plural, one {# unit first exposed} other {# units first exposed}}"
 msgstr "{total, plural, one {# unit first exposed} other {# units first exposed}}"
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "{unacknowledged, plural, one {# alert} other {# alerts}}"
+msgstr "{unacknowledged, plural, one {# alert} other {# alerts}}"
+
+#: src/components/experiment-alerts.tsx
+msgid "{variation} {seen}, expected {asked}"
+msgstr "{variation} {seen}, expected {asked}"
+
 #: src/lib/conditions.ts
 msgid "{variation} to {percent}% of {unitType} units"
 msgstr "{variation} to {percent}% of {unitType} units"
@@ -234,6 +252,10 @@ msgstr "{who} saved a change on {when}, after you opened this."
 #: src/components/conflict-banner.tsx
 msgid "{who} saved this configuration on {when}, after this draft was loaded."
 msgstr "{who} saved this configuration on {when}, after this draft was loaded."
+
+#: src/lib/experiment-alerts.ts
+msgid "< {bound}"
+msgstr "< {bound}"
 
 #: src/components/experiment-assignment.tsx
 msgid "<0>{unit}</0> gets <1>{variation}</1>."
@@ -383,6 +405,10 @@ msgstr "A rule has at most {maxConditionsText} conditions."
 msgid "A rule's rollout served: the unit's bucket is below its percentage."
 msgstr "A rule's rollout served: the unit's bucket is below its percentage."
 
+#: src/components/experiment-alerts.tsx
+msgid "A running experiment is checked every 10 minutes for a sample-ratio mismatch, a day without exposures, conflicting exposures and running past its expected end. An alert stays active until its condition clears; one returning raises a new alert."
+msgstr "A running experiment is checked every 10 minutes for a sample-ratio mismatch, a day without exposures, conflicting exposures and running past its expected end. An alert stays active until its condition clears; one returning raises a new alert."
+
 #: src/lib/problem-messages.ts
 msgid "A running experiment is stopped with a decision before it is archived."
 msgstr "A running experiment is stopped with a decision before it is archived."
@@ -477,6 +503,14 @@ msgstr "Accept invitation"
 msgid "Accept your invitation"
 msgstr "Accept your invitation"
 
+#: src/components/experiment-alerts.tsx
+msgid "Acknowledge"
+msgstr "Acknowledge"
+
+#: src/components/experiment-alerts.tsx
+msgid "Acknowledged"
+msgstr "Acknowledged"
+
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
 msgid "Action"
@@ -487,11 +521,16 @@ msgstr "Action"
 msgid "Actions"
 msgstr "Actions"
 
+#: src/components/experiment-alerts.tsx
 #: src/components/token-list.tsx
 #: src/lib/members.ts
 #: src/lib/sdk-keys.ts
 msgid "Active"
 msgstr "Active"
+
+#: src/components/experiment-alerts.tsx
+msgid "Active alerts"
+msgstr "Active alerts"
 
 #: src/components/audit-entry-sheet.tsx
 #: src/components/audit-log.tsx
@@ -570,6 +609,14 @@ msgstr "Administer the instance: projects, members and its settings."
 #: src/components/audit-entry-sheet.tsx
 msgid "After"
 msgstr "After"
+
+#: src/components/experiment-alerts.tsx
+msgid "Alert"
+msgstr "Alert"
+
+#: src/components/experiment-alerts.tsx
+msgid "Alerts"
+msgstr "Alerts"
 
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "All"
@@ -907,6 +954,10 @@ msgstr "Automatic exposure switched off."
 msgid "Automatic exposure switched on."
 msgstr "Automatic exposure switched on."
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Awaiting code removal"
+msgstr "Awaiting code removal"
+
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "Awaiting my decision"
 msgstr "Awaiting my decision"
@@ -1054,6 +1105,10 @@ msgstr "Changes to the segment"
 #: src/routes/_signed-in/settings/profile.tsx
 msgid "Changing it signs out every other device you are signed in on; this one stays signed in."
 msgstr "Changing it signs out every other device you are signed in on; this one stays signed in."
+
+#: src/components/experiment-exposures.tsx
+msgid "Checked <0/>."
+msgstr "Checked <0/>."
 
 #: src/components/rule-editor.tsx
 msgid "Checked top to bottom; the first whose conditions all hold serves. Reorder by dragging, with the arrows, or with Alt+Arrow Up and Down."
@@ -1216,6 +1271,10 @@ msgstr "Chosen tags"
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Clear filters"
 msgstr "Clear filters"
+
+#: src/components/experiment-alerts.tsx
+msgid "Cleared"
+msgstr "Cleared"
 
 #: src/components/experiment-assignment.tsx
 msgid "ClickHouse query"
@@ -1856,6 +1915,7 @@ msgid "Entity"
 msgstr "Entity"
 
 #. A kind of entity in the audit log.
+#: src/components/experiment-alerts.tsx
 #: src/components/flag-history.tsx
 #: src/components/project-audit.tsx
 #: src/lib/audit.ts
@@ -2026,6 +2086,10 @@ msgstr "Expected removal changed from {before} to {after}."
 msgid "Expected share"
 msgstr "Expected share"
 
+#: src/components/experiment-alerts.tsx
+msgid "Expected to end on {day}. Stop it with a decision, or move its expected end."
+msgstr "Expected to end on {day}. Stop it with a decision, or move its expected end."
+
 #: src/components/rule-editor.tsx
 #: src/lib/change-requests.ts
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -2081,6 +2145,10 @@ msgstr "Expired"
 msgid "Expires"
 msgstr "Expires"
 
+#: src/lib/experiment-alerts.ts
+msgid "Exposure conflicts"
+msgstr "Exposure conflicts"
+
 #: src/components/experiment-exposures.tsx
 msgid "Exposures"
 msgstr "Exposures"
@@ -2122,6 +2190,10 @@ msgstr "Filter the flags"
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Filter the segments"
 msgstr "Filter the segments"
+
+#: src/components/experiment-exposures.tsx
+msgid "Final check, taken at the stop on <0/>; it is never run again."
+msgstr "Final check, taken at the stop on <0/>; it is never run again."
 
 #: src/components/experiment-exposures.tsx
 msgid "First exposed to"
@@ -2220,6 +2292,10 @@ msgstr "Format"
 #: src/components/variations-editor.tsx
 msgid "Format variation {n}"
 msgstr "Format variation {n}"
+
+#: src/components/experiment-alerts.tsx
+msgid "Found"
+msgstr "Found"
 
 #: src/components/audit-log.tsx
 msgid "From"
@@ -2831,6 +2907,10 @@ msgstr "Membership (condition {position})"
 msgid "Mine"
 msgstr "Mine"
 
+#: src/components/experiment-exposures.tsx
+msgid "Mismatch: the units first exposed are out of line with the weights, and a sample-ratio mismatch alert is active."
+msgstr "Mismatch: the units first exposed are out of line with the weights, and a sample-ratio mismatch alert is active."
+
 #: src/components/experiment-transitions.tsx
 msgid "Missing to start"
 msgstr "Missing to start"
@@ -2877,6 +2957,10 @@ msgstr "Name or email"
 #: src/components/experiment-fields.tsx
 msgid "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _. It never changes."
 msgstr "Names the experiment in rules and in the exposures SDKs report: letters, digits, ., - and _. It never changes."
+
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Needs attention"
+msgstr "Needs attention"
 
 #: src/lib/access.ts
 msgid "Needs the permission to {name}, held by {list}."
@@ -2965,6 +3049,10 @@ msgstr "Next"
 msgid "No"
 msgstr "No"
 
+#: src/components/experiment-alerts.tsx
+msgid "No alert has been raised."
+msgstr "No alert has been raised."
+
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "No change request awaits your decision."
 msgstr "No change request awaits your decision."
@@ -2988,6 +3076,18 @@ msgstr "No experiment matches these filters."
 #: src/components/experiment-exposures.tsx
 msgid "No exposure has been received in this environment yet."
 msgstr "No exposure has been received in this environment yet."
+
+#: src/components/experiment-alerts.tsx
+msgid "No exposure since <0/>."
+msgstr "No exposure since <0/>."
+
+#: src/components/experiment-alerts.tsx
+msgid "No exposure since the start, <0/>."
+msgstr "No exposure since the start, <0/>."
+
+#: src/lib/experiment-alerts.ts
+msgid "No exposures"
+msgstr "No exposures"
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "No flag matches these filters."
@@ -3117,6 +3217,10 @@ msgstr "none chosen"
 #: src/lib/sdk-keys.ts
 msgid "None, end the old key now"
 msgstr "None, end the old key now"
+
+#: src/components/experiment-exposures.tsx
+msgid "Not checked yet: a running experiment is checked every 10 minutes in each environment holding its rule, and once more at its stop."
+msgstr "Not checked yet: a running experiment is checked every 10 minutes in each environment holding its rule, and once more at its stop."
 
 #: src/components/experiment-exposures.tsx
 msgid "Not counted yet: the exposures are first counted within seconds of arriving."
@@ -3297,6 +3401,10 @@ msgstr "Operator (condition {position})"
 msgid "Optional; the author and the audit log see it."
 msgstr "Optional; the author and the audit log see it."
 
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Overdue"
+msgstr "Overdue"
+
 #: src/components/experiment-exposures.tsx
 msgid "Overridden"
 msgstr "Overridden"
@@ -3362,6 +3470,14 @@ msgstr "Owner"
 msgid "Owner changed from {before} to {after}."
 msgstr "Owner changed from {before} to {after}."
 
+#: src/components/experiment-exposures.tsx
+msgid "p-value"
+msgstr "p-value"
+
+#: src/components/experiment-alerts.tsx
+msgid "p-value {p}; units first exposed: {n} ({split})."
+msgstr "p-value {p}; units first exposed: {n} ({split})."
+
 #: src/components/not-found.tsx
 msgid "Page not found"
 msgstr "Page not found"
@@ -3403,6 +3519,11 @@ msgstr "Password changed"
 #: src/components/auth-settings-form.tsx
 msgid "Password minimum length"
 msgstr "Password minimum length"
+
+#: src/lib/experiment-alerts.ts
+#: src/routes/_signed-in/projects/$project/experiments/index.tsx
+msgid "Past expected end"
+msgstr "Past expected end"
 
 #: src/components/experiment-exposures.tsx
 msgid "Per day"
@@ -3554,6 +3675,14 @@ msgstr "Put it in the client SDK’s configuration. It ships inside the browser 
 #: src/components/sdk-keys.tsx
 msgid "Put it in the server SDK’s configuration, where only the service that uses it can read it. Never ship it in a browser or an app."
 msgstr "Put it in the server SDK’s configuration, where only the service that uses it can read it. Never ship it in a browser or an app."
+
+#: src/components/experiment-alerts.tsx
+msgid "Raised"
+msgstr "Raised"
+
+#: src/components/experiment-alerts.tsx
+msgid "Raised <0/>. Acknowledging hides it until it clears."
+msgstr "Raised <0/>. Acknowledging hides it until it clears."
 
 #: src/components/member-actions.tsx
 msgid "Reactivate"
@@ -3955,6 +4084,14 @@ msgstr "Salt (rule {position}): given by the server when the rule is saved as a 
 msgid "Salt <0>{salt}</0>"
 msgstr "Salt <0>{salt}</0>"
 
+#: src/components/experiment-exposures.tsx
+msgid "Sample-ratio check"
+msgstr "Sample-ratio check"
+
+#: src/lib/experiment-alerts.ts
+msgid "Sample-ratio mismatch"
+msgstr "Sample-ratio mismatch"
+
 #: src/components/auth-settings-form.tsx
 #: src/components/change-request-actions.tsx
 #: src/components/member-actions.tsx
@@ -4201,6 +4338,14 @@ msgid "Skip to content"
 msgstr "Skip to content"
 
 #: src/components/experiment-exposures.tsx
+msgid "Skipped: a variation expects fewer than 5 units."
+msgstr "Skipped: a variation expects fewer than 5 units."
+
+#: src/components/experiment-exposures.tsx
+msgid "Skipped: the check needs 1,000 units first exposed; units first exposed so far: {n}."
+msgstr "Skipped: the check needs 1,000 units first exposed; units first exposed so far: {n}."
+
+#: src/components/experiment-exposures.tsx
 msgid "Some exposures were refused and are not counted above. An SDK sends exposures the experiment does not take:"
 msgstr "Some exposures were refused and are not counted above. An SDK sends exposures the experiment does not take:"
 
@@ -4422,6 +4567,10 @@ msgstr "That device is signed out at its next request and must sign in again."
 #: src/lib/problem-messages.ts
 msgid "That is not your current password."
 msgstr "That is not your current password."
+
+#: src/components/experiment-alerts.tsx
+msgid "The alert is acknowledged."
+msgstr "The alert is acknowledged."
 
 #: src/components/member-credentials.tsx
 msgid "The API tokens of {name}"
@@ -4992,6 +5141,10 @@ msgstr "The unit type {key} is no longer declared, and its key can be declared a
 #: src/lib/experiment-transitions.ts
 msgid "The unit type {unitType} is not declared."
 msgstr "The unit type {unitType} is not declared."
+
+#: src/components/experiment-exposures.tsx
+msgid "The units first exposed match the weights."
+msgstr "The units first exposed match the weights."
 
 #: src/components/tester-panel.tsx
 msgid "The unsaved draft cannot be evaluated as it is:"
@@ -5619,6 +5772,10 @@ msgstr "Which variation the experiment gives a unit, from its salts and traffic 
 msgid "While the experiment is a draft, SDKs do not receive this rule: units continue to the next rule until it starts."
 msgstr "While the experiment is a draft, SDKs do not receive this rule: units continue to the next rule until it starts."
 
+#: src/components/experiment-alerts.tsx
+msgid "Whole experiment"
+msgstr "Whole experiment"
+
 #: src/components/experiment-fields.tsx
 msgid "Whose units are split: users, accounts, devices."
 msgstr "Whose units are split: users, accounts, devices."
@@ -5646,6 +5803,10 @@ msgstr "With"
 #: src/lib/experiments.ts
 msgid "Write the hypothesis: an experiment starts only with one."
 msgstr "Write the hypothesis: an experiment starts only with one."
+
+#: src/components/experiment-exposures.tsx
+msgid "X²"
+msgstr "X²"
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "Yes"
