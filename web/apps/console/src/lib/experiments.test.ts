@@ -158,6 +158,21 @@ describe("the experiments list's search", () => {
     expect(validateExperimentsSearch({ status: "paused" })).toEqual({});
   });
 
+  it("keeps the overdue and awaiting code removal filters only when set", () => {
+    expect(
+      validateExperimentsSearch({ past_expected_end: "true", awaiting_code_removal: true }),
+    ).toEqual({ past_expected_end: true, awaiting_code_removal: true });
+    expect(
+      validateExperimentsSearch({ past_expected_end: "false", awaiting_code_removal: "yes" }),
+    ).toEqual({});
+  });
+
+  it("asks for the overdue and awaiting code removal filters by the API's names", () => {
+    expect(
+      listExperimentsQueryOf({ past_expected_end: true, awaiting_code_removal: true }),
+    ).toEqual({ past_expected_end: true, awaiting_code_removal: true });
+  });
+
   it("is filtered by anything but the page", () => {
     expect(isExperimentsFiltered({ cursor: "abc" })).toBe(false);
     expect(isExperimentsFiltered({ archived: true })).toBe(true);

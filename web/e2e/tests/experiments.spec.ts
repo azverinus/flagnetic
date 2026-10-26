@@ -5,6 +5,8 @@ import {
   getExperiment,
   getExperimentAssignment,
   listMembers,
+  startExperiment,
+  stopExperiment,
   updateExperiment,
 } from "@flagnetic/api";
 import { expect, type Page, test } from "@playwright/test";
@@ -393,6 +395,110 @@ test.describe("experiments", () => {
       `user-1 gets ${expected.variation}.`,
     );
     await expect(lookup.getByLabel("ClickHouse query")).toHaveText(expected.sql);
+  });
+
+  test("raises a sample-ratio mismatch on skewed exposures and hides its banner once acknowledged", async ({
+    page,
+  }) => {
+    // Posting the exposures and waiting for the rollup to count them takes
+    // most of the default time.
+    test.setTimeout(90_000);
+    const project = await seedProject("exp-srm");
+    const flag = "checkout_cta";
+    const key = "cta_copy";
+    await seedFlag(project, stringFlag(flag));
+    await seedExperiment(project, experimentOn(flag, key, { traffic_allocation: 10_000 }));
+    await writeConfiguration(project, flag, "staging", () => ({
+      rules: [
+        {
+          description: "",
+          conditions: [],
+          serve: { kind: "experiment" as const, experiment: key },
+        },
+      ],
+    }));
+    const client = managementClient();
+    const draft = await readExperiment(project, key);
+    const running = must(
+      `starting ${key}`,
+      await startExperiment({
+        client,
+        path: { project, experiment: key },
+        headers: { "If-Match": `"${draft.version}"` },
+      }),
+    );
+
+    // 800 units first exposed to control and 400 to treatment, where the
+    // weights ask for an even split: far past what chance explains.
+    const sdkKey = await seedSdkKey(project, "staging", { kind: "server", name: "Checkout" });
+    const at = new Date(Date.now() - 60_000);
+    const units = Array.from({ length: 1200 }, (_, index) => ({
+      experiment: key,
+      flag,
+      variation: index < 800 ? "control" : "treatment",
+      unitType: "user",
+      unitId: `user-${index}`,
+      at,
+    }));
+    for (let start = 0; start < units.length; start += 400) {
+      const result = await postExposures(sdkKey, units.slice(start, start + 400));
+      expect(result.accepted).toBe(400);
+    }
+
+    await signIn(page, admin);
+    await page.goto(`/projects/${project}/experiments/${key}`);
+    const exposures = page.getByRole("region", { name: "Exposures" });
+    // The rollup counts the exposures within seconds; the check every 10
+    // minutes would come too late for a test, so the stop takes the final
+    // check over what the rollup counted.
+    await expect(async () => {
+      await page.reload();
+      await expect(exposures.getByText("1,200 units first exposed, counted up to")).toBeVisible({
+        timeout: 5_000,
+      });
+    }).toPass({ timeout: 45_000 });
+    must(
+      `stopping ${key}`,
+      await stopExperiment({
+        client,
+        path: { project, experiment: key },
+        headers: { "If-Match": `"${running.version}"` },
+        body: { outcome: "removed", note: "" },
+      }),
+    );
+
+    await page.reload();
+    const banners = page.getByRole("list", { name: "Active alerts" });
+    await expect(banners.getByRole("listitem")).toHaveCount(1);
+    await expect(banners).toContainText("Sample-ratio mismatch in Staging");
+    await expect(banners).toContainText(
+      "p-value < 0.0001; units first exposed: 1,200 (control 800, expected 600; treatment 400, expected 600).",
+    );
+    // The stop deleted the rule, so the page opens the project's first
+    // environment; the check is Staging's.
+    await exposures.getByRole("tab", { name: "Staging" }).click();
+    const check = exposures.getByRole("region", { name: "Sample-ratio check" });
+    await expect(check).toContainText("Mismatch: the units first exposed are out of line");
+    await expect(check).toContainText("Final check, taken at the stop on");
+    await expectNoSeriousViolations(page, "an experiment's alerts");
+
+    // The list marks it until someone acknowledges the alert.
+    await page.goto(`/projects/${project}/experiments`);
+    await expect(rowFor(page, key).getByRole("list", { name: "Needs attention" })).toHaveText(
+      "1 alert",
+    );
+    await rowFor(page, key).getByRole("link").first().click();
+
+    await banners.getByRole("button", { name: "Acknowledge" }).click();
+    await expect(page.getByText("The alert is acknowledged.")).toBeVisible();
+    await expect(banners).toHaveCount(0);
+    const history = page.getByRole("table", { name: "Alerts" });
+    await expect(history.getByRole("row", { name: /Sample-ratio mismatch/ })).toHaveText(
+      /Sample-ratio mismatch\s*Staging.*Active/,
+    );
+    await page.goto(`/projects/${project}/experiments`);
+    await expect(rowFor(page, key)).toBeVisible();
+    await expect(rowFor(page, key).getByRole("list", { name: "Needs attention" })).toHaveCount(0);
   });
 
   test("tells a viewer which roles may create and edit experiments", async ({ page }) => {

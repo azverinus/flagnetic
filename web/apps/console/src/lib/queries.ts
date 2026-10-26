@@ -45,12 +45,14 @@ import {
   getFlag,
   listExperiments,
   getExperiment,
+  listExperimentAlerts,
   getExperimentAssignment,
   getExperimentConflicts,
   getExperimentExposures,
   getExperimentExposureTimeline,
   type Experiment,
   type ExperimentAssignment,
+  type ExperimentAlertList,
   type ExperimentExposures,
   type ExposureConflicts,
   type ExposureTimeline,
@@ -377,6 +379,31 @@ export function experimentExposuresQuery(project: string, experiment: string, en
     queryKey: [...experimentsQueryKey(project), "detail", experiment, "exposures", environment],
     queryFn: () =>
       unwrap(getExperimentExposures({ path: { project, experiment }, query: { environment } })),
+  });
+}
+
+/**
+ * Every alert an experiment has had, the most recently raised first, or
+ * only its active ones: under the experiment's own key, so a transition
+ * or an acknowledgement refreshes them with it.
+ */
+export function experimentAlertsQuery(
+  project: string,
+  experiment: string,
+  { active }: { active?: true } = {},
+) {
+  return queryOptions<ExperimentAlertList>({
+    queryKey: [
+      ...experimentsQueryKey(project),
+      "detail",
+      experiment,
+      "alerts",
+      active ? "active" : "every",
+    ],
+    queryFn: () =>
+      unwrap(
+        listExperimentAlerts({ path: { project, experiment }, query: active ? { active } : {} }),
+      ),
   });
 }
 

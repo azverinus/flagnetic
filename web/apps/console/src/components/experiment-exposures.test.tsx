@@ -49,16 +49,39 @@ const timeline: ExposureTimeline = {
 
 const none: ExposureConflicts = { items: [] };
 
-function show(over: Partial<{ summary: ExperimentExposures; conflicts: ExposureConflicts }> = {}) {
+function show(
+  over: Partial<{
+    summary: ExperimentExposures;
+    conflicts: ExposureConflicts;
+    stoppedAt: string;
+  }> = {},
+) {
   renderWithProviders(
     <ExposuresView
       summary={over.summary ?? summary}
       timeline={timeline}
       conflicts={over.conflicts ?? none}
       variations={["control", "treatment"]}
+      stoppedAt={over.stoppedAt}
     />,
   );
 }
+
+const checked = (check: Partial<NonNullable<ExperimentExposures["sample_ratio"]>>) => ({
+  ...summary,
+  sample_ratio: {
+    n: 10_000,
+    chi_square: 16,
+    p_value: 0.000063,
+    skipped_reason: null,
+    active: true,
+    checked_at: "2026-10-21T09:40:00Z",
+    ...check,
+  },
+});
+
+/** The sample-ratio check's region of the environment shown. */
+const sampleRatio = () => screen.getByRole("region", { name: "Sample-ratio check" });
 
 const rowOf = (table: HTMLElement, name: string) =>
   within(table)
@@ -173,6 +196,95 @@ describe("an environment's exposures", () => {
       screen.getByText(
         "1 unit was exposed to a variation other than its first, in 1 exposure. The latest conflicts:",
       ),
+    ).toBeVisible();
+  });
+
+  it("says the sample-ratio check has not run before the first", () => {
+    show();
+    expect(within(sampleRatio()).getByText(/^Not checked yet/)).toBeVisible();
+  });
+
+  it("shows a mismatch the check found, with its statistic", () => {
+    show({ summary: checked({}) });
+    const region = sampleRatio();
+    expect(
+      within(region).getByText(
+        "Mismatch: the units first exposed are out of line with the weights, and a sample-ratio mismatch alert is active.",
+      ),
+    ).toBeVisible();
+    const terms = within(region)
+      .getAllByRole("term")
+      .map((term) => [term.textContent, term.nextElementSibling?.textContent]);
+    expect(terms).toEqual([
+      ["p-value", "< 0.0001"],
+      ["X²", "16.00"],
+      ["Units first exposed", "10,000"],
+    ]);
+    expect(within(region).getByText(/^Checked /)).toBeVisible();
+  });
+
+  it("shows a split matching the weights", () => {
+    show({ summary: checked({ chi_square: 0.04, p_value: 0.84, active: false }) });
+    expect(
+      within(sampleRatio()).getByText("The units first exposed match the weights."),
+    ).toBeVisible();
+  });
+
+  it("says why the check was skipped, with no statistic", () => {
+    show({
+      summary: checked({
+        n: 420,
+        chi_square: null,
+        p_value: null,
+        skipped_reason: "below_minimum_sample",
+        active: false,
+      }),
+    });
+    const region = sampleRatio();
+    expect(
+      within(region).getByText(
+        "Skipped: the check needs 1,000 units first exposed; units first exposed so far: 420.",
+      ),
+    ).toBeVisible();
+    expect(within(region).queryByRole("term")).toBeNull();
+
+    show({
+      summary: checked({
+        chi_square: null,
+        p_value: null,
+        skipped_reason: "expected_below_5",
+        active: false,
+      }),
+    });
+    expect(
+      within(screen.getAllByRole("region", { name: "Sample-ratio check" }).at(-1)!).getByText(
+        "Skipped: a variation expects fewer than 5 units.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("says a stopped experiment keeps the check its stop took", () => {
+    show({
+      summary: checked({ active: false, p_value: 0.5, chi_square: 0.45 }),
+      stoppedAt: "2026-10-21T09:40:00.000Z",
+    });
+    expect(within(sampleRatio()).getByText(/^Final check, taken at the stop/)).toBeVisible();
+  });
+
+  it("does not call a check from before the stop its final one", () => {
+    show({
+      summary: checked({ active: false, p_value: 0.5, chi_square: 0.45 }),
+      stoppedAt: "2026-10-22T12:00:00Z",
+    });
+    const region = sampleRatio();
+    expect(within(region).queryByText(/^Final check/)).toBeNull();
+    expect(within(region).getByText(/^Last checked .*, while the experiment ran/)).toBeVisible();
+  });
+
+  it("says a stopped experiment never checked in the environment will not be", () => {
+    show({ stoppedAt: "2026-10-22T12:00:00Z" });
+    expect(
+      within(sampleRatio()).getByText(/^Not checked: the experiment stopped before a check ran/),
     ).toBeVisible();
   });
 });

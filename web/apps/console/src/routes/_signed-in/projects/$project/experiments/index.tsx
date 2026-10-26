@@ -1,14 +1,16 @@
 import type { Experiment } from "@flagnetic/api";
+import { plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FlaskConicalIcon, PlusIcon } from "lucide-react";
+import { BellIcon, ClockAlertIcon, FlaskConicalIcon, PlusIcon } from "lucide-react";
 import { type ReactNode, useId, useMemo, useState } from "react";
 
 import { Can } from "@/components/can";
 import { ExperimentStatusBadge } from "@/components/experiment-status-badge";
 import { QueryError } from "@/components/query-error";
 import { SearchField } from "@/components/search-field";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field } from "@/components/ui/field";
@@ -19,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Table, type TableColumn } from "@/components/ui/table";
 import { formatDay } from "@/i18n/format";
+import { awaitingAcknowledgement, isOverdue } from "@/lib/experiment-alerts";
 import {
   experimentStatuses,
   experimentStatusName,
@@ -28,8 +31,15 @@ import {
   validateExperimentsSearch,
 } from "@/lib/experiments";
 import { madeBy } from "@/lib/project-members";
-import { environmentsQuery, experimentsQuery, flagChoicesQuery, flagQuery } from "@/lib/queries";
+import {
+  environmentsQuery,
+  experimentAlertsQuery,
+  experimentsQuery,
+  flagChoicesQuery,
+  flagQuery,
+} from "@/lib/queries";
 import { useKnownMembers } from "@/lib/use-known-members";
+import { useNowPassing } from "@/lib/use-now";
 
 export const Route = createFileRoute("/_signed-in/projects/$project/experiments/")({
   validateSearch: validateExperimentsSearch,
@@ -106,6 +116,8 @@ function ExperimentFilters({
 }) {
   const { i18n, t } = useLingui();
   const archived = useId();
+  const overdue = useId();
+  const awaiting = useId();
   const flags = useQuery(flagChoicesQuery(project));
   const ownerOptions = useMemo(
     () =>
@@ -186,6 +198,28 @@ function ExperimentFilters({
         />
         <Label htmlFor={archived}>
           <Trans>Include archived experiments</Trans>
+        </Label>
+      </div>
+      <div className="flex h-9 items-center gap-2">
+        <Switch
+          id={overdue}
+          checked={search.past_expected_end === true}
+          onCheckedChange={(checked) => onFilter({ past_expected_end: checked ? true : undefined })}
+        />
+        <Label htmlFor={overdue}>
+          <Trans>Past expected end</Trans>
+        </Label>
+      </div>
+      <div className="flex h-9 items-center gap-2">
+        <Switch
+          id={awaiting}
+          checked={search.awaiting_code_removal === true}
+          onCheckedChange={(checked) =>
+            onFilter({ awaiting_code_removal: checked ? true : undefined })
+          }
+        />
+        <Label htmlFor={awaiting}>
+          <Trans>Awaiting code removal</Trans>
         </Label>
       </div>
     </div>
@@ -321,6 +355,52 @@ function HoldingEnvironments({ project, experiment }: { project: string; experim
   );
 }
 
+/**
+ * What needs a look in a row: running past the expected end, judged from
+ * the date as the `past_expected_end` filter judges it, and the active
+ * alerts nobody has acknowledged, read per experiment since the
+ * experiment resource does not carry them. A draft is never checked, so
+ * its alerts are not read.
+ */
+function AttentionMarkers({
+  project,
+  experiment,
+  now,
+}: {
+  project: string;
+  experiment: Experiment;
+  now: Date;
+}) {
+  const { t } = useLingui();
+  const alerts = useQuery({
+    ...experimentAlertsQuery(project, experiment.key, { active: true }),
+    enabled: experiment.status !== "draft",
+  });
+  const overdue = isOverdue(experiment, now);
+  const unacknowledged = alerts.data ? awaitingAcknowledgement(alerts.data.items).length : 0;
+  if (!overdue && unacknowledged === 0) return null;
+  return (
+    <ul aria-label={t`Needs attention`} className="flex flex-wrap gap-1">
+      {overdue ? (
+        <li>
+          <Badge variant="muted" className="flex items-center gap-1 whitespace-nowrap">
+            <ClockAlertIcon aria-hidden className="size-3" />
+            <Trans>Overdue</Trans>
+          </Badge>
+        </li>
+      ) : null}
+      {unacknowledged > 0 ? (
+        <li>
+          <Badge className="flex items-center gap-1 whitespace-nowrap border-destructive/50 text-destructive">
+            <BellIcon aria-hidden className="size-3" />
+            {t`${plural(unacknowledged, { one: "# alert", other: "# alerts" })}`}
+          </Badge>
+        </li>
+      ) : null}
+    </ul>
+  );
+}
+
 function ExperimentsTable({
   project,
   experiments,
@@ -333,6 +413,8 @@ function ExperimentsTable({
   owners: ReadonlyMap<string, string> | undefined;
 }) {
   const { i18n, t } = useLingui();
+  // Overdue changes with the UTC day; the page read since is near enough.
+  const now = useNowPassing([]);
   const columns = useMemo<TableColumn<Experiment>[]>(
     () => [
       {
@@ -352,7 +434,12 @@ function ExperimentsTable({
       {
         id: "status",
         header: t`Status`,
-        cell: ({ row }) => <ExperimentStatusBadge status={row.original.status} />,
+        cell: ({ row }) => (
+          <span className="flex flex-col items-start gap-1">
+            <ExperimentStatusBadge status={row.original.status} />
+            <AttentionMarkers project={project} experiment={row.original} now={now} />
+          </span>
+        ),
       },
       {
         id: "flag",
@@ -404,7 +491,7 @@ function ExperimentsTable({
           ),
       },
     ],
-    [i18n, owners, project, t],
+    [i18n, now, owners, project, t],
   );
   return (
     <Table

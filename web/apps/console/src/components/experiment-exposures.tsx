@@ -1,6 +1,7 @@
 import type {
   Experiment,
   ExperimentExposures,
+  SampleRatioCheck,
   ExposureConflict,
   ExposureConflicts,
   ExposureTimeline,
@@ -9,8 +10,8 @@ import type {
 import { plural } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCwIcon } from "lucide-react";
-import { useMemo } from "react";
+import { RefreshCwIcon, TriangleAlertIcon } from "lucide-react";
+import { type ReactNode, useId, useMemo } from "react";
 
 import { Moment } from "@/components/moment";
 import { QueryError } from "@/components/query-error";
@@ -20,6 +21,7 @@ import { Table, type TableColumn } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
 import { formatDay, formatNumber } from "@/i18n/format";
 import { cn } from "@/lib/cn";
+import { pValueText } from "@/lib/experiment-alerts";
 import {
   exposureEnvironment,
   shareText,
@@ -166,6 +168,7 @@ function EnvironmentExposures({
       timeline={timeline.data}
       conflicts={conflicts.data}
       variations={experiment.variations.map(({ variation }) => variation)}
+      stoppedAt={experiment.stopped_at}
       refreshing={reads.some((read) => read.isFetching)}
       onRefresh={refresh}
     />
@@ -178,6 +181,11 @@ export type ExposuresViewProps = {
   conflicts: ExposureConflicts;
   /** The experiment's variations in its order, which the timeline's columns follow. */
   variations: readonly string[];
+  /**
+   * When the experiment stopped, if it did: no sample-ratio check runs
+   * after, and the one taken at that instant is the stop's final check.
+   */
+  stoppedAt?: string | null;
   refreshing?: boolean;
   onRefresh?: () => void;
 };
@@ -188,6 +196,7 @@ export function ExposuresView({
   timeline,
   conflicts,
   variations,
+  stoppedAt = null,
   refreshing = false,
   onRefresh,
 }: ExposuresViewProps) {
@@ -230,6 +239,7 @@ export function ExposuresView({
       </div>
       <VariationTable rows={summary.variations} />
       <Refusals rejections={summary.rejections} />
+      <SampleRatioResult check={summary.sample_ratio} stoppedAt={stoppedAt} />
       <div className="flex flex-col gap-2">
         <h3 className="font-medium">
           <Trans>Per day</Trans>
@@ -315,6 +325,122 @@ function VariationTable({ rows }: { rows: readonly VariationExposures[] }) {
       data={rows}
       getRowId={(row) => row.variation}
     />
+  );
+}
+
+/**
+ * The latest sample-ratio check in the environment: whether the units
+ * first exposed fall to the variations as their weights ask, judged by
+ * chi-square, or why the check computed nothing. An `srm` alert stays
+ * active between a p-value of 0.001 and 0.01 once raised, so whether one
+ * is active, not the p-value alone, says which way the check came out.
+ * A stop takes the final check only in the environments holding the rule
+ * at that moment, so one that stopped holding it earlier keeps the last
+ * check taken while the experiment ran, or none.
+ */
+function SampleRatioResult({
+  check,
+  stoppedAt,
+}: {
+  check: SampleRatioCheck | null;
+  stoppedAt: string | null;
+}) {
+  const { i18n, t } = useLingui();
+  const heading = useId();
+  const n = check ? formatNumber(i18n, check.n) : "";
+
+  const stopped = stoppedAt !== null;
+  const takenAtStop =
+    stopped && check !== null && Date.parse(check.checked_at) === Date.parse(stoppedAt);
+
+  let verdict: ReactNode;
+  if (check === null && stopped) {
+    verdict = (
+      <Trans>
+        Not checked: the experiment stopped before a check ran in this environment, and none runs
+        after a stop.
+      </Trans>
+    );
+  } else if (check === null) {
+    verdict = (
+      <Trans>
+        Not checked yet: a running experiment is checked every 10 minutes in each environment
+        holding its rule, and once more at its stop.
+      </Trans>
+    );
+  } else if (check.skipped_reason === "below_minimum_sample") {
+    verdict = (
+      <Trans>
+        Skipped: the check needs 1,000 units first exposed; units first exposed so far: {n}.
+      </Trans>
+    );
+  } else if (check.skipped_reason === "expected_below_5") {
+    verdict = <Trans>Skipped: a variation expects fewer than 5 units.</Trans>;
+  } else if (check.active) {
+    verdict = (
+      <Trans>
+        Mismatch: the units first exposed are out of line with the weights, and a sample-ratio
+        mismatch alert is active.
+      </Trans>
+    );
+  } else {
+    verdict = <Trans>The units first exposed match the weights.</Trans>;
+  }
+  const mismatch = check !== null && check.skipped_reason === null && check.active;
+
+  return (
+    <section aria-labelledby={heading} className="flex flex-col gap-2">
+      <h3 id={heading} className="font-medium">
+        <Trans>Sample-ratio check</Trans>
+      </h3>
+      <div
+        className={cn(
+          "flex flex-col gap-2 rounded-md border p-3 text-sm",
+          mismatch ? "border-destructive/50 bg-destructive/5" : "bg-muted/40",
+        )}
+      >
+        <p className="flex items-start gap-2">
+          {mismatch ? (
+            <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+          ) : null}
+          <span>{verdict}</span>
+        </p>
+        {check !== null && check.p_value !== null && check.chi_square !== null ? (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5">
+            <dt className="text-muted-foreground">{t`p-value`}</dt>
+            <dd className="tabular-nums">{pValueText(i18n, check.p_value)}</dd>
+            <dt className="text-muted-foreground">{t`X²`}</dt>
+            <dd className="tabular-nums">
+              {new Intl.NumberFormat(i18n.locale, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }).format(check.chi_square)}
+            </dd>
+            <dt className="text-muted-foreground">{t`Units first exposed`}</dt>
+            <dd className="tabular-nums">{n}</dd>
+          </dl>
+        ) : null}
+        {check === null ? null : (
+          <p className="text-muted-foreground">
+            {takenAtStop ? (
+              <Trans>
+                Final check, taken at the stop on <Moment value={check.checked_at} />; it is never
+                run again.
+              </Trans>
+            ) : stopped ? (
+              <Trans>
+                Last checked <Moment value={check.checked_at} />, while the experiment ran; the stop
+                took no check here, as the environment no longer held its rule.
+              </Trans>
+            ) : (
+              <Trans>
+                Checked <Moment value={check.checked_at} />.
+              </Trans>
+            )}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 
