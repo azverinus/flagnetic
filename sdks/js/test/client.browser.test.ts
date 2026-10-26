@@ -24,7 +24,7 @@ declare module "vitest/browser" {
     crossOriginServe(sdkKey: string, doc: unknown): Promise<void>;
     crossOriginRequests(): Promise<SeenRequest[]>;
     crossOriginSend(text: string): Promise<number>;
-    closePage(baseUrl: string, sdkKey: string): Promise<void>;
+    closePage(baseUrl: string, sdkKey: string, unitType?: string): Promise<void>;
   }
 }
 
