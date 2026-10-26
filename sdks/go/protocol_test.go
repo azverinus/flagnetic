@@ -576,6 +576,7 @@ func TestProtocolScenarios(t *testing.T) {
 		}
 		ran++
 		t.Run(sc.Name, func(t *testing.T) {
+			reportScenario(t, sc.Name)
 			var l logs
 			var mu sync.Mutex
 			next := 0 // the step the next request belongs to
