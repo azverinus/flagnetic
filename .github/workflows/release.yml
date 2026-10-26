@@ -28,6 +28,9 @@ jobs:
       sdk_go_released: ${{ steps.release.outputs['sdks/go--release_created'] }}
       sdk_go_tag: ${{ steps.release.outputs['sdks/go--tag_name'] }}
       sdk_go_version: ${{ steps.release.outputs['sdks/go--version'] }}
+      sdk_js_released: ${{ steps.release.outputs['sdks/js--release_created'] }}
+      sdk_js_tag: ${{ steps.release.outputs['sdks/js--tag_name'] }}
+      sdk_js_version: ${{ steps.release.outputs['sdks/js--version'] }}
     steps:
       # A GitHub App token makes the release pull request trigger CI; without
       # the app the built-in token still works, but CI must be run by hand.
@@ -118,3 +121,76 @@ jobs:
         env:
           FLAGNETIC_RELEASE_VERSION: ${{ needs.release-please.outputs.sdk_go_version }}
         run: go test -count=1 -run 'TestVersionIsTheReleasedTagsVersion$' .
+
+  # The JavaScript SDK goes to npm through trusted publishing: npm trusts
+  # this workflow, in the npm environment, by its OIDC token, so no npm
+  # token is stored anywhere, and the package carries a provenance
+  # attestation. npm lets a package trust a workflow only once it exists,
+  # so while `flagnetic` is not on npm the job stops at a dry run, and the
+  # maintainer publishes the first version by hand from the tarball it
+  # keeps (CONTRIBUTING.md).
+  sdk-js-npm:
+    name: npm (flagnetic)
+    needs: release-please
+    if: needs.release-please.outputs.sdk_js_released == 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: sdks/js
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.sdk_js_tag }}
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: sdks/js/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later.
+      - name: npm with trusted publishing
+        run: npm install --global npm@11
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Version equals the tag
+        env:
+          FLAGNETIC_RELEASE_VERSION: ${{ needs.release-please.outputs.sdk_js_version }}
+        run: pnpm exec vitest run --project node test/version.node.test.ts
+      - name: Build
+        run: pnpm build
+      - name: Package
+        run: pnpm check:package
+      - name: Pack
+        id: pack
+        run: echo "tarball=$(npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" | tail -n 1)" >> "$GITHUB_OUTPUT"
+      - name: Keep the tarball
+        uses: actions/upload-artifact@v7
+        with:
+          name: flagnetic-${{ needs.release-please.outputs.sdk_js_version }}
+          path: ${{ runner.temp }}/${{ steps.pack.outputs.tarball }}
+          retention-days: 30
+      - name: Publish, or a dry run before the first version
+        env:
+          TARBALL: ${{ runner.temp }}/${{ steps.pack.outputs.tarball }}
+          VERSION: ${{ needs.release-please.outputs.sdk_js_version }}
+        run: |
+          # Only npm's answer that the package does not exist means a first
+          # version; any other failure to ask fails the job.
+          if found="$(npm view flagnetic name 2>&1)"; then
+            npm publish "$TARBALL" --access public
+            echo "Published flagnetic@$VERSION to npm with provenance." >> "$GITHUB_STEP_SUMMARY"
+          elif ! grep -q E404 <<< "$found"; then
+            echo "$found" >&2
+            exit 1
+          else
+            npm publish "$TARBALL" --access public --dry-run
+            {
+              echo "flagnetic is not on npm yet, so nothing was published."
+              echo "Publish the tarball of the artifact flagnetic-$VERSION by hand, then configure trusted publishing (CONTRIBUTING.md)."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

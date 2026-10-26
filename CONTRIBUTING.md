@@ -88,6 +88,18 @@ Before a module's first release its dependents require it at `v0.0.0`, which onl
 
 The first release of all three follows the order above, with one difference: Dependabot cannot resolve a `v0.0.0` requirement outside the workspace, so the first bump of each dependent is made by hand, in its directory, with `go get github.com/azverinus/flagnetic/eval@v0.1.0` (and the SDK's tag for the provider) and `.github/scripts/check-tidy.sh <dir> -w`. Every later bump is Dependabot's.
 
+### The JavaScript SDK
+
+The npm package `flagnetic` in `sdks/js` is its own release-please component, tagged `sdks/js/vX.Y.Z`; use the scope `sdk-js`. release-please keeps `package.json` and `VERSION` in `src/version.ts` at the release's version. When its release pull request is merged, the `npm (flagnetic)` job of `release.yml` checks out the tag, checks that the version is the tag's, builds and checks the package, keeps the tarball as the artifact `flagnetic-<version>` for 30 days and publishes that tarball to npm through [trusted publishing](https://docs.npmjs.com/trusted-publishers): npm accepts the workflow's OIDC token, so no npm token is stored, and attaches a provenance attestation. The job runs in the GitHub environment `npm`; give it the protection rules a publish should have.
+
+npm lets a package trust a workflow only once the package exists, so the first version is published by hand:
+
+1. Merge the first release pull request of `sdks/js`. While `flagnetic` is not on npm, the job stops at `npm publish --dry-run` and says so in its summary.
+2. Download the artifact `flagnetic-<version>` of that run and check its contents (`tar tzf flagnetic-<version>.tgz`).
+3. Publish it from an npm account with two-factor authentication: `npm publish flagnetic-<version>.tgz --access public --provenance=false`. A provenance attestation can only be made in CI, so this one version has none.
+4. When the next release pull request of `sdks/js` is ready to merge, add a trusted publisher in the package's settings on npmjs.com: GitHub Actions, organization or user `azverinus`, repository `flagnetic`, workflow filename `release.yml`, environment `npm`. A new trusted publisher must publish within two days or it expires and has to be deleted and added again, so merge that pull request within those two days; its release is the first the workflow publishes.
+5. Once it has, set the package's publishing access to require two-factor authentication and disallow tokens, so that only the workflow publishes.
+
 ## Licensing
 
 Flagnetic is licensed under [Apache-2.0](LICENSE). Contributions are accepted under the same license (inbound = outbound), certified by the sign-off above. There is no CLA.

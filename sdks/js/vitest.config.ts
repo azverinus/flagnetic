@@ -1,8 +1,12 @@
+import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 import type { BrowserCommand } from "vitest/node";
 import { CrossOriginServer } from "./test/support/cross-origin-server.js";
+import { ScenarioReport } from "./test/support/scenario-report.js";
 
 // The repository root: the conformance suite lives in conformance/ beside the SDKs.
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -39,8 +43,8 @@ const crossOriginSend: BrowserCommand<[text: string]> = (_ctx, text) => crossOri
 // Opens test/support/closing-page.html in a tab of its own, on the test
 // page's origin, waits for its client to record an event and closes the tab
 // as a user would: what the page sends on its way out is all the server gets.
-const closePage: BrowserCommand<[baseUrl: string, sdkKey: string]> = async (ctx, baseUrl, sdkKey) => {
-  const query = new URLSearchParams({ base_url: baseUrl, sdk_key: sdkKey });
+const closePage: BrowserCommand<[baseUrl: string, sdkKey: string, unitType?: string]> = async (ctx, baseUrl, sdkKey, unitType = "user") => {
+  const query = new URLSearchParams({ base_url: baseUrl, sdk_key: sdkKey, unit_type: unitType });
   const page = await ctx.context.newPage();
   try {
     await page.goto(`${new URL(ctx.page.url()).origin}/test/support/closing-page.html?${query.toString()}`);
@@ -51,9 +55,25 @@ const closePage: BrowserCommand<[baseUrl: string, sdkKey: string]> = async (ctx,
 };
 const commands = { crossOriginStart, crossOriginReset, crossOriginServe, crossOriginRequests, crossOriginSend, closePage };
 
+// The smokes against two real replicas brought up by `flagnetic-e2e up`
+// (e2e/README.md). The browser one reaches the seed and the harness's
+// control commands through these.
+const harness = process.env.FLAGNETIC_E2E_CMD ?? "flagnetic-e2e";
+const e2eSeed: BrowserCommand = () => {
+  const path = process.env.FLAGNETIC_E2E_SEED;
+  if (!path) throw new Error("FLAGNETIC_E2E_SEED must name the seed `flagnetic-e2e up` wrote");
+  return JSON.parse(readFileSync(path, "utf8")) as unknown;
+};
+const e2eHarness: BrowserCommand<string[]> = async (_ctx, ...args) => (await promisify(execFile)(harness, args)).stdout;
+
+// FLAGNETIC_SCENARIO_REPORT names the file the protocol scenarios that
+// passed are written to, for the behaviour matrix.
+const scenarioReport = process.env.FLAGNETIC_SCENARIO_REPORT;
+
 export default defineConfig({
   server: { fs: { allow: [repoRoot] } },
   test: {
+    ...(scenarioReport && { reporters: ["default", new ScenarioReport(scenarioReport)] }),
     projects: [
       {
         extends: true,
@@ -64,7 +84,7 @@ export default defineConfig({
           // A `.browser.test` needs a document, so it runs in the engines'
           // project alone; the React tests that only render to a string run
           // here too.
-          exclude: ["test/**/*.browser.test.{ts,tsx}", "test/**/*.p99.test.ts"],
+          exclude: ["test/**/*.browser.test.{ts,tsx}", "test/**/*.p99.test.ts", "test/e2e/**"],
           benchmark: { include: ["bench/**/*.bench.ts"] },
         },
       },
@@ -83,7 +103,7 @@ export default defineConfig({
         test: {
           name: "browser",
           include: ["test/**/*.test.{ts,tsx}"],
-          exclude: ["test/**/*.node.test.{ts,tsx}", "test/**/*.browser.test.{ts,tsx}", "test/**/*.p99.test.ts"],
+          exclude: ["test/**/*.node.test.{ts,tsx}", "test/**/*.browser.test.{ts,tsx}", "test/**/*.p99.test.ts", "test/e2e/**"],
           browser: chromium,
         },
       },
@@ -98,6 +118,27 @@ export default defineConfig({
             instances: engines.map((browser) => ({ browser })),
             commands,
           },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "e2e",
+          environment: "node",
+          include: ["test/e2e/**/*.e2e.test.ts"],
+          exclude: ["test/e2e/**/*.browser.e2e.test.ts"],
+          // One file at a time, in order: the smokes share one instance,
+          // and each ends by revoking its key.
+          fileParallelism: false,
+          sequence: { concurrent: false },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "e2e-browser",
+          include: ["test/e2e/**/*.browser.e2e.test.ts"],
+          browser: { ...chromium, commands: { e2eSeed, e2eHarness, closePage } },
         },
       },
     ],

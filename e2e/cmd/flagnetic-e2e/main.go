@@ -32,6 +32,7 @@ Commands:
   restore                write the seed's flags and segment back
   revoke <server|client> revoke the seed's key of that kind
   inventory              print the environment's SDK inventory
+  events                 print the project's events per day and type
 
 Environment:
   FLAGNETIC_E2E_SEED     up writes the seed JSON here; printed when unset
@@ -67,7 +68,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		statePath = e2e.DefaultStatePath()
 	}
 	command, rest := args[0], args[1:]
-	want := map[string]int{"up": 0, "seed": 0, "kill": 1, "restore": 0, "revoke": 1, "inventory": 0}
+	want := map[string]int{"up": 0, "seed": 0, "kill": 1, "restore": 0, "revoke": 1, "inventory": 0, "events": 0}
 	n, ok := want[command]
 	switch {
 	case command == "help" || command == "-h" || command == "--help":
@@ -106,6 +107,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return 2
 		}
 		return answer(stdout, stderr, command, nil, e2e.Revoke(ctx, state, kind))
+	case "events":
+		volume, err := e2e.EventVolume(ctx, state)
+		return answer(stdout, stderr, command, volume, err)
 	default:
 		items, err := e2e.Inventory(ctx, state)
 		return answer(stdout, stderr, command, items, err)

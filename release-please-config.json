@@ -52,6 +52,15 @@
       "component": "sdks/go-openfeature",
       "include-component-in-tag": true,
       "changelog-path": "CHANGELOG.md"
+    },
+    "sdks/js": {
+      "release-type": "node",
+      "initial-version": "0.1.0",
+      "package-name": "flagnetic",
+      "component": "sdks/js",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": ["src/version.ts"]
     }
   }
 }

@@ -11,6 +11,12 @@
 
 `react`, `@openfeature/server-sdk` and `@openfeature/web-sdk` are optional peer dependencies of the entry points that use them; every other entry point loads without them.
 
+```bash
+npm install flagnetic
+```
+
+Supported: Node 22 and later (the releases Node still supports; a release reaching its end of life is dropped in a minor version), browsers that run ES2022, React 18 and later, `@openfeature/server-sdk` 1.23 and later, `@openfeature/web-sdk` 1.10 and later. The package speaks the SDK API `/sdk/v1` and works with every Flagnetic server from 0.1.0 on ([compatibility](../../docs/sdks/compatibility.md)); [docs/sdks/javascript.md](../../docs/sdks/javascript.md) is how to choose and deploy each entry point.
+
 ## Server mode
 
 ```ts
@@ -193,6 +199,9 @@ pnpm test:browser    # the same suite in Chromium (pnpm exec playwright install 
 pnpm test:browsers   # the browser client cross-origin and the React bindings in Chromium, Firefox and WebKit (FLAGNETIC_BROWSERS=webkit for one)
 pnpm test:p99        # 1,000 flags evaluate under 1 ms at p99
 pnpm build && pnpm check:package && pnpm check:size
+pnpm test:e2e        # the smokes in Node and Chromium against two real replicas (below)
 ```
+
+The smokes need the end-to-end harness of [`e2e/`](../../e2e/README.md) running: start `flagnetic-e2e up` with `FLAGNETIC_E2E_SEED` naming a file, then run `pnpm test:e2e` with the same `FLAGNETIC_E2E_SEED` and, unless `flagnetic-e2e` is on the `PATH`, `FLAGNETIC_E2E_CMD` naming it. They end by revoking the seed's keys, so bring the harness up again before running them a second time.
 
 The Unicode class tables of the regular expression engine are generated from Go's `regexp/syntax`; after a Go upgrade run `pnpm gen:unicode`, and CI fails when they are stale.

@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/azverinus/flagnetic/e2e"
+	"github.com/azverinus/flagnetic/internal/infra/in/http/management"
 )
 
 // TestTheCommandServesAnSDKInAnyLanguage drives flagnetic-e2e as a smoke in
@@ -113,6 +114,11 @@ func TestTheCommandServesAnSDKInAnyLanguage(t *testing.T) {
 		t.Errorf("kill again = %+v, %v; want unchanged", second, err)
 	}
 	control("restore")
+
+	var volume management.EventVolume
+	if err := json.Unmarshal([]byte(control("events")), &volume); err != nil || volume.Days == nil {
+		t.Errorf("events = %+v, %v; want the project's event volume", volume, err)
+	}
 
 	if err := up.Process.Signal(syscall.SIGINT); err != nil {
 		t.Fatal(err)

@@ -11,7 +11,11 @@ export default defineConfig({
     openfeature: "src/openfeature.ts",
   },
   format: ["esm", "cjs"],
-  dts: true,
+  // Members marked @internal serve the package's own modules across
+  // files; they stay out of the declarations, so no application builds on
+  // them. Constructors are never marked: a class whose constructor is
+  // stripped would declare one that takes no arguments.
+  dts: { compilerOptions: { stripInternal: true } },
   target: "es2022",
   platform: "neutral",
   splitting: false,
