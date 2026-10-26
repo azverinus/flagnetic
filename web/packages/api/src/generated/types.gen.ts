@@ -1737,6 +1737,35 @@ export type ChangeRequestApplier = {
   name: string;
 };
 
+/**
+ * Why the system failed to apply a scheduled change request, cleared
+ * when it is applied or cancelled and kept when it is superseded. The
+ * failure changes neither the change request's state nor its version.
+ *
+ */
+export type ScheduleFailure = {
+  /**
+   * When the last attempt failed.
+   */
+  at: string;
+  /**
+   * The code of the refusal, as a manual application would answer it, or `internal`.
+   */
+  code: string;
+  message: string;
+  /**
+   * The attempts that failed in a row.
+   */
+  attempts: number;
+  /**
+   * Whether the system stopped trying, after
+   * `FLAGNETIC_SCHEDULE_MAX_FAILURES` attempts (5 by default). Cancel
+   * the change request and copy it to propose it again.
+   *
+   */
+  stopped: boolean;
+};
+
 export type ChangeRequestApprove = {
   /**
    * Optional, at most 2,000 characters.
@@ -1843,6 +1872,14 @@ export type ChangeRequest = {
    * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
    */
   superseded_by: string | null;
+  /**
+   * When the system applies the change request once approved, in UTC; null when it is applied by hand.
+   */
+  apply_at: string | null;
+  /**
+   * Why the last scheduled application failed; null when none did.
+   */
+  schedule_failure: ScheduleFailure | null;
   created_at: string;
   updated_at: string;
   version: Version;
@@ -1877,12 +1914,20 @@ export type ChangeRequestCreate = {
    * Open the change request for review at once instead of drafting it.
    */
   open?: boolean;
+  /**
+   * When the system applies the change request once approved; absent to apply it by hand.
+   */
+  apply_at?: string;
 };
 
 export type ChangeRequestPatch = {
   title?: string;
   description?: string;
   proposed?: ProposedInput;
+  /**
+   * The apply time; null removes it. Absent leaves it as it is.
+   */
+  apply_at?: string | null;
 };
 
 /**
@@ -8248,6 +8293,10 @@ export type ListChangeRequestsData = {
      *
      */
     awaiting_my_decision?: boolean;
+    /**
+     * When true, only those with an apply time; when false, only those without one.
+     */
+    scheduled?: boolean;
     /**
      * The `next_cursor` of the previous page.
      */

@@ -107,6 +107,14 @@ type Config struct {
 	// WebhookTick is how often a replica fans the outbox out to webhook
 	// subscriptions and sends the deliveries that are due.
 	WebhookTick time.Duration
+	// ScheduleMinLead is how far ahead a change request's apply time must
+	// be at least.
+	ScheduleMinLead time.Duration
+	// ScheduleTick is the time between the scheduler's rounds.
+	ScheduleTick time.Duration
+	// ScheduleMaxFailures is how many failed scheduled applications in a
+	// row stop the scheduler trying a change request.
+	ScheduleMaxFailures int
 }
 
 // RateLimits are the limits of the SDK API, each counted by every replica on
@@ -519,6 +527,36 @@ func Settings() []Setting {
 				"An event reaches a receiver about this long after its change at the earliest.",
 			Example: "5s",
 			apply:   durationSetting(func(c *Config, d time.Duration) { c.WebhookTick = d }),
+		},
+		{
+			Name:    "FLAGNETIC_SCHEDULE_MIN_LEAD",
+			Key:     "schedule_min_lead",
+			Default: "60s",
+			Unit:    "duration",
+			Description: "How far ahead a change request's apply time must be at least when it is set; " +
+				"a sooner time is refused `invalid_change_request`.",
+			Example: "5m",
+			apply:   durationSetting(func(c *Config, d time.Duration) { c.ScheduleMinLead = d }),
+		},
+		{
+			Name:    "FLAGNETIC_SCHEDULE_TICK",
+			Key:     "schedule_tick",
+			Default: "10s",
+			Unit:    "duration",
+			Description: "How often every replica looks for approved change requests whose apply time has come and applies them; " +
+				"a change request is applied at most this long after its time, or later when no replica was running.",
+			Example: "10s",
+			apply:   durationSetting(func(c *Config, d time.Duration) { c.ScheduleTick = d }),
+		},
+		{
+			Name:    "FLAGNETIC_SCHEDULE_MAX_FAILURES",
+			Key:     "schedule_max_failures",
+			Default: "5",
+			Unit:    "attempts",
+			Description: "How many scheduled applications of a change request may fail in a row before the scheduler stops trying it " +
+				"and records `change_request.schedule_failed`.",
+			Example: "5",
+			apply:   wholeNumber(func(c *Config, n int) { c.ScheduleMaxFailures = n }),
 		},
 		rateLimit("FLAGNETIC_RATE_LIMIT_CLIENT_EVALUATE", "120", "requests per minute",
 			"Remote evaluations a client key may ask of one replica per minute, counted per key and client IP.",

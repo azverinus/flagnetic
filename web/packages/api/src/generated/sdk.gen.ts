@@ -2891,6 +2891,11 @@ export const listChangeRequests = <ThrowOnError extends boolean = false>(
  * one; new rules and rollouts are given an identifier and a salt,
  * which `proposed` holds. A title of 1 to 200 characters is required
  * and a description has at most 10,000 (`invalid_change_request`).
+ * `apply_at` schedules the change request: once approved, the system
+ * applies it at that time, or as soon after as a replica runs. It is at
+ * least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+ * most 365 days ahead (`invalid_change_request`, `too_soon` or
+ * `too_late` under `/apply_at`), and answered in UTC.
  *
  */
 export const createChangeRequest = <ThrowOnError extends boolean = false>(
@@ -2945,7 +2950,8 @@ export const getChangeRequest = <ThrowOnError extends boolean = false>(
  * document the change request's kind and entity call for, is checked
  * as on creation, against the entity as it is now, and `diff` is
  * recomputed from the entity as the change request is based on it; a
- * rebase moves that. An edit that changes nothing changes
+ * rebase moves that. `apply_at` sets the apply time, judged
+ * from now as on creation, and null removes it. An edit that changes nothing changes
  * nothing and records nothing.
  *
  */
@@ -3176,7 +3182,8 @@ export const rejectChangeRequest = <ThrowOnError extends boolean = false>(
  * and the application refused (`base_moved`). What is proposed is
  * checked again as writing it directly is, since what it names may be
  * gone since the approval: a refusal writes nothing and leaves the
- * change request approved.
+ * change request approved. A change request with an apply time is
+ * applied by the system alone (`scheduled`).
  *
  */
 export const applyChangeRequest = <ThrowOnError extends boolean = false>(

@@ -3214,6 +3214,11 @@ paths:
             included.
           schema:
             type: boolean
+        - name: scheduled
+          in: query
+          description: When true, only those with an apply time; when false, only those without one.
+          schema:
+            type: boolean
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -3252,6 +3257,11 @@ paths:
         one; new rules and rollouts are given an identifier and a salt,
         which `proposed` holds. A title of 1 to 200 characters is required
         and a description has at most 10,000 (`invalid_change_request`).
+        `apply_at` schedules the change request: once approved, the system
+        applies it at that time, or as soon after as a replica runs. It is at
+        least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+        most 365 days ahead (`invalid_change_request`, `too_soon` or
+        `too_late` under `/apply_at`), and answered in UTC.
       x-permission: change_request.propose
       tags: [change-requests]
       requestBody:
@@ -3317,7 +3327,8 @@ paths:
         document the change request's kind and entity call for, is checked
         as on creation, against the entity as it is now, and `diff` is
         recomputed from the entity as the change request is based on it; a
-        rebase moves that. An edit that changes nothing changes
+        rebase moves that. `apply_at` sets the apply time, judged
+        from now as on creation, and null removes it. An edit that changes nothing changes
         nothing and records nothing.
       x-permission: change_request.propose
       tags: [change-requests]
@@ -3621,7 +3632,8 @@ paths:
         and the application refused (`base_moved`). What is proposed is
         checked again as writing it directly is, since what it names may be
         gone since the approval: a refusal writes nothing and leaves the
-        change request approved.
+        change request approved. A change request with an apply time is
+        applied by the system alone (`scheduled`).
       x-permission: change_request.propose
       tags: [change-requests]
       parameters:
@@ -7414,6 +7426,33 @@ components:
         name:
           type: string
           description: The member's display name or the token's name, as it is now; empty for the system.
+    ScheduleFailure:
+      type: object
+      description: |
+        Why the system failed to apply a scheduled change request, cleared
+        when it is applied or cancelled and kept when it is superseded. The
+        failure changes neither the change request's state nor its version.
+      required: [at, code, message, attempts, stopped]
+      properties:
+        at:
+          type: string
+          format: date-time
+          description: When the last attempt failed.
+        code:
+          type: string
+          description: The code of the refusal, as a manual application would answer it, or `internal`.
+        message:
+          type: string
+        attempts:
+          type: integer
+          minimum: 1
+          description: The attempts that failed in a row.
+        stopped:
+          type: boolean
+          description: |
+            Whether the system stopped trying, after
+            `FLAGNETIC_SCHEDULE_MAX_FAILURES` attempts (5 by default). Cancel
+            the change request and copy it to propose it again.
     ChangeRequestApprove:
       type: object
       properties:
@@ -7486,7 +7525,7 @@ components:
     ChangeRequest:
       type: object
       required: [id, kind, state, title, description, base_version, proposed, diff, author, approval, rejection, applied_at,
-        applied_by, superseded_by, created_at, updated_at, version]
+        applied_by, superseded_by, apply_at, schedule_failure, created_at, updated_at, version]
       properties:
         id:
           type: string
@@ -7559,6 +7598,16 @@ components:
             deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write
             to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found
             superseded only when it was approved or applied names none.
+        apply_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the system applies the change request once approved, in UTC; null when it is applied by hand.
+        schedule_failure:
+          description: Why the last scheduled application failed; null when none did.
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ScheduleFailure"
         created_at:
           type: string
           format: date-time
@@ -7605,6 +7654,10 @@ components:
           type: boolean
           default: false
           description: Open the change request for review at once instead of drafting it.
+        apply_at:
+          type: string
+          format: date-time
+          description: When the system applies the change request once approved; absent to apply it by hand.
     ChangeRequestPatch:
       type: object
       properties:
@@ -7614,6 +7667,15 @@ components:
           type: string
         proposed:
           $ref: "#/components/schemas/ProposedInput"
+        apply_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: The apply time; null removes it. Absent leaves it as it is.
+          x-go-type: nullable.Nullable[time.Time]
+          x-go-type-import:
+            path: github.com/oapi-codegen/nullable
+          x-go-type-skip-optional-pointer: true
     ProposedInput:
       description: |
         What a change request proposes, as a direct write would give it,

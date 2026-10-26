@@ -27,7 +27,9 @@ type CreateChangeRequestCommand struct {
 	Description string
 	Proposed    Proposed
 	// Open opens the change request for review at once.
-	Open    bool
+	Open bool
+	// ApplyAt schedules the change request, nil for none.
+	ApplyAt *time.Time
 	Author  governance.Author
 	Request governance.Request
 }
@@ -48,7 +50,7 @@ func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeReques
 		}
 		cr, err := propose(ctx, h.d, cmd.Project, cmd.Target, cmd.Proposed, governance.Proposal{
 			Title: cmd.Title, Description: cmd.Description,
-		}, cmd.Open, cmd.Author, now)
+		}, cmd.Open, cmd.ApplyAt, cmd.Author, now)
 		if err != nil {
 			return err
 		}
@@ -71,9 +73,10 @@ func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeReques
 }
 
 // propose returns a new change request of author proposing in for t in
-// project, based on its entity as it is now.
+// project, based on its entity as it is now, to be applied at applyAt unless
+// nil.
 func propose(ctx context.Context, d ChangeRequestDeps, project workspace.ProjectID, t Target, in Proposed,
-	p governance.Proposal, open bool, author governance.Author, now time.Time,
+	p governance.Proposal, open bool, applyAt *time.Time, author governance.Author, now time.Time,
 ) (governance.ChangeRequest, error) {
 	subject, proposed, err := d.propose(ctx, project, t, in, nil)
 	if err != nil {
@@ -82,7 +85,7 @@ func propose(ctx context.Context, d ChangeRequestDeps, project workspace.Project
 	p.Proposed = proposed
 	return governance.NewChangeRequest(governance.NewChangeRequestInput{
 		ID: id.New[governance.ChangeRequest](d.IDs), Project: project, Subject: subject, Proposal: p, Open: open,
-		Author: author, Now: now,
+		Author: author, ApplyAt: applyAt, MinLead: d.MinLead, Now: now,
 	})
 }
 
@@ -104,6 +107,8 @@ type UpdateChangeRequestCommand struct {
 	// Proposed is the document now proposed, the one the change request's
 	// kind and entity call for.
 	Proposed *Proposed
+	// Schedule sets or clears the apply time.
+	Schedule *governance.ScheduleEdit
 }
 
 // Handle edits the change request and returns it. A new proposal is checked
@@ -118,7 +123,7 @@ func (h *UpdateChangeRequest) Handle(ctx context.Context, cmd UpdateChangeReques
 			if _, err := cr.Next(governance.TransitionEdit, cmd.By); err != nil {
 				return cr, false, err
 			}
-			e := governance.Edit{Title: cmd.Title, Description: cmd.Description}
+			e := governance.Edit{Title: cmd.Title, Description: cmd.Description, Schedule: cmd.Schedule, MinLead: h.d.MinLead}
 			if cmd.Proposed != nil {
 				// The rules the change request proposes keep the
 				// identifiers and salts they were given when it was made.
@@ -214,8 +219,10 @@ type CopyChangeRequestCommand struct {
 }
 
 // Handle copies the change request, whatever its state, into a new draft of
-// the caller's with its title, description and proposal, based on its
-// entity as it is now and checked against it as a new change request is: a rejected or abandoned proposal is resumed on the current base. The
+// the caller's with its title, description and proposal, unscheduled, since
+// the time it named may have passed, based on its entity as it is now and
+// checked against it as a new change request is: a rejected or abandoned
+// proposal is resumed on the current base. The
 // copy records the change request it was copied from.
 func (h *CopyChangeRequest) Handle(ctx context.Context, cmd CopyChangeRequestCommand) (governance.ChangeRequest, error) {
 	now := h.d.now()
@@ -234,7 +241,7 @@ func (h *CopyChangeRequest) Handle(ctx context.Context, cmd CopyChangeRequestCom
 		}
 		cr, err := propose(ctx, h.d, cmd.Project, TargetOf(source), in, governance.Proposal{
 			Title: source.Title, Description: source.Description,
-		}, false, cmd.Author, now)
+		}, false, nil, cmd.Author, now)
 		if err != nil {
 			return err
 		}
@@ -283,8 +290,7 @@ func NewCountWaitingChangeRequests(store WaitingCounter) *CountWaitingChangeRequ
 }
 
 // Handle returns the change requests waiting on flag's configuration in
-// environment. No change request carries a time to be applied at yet, so
-// none is named.
+// environment and the earliest time one of them is scheduled for.
 func (h *CountWaitingChangeRequests) Handle(ctx context.Context, flag flags.FlagID, environment workspace.EnvironmentID,
 ) (governance.Waiting, error) {
 	return h.store.WaitingOn(ctx, flag, environment)
@@ -312,6 +318,9 @@ type ChangeRequestFilter struct {
 	// NotAuthoredBy leaves out the change requests of the member with this
 	// identifier.
 	NotAuthoredBy string
+	// Scheduled, when set, selects the change requests with an apply time
+	// (true) or without one (false).
+	Scheduled *bool
 }
 
 // ChangeRequestPage asks for one page of change requests, newest first.
@@ -422,20 +431,30 @@ func NewApplyChangeRequest(d ChangeRequestDeps) *ApplyChangeRequest {
 func (h *ApplyChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand) (governance.ChangeRequest, error) {
 	return transition(ctx, h.d, cmd, "change_request.applied",
 		func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
-			if _, err := cr.Next(governance.TransitionApply, cmd.By); err != nil {
-				return cr, false, err
-			}
-			current, err := h.d.judged(ctx, cr)
-			if err != nil {
-				return cr, false, err
-			}
-			applied, err := cr.Apply(cmd.By, current, now)
-			if err != nil {
-				return supersededOr(cr, applied, err)
-			}
-			if err = h.d.write(ctx, cr, cmd.By.As.Member, cmd.Request); err != nil {
-				return cr, false, under(err, "/proposed")
-			}
-			return applied, true, nil
+			return applyChange(ctx, h.d, cr, cmd.By, cmd.Request, now)
 		})
+}
+
+// applyChange is what applying cr by by at now in req changes, as a
+// transition's change answers it: what cr proposes written by the context
+// owning its entity when the entity is still cr's base, cr superseded when it
+// moved.
+func applyChange(ctx context.Context, d ChangeRequestDeps, cr governance.ChangeRequest, by governance.Taker,
+	req governance.Request, now time.Time,
+) (governance.ChangeRequest, bool, error) {
+	if _, err := cr.Next(governance.TransitionApply, by); err != nil {
+		return cr, false, err
+	}
+	current, err := d.judged(ctx, cr)
+	if err != nil {
+		return cr, false, err
+	}
+	applied, err := cr.Apply(by, current, now)
+	if err != nil {
+		return supersededOr(cr, applied, err)
+	}
+	if err = d.write(ctx, cr, by.As.Member, req); err != nil {
+		return cr, false, under(err, "/proposed")
+	}
+	return applied, true, nil
 }

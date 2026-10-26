@@ -89,11 +89,12 @@ func (s *ChangeRequests) CreateChangeRequest(ctx context.Context, cr governance.
 	}
 	_, err = s.db(ctx).Exec(ctx, `
 		INSERT INTO change_requests (id, project_id, kind, flag_id, environment_id, segment_id, state, title, description,
-		    base, base_version, base_referrers, proposed, diff, author_id, author_token_id, created_at, updated_at, version)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+		    base, base_version, base_referrers, proposed, diff, author_id, author_token_id, created_at, updated_at, version,
+		    apply_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
 		cr.ID.Bytes(), cr.Project.Bytes(), string(cr.Kind), flag, environment, segment, string(cr.State), cr.Title,
 		cr.Description, base, cr.BaseVersion, referrersOf(cr), proposed, diff, member, token, cr.CreatedAt, cr.UpdatedAt,
-		cr.Version)
+		cr.Version, cr.ApplyAt)
 	if err != nil {
 		return fmt.Errorf("creating a change request: %w", err)
 	}
@@ -128,7 +129,8 @@ func coversOf(cr governance.ChangeRequest) any {
 
 // UpdateChangeRequest stores what a transition changes of cr: its state,
 // texts, base, proposal and diff, the decision taken on it, what its
-// approval covers and its application. The entity it names and its author never change.
+// approval covers, its application, its apply time and its schedule
+// failure. The entity it names and its author never change.
 func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.ChangeRequest) error {
 	base, proposed, diff, err := documents(cr)
 	if err != nil {
@@ -161,11 +163,14 @@ func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.
 		SET state = $3, title = $4, description = $5, base = $6, base_version = $7, proposed = $8, diff = $9,
 		    updated_at = $10, version = $11, decision = $12, decided_by = $13, decided_at = $14, decision_comment = $15,
 		    applied_at = $16, applied_by_kind = $17, applied_by = $18, applied_by_token = $19, superseded_by = $20,
-		    base_referrers = $21, approval_covers = $22
+		    base_referrers = $21, approval_covers = $22, apply_at = $23, schedule_failed_at = $24,
+		    schedule_failure_code = $25, schedule_failure_message = $26, schedule_failures = $27, schedule_stopped = $28
 		WHERE project_id = $1 AND id = $2`,
-		cr.Project.Bytes(), cr.ID.Bytes(), string(cr.State), cr.Title, cr.Description, base, cr.BaseVersion, proposed, diff,
-		cr.UpdatedAt, cr.Version, decision, decidedBy, decidedAt, comment, appliedAt, appliedKind, appliedBy, appliedT,
-		supersededBy, referrersOf(cr), coversOf(cr))
+		append([]any{
+			cr.Project.Bytes(), cr.ID.Bytes(), string(cr.State), cr.Title, cr.Description, base, cr.BaseVersion, proposed, diff,
+			cr.UpdatedAt, cr.Version, decision, decidedBy, decidedAt, comment, appliedAt, appliedKind, appliedBy, appliedT,
+			supersededBy, referrersOf(cr), coversOf(cr), cr.ApplyAt,
+		}, failureArgs(cr.ScheduleFailure)...)...)
 	if err != nil {
 		return fmt.Errorf("updating a change request: %w", err)
 	}
@@ -173,6 +178,62 @@ func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.
 		return appgovernance.ErrNotFound
 	}
 	return nil
+}
+
+// RecordScheduleFailure stores cr's schedule failure and nothing else, so
+// recording why a scheduled application failed never moves the change
+// request's version.
+func (s *ChangeRequests) RecordScheduleFailure(ctx context.Context, cr governance.ChangeRequest) error {
+	tag, err := s.db(ctx).Exec(ctx, `
+		UPDATE change_requests
+		SET schedule_failed_at = $3, schedule_failure_code = $4, schedule_failure_message = $5, schedule_failures = $6,
+		    schedule_stopped = $7
+		WHERE project_id = $1 AND id = $2`,
+		append([]any{cr.Project.Bytes(), cr.ID.Bytes()}, failureArgs(cr.ScheduleFailure)...)...)
+	if err != nil {
+		return fmt.Errorf("recording a schedule failure: %w", err)
+	}
+	if tag.RowsAffected() != 1 {
+		return appgovernance.ErrNotFound
+	}
+	return nil
+}
+
+// failureArgs are the columns of f: when, code, message, attempts and
+// whether it stopped the scheduler; none and zero attempts for nil.
+func failureArgs(f *governance.ScheduleFailure) []any {
+	if f == nil {
+		return []any{nil, nil, nil, 0, false}
+	}
+	return []any{f.At, f.Code, f.Message, f.Attempts, f.Stopped}
+}
+
+// DueChangeRequests returns at most limit change requests of any project
+// that are approved, scheduled at or before now and not stopped by their
+// failures, earliest first. It reads without a lock: whoever applies one
+// locks its project's row and reads it again.
+func (s *ChangeRequests) DueChangeRequests(ctx context.Context, now time.Time, limit int,
+) ([]appgovernance.DueChangeRequest, error) {
+	rows, err := s.db(ctx).Query(ctx, `
+		SELECT project_id, id FROM change_requests
+		WHERE state = 'approved' AND apply_at IS NOT NULL AND NOT schedule_stopped AND apply_at <= $1
+		ORDER BY apply_at, id
+		LIMIT $2`, now, limit)
+	if err != nil {
+		return nil, fmt.Errorf("reading the due change requests: %w", err)
+	}
+	defer rows.Close()
+	var out []appgovernance.DueChangeRequest
+	for rows.Next() {
+		var project, cr [16]byte
+		if err := rows.Scan(&project, &cr); err != nil {
+			return nil, err
+		}
+		out = append(out, appgovernance.DueChangeRequest{
+			Project: id.FromBytes[workspace.Project](project), ChangeRequest: id.FromBytes[governance.ChangeRequest](cr),
+		})
+	}
+	return out, rows.Err()
 }
 
 // decisionOf returns the decision taken on cr and its kind, or nil.
@@ -194,7 +255,8 @@ const changeRequestColumns = `cr.id, cr.project_id, cr.kind, cr.flag_id, f.key, 
 	coalesce(m.display_name, t.name, ''), cr.decision, cr.decided_by, coalesce(dm.display_name, ''), cr.decided_at,
 	cr.decision_comment, cr.applied_at, cr.applied_by_kind, cr.applied_by, cr.applied_by_token,
 	coalesce(am.display_name, ap.name, ''), cr.superseded_by, cr.created_at, cr.updated_at, cr.version, cr.segment_id,
-	s.key, cr.base_referrers, cr.approval_covers`
+	s.key, cr.base_referrers, cr.approval_covers, cr.apply_at, cr.schedule_failed_at, cr.schedule_failure_code,
+	cr.schedule_failure_message, cr.schedule_failures, cr.schedule_stopped`
 
 const changeRequestFrom = ` FROM change_requests cr
 	LEFT JOIN flags f ON f.id = cr.flag_id
@@ -221,12 +283,26 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 		referrers, covers              [][16]byte
 		deciderName, applierName       string
 		decidedAt, appliedAt           *time.Time
+		applyAt, failedAt              *time.Time
+		failureCode, failureMessage    *string
+		failures                       int
+		stopped                        bool
 	)
 	if err := row.Scan(&crk, &pk, &kind, &fk, &flagKey, &ek, &environmentKey, &state, &cr.Title, &cr.Description, &base,
 		&cr.BaseVersion, &proposed, &diff, &member, &token, &cr.Author.Name, &decision, &decidedBy, &deciderName, &decidedAt,
 		&comment, &appliedAt, &appliedKind, &appliedBy, &appliedT, &applierName, &supersededBy, &cr.CreatedAt, &cr.UpdatedAt,
-		&cr.Version, &sk, &segmentKey, &referrers, &covers); err != nil {
+		&cr.Version, &sk, &segmentKey, &referrers, &covers, &applyAt, &failedAt, &failureCode, &failureMessage, &failures,
+		&stopped); err != nil {
 		return cr, err
+	}
+	if applyAt != nil {
+		at := applyAt.UTC()
+		cr.ApplyAt = &at
+	}
+	if failedAt != nil {
+		cr.ScheduleFailure = &governance.ScheduleFailure{
+			At: failedAt.UTC(), Code: *failureCode, Message: *failureMessage, Attempts: failures, Stopped: stopped,
+		}
 	}
 	if decision != nil {
 		d := &governance.Decision{
@@ -337,10 +413,11 @@ func (s *ChangeRequests) ChangeRequests(ctx context.Context, f appgovernance.Cha
 		  AND ($7::uuid IS NULL OR cr.id < $7)
 		  AND ($9 = '' OR cr.author_id IS NULL OR cr.author_id::text <> $9)
 		  AND ($10 = '' OR s.key = $10)
+		  AND ($11::boolean IS NULL OR (cr.apply_at IS NOT NULL) = $11)
 		ORDER BY cr.id DESC
 		LIMIT $8`,
 		f.Project.Bytes(), f.Flag, f.Environment, string(f.Kind), string(f.State), f.Author, cursor, limit, f.NotAuthoredBy,
-		f.Segment)
+		f.Segment, f.Scheduled)
 	if err != nil {
 		return nil, fmt.Errorf("listing change requests: %w", err)
 	}
@@ -396,17 +473,22 @@ func (s *ChangeRequests) Waiting(ctx context.Context, project workspace.ProjectI
 }
 
 // WaitingOn returns how many of the change requests on flag's
-// configuration in environment are open and how many approved.
+// configuration in environment are open and how many approved, and the
+// earliest apply time among them.
 func (s *ChangeRequests) WaitingOn(ctx context.Context, flag flags.FlagID, environment workspace.EnvironmentID,
 ) (governance.Waiting, error) {
 	var w governance.Waiting
 	err := s.db(ctx).QueryRow(ctx, `
-		SELECT count(*) FILTER (WHERE state = 'open'), count(*) FILTER (WHERE state = 'approved')
+		SELECT count(*) FILTER (WHERE state = 'open'), count(*) FILTER (WHERE state = 'approved'), min(apply_at)
 		FROM change_requests
 		WHERE flag_id = $1 AND environment_id = $2 AND state IN ('open', 'approved')`,
-		flag.Bytes(), environment.Bytes()).Scan(&w.Open, &w.Approved)
+		flag.Bytes(), environment.Bytes()).Scan(&w.Open, &w.Approved, &w.NextApplyAt)
 	if err != nil {
 		return w, fmt.Errorf("counting the waiting change requests: %w", err)
+	}
+	if w.NextApplyAt != nil {
+		at := w.NextApplyAt.UTC()
+		w.NextApplyAt = &at
 	}
 	return w, nil
 }
