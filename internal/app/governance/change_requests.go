@@ -88,6 +88,24 @@ type ProposalApplier interface {
 		baseVersion int64, by *access.MemberID, req governance.Request) error
 }
 
+// Reverts is the flags context reverting a flag's configuration in one
+// environment to an earlier version, as a change request proposes it.
+type Reverts interface {
+	// ProposeRevert returns project's flag keyed flag, its saved
+	// configuration in the environment keyed environment, and what
+	// reverting it to version would write, with the refusals a direct
+	// revert gets; it writes nothing.
+	ProposeRevert(ctx context.Context, project workspace.ProjectID, flag, environment string, version int64,
+	) (flags.Flag, flags.EnvironmentConfiguration, flags.Configuration, error)
+	// ApplyRevert reverts that configuration to version, based on its
+	// version baseVersion, in the unit of work ctx carries, as a direct
+	// revert does: a refusal rolls the application back. by is the member
+	// applying, nil for a project token or the system; req is who makes the
+	// change.
+	ApplyRevert(ctx context.Context, project workspace.ProjectID, flag, environment string, version, baseVersion int64,
+		by *access.MemberID, req governance.Request) error
+}
+
 // ChangeRequestDeps are what a change request's command handlers run on.
 type ChangeRequestDeps struct {
 	Tx             Transactor
@@ -95,6 +113,7 @@ type ChangeRequestDeps struct {
 	Store          ChangeRequestStore
 	Configurations Configurations
 	Proposals      ProposalApplier
+	Reverts        Reverts
 	Definitions    Definitions
 	Environments   ProtectedEnvironments
 	Audit          AuditLog
@@ -310,6 +329,9 @@ func changeRequestValues(cr governance.ChangeRequest) map[string]any {
 	}
 	if cr.Segment != nil {
 		out["segment"] = cr.Segment.Key
+	}
+	if cr.RevertTo != nil {
+		out["revert_to"] = *cr.RevertTo
 	}
 	if !cr.SupersededBy.IsZero() {
 		out["superseded_by"] = cr.SupersededBy.String()

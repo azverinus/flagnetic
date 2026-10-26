@@ -32,6 +32,7 @@ A change request may propose a change to any environment. In a [protected enviro
 | `title` | 1 to 200 characters. |
 | `description` | At most 10,000 characters. |
 | `proposed` | What the change request proposes, by its kind and entity (below). |
+| `revert_to` | In place of `proposed`, for a flag's configuration: the version to revert it to, from which the server fills `proposed` (see [Reverting a protected environment](governance.md#reverting-a-protected-environment)). |
 | `open` | `true` opens it for review at once; it is a draft otherwise. |
 
 | Proposes | `proposed` |
@@ -53,7 +54,7 @@ Each of these is a `POST` to `/projects/{project}/change-requests/{id}/…`, or 
 | Operation | From | |
 |---|---|---|
 | `PATCH` | `draft`, `open` | Changes `title`, `description`, `proposed` or `apply_at` (null removes it, see [Scheduled changes](#scheduled-changes)); what is absent stays. `diff` is recomputed against the same base. An edit that changes nothing records nothing. |
-| `/rebase` | `draft` | Bases the change request on the configuration, flag or segment as it is now: `base_version` moves, `diff` is recomputed, `proposed` stays. |
+| `/rebase` | `draft` | Bases the change request on the configuration, flag or segment as it is now: `base_version` moves, `diff` is recomputed, `proposed` stays; a revert's is filled again from `revert_to`. |
 | `/open` | `draft` | Offers it for review. Refused with `409 base_moved` when what it is based on was written since `base_version`, until it is rebased: a reviewer reads the diff against what is served now. |
 | `/cancel` | `draft`, `open`, `approved` | Abandons it. |
 | `/copy` | any | Copies any change request, whoever wrote it, into a new draft of the caller's with its title, description and proposal, based on its configuration, flag or segment as it is now and checked again; it is not scheduled. Needs no `If-Match`. |

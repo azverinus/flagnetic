@@ -151,6 +151,11 @@ type ChangeRequest struct {
 	// with, and Diff the RFC 6902 patch turning Base into it.
 	Proposed Document
 	Diff     []PatchOperation
+	// RevertTo is, for a revert, the version of its configuration it
+	// returns to, nil for any other change request. The server fills
+	// Proposed from it and nobody edits that: whoever may propose a revert
+	// cannot slip any other change in under its name.
+	RevertTo *int64
 	Author   Author
 	// Approval and Rejection are the decision taken on the change request,
 	// at most one of them; Applied is its application.
@@ -249,6 +254,9 @@ type NewChangeRequestInput struct {
 	Project workspace.ProjectID
 	Subject Subject
 	Proposal
+	// RevertTo is the version a revert returns to, Proposed filled from
+	// it; nil for any other change request.
+	RevertTo *int64
 	// Open asks for the change request to be opened for review at once
 	// rather than drafted.
 	Open   bool
@@ -280,7 +288,8 @@ func NewChangeRequest(in NewChangeRequestInput) (ChangeRequest, error) {
 	}
 	return ChangeRequest{
 		ID: in.ID, Project: in.Project, Subject: in.Subject, State: state, Title: title, Description: description,
-		Proposed: in.Proposed, Diff: diff, Author: in.Author, ApplyAt: applyAt, CreatedAt: in.Now, UpdatedAt: in.Now, Version: 1,
+		Proposed: in.Proposed, Diff: diff, RevertTo: in.RevertTo, Author: in.Author, ApplyAt: applyAt, CreatedAt: in.Now,
+		UpdatedAt: in.Now, Version: 1,
 	}, nil
 }
 
@@ -487,6 +496,9 @@ func (cr ChangeRequest) Edit(by Taker, e Edit, now time.Time) (ChangeRequest, bo
 	if _, err := cr.Next(TransitionEdit, by); err != nil {
 		return cr, false, err
 	}
+	if cr.RevertTo != nil && e.Proposed != nil {
+		return cr, false, errRevertProposed
+	}
 	p := Proposal{Title: cr.Title, Description: cr.Description, Proposed: cr.Proposed}
 	if e.Title != nil {
 		p.Title = *e.Title
@@ -533,6 +545,28 @@ func (cr ChangeRequest) Rebase(by Taker, current Subject, now time.Time) (Change
 	out.Diff = Diff(current.Base, cr.Proposed)
 	return cr.changedTo(out, now)
 }
+
+// RebaseRevert returns cr, a revert, based on current, the configuration as
+// it is now, proposing proposed, the version it returns to as reverting
+// current to it would write it now, its diff recomputed, and whether
+// anything changed. A revert's proposal is the server's, so a rebase fills
+// it again from the same target rather than keeping it. Only the author
+// rebases, and only a draft.
+func (cr ChangeRequest) RebaseRevert(by Taker, current Subject, proposed Document, now time.Time) (ChangeRequest, bool, error) {
+	if _, err := cr.Next(TransitionRebase, by); err != nil {
+		return cr, false, err
+	}
+	out := cr
+	out.Base, out.BaseVersion, out.Proposed = current.Base, current.BaseVersion, proposed
+	out.Diff = Diff(current.Base, proposed)
+	return cr.changedTo(out, now)
+}
+
+// errRevertProposed refuses an edit of what a revert proposes, which the
+// server fills from the version it returns to.
+var errRevertProposed = apperrors.Invalid("invalid_change_request", "the change request is not valid", apperrors.Violation{
+	Pointer: "/proposed", Code: "not_allowed", Detail: "a revert proposes the version it returns to, which nobody edits",
+})
 
 // Open returns cr opened for review by by at now. currentVersion is the
 // version of the entity now: when it is not the one cr was based on, the

@@ -1840,6 +1840,10 @@ export type ChangeRequest = {
    */
   base_version: number;
   /**
+   * For a revert, the version of the configuration it returns to, from which the server fills `proposed`; null for any other change request.
+   */
+  revert_to: number | null;
+  /**
    * What the change request proposes, by its kind and the entity it
    * names: a `ProposedConfiguration` for `flag_configuration`, a
    * `ProposedFlagDefinition` for a flag's `definition`, a
@@ -1909,7 +1913,11 @@ export type ChangeRequestCreate = {
   segment?: string;
   title: string;
   description?: string;
-  proposed: ProposedInput;
+  proposed?: ProposedInput;
+  /**
+   * Propose reverting a `flag_configuration` to this version of it instead of giving `proposed`, which the server fills.
+   */
+  revert_to?: number;
   /**
    * Open the change request for review at once instead of drafting it.
    */
@@ -8699,6 +8707,10 @@ export type RebaseChangeRequestErrors = {
    * `version_mismatch`: the entity changed since the version `If-Match` names; `current_version` is the version it has now.
    */
   412: Problem;
+  /**
+   * The request is well formed but breaks a rule; `errors` names each field to fix.
+   */
+  422: Problem;
   /**
    * `precondition_required`: the write names no version in `If-Match`.
    */

@@ -1545,7 +1545,14 @@ export const zChangeRequestCreate = z.object({
   segment: z.string().optional(),
   title: z.string(),
   description: z.string().optional(),
-  proposed: zProposedInput,
+  proposed: zProposedInput.optional(),
+  revert_to: z.coerce
+    .bigint()
+    .gte(BigInt(1))
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    })
+    .optional(),
   open: z.boolean().optional().default(false),
   apply_at: z.iso.datetime().optional(),
 });
@@ -1582,6 +1589,15 @@ export const zChangeRequest = z.object({
     .max(BigInt("9223372036854775807"), {
       error: "Invalid value: Expected int64 to be <= 9223372036854775807",
     }),
+  revert_to: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    })
+    .nullable(),
   proposed: z.union([zProposedConfiguration, zProposedFlagDefinition, zProposedSegmentDefinition]),
   diff: z.array(zPatchOperation),
   author: zChangeRequestAuthor,

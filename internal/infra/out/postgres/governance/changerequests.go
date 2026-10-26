@@ -90,11 +90,11 @@ func (s *ChangeRequests) CreateChangeRequest(ctx context.Context, cr governance.
 	_, err = s.db(ctx).Exec(ctx, `
 		INSERT INTO change_requests (id, project_id, kind, flag_id, environment_id, segment_id, state, title, description,
 		    base, base_version, base_referrers, proposed, diff, author_id, author_token_id, created_at, updated_at, version,
-		    apply_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+		    apply_at, revert_to)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
 		cr.ID.Bytes(), cr.Project.Bytes(), string(cr.Kind), flag, environment, segment, string(cr.State), cr.Title,
 		cr.Description, base, cr.BaseVersion, referrersOf(cr), proposed, diff, member, token, cr.CreatedAt, cr.UpdatedAt,
-		cr.Version, cr.ApplyAt)
+		cr.Version, cr.ApplyAt, cr.RevertTo)
 	if err != nil {
 		return fmt.Errorf("creating a change request: %w", err)
 	}
@@ -130,7 +130,8 @@ func coversOf(cr governance.ChangeRequest) any {
 // UpdateChangeRequest stores what a transition changes of cr: its state,
 // texts, base, proposal and diff, the decision taken on it, what its
 // approval covers, its application, its apply time and its schedule
-// failure. The entity it names and its author never change.
+// failure. The entity it names, its author and the version a revert returns
+// to never change.
 func (s *ChangeRequests) UpdateChangeRequest(ctx context.Context, cr governance.ChangeRequest) error {
 	base, proposed, diff, err := documents(cr)
 	if err != nil {
@@ -256,7 +257,7 @@ const changeRequestColumns = `cr.id, cr.project_id, cr.kind, cr.flag_id, f.key, 
 	cr.decision_comment, cr.applied_at, cr.applied_by_kind, cr.applied_by, cr.applied_by_token,
 	coalesce(am.display_name, ap.name, ''), cr.superseded_by, cr.created_at, cr.updated_at, cr.version, cr.segment_id,
 	s.key, cr.base_referrers, cr.approval_covers, cr.apply_at, cr.schedule_failed_at, cr.schedule_failure_code,
-	cr.schedule_failure_message, cr.schedule_failures, cr.schedule_stopped`
+	cr.schedule_failure_message, cr.schedule_failures, cr.schedule_stopped, cr.revert_to`
 
 const changeRequestFrom = ` FROM change_requests cr
 	LEFT JOIN flags f ON f.id = cr.flag_id
@@ -292,7 +293,7 @@ func scanChangeRequest(row pgx.Row) (governance.ChangeRequest, error) {
 		&cr.BaseVersion, &proposed, &diff, &member, &token, &cr.Author.Name, &decision, &decidedBy, &deciderName, &decidedAt,
 		&comment, &appliedAt, &appliedKind, &appliedBy, &appliedT, &applierName, &supersededBy, &cr.CreatedAt, &cr.UpdatedAt,
 		&cr.Version, &sk, &segmentKey, &referrers, &covers, &applyAt, &failedAt, &failureCode, &failureMessage, &failures,
-		&stopped); err != nil {
+		&stopped, &cr.RevertTo); err != nil {
 		return cr, err
 	}
 	if applyAt != nil {

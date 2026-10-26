@@ -45,7 +45,7 @@ func proposedOn() management.FlagConfigurationPut {
 func configurationRequest(title string, proposed management.FlagConfigurationPut) management.ChangeRequestCreate {
 	return management.ChangeRequestCreate{
 		Kind: management.ChangeRequestCreateKindFlagConfiguration, Flag: ptr("checkout_title"), Environment: ptr("production"),
-		Title: title, Proposed: configurationInput(proposed),
+		Title: title, Proposed: ptr(configurationInput(proposed)),
 	}
 }
 

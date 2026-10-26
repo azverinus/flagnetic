@@ -104,13 +104,17 @@ func (a *api) CreateChangeRequest(ctx context.Context, req CreateChangeRequestRe
 		Kind: governance.ChangeRequestKind(b.Kind), Flag: valueOf(b.Flag), Environment: valueOf(b.Environment),
 		Segment: valueOf(b.Segment),
 	}
-	proposed, err := proposedIn(target, b.Proposed)
-	if err != nil {
-		return nil, err
+	// A revert gives no proposal: the server fills it from revert_to.
+	var proposed appgovernance.Proposed
+	if b.Proposed != nil {
+		var err error
+		if proposed, err = proposedIn(target, *b.Proposed); err != nil {
+			return nil, err
+		}
 	}
 	cr, err := a.h.CreateChangeRequest.Handle(ctx, appgovernance.CreateChangeRequestCommand{
 		Project: projectID(ctx), Target: target, Title: b.Title, Description: valueOf(b.Description), Proposed: proposed,
-		Open: valueOr(b.Open, false), ApplyAt: b.ApplyAt, Author: authorOf(ctx), Request: requestOf(ctx),
+		RevertTo: b.RevertTo, Open: valueOr(b.Open, false), ApplyAt: b.ApplyAt, Author: authorOf(ctx), Request: requestOf(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -368,7 +372,7 @@ func changeRequestOut(cr governance.ChangeRequest) (ChangeRequest, error) {
 		Id: openapi_types.UUID(cr.ID.Bytes()), Kind: ChangeRequestKind(cr.Kind), State: ChangeRequestState(cr.State),
 		Title: cr.Title, Description: cr.Description, BaseVersion: cr.BaseVersion, Diff: make([]PatchOperation, len(cr.Diff)),
 		Author: ChangeRequestAuthor{Kind: ChangeRequestAuthorKindMember, Name: cr.Author.Name}, CreatedAt: cr.CreatedAt,
-		UpdatedAt: cr.UpdatedAt, Version: cr.Version,
+		UpdatedAt: cr.UpdatedAt, Version: cr.Version, RevertTo: cr.RevertTo,
 	}
 	switch {
 	case cr.Author.Token != nil:

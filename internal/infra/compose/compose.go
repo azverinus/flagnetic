@@ -210,6 +210,10 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	updateSegment := appflags.NewUpdateSegment(appflags.UpdateSegmentDeps{
 		Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 	})
+	// A revert finds the version it writes again in the audit log.
+	revertConfiguration := appflags.NewRevertConfiguration(appflags.RevertConfigurationDeps{
+		Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, History: auditLog, Rulesets: rulesets, Recorder: flagRec,
+	})
 	// A change request proposes a configuration or a definition the flags
 	// context checks as it would check writing it, and writes it when the
 	// change request is applied; a definition's approval covers the
@@ -220,6 +224,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Proposals: appflags.NewApplyProposal(appflags.ReplaceConfigurationDeps{
 			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
+		Reverts:      revertConfiguration,
 		Definitions:  appflags.NewDefinitions(updateFlag, updateSegment, appflags.NewSegmentReferrers(flagStore)),
 		Environments: appworkspace.NewProtectedEnvironments(ws),
 		Audit:        audit, Clock: d.Clock, IDs: d.IDs, MinLead: o.Schedule.MinLead,
@@ -341,12 +346,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		SetOverride: appflags.NewSetOverride(appflags.SetOverrideDeps{
 			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		RemoveOverride: appflags.NewRemoveOverride(configuration),
-		RegenerateSalt: appflags.NewRegenerateSalt(configuration),
-		// A revert finds the version it writes again in the audit log.
-		RevertConfiguration: appflags.NewRevertConfiguration(appflags.RevertConfigurationDeps{
-			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, History: auditLog, Rulesets: rulesets, Recorder: flagRec,
-		}),
+		RemoveOverride:      appflags.NewRemoveOverride(configuration),
+		RegenerateSalt:      appflags.NewRegenerateSalt(configuration),
+		RevertConfiguration: revertConfiguration,
 		CopyConfiguration: appflags.NewCopyConfiguration(appflags.ReplaceConfigurationDeps{
 			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),

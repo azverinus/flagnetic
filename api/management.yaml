@@ -3262,6 +3262,15 @@ paths:
         least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
         most 365 days ahead (`invalid_change_request`, `too_soon` or
         `too_late` under `/apply_at`), and answered in UTC.
+
+        A `flag_configuration` change request given `revert_to`, a version
+        of the configuration, instead of `proposed` proposes reverting to
+        it: the server fills `proposed` with the configuration that version
+        was, whole, rule identifiers and salts included, as a direct revert
+        writes it, with the same refusals (`version_not_found`;
+        `experiment_rules_changed`, 409; `invalid_configuration` under
+        `/proposed`). Giving both, neither, or `revert_to` on another kind
+        is `invalid_change_request`.
       x-permission: change_request.propose
       tags: [change-requests]
       requestBody:
@@ -3329,7 +3338,10 @@ paths:
         recomputed from the entity as the change request is based on it; a
         rebase moves that. `apply_at` sets the apply time, judged
         from now as on creation, and null removes it. An edit that changes nothing changes
-        nothing and records nothing.
+        nothing and records nothing. The proposal of a revert, which the
+        server fills from `revert_to`, is edited by nobody
+        (`invalid_change_request`, `not_allowed` under `/proposed`); its
+        title, description and apply time are.
       x-permission: change_request.propose
       tags: [change-requests]
       parameters:
@@ -3415,8 +3427,10 @@ paths:
       description: |
         Keeps what is proposed and recomputes `diff` from the entity as it
         is now, whose version becomes `base_version`. Only the author rebases
-        (`not_author`), and only a draft (`invalid_state`). Rebasing on the
-        base it has changes nothing and records nothing.
+        (`not_author`), and only a draft (`invalid_state`). A revert keeps
+        its `revert_to` and fills `proposed` from it again against the
+        configuration as it is now, with the refusals of its creation.
+        Rebasing on the base it has changes nothing and records nothing.
       x-permission: change_request.propose
       tags: [change-requests]
       parameters:
@@ -3441,6 +3455,8 @@ paths:
           $ref: "#/components/responses/Conflict"
         "412":
           $ref: "#/components/responses/VersionMismatch"
+        "422":
+          $ref: "#/components/responses/Invalid"
         "428":
           $ref: "#/components/responses/PreconditionRequired"
   /projects/{project}/change-requests/{change_request}/cancel:
@@ -3492,7 +3508,8 @@ paths:
         Copies any change request, whatever its state and whoever wrote it,
         into a new draft of the caller's with the same title, description
         and proposal, based on the entity as it is now and checked against
-        it as a new change request is.
+        it as a new change request is. A revert's copy keeps its
+        `revert_to` and fills `proposed` from it again.
       x-permission: change_request.propose
       tags: [change-requests]
       responses:
@@ -3633,7 +3650,10 @@ paths:
         checked again as writing it directly is, since what it names may be
         gone since the approval: a refusal writes nothing and leaves the
         change request approved. A change request with an apply time is
-        applied by the system alone (`scheduled`).
+        applied by the system alone (`scheduled`). A revert is applied as a
+        direct revert to `revert_to` is, audited `flag.reverted`: the
+        version's rule identifiers and salts, override notes and authors
+        are restored whole.
       x-permission: change_request.propose
       tags: [change-requests]
       parameters:
@@ -7524,7 +7544,7 @@ components:
             $ref: "#/components/schemas/Rule"
     ChangeRequest:
       type: object
-      required: [id, kind, state, title, description, base_version, proposed, diff, author, approval, rejection, applied_at,
+      required: [id, kind, state, title, description, base_version, revert_to, proposed, diff, author, approval, rejection, applied_at,
         applied_by, superseded_by, apply_at, schedule_failure, created_at, updated_at, version]
       properties:
         id:
@@ -7551,6 +7571,13 @@ components:
           type: integer
           format: int64
           description: The version of the configuration, the flag or the segment the change request is based on.
+        revert_to:
+          type: integer
+          format: int64
+          nullable: true
+          description: >-
+            For a revert, the version of the configuration it returns to, from which the server fills `proposed`;
+            null for any other change request.
         proposed:
           description: |
             What the change request proposes, by its kind and the entity it
@@ -7630,7 +7657,7 @@ components:
           description: Pass as `cursor` for the next page; null on the last.
     ChangeRequestCreate:
       type: object
-      required: [kind, title, proposed]
+      required: [kind, title]
       properties:
         kind:
           type: string
@@ -7650,6 +7677,13 @@ components:
           type: string
         proposed:
           $ref: "#/components/schemas/ProposedInput"
+        revert_to:
+          type: integer
+          format: int64
+          minimum: 1
+          description: >-
+            Propose reverting a `flag_configuration` to this version of it instead of giving `proposed`, which the
+            server fills.
         open:
           type: boolean
           default: false

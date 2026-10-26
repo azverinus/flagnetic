@@ -66,7 +66,7 @@ func segmentDefinitionInput(d management.SegmentDefinitionPut) management.Propos
 func flagDefinitionRequest(flag string, d management.FlagDefinitionPut) management.ChangeRequestCreate {
 	return management.ChangeRequestCreate{
 		Kind: management.ChangeRequestCreateKindDefinition, Flag: ptr(flag), Title: "Change " + flag,
-		Proposed: flagDefinitionInput(d), Open: ptr(true),
+		Proposed: ptr(flagDefinitionInput(d)), Open: ptr(true),
 	}
 }
 
@@ -75,9 +75,9 @@ func flagDefinitionRequest(flag string, d management.FlagDefinitionPut) manageme
 func segmentDefinitionRequest(segment, users string) management.ChangeRequestCreate {
 	return management.ChangeRequestCreate{
 		Kind: management.ChangeRequestCreateKindDefinition, Segment: ptr(segment), Title: "Change " + segment,
-		Proposed: segmentDefinitionInput(management.SegmentDefinitionPut{
+		Proposed: ptr(segmentDefinitionInput(management.SegmentDefinitionPut{
 			Conditions: []management.Condition{attr("user", "in", users)},
-		}), Open: ptr(true),
+		})), Open: ptr(true),
 	}
 }
 
@@ -230,7 +230,7 @@ func TestADefinitionChangeRequestSwitchesASegmentPrivate(t *testing.T) {
 		"change_request_required")
 
 	body := segmentDefinitionRequest("employees", `["u1"]`)
-	body.Proposed = segmentDefinitionInput(management.SegmentDefinitionPut{Conditions: segment.Conditions, Private: true})
+	body.Proposed = ptr(segmentDefinitionInput(management.SegmentDefinitionPut{Conditions: segment.Conditions, Private: true}))
 	cr := createChangeRequest(t, f.developer.ClientWithResponses, f.project.Key, body)
 	if got := raw(cr.Diff); got != `[{"op":"replace","path":"/private","value":true}]` {
 		t.Errorf("diff = %s", got)
@@ -438,27 +438,27 @@ func TestADefinitionChangeRequestIsValidatedAsTheDirectWrite(t *testing.T) {
 			Variations: *variations("a", `"A"`, "b", `"B"`)}), http.StatusConflict, "in_use"},
 		{"a segment condition in a segment", management.ChangeRequestCreate{
 			Kind: management.ChangeRequestCreateKindDefinition, Segment: ptr("employees"), Title: "Nested",
-			Proposed: segmentDefinitionInput(management.SegmentDefinitionPut{Conditions: []management.Condition{inSegment("employees")}}),
+			Proposed: ptr(segmentDefinitionInput(management.SegmentDefinitionPut{Conditions: []management.Condition{inSegment("employees")}})),
 		}, http.StatusUnprocessableEntity, "invalid_segment"},
 		{"a condition on an undeclared attribute", management.ChangeRequestCreate{
 			Kind: management.ChangeRequestCreateKindDefinition, Segment: ptr("employees"), Title: "Shoes",
-			Proposed: segmentDefinitionInput(management.SegmentDefinitionPut{Conditions: []management.Condition{attr("shoe_size", "eq", "42")}}),
+			Proposed: ptr(segmentDefinitionInput(management.SegmentDefinitionPut{Conditions: []management.Condition{attr("shoe_size", "eq", "42")}})),
 		}, http.StatusUnprocessableEntity, "invalid_segment"},
 		{"both a flag and a segment", management.ChangeRequestCreate{
 			Kind: management.ChangeRequestCreateKindDefinition, Flag: ptr("banner"), Segment: ptr("employees"), Title: "Both",
-			Proposed: segmentDefinitionInput(management.SegmentDefinitionPut{Conditions: []management.Condition{}}),
+			Proposed: ptr(segmentDefinitionInput(management.SegmentDefinitionPut{Conditions: []management.Condition{}})),
 		}, http.StatusUnprocessableEntity, "invalid_change_request"},
 		{"an environment", management.ChangeRequestCreate{
 			Kind: management.ChangeRequestCreateKindDefinition, Flag: ptr("banner"), Environment: ptr("production"), Title: "Where",
-			Proposed: flagDefinitionInput(management.FlagDefinitionPut{Variations: *variations("a", `"x"`)}),
+			Proposed: ptr(flagDefinitionInput(management.FlagDefinitionPut{Variations: *variations("a", `"x"`)})),
 		}, http.StatusUnprocessableEntity, "invalid_change_request"},
 		{"neither a flag nor a segment", management.ChangeRequestCreate{
 			Kind: management.ChangeRequestCreateKindDefinition, Title: "What",
-			Proposed: flagDefinitionInput(booleanDefinition),
+			Proposed: ptr(flagDefinitionInput(booleanDefinition)),
 		}, http.StatusUnprocessableEntity, "invalid_change_request"},
 		{"a configuration without an environment", management.ChangeRequestCreate{
 			Kind: management.ChangeRequestCreateKindFlagConfiguration, Flag: ptr("banner"), Title: "Where",
-			Proposed: configurationInput(management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a"}),
+			Proposed: ptr(configurationInput(management.FlagConfigurationPut{OffVariation: "a", Fallthrough: "a"})),
 		}, http.StatusUnprocessableEntity, "invalid_change_request"},
 	} {
 		res := do(c.CreateChangeRequestWithResponse(t.Context(), f.project.Key, tc.body))

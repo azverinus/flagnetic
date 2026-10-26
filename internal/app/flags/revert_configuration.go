@@ -85,6 +85,50 @@ func (h *RevertConfiguration) Handle(ctx context.Context, cmd RevertConfiguratio
 	})
 }
 
+// ProposeRevert returns project's flag keyed flag, its saved configuration
+// in the environment keyed environment, and what reverting it to version
+// would write, with the refusals a revert gets: not_found, archived,
+// version_not_found, experiment_rules_changed, invalid_configuration. It
+// writes nothing: a change request proposes the revert, and fills what it
+// proposes from it.
+func (h *RevertConfiguration) ProposeRevert(ctx context.Context, project workspace.ProjectID, flag, environment string,
+	version int64,
+) (flags.Flag, flags.EnvironmentConfiguration, flags.Configuration, error) {
+	f, saved, err := configurationOf(ctx, h.d.Store, project, flag, environment)
+	if err != nil {
+		return f, saved, flags.Configuration{}, err
+	}
+	if err = f.CanConfigure(); err != nil {
+		return f, saved, flags.Configuration{}, err
+	}
+	recorded, err := h.recorded(ctx, project, f, saved.Configuration, version)
+	if err != nil {
+		return f, saved, flags.Configuration{}, err
+	}
+	r, err := referentsOf(ctx, h.d.Store, h.d.Declarations, project, saved.Configuration.Environment)
+	if err != nil {
+		return f, saved, flags.Configuration{}, err
+	}
+	proposed, _, err := saved.Configuration.Revert(f, recorded, r, flags.Write{})
+	return f, saved, proposed, err
+}
+
+// ApplyRevert reverts the configuration of project's flag keyed flag in the
+// environment keyed environment to version, based on its version
+// baseVersion, in the unit of work ctx carries, which joins the change
+// request's application: as a direct revert is, written whole and audited
+// flag.reverted. by is the member applying, nil for a project token or the
+// system; req is who makes the change. A refusal rolls the application
+// back.
+func (h *RevertConfiguration) ApplyRevert(ctx context.Context, project workspace.ProjectID, flag, environment string,
+	version, baseVersion int64, by *access.MemberID, req governance.Request,
+) error {
+	_, err := h.Handle(ctx, RevertConfigurationCommand{Version: version, Configuration: ConfigurationCommand{
+		Project: project, Flag: flag, Environment: environment, Expected: precondition.On(baseVersion), Caller: by, Request: req,
+	}})
+	return err
+}
+
 // recorded returns f's configuration current was at version: current itself
 // at its own version, otherwise as the audit log recorded it.
 func (h *RevertConfiguration) recorded(ctx context.Context, project workspace.ProjectID, f flags.Flag,
