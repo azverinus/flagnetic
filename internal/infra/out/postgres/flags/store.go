@@ -225,9 +225,9 @@ func (s *Store) UnarchivedFlags(ctx context.Context, project workspace.ProjectID
 	defer rows.Close()
 	configs := map[flags.FlagID][]flags.EnvironmentConfiguration{}
 	for rows.Next() {
-		ec, err := scanConfiguration(rows)
-		if err != nil {
-			return nil, err
+		ec, scanErr := scanConfiguration(rows)
+		if scanErr != nil {
+			return nil, scanErr
 		}
 		configs[ec.Configuration.Flag] = append(configs[ec.Configuration.Flag], ec)
 	}
