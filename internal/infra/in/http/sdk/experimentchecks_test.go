@@ -250,6 +250,14 @@ func TestAnOverdueExperimentIsListedAndAlertedOnceUntilItEnds(t *testing.T) {
 	f := startSampleRatio(t, srv, c, 5000, 5000, 10000)
 	end := c.Now().AddDate(0, 0, 1)
 	f.patch(t, management.ExperimentPatch{ExpectedEndAt: date(end)})
+	// A draft past its expected end is not overdue: it never ran.
+	draft := do(f.p.admin.CreateExperimentWithResponse(t.Context(), f.p.key, management.ExperimentCreate{
+		Key: "overdue_draft", Name: "Overdue draft", Flag: "checkout", UnitType: "user", ExpectedEndAt: date(c.Now().AddDate(0, 0, -3)),
+		Variations: []management.ExperimentWeight{{Variation: "true", Weight: 5000}, {Variation: "false", Weight: 5000}},
+	}))
+	if draft.JSON201 == nil {
+		t.Fatalf("POST …/experiments = %d: %s", draft.StatusCode(), draft.Body)
+	}
 	overdue := func() []string { return f.list(t, management.ListExperimentsParams{PastExpectedEnd: ptr(true)}) }
 	past := func(active *bool) []management.ExperimentAlert {
 		return ofKind(f.alerts(t, active), management.ExperimentAlertKindPastExpectedEnd)
@@ -273,7 +281,7 @@ func TestAnOverdueExperimentIsListedAndAlertedOnceUntilItEnds(t *testing.T) {
 	if got := overdue(); !slices.Equal(got, []string{"checkout_test"}) {
 		t.Fatalf("overdue = %v, want [checkout_test]", got)
 	}
-	if got := f.list(t, management.ListExperimentsParams{PastExpectedEnd: ptr(false)}); !slices.Equal(got, []string{"checkout_test"}) {
+	if got := f.list(t, management.ListExperimentsParams{PastExpectedEnd: ptr(false)}); !slices.Equal(got, []string{"checkout_test", "overdue_draft"}) {
 		t.Errorf("listed with past_expected_end false = %v, want everything", got)
 	}
 	raised := past(ptr(true))

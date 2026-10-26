@@ -40,10 +40,11 @@ type ExposureActivity interface {
 	// environment named another variation than their unit's first one,
 	// and how many units had one.
 	ConflictTotals(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID) (total, units int64, err error)
-	// LastExposureAt returns when the server last received, at or before
-	// at, an exposure of experiment in environment that no override
-	// decided; nil when it never did.
-	LastExposureAt(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID, at time.Time,
+	// LastExposureAt returns when the server last received, after after
+	// and at or before at, an exposure of experiment in environment that
+	// no override decided; nil when it did not. A zero after sets no lower
+	// bound.
+	LastExposureAt(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID, after, at time.Time,
 	) (*time.Time, error)
 }
 
@@ -165,7 +166,13 @@ func (c checker) noExposures(ctx context.Context, e experiments.Experiment, env 
 	if e.StartedAt == nil {
 		return nil
 	}
-	last, err := c.exposures.LastExposureAt(ctx, env, e.ID, now)
+	// The condition needs the last day alone: an exposure within it keeps
+	// the alert down, and without one the alert is due once the experiment
+	// ran a day. Reading only that day keeps the round from walking a busy
+	// experiment's whole history every time in an environment that stays
+	// silent; the latest exposure before it is read for the details of a
+	// raise alone.
+	last, err := c.exposures.LastExposureAt(ctx, env, e.ID, now.Add(-experiments.NoExposuresAfter), now)
 	if err != nil {
 		return err
 	}
@@ -173,6 +180,12 @@ func (c checker) noExposures(ctx context.Context, e experiments.Experiment, env 
 	active, err := c.store.ActiveAlert(ctx, e.ID, &env, experiments.AlertKindNoExposures)
 	if err != nil {
 		return err
+	}
+	if holds && active == nil {
+		if last, err = c.exposures.LastExposureAt(ctx, env, e.ID, time.Time{}, now); err != nil {
+			return err
+		}
+		found, holds = experiments.CheckNoExposures(*e.StartedAt, last, now)
 	}
 	return c.apply(ctx, e, &env, experiments.AlertKindNoExposures, active, experiments.ConditionChange(holds, active != nil),
 		experiments.AlertDetails{NoExposures: &found}, now, req)

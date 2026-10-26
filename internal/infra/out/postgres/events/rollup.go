@@ -504,18 +504,25 @@ func (s *Store) ConflictTotals(ctx context.Context, environment workspace.Enviro
 	return total, units, nil
 }
 
-// LastExposureAt returns when the server last received, at or before at, an
-// exposure of experiment in environment that no override decided; nil when it
-// never did. It reads the raw exposures, which hold what the rollups have
-// not read yet too, so an exposure counts as soon as it is received; the
-// latest are found through the experiment's index by receipt, newest first.
+// LastExposureAt returns when the server last received, after after (no
+// bound when zero) and at or before at, an exposure of experiment in
+// environment that no override decided; nil when it did not. It reads the raw
+// exposures, which hold what the rollups have not read yet too, so an
+// exposure counts as soon as it is received; the latest are found through the
+// experiment's index by receipt, newest first, and a lower bound leaves the
+// older partitions unread.
 func (s *Store) LastExposureAt(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID,
-	at time.Time,
+	after, at time.Time,
 ) (*time.Time, error) {
+	var from any
+	if !after.IsZero() {
+		from = after
+	}
 	var last *time.Time
 	err := s.db(ctx).QueryRow(ctx, `SELECT received_at FROM exposure_events
 		WHERE experiment_id = $1 AND environment_id = $2 AND NOT override AND received_at <= $3
-		ORDER BY received_at DESC LIMIT 1`, experiment.Bytes(), environment.Bytes(), at).Scan(&last)
+		  AND ($4::timestamptz IS NULL OR received_at > $4)
+		ORDER BY received_at DESC LIMIT 1`, experiment.Bytes(), environment.Bytes(), at, from).Scan(&last)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
