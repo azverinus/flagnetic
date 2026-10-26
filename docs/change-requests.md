@@ -68,7 +68,7 @@ Each of these is a `POST` to `/projects/{project}/change-requests/{id}/…`, or 
 | `/rebase` | `draft` | Bases the change request on the configuration, flag, segment or experiment as it is now: `base_version` moves, `diff` is recomputed, `proposed` stays; a revert's is filled again from `revert_to`. |
 | `/open` | `draft` | Offers it for review. Refused with `409 base_moved` when what it is based on was written since `base_version`, or, for an experiment, when other environments hold its rule now, until it is rebased: a reviewer reads the diff against what is served now. |
 | `/cancel` | `draft`, `open`, `approved` | Abandons it. |
-| `/copy` | any | Copies any change request, whoever wrote it, into a new draft of the caller's with its title, description and proposal, based on its configuration, flag or segment as it is now and checked again; it is not scheduled. Needs no `If-Match`. |
+| `/copy` | any | Copies any change request, whoever wrote it, into a new draft of the caller's with its title, description and proposal, based on its configuration, flag, segment or experiment as it is now and checked again; it is not scheduled. Needs no `If-Match`. |
 
 ## Approving and applying
 

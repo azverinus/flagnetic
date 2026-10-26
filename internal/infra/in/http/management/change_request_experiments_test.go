@@ -471,6 +471,14 @@ func TestExperimentChangeRequestsAreListedAndAuthoredByAProjectToken(t *testing.
 	if listed.JSON200 == nil || len(listed.JSON200.Items) != 1 || listed.JSON200.Items[0].Id != other.Id {
 		t.Errorf("listed by experiment = %d: %s", listed.StatusCode(), listed.Body)
 	}
+	// The change request names the experiment's flag, so listing by the flag
+	// finds it beside the flag's configuration change request.
+	byFlag := do(f.admin.ListChangeRequestsWithResponse(t.Context(), key, &management.ListChangeRequestsParams{Flag: ptr("checkout_title")}))
+	if byFlag.JSON200 == nil || !slices.ContainsFunc(byFlag.JSON200.Items, func(cr management.ChangeRequest) bool {
+		return cr.Id == other.Id && valueOr(cr.Flag) == "checkout_title"
+	}) {
+		t.Errorf("listed by flag = %d: %s", byFlag.StatusCode(), byFlag.Body)
+	}
 	cancelChangeRequest(t, f.developer.ClientWithResponses, key, other)
 
 	cr := createChangeRequest(t, ci, key, experimentRequest(startTransition))
