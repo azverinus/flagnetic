@@ -274,7 +274,7 @@ func TestTwoReplicasApplyAScheduledChangeRequestOnce(t *testing.T) {
 			flag := "release_" + env + "_" + string(rune('a'+i))
 			stringFlag(t, f.admin, key, flag)
 			body := configurationRequest("Release "+flag, proposedOn())
-			body.Flag, body.Environment, body.Open, body.ApplyAt = flag, env, ptr(true), &at
+			body.Flag, body.Environment, body.Open, body.ApplyAt = ptr(flag), ptr(env), ptr(true), &at
 			crs = append(crs, mustApprove(t, f.maintainer.ClientWithResponses, key, createChangeRequest(t, f.dev.ClientWithResponses, key, body)))
 		}
 	}
@@ -426,5 +426,48 @@ func TestAScheduleFailureIsKeptWhenTheChangeRequestIsSuperseded(t *testing.T) {
 	if got.State != management.ChangeRequestStateSuperseded || got.ScheduleFailure == nil || got.ScheduleFailure.Attempts != 1 ||
 		got.ScheduleFailure.Code != "invalid_configuration" {
 		t.Errorf("superseded = %s, failure %+v", got.State, got.ScheduleFailure)
+	}
+}
+
+// A definition is scheduled as a configuration is: refused by hand, then
+// applied by the system in every environment, protected production
+// included, as one edit of the flag.
+func TestTheSchedulerAppliesAScheduledDefinition(t *testing.T) {
+	f := startSchedules(t)
+	key := f.project.Key
+	setProtected(t, f.admin, key, "production", true)
+	at := f.clock.Now().Add(time.Hour)
+	body := flagDefinitionRequest("checkout_title", management.FlagDefinitionPut{
+		Variations: *variations("a", `"Welcome"`, "b", `"B"`, "c", `"C"`),
+	})
+	body.ApplyAt = &at
+	cr := mustApprove(t, f.maintainer.ClientWithResponses, key, createChangeRequest(t, f.dev.ClientWithResponses, key, body))
+	res := applyChangeRequest(t, f.dev.ClientWithResponses, key, cr)
+	assertProblem(t, "applying a scheduled definition by hand", res.StatusCode(), res.Body, http.StatusConflict, "scheduled")
+	before := rulesetVersions(t, f.project)
+
+	f.clock.Advance(time.Hour)
+	mustTick(t, f.srv)
+	got := getChangeRequest(t, f.admin, key, cr)
+	if got.State != management.ChangeRequestStateApplied || got.AppliedBy == nil ||
+		got.AppliedBy.Kind != management.ChangeRequestApplierKindSystem {
+		t.Fatalf("at its time: %s applied by %+v", got.State, got.AppliedBy)
+	}
+	if flag := getFlag(t, f.admin, key, "checkout_title"); flag.Version != cr.BaseVersion+1 ||
+		string(flag.Variations[0].Value) != `"Welcome"` {
+		t.Errorf("flag = version %d, a = %s; want version %d with a = Welcome", flag.Version, flag.Variations[0].Value,
+			cr.BaseVersion+1)
+	}
+	if moved := bumped(t, "the application", before, rulesetVersions(t, f.project)); !slices.Equal(moved, everyEnvironment) {
+		t.Errorf("rulesets moved = %v, want every environment", moved)
+	}
+	entries := applicationEntries(t, f.srv, cr)
+	if actions := actionsOf(entries); !slices.Equal(actions, []string{"change_request.applied", "flag.updated"}) {
+		t.Fatalf("entries of the application = %v", actions)
+	}
+	for _, e := range entries {
+		if e.Actor.Kind != management.ActorKindSystem {
+			t.Errorf("%s by %+v, want the system", e.Action, e.Actor)
+		}
 	}
 }
