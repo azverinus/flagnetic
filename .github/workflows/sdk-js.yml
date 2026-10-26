@@ -76,7 +76,17 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Conformance suite and unit tests
+        env:
+          FLAGNETIC_SCENARIO_REPORT: ${{ runner.temp }}/scenarios.json
         run: pnpm test
+      - name: Behaviour matrix
+        # The JavaScript column of docs/sdks/behaviour-matrix.md is what the
+        # protocol runners report as passed in the run above; the server
+        # mode and the browser client run in Node alike.
+        if: matrix.node == 24
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/behaviour-matrix.sh" JavaScript "$RUNNER_TEMP/scenarios.json"
+          git diff --exit-code -- "$GITHUB_WORKSPACE/docs/sdks/behaviour-matrix.md"
       # Timed alone: the other tests running beside it would distort it.
       - name: Evaluation p99 over 1,000 flags
         run: pnpm test:p99

@@ -11,6 +11,7 @@ import (
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/access"
+	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -26,7 +27,9 @@ const (
 // first.
 func (a *api) ListChangeRequests(ctx context.Context, req ListChangeRequestsRequestObject) (ListChangeRequestsResponseObject, error) {
 	p := req.Params
-	f := appgovernance.ChangeRequestFilter{Project: projectID(ctx), Flag: valueOf(p.Flag), Environment: valueOf(p.Environment)}
+	f := appgovernance.ChangeRequestFilter{
+		Project: projectID(ctx), Flag: valueOf(p.Flag), Environment: valueOf(p.Environment), Segment: valueOf(p.Segment),
+	}
 	// An unknown kind or state would match nothing, which reads as no
 	// change request of it rather than as a filter misspelt.
 	if p.Kind != nil {
@@ -96,10 +99,17 @@ func decodeChangeRequestCursor(cursor string) (governance.ChangeRequestID, error
 // CreateChangeRequest proposes a change.
 func (a *api) CreateChangeRequest(ctx context.Context, req CreateChangeRequestRequestObject) (CreateChangeRequestResponseObject, error) {
 	b := req.Body
+	target := appgovernance.Target{
+		Kind: governance.ChangeRequestKind(b.Kind), Flag: valueOf(b.Flag), Environment: valueOf(b.Environment),
+		Segment: valueOf(b.Segment),
+	}
+	proposed, err := proposedIn(target, b.Proposed)
+	if err != nil {
+		return nil, err
+	}
 	cr, err := a.h.CreateChangeRequest.Handle(ctx, appgovernance.CreateChangeRequestCommand{
-		Project: projectID(ctx), Kind: governance.ChangeRequestKind(b.Kind), Flag: b.Flag, Environment: b.Environment,
-		Title: b.Title, Description: valueOf(b.Description), Proposed: configurationIn(b.Proposed), Open: valueOr(b.Open, false),
-		Author: authorOf(ctx), Request: requestOf(ctx),
+		Project: projectID(ctx), Target: target, Title: b.Title, Description: valueOf(b.Description), Proposed: proposed,
+		Open: valueOr(b.Open, false), Author: authorOf(ctx), Request: requestOf(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -133,7 +143,16 @@ func (a *api) UpdateChangeRequest(ctx context.Context, req UpdateChangeRequestRe
 	b := req.Body
 	update := appgovernance.UpdateChangeRequestCommand{ChangeRequestCommand: cmd, Title: b.Title, Description: b.Description}
 	if b.Proposed != nil {
-		in := configurationIn(*b.Proposed)
+		// What a change request proposes is read by its kind and entity,
+		// which only the change request knows.
+		current, readErr := a.h.GetChangeRequest.Handle(ctx, cmd.Project, cmd.ChangeRequest)
+		if readErr != nil {
+			return nil, readErr
+		}
+		in, readErr := proposedIn(appgovernance.TargetOf(current), *b.Proposed)
+		if readErr != nil {
+			return nil, readErr
+		}
 		update.Proposed = &in
 	}
 	cr, err := a.h.UpdateChangeRequest.Handle(ctx, update)
@@ -239,6 +258,39 @@ func (a *api) CopyChangeRequest(ctx context.Context, req CopyChangeRequestReques
 	return CopyChangeRequest201JSONResponse{Body: out, Headers: CopyChangeRequest201ResponseHeaders{ETag: etag(cr.Version)}}, nil
 }
 
+// proposedIn reads in as the document t calls for: a configuration, a
+// flag's definition or a segment's. A target calling for none proposes
+// nothing, which the change request refuses as it refuses the target.
+func proposedIn(t appgovernance.Target, in ProposedInput) (appgovernance.Proposed, error) {
+	var out appgovernance.Proposed
+	switch {
+	case t.Kind == governance.KindFlagConfiguration:
+		c, err := in.AsFlagConfigurationPut()
+		if err != nil {
+			return out, flaghttp.InvalidRequest("proposed is not a flag configuration")
+		}
+		configuration := configurationIn(c)
+		out.Configuration = &configuration
+	case t.Kind == governance.KindDefinition && t.Segment != "":
+		d, err := in.AsSegmentDefinitionPut()
+		if err != nil {
+			return out, flaghttp.InvalidRequest("proposed is not a segment's definition")
+		}
+		conditions := conditionsIn(d.Conditions)
+		if conditions == nil {
+			conditions = []flags.Condition{}
+		}
+		out.Segment = &flags.SegmentChange{Conditions: &conditions, Private: &d.Private}
+	case t.Kind == governance.KindDefinition:
+		d, err := in.AsFlagDefinitionPut()
+		if err != nil {
+			return out, flaghttp.InvalidRequest("proposed is not a flag's definition")
+		}
+		out.Flag = &flags.FlagChange{AutomaticExposure: &d.AutomaticExposure, Variations: variationsIn(&d.Variations)}
+	}
+	return out, nil
+}
+
 // transitioned is a change request as a transition answers it.
 type transitioned struct {
 	out  ChangeRequest
@@ -337,6 +389,9 @@ func changeRequestOut(cr governance.ChangeRequest) (ChangeRequest, error) {
 	}
 	if cr.Environment != nil {
 		out.Environment = &cr.Environment.Key
+	}
+	if cr.Segment != nil {
+		out.Segment = &cr.Segment.Key
 	}
 	for i, op := range cr.Diff {
 		out.Diff[i] = PatchOperation{Op: PatchOperationOp(op.Op), Path: op.Path}

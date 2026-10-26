@@ -65,14 +65,18 @@ func (h *DeleteSegment) Handle(ctx context.Context, cmd SegmentCommand) error {
 		if len(usages) > 0 {
 			return flags.ErrInUse(usages)
 		}
+		// The deletion is recorded before the row goes, so what it ends
+		// elsewhere, such as the change requests proposed for the segment,
+		// is found and closed with an entry of its own before the cascade
+		// removes it.
+		if err = h.d.Recorder.record(ctx, now, cmd.Request, governance.Record{
+			Project: cmd.Project, Action: "segment.deleted", Entity: segmentEntity(s), Before: segmentValues(s),
+		}); err != nil {
+			return err
+		}
 		if err = h.d.Store.DeleteSegment(ctx, s.ID); err != nil {
 			return err
 		}
-		if err = h.d.Rulesets.Project(ctx, cmd.Project); err != nil {
-			return err
-		}
-		return h.d.Recorder.record(ctx, now, cmd.Request, governance.Record{
-			Project: cmd.Project, Action: "segment.deleted", Entity: segmentEntity(s), Before: segmentValues(s),
-		})
+		return h.d.Rulesets.Project(ctx, cmd.Project)
 	})
 }

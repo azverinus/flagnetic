@@ -25,7 +25,7 @@ The answer is the experiment at `status` `draft` and `version` 1, which is also 
 
 ## Listing experiments
 
-`GET /projects/{project}/experiments` lists the project's experiments by key in byte order (capitals before lower case), paged with `limit` (1 to 200, 50 by default) and `cursor`, the `next_cursor` of the previous page. Filters, all of which apply when given: `status` (`draft`, `running`, `stopped` or `archived`), `flag` (a flag's key), `owner` (a member's identifier) and `tag` (matched exactly). Archived experiments are left out unless `include_archived` is `true` or `status` is `archived`. Keep the same filters while paging.
+`GET /projects/{project}/experiments` lists the project's experiments by key in byte order (capitals before lower case), paged with `limit` (1 to 200, 50 by default) and `cursor`, the `next_cursor` of the previous page. Filters, all of which apply when given: `status` (`draft`, `running`, `stopped` or `archived`), `flag` (a flag's key), `owner` (a member's identifier) and `tag` (matched exactly). Archived experiments are left out unless `include_archived` is `true` or `status` is `archived`. Two filters find the experiments that need someone: `past_expected_end=true` lists the overdue ones, running from the UTC day after their expected end; `awaiting_code_removal=true` lists the stopped ones whose flag SDKs still evaluate, those with an SDK's evaluation summary counting the flag in some environment on one of the last 7 UTC days, today included, and an evaluation there after the stop (remote evaluations the server answered do not count). Keep the same filters while paging.
 
 ## Changing a draft
 
@@ -147,6 +147,15 @@ The check is skipped below 1,000 first exposures (`below_minimum_sample`) or whe
 ## Alerts
 
 `GET /projects/{project}/experiments/{experiment}/alerts` lists every alert the experiment has had, the most recently raised first; `active=true` keeps those not cleared, `active=false` those cleared. Each names its `kind`, its `environment`, when it was `raised_at`, `cleared_at` and `acknowledged_at`, and in `details` what the check found when it raised it. At most one alert of a kind is active per environment; once it clears, a mismatch returning raises a new one. An `srm` alert the final check raises stays active on the stopped experiment.
+
+The checks run every 10 minutes over every running experiment, and raise four kinds of alert:
+
+- `srm`, in an environment holding the experiment's rule, by the sample-ratio check above; `details.sample_ratio` holds the check.
+- `no_exposures`, in an environment holding the rule, once the server received no exposure there, overrides aside, for 24 hours since the start or since the last one: most likely the code never records exposures. The next exposure clears it, and so does the environment ceasing to hold the rule. `details.no_exposures` holds `last_exposure_at` (null when none ever came) and `since`.
+- `exposure_conflicts`, in an environment holding the rule, once the exposures naming another variation than their unit's first one reach `max(3, min(10, ceil(first_exposures / 1000)))`; it clears when they fall below that as first exposures grow. `details.exposure_conflicts` holds `conflicts`, `conflicting_units`, `first_exposures` and `threshold`.
+- `past_expected_end`, about the experiment as a whole (`environment` null), from the UTC day after its expected end; moving the end to today or later clears it. `details.past_expected_end` holds the `expected_end_at` it passed.
+
+The details are taken when the alert is raised and do not change. A stop clears the `no_exposures` and `past_expected_end` alerts, since the experiment no longer waits for exposures or runs late; `srm` and `exposure_conflicts` alerts stay, as they are what its exposures came to.
 
 `POST …/alerts/{alert}/acknowledge` (`experiment.edit`) hides an alert until it clears. It takes no `If-Match`, since an alert has no version; acknowledging again answers the alert as it is.
 

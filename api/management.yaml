@@ -2360,6 +2360,26 @@ paths:
           schema:
             type: boolean
             default: false
+        - name: past_expected_end
+          in: query
+          description: |
+            `true` lists only running experiments past their expected end:
+            from the UTC day after the `expected_end_at` date, as the
+            `past_expected_end` alert. `false` or absent filters nothing.
+          schema:
+            type: boolean
+            default: false
+        - name: awaiting_code_removal
+          in: query
+          description: |
+            `true` lists only stopped experiments whose flag SDKs still
+            evaluate: in some environment, an SDK reported evaluations of
+            the flag on one of the last 7 UTC days, today included, and
+            evaluated it after the stop. Remote evaluations the server
+            answered do not count. `false` or absent filters nothing.
+          schema:
+            type: boolean
+            default: false
         - $ref: "#/components/parameters/Cursor"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -3060,10 +3080,28 @@ paths:
         returning after it cleared raises a new alert. At most one alert of a
         kind is active per environment.
 
-        `srm` is raised by the sample-ratio check in an environment holding
-        the experiment's rule, at a p-value below 0.001, and cleared above
-        0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-        the audit log as `experiment.alert_raised` and
+        The checks run every 10 minutes over every running experiment.
+
+        - `srm` is raised by the sample-ratio check in an environment
+          holding the experiment's rule, at a p-value below 0.001, and
+          cleared above 0.01 (see `GET .../exposures`).
+        - `no_exposures` is raised in an environment holding the rule once
+          the server received no exposure there, overrides aside, for 24
+          hours since the start or since the last one; it clears with the
+          next exposure, when the environment stops holding the rule, and
+          at the stop.
+        - `exposure_conflicts` is raised in an environment holding the rule
+          once the exposures naming another variation than their unit's
+          first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+          and cleared when they fall below it as first exposures grow.
+        - `past_expected_end`, about the experiment as a whole
+          (`environment` null), is raised from the UTC day after the
+          expected end, once until it clears: when the expected end moves
+          to today or later, and at the stop.
+
+        A stop leaves `srm` and `exposure_conflicts` active: they are what
+        the exposures came to. Raising and clearing are recorded in the
+        audit log as `experiment.alert_raised` and
         `experiment.alert_cleared` by the system.
       x-permission: project.read
       tags: [experiments]
@@ -3148,6 +3186,11 @@ paths:
           description: Only those naming the environment with this key.
           schema:
             type: string
+        - name: segment
+          in: query
+          description: Only those naming the segment with this key.
+          schema:
+            type: string
         - name: kind
           in: query
           schema:
@@ -3192,18 +3235,23 @@ paths:
       operationId: createChangeRequest
       summary: Propose a change
       description: |
-        Proposes a flag's configuration in one environment as a change
-        request, as a draft or, with `open`, opened for review at once. The
-        caller, a member or a project token, is its author. It is based on
-        the configuration as it is now, and `diff` is the RFC 6902 patch from
-        that configuration to `proposed`. `proposed` is checked as replacing
-        the configuration would be, with the same refusals under
-        `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-        configuration has no rule with, and a `salt` that is not that rule's,
-        are left out, so the rule is a new one. New rules and rollouts are
-        given an identifier and a salt, which `proposed` holds. A title of 1
-        to 200 characters is required and a description has at most 10,000
-        (`invalid_change_request`).
+        Proposes a change as a change request, as a draft or, with `open`,
+        opened for review at once. The caller, a member or a project token,
+        is its author. A `flag_configuration` change request names a `flag`
+        and an `environment` and proposes a `FlagConfigurationPut`; a
+        `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+        one `segment`, proposing a `SegmentDefinitionPut`, and no
+        environment, since a definition is applied in every environment
+        (`invalid_change_request` naming the field otherwise). It is based on
+        the entity as it is now, and `diff` is the RFC 6902 patch from it to
+        `proposed`. `proposed` is checked as writing it directly would be,
+        with the same refusals under `/proposed` (`invalid_configuration`,
+        `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+        configuration, a rule `id` the configuration has no rule with, and a
+        `salt` that is not that rule's, are left out, so the rule is a new
+        one; new rules and rollouts are given an identifier and a salt,
+        which `proposed` holds. A title of 1 to 200 characters is required
+        and a description has at most 10,000 (`invalid_change_request`).
       x-permission: change_request.propose
       tags: [change-requests]
       requestBody:
@@ -3265,10 +3313,11 @@ paths:
       description: |
         Changes the title, the description or what is proposed, each left
         as it is when absent. Only the author edits (`not_author`), a draft
-        or an open change request (`invalid_state`). A new `proposed` is
-        checked as on creation, against the configuration as it is now, and
-        `diff` is recomputed from the configuration the change request is
-        based on; a rebase moves that. An edit that changes nothing changes
+        or an open change request (`invalid_state`). A new `proposed`, the
+        document the change request's kind and entity call for, is checked
+        as on creation, against the entity as it is now, and `diff` is
+        recomputed from the entity as the change request is based on it; a
+        rebase moves that. An edit that changes nothing changes
         nothing and records nothing.
       x-permission: change_request.propose
       tags: [change-requests]
@@ -3315,9 +3364,10 @@ paths:
       summary: Open a draft change request for review
       description: |
         Only the author opens (`not_author`), and only a draft
-        (`invalid_state`). When the configuration was written since the
-        change request was based on it, its diff no longer shows what it
-        would do, and opening is refused (`base_moved`) until it is rebased.
+        (`invalid_state`). When its flag's configuration, its flag or its
+        segment was written since the change request was based on it, its
+        diff no longer shows what it would do, and opening is refused
+        (`base_moved`) until it is rebased.
       x-permission: change_request.propose
       tags: [change-requests]
       parameters:
@@ -3352,8 +3402,8 @@ paths:
       operationId: rebaseChangeRequest
       summary: Base a draft change request on the configuration as it is now
       description: |
-        Keeps what is proposed and recomputes `diff` from the configuration
-        as it is now, which becomes `base_version`. Only the author rebases
+        Keeps what is proposed and recomputes `diff` from the entity as it
+        is now, whose version becomes `base_version`. Only the author rebases
         (`not_author`), and only a draft (`invalid_state`). Rebasing on the
         base it has changes nothing and records nothing.
       x-permission: change_request.propose
@@ -3430,8 +3480,8 @@ paths:
       description: |
         Copies any change request, whatever its state and whoever wrote it,
         into a new draft of the caller's with the same title, description
-        and proposal, based on the configuration as it is now and checked
-        against it as a new change request is.
+        and proposal, based on the entity as it is now and checked against
+        it as a new change request is.
       x-permission: change_request.propose
       tags: [change-requests]
       responses:
@@ -3466,9 +3516,10 @@ paths:
         request (`invalid_state`) with an optional comment of at most 2,000
         characters, unless they are its author (`author_cannot_approve`); a
         project token never decides one (`token_cannot_approve`). When the
-        configuration was written since the change request was based on it,
-        what would be approved is no longer what was reviewed: the change
-        request is superseded and the approval refused (`base_moved`).
+        entity was written since the change request was based on it, what
+        would be approved is no longer what was reviewed: the change request
+        is superseded and the approval refused (`base_moved`). A definition's
+        approval covers the environments protected when it is given.
       x-permission: change_request.approve
       tags: [change-requests]
       parameters:
@@ -3559,15 +3610,18 @@ paths:
       operationId: applyChangeRequest
       summary: Apply an approved change request
       description: |
-        Writes the configuration proposed, in a protected environment too,
-        as one write whose audit entries carry the change request's
-        identifier. Its author or a member holding `change_request.approve`
-        applies it (`not_author`), once approved (`invalid_state`). When the
-        configuration was written since the change request was based on it,
-        the change request is superseded and the application refused
-        (`base_moved`). The configuration is checked again as a replace is,
-        since what it names may be gone since the approval: a refusal
-        writes nothing and leaves the change request approved.
+        Writes what is proposed as one write whose audit entries carry the
+        change request's identifier: a configuration in its environment,
+        protected or not; a definition in every environment, changing the
+        protected ones its approval covers. Its author or a member holding
+        `change_request.approve` applies it (`not_author`), once approved
+        (`invalid_state`). When the entity was written since the change
+        request was based on it, or, for a definition, an environment was
+        protected since it was approved, the change request is superseded
+        and the application refused (`base_moved`). What is proposed is
+        checked again as writing it directly is, since what it names may be
+        gone since the approval: a refusal writes nothing and leaves the
+        change request approved.
       x-permission: change_request.propose
       tags: [change-requests]
       parameters:
@@ -4659,6 +4713,38 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/webhooks/{webhook}/test:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/WebhookID"
+    post:
+      operationId: testWebhook
+      summary: Send a test ping
+      description: |
+        Queues a `ping` event for this subscription alone, whatever event
+        types it names, and answers the pending delivery; the delivery
+        worker sends it within a few seconds, signed like every event, and
+        its attempts show in the delivery log. The ping names the project
+        and the caller; its environment, entity and audit entry are null.
+        A disabled subscription is refused `409 webhook_disabled`, since
+        the ping would wait unsent until it is enabled.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "202":
+          description: The ping's delivery, pending.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /projects/{project}/webhooks/{webhook}/deliveries:
     parameters:
       - $ref: "#/components/parameters/ProjectKey"
@@ -4742,6 +4828,43 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver:
+    parameters:
+      - $ref: "#/components/parameters/ProjectKey"
+      - $ref: "#/components/parameters/WebhookID"
+      - name: delivery
+        in: path
+        required: true
+        description: The delivery whose event to send again.
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: redeliverWebhookDelivery
+      summary: Send a delivery's event again
+      description: |
+        Queues the delivery's event again as a new delivery, with the same
+        event `id` and body byte for byte, and answers it pending; the
+        delivery redelivered is left as it is. A receiver deduplicating on
+        the event `id` recognises it, and one that lost it takes it. A
+        disabled subscription is refused `409 webhook_disabled`.
+      x-permission: webhook.manage
+      tags: [webhooks]
+      responses:
+        "202":
+          description: The new delivery, pending.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDelivery"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 components:
   parameters:
     AuditActor:
@@ -6699,8 +6822,13 @@ components:
             $ref: "#/components/schemas/ExperimentAlert"
     ExperimentAlertKind:
       type: string
-      enum: [srm]
-      description: "`srm`: the sample-ratio check found first exposures out of line with the weights."
+      enum: [srm, no_exposures, exposure_conflicts, past_expected_end]
+      description: |
+        `srm`: the sample-ratio check found first exposures out of line
+        with the weights. `no_exposures`: no exposure for 24 hours in an
+        environment holding the rule. `exposure_conflicts`: too many units
+        exposed to another variation than their first one.
+        `past_expected_end`: the experiment runs past its expected end.
     ExperimentAlert:
       type: object
       required: [id, kind, environment, raised_at, cleared_at, acknowledged_at, details]
@@ -6732,12 +6860,65 @@ components:
     ExperimentAlertDetails:
       type: object
       description: What the check found when it raised the alert; the block of the alert's kind is set, every other one is null.
-      required: [sample_ratio]
+      required: [sample_ratio, no_exposures, exposure_conflicts, past_expected_end]
       properties:
         sample_ratio:
           allOf:
             - $ref: "#/components/schemas/SampleRatioAlertDetails"
           nullable: true
+        no_exposures:
+          allOf:
+            - $ref: "#/components/schemas/NoExposuresAlertDetails"
+          nullable: true
+        exposure_conflicts:
+          allOf:
+            - $ref: "#/components/schemas/ExposureConflictsAlertDetails"
+          nullable: true
+        past_expected_end:
+          allOf:
+            - $ref: "#/components/schemas/PastExpectedEndAlertDetails"
+          nullable: true
+    NoExposuresAlertDetails:
+      type: object
+      required: [last_exposure_at, since]
+      properties:
+        last_exposure_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the server last received an exposure in the environment, overrides aside; null when it never did.
+        since:
+          type: string
+          format: date-time
+          description: Since when no exposure came, the later of the start and the last exposure.
+    ExposureConflictsAlertDetails:
+      type: object
+      required: [conflicts, conflicting_units, first_exposures, threshold]
+      properties:
+        conflicts:
+          type: integer
+          format: int64
+          description: The exposures naming another variation than their unit's first exposure.
+        conflicting_units:
+          type: integer
+          format: int64
+          description: The units with at least one such exposure.
+        first_exposures:
+          type: integer
+          format: int64
+          description: The first exposures in the environment.
+        threshold:
+          type: integer
+          format: int64
+          description: "`max(3, min(10, ceil(first_exposures / 1000)))`, which `conflicts` reached."
+    PastExpectedEndAlertDetails:
+      type: object
+      required: [expected_end_at]
+      properties:
+        expected_end_at:
+          type: string
+          format: date
+          description: The expected end the experiment passed.
     SampleRatioAlertDetails:
       type: object
       required: [n, chi_square, p_value, variations]
@@ -7168,8 +7349,10 @@ components:
       type: string
       description: |
         What a change request proposes: `flag_configuration`, a flag's
-        configuration in one environment. Other kinds are to come; a client
-        reads `proposed` by the kind.
+        configuration in one environment; `definition`, a flag's variations
+        and automatic exposure, or a segment's conditions and private
+        switch, in every environment. `experiment` is to come. A client
+        reads `proposed` by the kind and the entity named.
       enum: [flag_configuration, definition, experiment]
     ChangeRequestState:
       type: string
@@ -7316,6 +7499,9 @@ components:
         environment:
           type: string
           description: The key of the environment of a `flag_configuration` change request.
+        segment:
+          type: string
+          description: The key of the segment of a segment's `definition`.
         state:
           $ref: "#/components/schemas/ChangeRequestState"
         title:
@@ -7325,12 +7511,20 @@ components:
         base_version:
           type: integer
           format: int64
-          description: The version of the configuration the change request is based on.
+          description: The version of the configuration, the flag or the segment the change request is based on.
         proposed:
-          $ref: "#/components/schemas/ProposedConfiguration"
+          description: |
+            What the change request proposes, by its kind and the entity it
+            names: a `ProposedConfiguration` for `flag_configuration`, a
+            `ProposedFlagDefinition` for a flag's `definition`, a
+            `ProposedSegmentDefinition` for a segment's.
+          oneOf:
+            - $ref: "#/components/schemas/ProposedConfiguration"
+            - $ref: "#/components/schemas/ProposedFlagDefinition"
+            - $ref: "#/components/schemas/ProposedSegmentDefinition"
         diff:
           type: array
-          description: The RFC 6902 patch from the configuration the change request is based on to `proposed`.
+          description: The RFC 6902 patch from the entity as the change request is based on it to `proposed`.
           items:
             $ref: "#/components/schemas/PatchOperation"
         author:
@@ -7362,7 +7556,8 @@ components:
           description: >-
             The audit entry of the write that superseded the change request by changing what it was based on: a direct
             write, an override, the kill switch, a copy, a revert, another change request's application, archiving or
-            deleting its flag, or deleting its environment. Null unless a write superseded it; a change request found
+            deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write
+            to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found
             superseded only when it was approved or applied names none.
         created_at:
           type: string
@@ -7386,23 +7581,26 @@ components:
           description: Pass as `cursor` for the next page; null on the last.
     ChangeRequestCreate:
       type: object
-      required: [kind, flag, environment, title, proposed]
+      required: [kind, title, proposed]
       properties:
         kind:
           type: string
-          enum: [flag_configuration]
+          enum: [flag_configuration, definition]
         flag:
           type: string
-          description: The key of the flag.
+          description: The key of the flag, for a configuration or a flag's definition.
         environment:
           type: string
-          description: The key of the environment.
+          description: The key of the environment, for a configuration only.
+        segment:
+          type: string
+          description: The key of the segment, for a segment's definition only.
         title:
           type: string
         description:
           type: string
         proposed:
-          $ref: "#/components/schemas/FlagConfigurationPut"
+          $ref: "#/components/schemas/ProposedInput"
         open:
           type: boolean
           default: false
@@ -7415,7 +7613,70 @@ components:
         description:
           type: string
         proposed:
-          $ref: "#/components/schemas/FlagConfigurationPut"
+          $ref: "#/components/schemas/ProposedInput"
+    ProposedInput:
+      description: |
+        What a change request proposes, as a direct write would give it,
+        read by the change request's kind and the entity it names: a
+        `FlagConfigurationPut` for `flag_configuration`, a
+        `FlagDefinitionPut` for a flag's `definition`, a
+        `SegmentDefinitionPut` for a segment's.
+      oneOf:
+        - $ref: "#/components/schemas/FlagConfigurationPut"
+        - $ref: "#/components/schemas/FlagDefinitionPut"
+        - $ref: "#/components/schemas/SegmentDefinitionPut"
+    FlagDefinitionPut:
+      type: object
+      description: |
+        A flag's definition as a change request proposes it: what every
+        environment's ruleset carries of the flag. Its other fields are
+        edited directly.
+      required: [automatic_exposure, variations]
+      properties:
+        automatic_exposure:
+          type: boolean
+        variations:
+          type: array
+          description: Every variation, in order, matched to the current ones by key.
+          items:
+            $ref: "#/components/schemas/VariationInput"
+    SegmentDefinitionPut:
+      type: object
+      description: |
+        A segment's definition as a change request proposes it: what every
+        environment's ruleset carries of the segment. Its name and
+        description are edited directly.
+      required: [conditions, private]
+      properties:
+        conditions:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/Condition"
+        private:
+          type: boolean
+    ProposedFlagDefinition:
+      type: object
+      description: A flag's definition as a change request proposes it.
+      required: [automatic_exposure, variations]
+      properties:
+        automatic_exposure:
+          type: boolean
+        variations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Variation"
+    ProposedSegmentDefinition:
+      type: object
+      description: A segment's definition as a change request proposes it.
+      required: [conditions, private]
+      properties:
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Condition"
+        private:
+          type: boolean
     FlagConfigurationCopy:
       type: object
       required: [from]

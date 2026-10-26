@@ -184,8 +184,13 @@ func (s *Store) ExperimentByKey(ctx context.Context, project workspace.ProjectID
 
 // Experiments returns up to limit experiments of project matching filter by
 // key in byte order, those whose key is greater than after when it is not "".
+//
+// An experiment is awaiting code removal in an environment where its flag's
+// latest SDK evaluation came after the stop and an SDK reported evaluating
+// it on a recent day: the latest evaluation says the flag outlived the
+// decision, the day says it still does.
 func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, filter appexperiments.ExperimentFilter,
-	after string, limit int) ([]experiments.Experiment, error) {
+	now time.Time, after string, limit int) ([]experiments.Experiment, error) {
 	var owner any
 	if filter.Owner != nil {
 		owner = filter.Owner.Bytes()
@@ -198,8 +203,16 @@ func (s *Store) Experiments(ctx context.Context, project workspace.ProjectID, fi
 		  AND ($5 = '' OR f.key = $5)
 		  AND ($6::uuid IS NULL OR e.owner_id = $6)
 		  AND ($7 = '' OR $7 = ANY (e.tags))
+		  AND (NOT $9 OR (e.status = 'running' AND e.expected_end_at < $11::date))
+		  AND (NOT $10 OR (e.status = 'stopped' AND EXISTS (
+		      SELECT 1 FROM flag_last_evaluated l
+		      WHERE l.flag_id = e.flag_id AND l.last_evaluated_at > e.stopped_at
+		        AND EXISTS (SELECT 1 FROM evaluation_counts_daily c
+		            WHERE c.flag_id = l.flag_id AND c.environment_id = l.environment_id AND c.source = 'sdk'
+		              AND c.day > $11::date - $12::int AND c.day >= (e.stopped_at AT TIME ZONE 'UTC')::date))))
 		ORDER BY e.key COLLATE "C"
-		LIMIT $8`, project.Bytes(), after, string(filter.Status), filter.IncludeArchived, filter.Flag, owner, filter.Tag, limit)
+		LIMIT $8`, project.Bytes(), after, string(filter.Status), filter.IncludeArchived, filter.Flag, owner, filter.Tag, limit,
+		filter.PastExpectedEnd, filter.AwaitingCodeRemoval, now.Format(time.DateOnly), appexperiments.AwaitingCodeRemovalDays)
 	if err != nil {
 		return nil, fmt.Errorf("listing experiments: %w", err)
 	}

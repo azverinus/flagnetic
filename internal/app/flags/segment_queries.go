@@ -119,3 +119,28 @@ func (h *ListSegmentUsages) Handle(ctx context.Context, project workspace.Projec
 	})
 	return usages, err
 }
+
+// ReferrerReader reads which flags name a segment.
+type ReferrerReader interface {
+	// SegmentReferrers returns the flags of project whose rules name the
+	// segment key in some environment, archived flags included, each once.
+	SegmentReferrers(ctx context.Context, project workspace.ProjectID, key string) ([]flags.FlagID, error)
+}
+
+// SegmentReferrers reads which flags name a segment, for the governance
+// context to tell which writes move a change request to its definition.
+type SegmentReferrers struct{ store ReferrerReader }
+
+// NewSegmentReferrers returns the query.
+func NewSegmentReferrers(store ReferrerReader) *SegmentReferrers {
+	return &SegmentReferrers{store: store}
+}
+
+// SegmentReferrers returns the flags of project whose rules name the
+// segment key in some environment, archived flags included, each once, read
+// in the unit of work ctx carries; none for a segment nothing names or the
+// project does not have.
+func (h *SegmentReferrers) SegmentReferrers(ctx context.Context, project workspace.ProjectID, key string,
+) ([]flags.FlagID, error) {
+	return h.store.SegmentReferrers(ctx, project, key)
+}

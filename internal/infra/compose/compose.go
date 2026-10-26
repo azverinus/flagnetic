@@ -40,6 +40,7 @@ import (
 	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
+	"github.com/azverinus/flagnetic/internal/infra/out/webhook"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -86,6 +87,9 @@ type Options struct {
 	// WebhookTargets is what the operator allows a webhook subscription's
 	// target to be.
 	WebhookTargets governance.TargetPolicy
+	// WebhookTick is how often the replica fans the outbox out and sends the
+	// webhook deliveries that are due.
+	WebhookTick time.Duration
 	management.Options
 }
 
@@ -128,7 +132,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	// catalogue events they cause to the outbox and announces them to the
 	// management change streams.
 	changeRequestStore := pggovernance.NewChangeRequests(d.Pool)
-	audit := appgovernance.NewRecord(auditLog, changeRequestStore, d.IDs,
+	audit := appgovernance.NewRecord(auditLog, changeRequestStore, appflags.NewSegmentReferrers(pgflags.NewStore(d.Pool)), d.IDs,
 		appgovernance.WithOutbox(outbox, d.IDs), appgovernance.WithChangeStream(auditLog))
 	// Every replica offers the entries announced to the change streams it
 	// holds, reading them from the audit log.
@@ -177,6 +181,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		Tx: tx, Store: webhookStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets,
 	}
+	deliveryRequests := appgovernance.DeliveryRequestDeps{
+		Tx: tx, Webhooks: webhookStore, Deliveries: webhookStore, Queue: outbox, Clock: d.Clock, IDs: d.IDs,
+	}
 	sdkKeys := appdelivery.SDKKeyDeps{
 		Tx: tx, Store: deliveryStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 	}
@@ -184,16 +191,26 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	owners := appaccess.NewOwnership(accessStore)
 	experimentStore := pgexperiments.NewStore(d.Pool)
 	experimentRec := appexperiments.NewRecorder(audit, d.Clock, d.IDs)
-	// A change request proposes a configuration the flags context checks as
-	// it would check writing it, and writes it when the change request is
-	// applied.
+	updateFlag := appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
+		Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
+		Evaluations: eventStore,
+	})
+	updateSegment := appflags.NewUpdateSegment(appflags.UpdateSegmentDeps{
+		Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
+	})
+	// A change request proposes a configuration or a definition the flags
+	// context checks as it would check writing it, and writes it when the
+	// change request is applied; a definition's approval covers the
+	// environments the workspace context says are protected.
 	changeRequests := appgovernance.ChangeRequestDeps{
 		Tx: tx, Projects: changeRequestStore, Store: changeRequestStore,
 		Configurations: appflags.NewDraftConfiguration(ws, flagStore, d.IDs),
 		Proposals: appflags.NewApplyProposal(appflags.ReplaceConfigurationDeps{
 			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		Audit: audit, Clock: d.Clock, IDs: d.IDs,
+		Definitions:  appflags.NewDefinitions(updateFlag, updateSegment, appflags.NewSegmentReferrers(flagStore)),
+		Environments: appworkspace.NewProtectedEnvironments(ws),
+		Audit:        audit, Clock: d.Clock, IDs: d.IDs,
 	}
 	// Deleting a unit type or attribute asks the flags context what still
 	// names it.
@@ -291,11 +308,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		CreateFlag: appflags.NewCreateFlag(appflags.CreateFlagDeps{
 			Tx: tx, Projects: flagStore, Environments: ws, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		GetFlag: appflags.NewGetFlag(tx, flagStore, eventStore),
-		UpdateFlag: appflags.NewUpdateFlag(appflags.UpdateFlagDeps{
-			Tx: tx, Projects: flagStore, Store: flagStore, Owners: owners, Rulesets: rulesets, Recorder: flagRec,
-			Evaluations: eventStore,
-		}),
+		GetFlag:    appflags.NewGetFlag(tx, flagStore, eventStore),
+		UpdateFlag: updateFlag,
 
 		ArchiveFlag: appflags.NewArchiveFlag(appflags.ArchiveFlagDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec, Evaluations: eventStore,
@@ -351,7 +365,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		RotateSDKKey: appdelivery.NewRotateSDKKey(sdkKeys),
 		RevokeSDKKey: appdelivery.NewRevokeSDKKey(sdkKeys),
 
-		ListExperiments: appexperiments.NewListExperiments(experimentStore),
+		ListExperiments: appexperiments.NewListExperiments(experimentStore, d.Clock),
 		CreateExperiment: appexperiments.NewCreateExperiment(appexperiments.CreateExperimentDeps{
 			Tx: tx, Projects: experimentStore, Store: experimentStore, Flags: flagStore, UnitTypes: ws, Rollouts: flagStore,
 			Owners: owners, Recorder: experimentRec,
@@ -427,15 +441,15 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		DeleteWebhook:         appgovernance.NewDeleteWebhook(webhooks),
 		ListWebhookDeliveries: appgovernance.NewListDeliveries(webhookStore, webhookStore),
 		GetWebhookDelivery:    appgovernance.NewGetDelivery(webhookStore, webhookStore),
+		TestWebhook:           appgovernance.NewTestWebhook(deliveryRequests),
+		RedeliverWebhook:      appgovernance.NewRedeliver(deliveryRequests),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),
 		CreateSegment: appflags.NewCreateSegment(appflags.CreateSegmentDeps{
 			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
-		UpdateSegment: appflags.NewUpdateSegment(appflags.UpdateSegmentDeps{
-			Tx: tx, Projects: flagStore, Declarations: ws, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
-		}),
+		UpdateSegment: updateSegment,
 		DeleteSegment: appflags.NewDeleteSegment(appflags.DeleteSegmentDeps{
 			Tx: tx, Projects: flagStore, Store: flagStore, Rulesets: rulesets, Recorder: flagRec,
 		}),
@@ -488,11 +502,15 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.EventRetention(
 				appevents.NewRunRetention(tx, eventStore, d.Clock, d.IDs, o.EventsRetention, o.EventsPartitionsAhead),
 				appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention), edge.Logger(), reg),
-			worker.WebhookFanOut(appgovernance.NewRunFanOut(tx, outbox, d.Clock, d.IDs), reg),
+			worker.WebhookFanOut(appgovernance.NewRunFanOut(tx, outbox, d.Clock, d.IDs), o.WebhookTick, reg),
+			worker.WebhookDelivery(appgovernance.NewDeliver(appgovernance.DeliverDeps{
+				Tx: tx, Store: pggovernance.NewDeliveries(d.Pool), Sender: webhook.NewSender(o.WebhookTargets),
+				Opener: o.Keyring, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
+			}), o.WebhookTick, edge.Logger(), reg),
 			worker.ProjectPurge(appworkspace.NewPurgeDeletedProjects(tx, ws)),
 			worker.ExperimentChecks(appexperiments.CheckInterval, appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
 				Tx: tx, Lock: experimentStore, Running: experimentStore, Projects: experimentStore, Store: experimentStore,
-				Holders: flagStore, FirstExposures: eventStore, Checks: experimentStore, Recorder: experimentRec,
+				Holders: flagStore, FirstExposures: eventStore, Exposures: eventStore, Checks: experimentStore, Recorder: experimentRec,
 			}).Handle),
 		},
 		Listeners: []Listener{
@@ -567,6 +585,7 @@ func Console(edge *flaghttp.Server, defaultLocale string) (bool, error) {
 // record returns the audit port of a use case run from the command line,
 // recording through the governance context like every other.
 func record(d Deps) *appgovernance.Record {
-	return appgovernance.NewRecord(pggovernance.NewAuditLog(d.Pool), pggovernance.NewChangeRequests(d.Pool), d.IDs,
+	return appgovernance.NewRecord(pggovernance.NewAuditLog(d.Pool), pggovernance.NewChangeRequests(d.Pool),
+		appflags.NewSegmentReferrers(pgflags.NewStore(d.Pool)), d.IDs,
 		appgovernance.WithOutbox(pggovernance.NewOutbox(d.Pool), d.IDs))
 }

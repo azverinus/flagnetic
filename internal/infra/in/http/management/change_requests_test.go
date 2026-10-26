@@ -1,6 +1,8 @@
 package management_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"slices"
 	"testing"
@@ -42,8 +44,8 @@ func proposedOn() management.FlagConfigurationPut {
 
 func configurationRequest(title string, proposed management.FlagConfigurationPut) management.ChangeRequestCreate {
 	return management.ChangeRequestCreate{
-		Kind: management.ChangeRequestCreateKindFlagConfiguration, Flag: "checkout_title", Environment: "production", Title: title,
-		Proposed: proposed,
+		Kind: management.ChangeRequestCreateKindFlagConfiguration, Flag: ptr("checkout_title"), Environment: ptr("production"),
+		Title: title, Proposed: configurationInput(proposed),
 	}
 }
 
@@ -127,8 +129,8 @@ func TestAChangeRequestIsDraftedEditedAndOpenedWithoutChangingTheConfiguration(t
 	if got := patchOf(cr.Diff); !slices.Equal(got, []string{"replace /on=true"}) {
 		t.Errorf("diff = %v", got)
 	}
-	if !cr.Proposed.On || cr.Proposed.Rules == nil || cr.Proposed.Overrides == nil || cr.Proposed.Prerequisites == nil {
-		t.Errorf("proposed = %+v", cr.Proposed)
+	if !proposedConfiguration(t, cr).On || proposedConfiguration(t, cr).Rules == nil || proposedConfiguration(t, cr).Overrides == nil || proposedConfiguration(t, cr).Prerequisites == nil {
+		t.Errorf("proposed = %+v", proposedConfiguration(t, cr))
 	}
 	if c := getConfiguration(t, f.admin, f.project.Key, "checkout_title", "production"); c.On || c.Version != 1 {
 		t.Errorf("the configuration changed: %+v", c)
@@ -140,7 +142,7 @@ func TestAChangeRequestIsDraftedEditedAndOpenedWithoutChangingTheConfiguration(t
 	proposed := proposedOn()
 	proposed.Overrides = &[]management.OverrideInput{{UnitType: "user", UnitId: "u-1", Variation: "b", Note: ptr("QA")}}
 	res := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr, management.ChangeRequestPatch{
-		Title: ptr("Show the title, pin QA"), Proposed: &proposed,
+		Title: ptr("Show the title, pin QA"), Proposed: ptr(configurationInput(proposed)),
 	})
 	if res.JSON200 == nil || res.HTTPResponse.Header.Get("ETag") != `"2"` {
 		t.Fatalf("PATCH = %d: %s", res.StatusCode(), res.Body)
@@ -154,7 +156,7 @@ func TestAChangeRequestIsDraftedEditedAndOpenedWithoutChangingTheConfiguration(t
 
 	// An edit that changes nothing writes nothing.
 	same := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, edited, management.ChangeRequestPatch{
-		Title: ptr("Show the title, pin QA"), Proposed: &proposed,
+		Title: ptr("Show the title, pin QA"), Proposed: ptr(configurationInput(proposed)),
 	})
 	if same.JSON200 == nil || same.JSON200.Version != 2 || !same.JSON200.UpdatedAt.Equal(edited.UpdatedAt) {
 		t.Errorf("the same edit = %d: %s", same.StatusCode(), same.Body)
@@ -266,7 +268,7 @@ func TestACopyIsANewDraftOfTheCallersOnTheCurrentBase(t *testing.T) {
 	}
 	cp := *res.JSON201
 	if cp.Id == cr.Id || cp.State != management.ChangeRequestStateDraft || cp.Title != "Turn it on" || cp.Description != "Why." ||
-		cp.BaseVersion != 2 || cp.Author.Id != otherMember.ID.Bytes() || !cp.Proposed.On || cp.Proposed.Fallthrough != "a" {
+		cp.BaseVersion != 2 || cp.Author.Id != otherMember.ID.Bytes() || !proposedConfiguration(t, cp).On || proposedConfiguration(t, cp).Fallthrough != "a" {
 		t.Errorf("copy = %+v", cp)
 	}
 	if got := patchOf(cp.Diff); !slices.Equal(got, []string{`replace /fallthrough="a"`, "replace /on=true"}) {
@@ -363,12 +365,12 @@ func TestAProposalIsCheckedAsTheWriteWouldBe(t *testing.T) {
 	}
 
 	unknown := configurationRequest("Unknown", proposedOn())
-	unknown.Flag = "no_such_flag"
+	unknown.Flag = ptr("no_such_flag")
 	res = do(f.dev.CreateChangeRequestWithResponse(t.Context(), f.project.Key, unknown))
 	assertProblem(t, "an unknown flag", res.StatusCode(), res.Body, http.StatusNotFound, "not_found")
 
 	cr := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("Good", proposedOn()))
-	edit := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr, management.ChangeRequestPatch{Proposed: &bad})
+	edit := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr, management.ChangeRequestPatch{Proposed: ptr(configurationInput(bad))})
 	assertProblem(t, "an invalid edit", edit.StatusCode(), edit.Body, http.StatusUnprocessableEntity, "invalid_configuration")
 
 	missing := do(f.dev.GetChangeRequestWithResponse(t.Context(), f.project.Key, openapi_types.UUID(projectIDOf(f.project).Bytes())))
@@ -385,7 +387,7 @@ func TestRuleIdentifiersAndSaltsTheConfigurationDoesNotHoldAreLeftOut(t *testing
 	proposed.Rules = &[]management.RuleInput{{Id: &stranger, Serve: rollout}}
 
 	cr := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("Roll out", proposed))
-	rules := cr.Proposed.Rules
+	rules := proposedConfiguration(t, cr).Rules
 	if len(rules) != 1 || rules[0].Id == stranger || rules[0].Id == (openapi_types.UUID{}) || rules[0].Serve.Salt == nil ||
 		*rules[0].Serve.Salt == salt || *rules[0].Serve.Salt == "" {
 		t.Errorf("proposed rules = %+v, want a new rule with a salt of its own", rules)
@@ -397,12 +399,12 @@ func TestAProposalsNewRulesKeepTheirIdentifiersAndSaltsWhileItIsEdited(t *testin
 	proposed := proposedOn()
 	proposed.Rules = &[]management.RuleInput{{Serve: rolloutOf("user", "b", 2500)}}
 	cr := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("Roll out", proposed))
-	given := cr.Proposed.Rules[0]
+	given := proposedConfiguration(t, cr).Rules[0]
 
 	// Sending back the proposal as it was answered changes nothing.
 	echoed := proposedOn()
 	echoed.Rules = &[]management.RuleInput{{Id: &given.Id, Serve: given.Serve}}
-	same := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr, management.ChangeRequestPatch{Proposed: &echoed})
+	same := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr, management.ChangeRequestPatch{Proposed: ptr(configurationInput(echoed))})
 	if same.JSON200 == nil || same.JSON200.Version != 1 || !same.JSON200.UpdatedAt.Equal(cr.UpdatedAt) {
 		t.Fatalf("sending the proposal back = %d: %s", same.StatusCode(), same.Body)
 	}
@@ -411,11 +413,11 @@ func TestAProposalsNewRulesKeepTheirIdentifiersAndSaltsWhileItIsEdited(t *testin
 	grown := proposedOn()
 	serve := rolloutOf("user", "b", 5000)
 	grown.Rules = &[]management.RuleInput{{Id: &given.Id, Serve: serve}}
-	res := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr, management.ChangeRequestPatch{Proposed: &grown})
+	res := updateChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, cr, management.ChangeRequestPatch{Proposed: ptr(configurationInput(grown))})
 	if res.JSON200 == nil {
 		t.Fatalf("growing the rollout = %d: %s", res.StatusCode(), res.Body)
 	}
-	rules := res.JSON200.Proposed.Rules
+	rules := proposedConfiguration(t, *res.JSON200).Rules
 	if len(rules) != 1 || rules[0].Id != given.Id || valueOr(rules[0].Serve.Salt) != valueOr(given.Serve.Salt) ||
 		rules[0].Serve.Percentage == nil || *rules[0].Serve.Percentage != 5000 {
 		t.Errorf("proposed rules = %+v, want rule %v with salt %q at 5000", rules, given.Id, valueOr(given.Serve.Salt))
@@ -489,10 +491,10 @@ func TestChangeRequestsAreListedNewestFirstByFilter(t *testing.T) {
 
 	first := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, configurationRequest("First", proposedOn()))
 	staging := configurationRequest("Staging", proposedOn())
-	staging.Environment = "staging"
+	staging.Environment = ptr("staging")
 	second := createChangeRequest(t, f.dev.ClientWithResponses, f.project.Key, staging)
 	banner := configurationRequest("Banner", proposedOn())
-	banner.Flag, banner.Open = "banner", ptr(true)
+	banner.Flag, banner.Open = ptr("banner"), ptr(true)
 	third := createChangeRequest(t, other.ClientWithResponses, f.project.Key, banner)
 
 	list := func(params *management.ListChangeRequestsParams) []string {
@@ -611,4 +613,39 @@ func TestAwaitingMyDecisionListsTheOpenChangeRequestsTheCallerMayApprove(t *test
 	if got := awaiting(ci, management.ListChangeRequestsParams{}); len(got) != 0 {
 		t.Errorf("the token's = %v, want none: a token never decides", got)
 	}
+}
+
+// configurationInput returns c as a configuration change request proposes
+// it.
+func configurationInput(c management.FlagConfigurationPut) management.ProposedInput {
+	var p management.ProposedInput
+	if err := p.FromFlagConfigurationPut(c); err != nil {
+		panic(err)
+	}
+	return p
+}
+
+// proposedConfiguration returns the configuration cr proposes, refusing a
+// document with a field a configuration does not have, so a test reading
+// another kind's document as a configuration fails.
+func proposedConfiguration(t testing.TB, cr management.ChangeRequest) management.ProposedConfiguration {
+	t.Helper()
+	return proposedAs[management.ProposedConfiguration](t, cr)
+}
+
+// proposedAs decodes what cr proposes as a T, refusing a field T does not
+// have.
+func proposedAs[T any](t testing.TB, cr management.ChangeRequest) T {
+	t.Helper()
+	b, err := cr.Proposed.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out T
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.DisallowUnknownFields()
+	if err := d.Decode(&out); err != nil {
+		t.Fatalf("proposed %s as %T: %v", b, out, err)
+	}
+	return out
 }

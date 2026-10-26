@@ -6,6 +6,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 import type { BrowserCommand } from "vitest/node";
 import { CrossOriginServer } from "./test/support/cross-origin-server.js";
+import { ScenarioReport } from "./test/support/scenario-report.js";
 
 // The repository root: the conformance suite lives in conformance/ beside the SDKs.
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -65,9 +66,14 @@ const e2eSeed: BrowserCommand = () => {
 };
 const e2eHarness: BrowserCommand<string[]> = async (_ctx, ...args) => (await promisify(execFile)(harness, args)).stdout;
 
+// FLAGNETIC_SCENARIO_REPORT names the file the protocol scenarios that
+// passed are written to, for the behaviour matrix.
+const scenarioReport = process.env.FLAGNETIC_SCENARIO_REPORT;
+
 export default defineConfig({
   server: { fs: { allow: [repoRoot] } },
   test: {
+    ...(scenarioReport && { reporters: ["default", new ScenarioReport(scenarioReport)] }),
     projects: [
       {
         extends: true,

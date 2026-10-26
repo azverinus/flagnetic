@@ -26,6 +26,7 @@ const proposed = {
 
 const changeRequest = (patch: Partial<ChangeRequest> = {}) =>
   ({
+    kind: "flag_configuration",
     state: "open",
     base_version: 4,
     proposed,

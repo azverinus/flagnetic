@@ -117,12 +117,15 @@ func (e ChangeRequestAuthorKind) Valid() bool {
 
 // Defines values for ChangeRequestCreateKind.
 const (
+	ChangeRequestCreateKindDefinition        ChangeRequestCreateKind = "definition"
 	ChangeRequestCreateKindFlagConfiguration ChangeRequestCreateKind = "flag_configuration"
 )
 
 // Valid indicates whether the value is a known member of the ChangeRequestCreateKind enum.
 func (e ChangeRequestCreateKind) Valid() bool {
 	switch e {
+	case ChangeRequestCreateKindDefinition:
+		return true
 	case ChangeRequestCreateKindFlagConfiguration:
 		return true
 	default:
@@ -243,12 +246,21 @@ func (e EventType) Valid() bool {
 
 // Defines values for ExperimentAlertKind.
 const (
-	ExperimentAlertKindSrm ExperimentAlertKind = "srm"
+	ExperimentAlertKindExposureConflicts ExperimentAlertKind = "exposure_conflicts"
+	ExperimentAlertKindNoExposures       ExperimentAlertKind = "no_exposures"
+	ExperimentAlertKindPastExpectedEnd   ExperimentAlertKind = "past_expected_end"
+	ExperimentAlertKindSrm               ExperimentAlertKind = "srm"
 )
 
 // Valid indicates whether the value is a known member of the ExperimentAlertKind enum.
 func (e ExperimentAlertKind) Valid() bool {
 	switch e {
+	case ExperimentAlertKindExposureConflicts:
+		return true
+	case ExperimentAlertKindNoExposures:
+		return true
+	case ExperimentAlertKindPastExpectedEnd:
+		return true
 	case ExperimentAlertKindSrm:
 		return true
 	default:
@@ -891,12 +903,12 @@ type ChangeRequest struct {
 	// Author The member or the project token that proposed the change request.
 	Author ChangeRequestAuthor `json:"author"`
 
-	// BaseVersion The version of the configuration the change request is based on.
+	// BaseVersion The version of the configuration, the flag or the segment the change request is based on.
 	BaseVersion int64     `json:"base_version"`
 	CreatedAt   time.Time `json:"created_at"`
 	Description string    `json:"description"`
 
-	// Diff The RFC 6902 patch from the configuration the change request is based on to `proposed`.
+	// Diff The RFC 6902 patch from the entity as the change request is based on it to `proposed`.
 	Diff []PatchOperation `json:"diff"`
 
 	// Environment The key of the environment of a `flag_configuration` change request.
@@ -907,30 +919,44 @@ type ChangeRequest struct {
 	Id   openapi_types.UUID `json:"id"`
 
 	// Kind What a change request proposes: `flag_configuration`, a flag's
-	// configuration in one environment. Other kinds are to come; a client
-	// reads `proposed` by the kind.
+	// configuration in one environment; `definition`, a flag's variations
+	// and automatic exposure, or a segment's conditions and private
+	// switch, in every environment. `experiment` is to come. A client
+	// reads `proposed` by the kind and the entity named.
 	Kind ChangeRequestKind `json:"kind"`
 
-	// Proposed A flag configuration as a change request proposes it: what it serves
-	// and the notes and descriptions that stay on the server, without who
-	// wrote it or when.
-	Proposed ProposedConfiguration `json:"proposed"`
+	// Proposed What the change request proposes, by its kind and the entity it
+	// names: a `ProposedConfiguration` for `flag_configuration`, a
+	// `ProposedFlagDefinition` for a flag's `definition`, a
+	// `ProposedSegmentDefinition` for a segment's.
+	Proposed ChangeRequest_Proposed `json:"proposed"`
 
 	// Rejection Who rejected the change request, when and why; null unless it was rejected.
 	Rejection *ChangeRequestDecision `json:"rejection"`
+
+	// Segment The key of the segment of a segment's `definition`.
+	Segment *string `json:"segment,omitempty"`
 
 	// State `draft` (its author prepares it), `open` (offered for review),
 	// `approved`, `rejected`, `applied`, `cancelled`, `superseded` (what
 	// it was based on moved). The last four are final.
 	State ChangeRequestState `json:"state"`
 
-	// SupersededBy The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, or deleting its environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
+	// SupersededBy The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
 	SupersededBy *openapi_types.UUID `json:"superseded_by"`
 	Title        string              `json:"title"`
 	UpdatedAt    time.Time           `json:"updated_at"`
 
 	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
 	Version Version `json:"version"`
+}
+
+// ChangeRequest_Proposed What the change request proposes, by its kind and the entity it
+// names: a `ProposedConfiguration` for `flag_configuration`, a
+// `ProposedFlagDefinition` for a flag's `definition`, a
+// `ProposedSegmentDefinition` for a segment's.
+type ChangeRequest_Proposed struct {
+	union json.RawMessage
 }
 
 // ChangeRequestApplier The member or the project token that applied a change request, or the system at its scheduled time.
@@ -968,17 +994,26 @@ type ChangeRequestAuthorKind string
 type ChangeRequestCreate struct {
 	Description *string `json:"description,omitempty"`
 
-	// Environment The key of the environment.
-	Environment string `json:"environment"`
+	// Environment The key of the environment, for a configuration only.
+	Environment *string `json:"environment,omitempty"`
 
-	// Flag The key of the flag.
-	Flag string                  `json:"flag"`
+	// Flag The key of the flag, for a configuration or a flag's definition.
+	Flag *string                 `json:"flag,omitempty"`
 	Kind ChangeRequestCreateKind `json:"kind"`
 
 	// Open Open the change request for review at once instead of drafting it.
-	Open     *bool                `json:"open,omitempty"`
-	Proposed FlagConfigurationPut `json:"proposed"`
-	Title    string               `json:"title"`
+	Open *bool `json:"open,omitempty"`
+
+	// Proposed What a change request proposes, as a direct write would give it,
+	// read by the change request's kind and the entity it names: a
+	// `FlagConfigurationPut` for `flag_configuration`, a
+	// `FlagDefinitionPut` for a flag's `definition`, a
+	// `SegmentDefinitionPut` for a segment's.
+	Proposed ProposedInput `json:"proposed"`
+
+	// Segment The key of the segment, for a segment's definition only.
+	Segment *string `json:"segment,omitempty"`
+	Title   string  `json:"title"`
 }
 
 // ChangeRequestCreateKind defines model for ChangeRequestCreate.Kind.
@@ -994,8 +1029,10 @@ type ChangeRequestDecision struct {
 }
 
 // ChangeRequestKind What a change request proposes: `flag_configuration`, a flag's
-// configuration in one environment. Other kinds are to come; a client
-// reads `proposed` by the kind.
+// configuration in one environment; `definition`, a flag's variations
+// and automatic exposure, or a segment's conditions and private
+// switch, in every environment. `experiment` is to come. A client
+// reads `proposed` by the kind and the entity named.
 type ChangeRequestKind string
 
 // ChangeRequestList defines model for ChangeRequestList.
@@ -1016,9 +1053,15 @@ type ChangeRequestMember struct {
 
 // ChangeRequestPatch defines model for ChangeRequestPatch.
 type ChangeRequestPatch struct {
-	Description *string               `json:"description,omitempty"`
-	Proposed    *FlagConfigurationPut `json:"proposed,omitempty"`
-	Title       *string               `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
+
+	// Proposed What a change request proposes, as a direct write would give it,
+	// read by the change request's kind and the entity it names: a
+	// `FlagConfigurationPut` for `flag_configuration`, a
+	// `FlagDefinitionPut` for a flag's `definition`, a
+	// `SegmentDefinitionPut` for a segment's.
+	Proposed *ProposedInput `json:"proposed,omitempty"`
+	Title    *string        `json:"title,omitempty"`
 }
 
 // ChangeRequestReject defines model for ChangeRequestReject.
@@ -1400,17 +1443,28 @@ type ExperimentAlert struct {
 	Environment *string            `json:"environment"`
 	Id          openapi_types.UUID `json:"id"`
 
-	// Kind `srm`: the sample-ratio check found first exposures out of line with the weights.
+	// Kind `srm`: the sample-ratio check found first exposures out of line
+	// with the weights. `no_exposures`: no exposure for 24 hours in an
+	// environment holding the rule. `exposure_conflicts`: too many units
+	// exposed to another variation than their first one.
+	// `past_expected_end`: the experiment runs past its expected end.
 	Kind     ExperimentAlertKind `json:"kind"`
 	RaisedAt time.Time           `json:"raised_at"`
 }
 
 // ExperimentAlertDetails What the check found when it raised the alert; the block of the alert's kind is set, every other one is null.
 type ExperimentAlertDetails struct {
-	SampleRatio *SampleRatioAlertDetails `json:"sample_ratio"`
+	ExposureConflicts *ExposureConflictsAlertDetails `json:"exposure_conflicts"`
+	NoExposures       *NoExposuresAlertDetails       `json:"no_exposures"`
+	PastExpectedEnd   *PastExpectedEndAlertDetails   `json:"past_expected_end"`
+	SampleRatio       *SampleRatioAlertDetails       `json:"sample_ratio"`
 }
 
-// ExperimentAlertKind `srm`: the sample-ratio check found first exposures out of line with the weights.
+// ExperimentAlertKind `srm`: the sample-ratio check found first exposures out of line
+// with the weights. `no_exposures`: no exposure for 24 hours in an
+// environment holding the rule. `exposure_conflicts`: too many units
+// exposed to another variation than their first one.
+// `past_expected_end`: the experiment runs past its expected end.
 type ExperimentAlertKind string
 
 // ExperimentAlertList defines model for ExperimentAlertList.
@@ -1592,6 +1646,21 @@ type ExposureConflicts struct {
 	Items []ExposureConflict `json:"items"`
 }
 
+// ExposureConflictsAlertDetails defines model for ExposureConflictsAlertDetails.
+type ExposureConflictsAlertDetails struct {
+	// ConflictingUnits The units with at least one such exposure.
+	ConflictingUnits int64 `json:"conflicting_units"`
+
+	// Conflicts The exposures naming another variation than their unit's first exposure.
+	Conflicts int64 `json:"conflicts"`
+
+	// FirstExposures The first exposures in the environment.
+	FirstExposures int64 `json:"first_exposures"`
+
+	// Threshold `max(3, min(10, ceil(first_exposures / 1000)))`, which `conflicts` reached.
+	Threshold int64 `json:"threshold"`
+}
+
 // ExposureDay defines model for ExposureDay.
 type ExposureDay struct {
 	Day            openapi_types.Date `json:"day"`
@@ -1765,6 +1834,16 @@ type FlagDefinition struct {
 
 	// Version Counts the entity's accepted changes, from 1; send it back in `If-Match` to change the entity.
 	Version Version `json:"version"`
+}
+
+// FlagDefinitionPut A flag's definition as a change request proposes it: what every
+// environment's ruleset carries of the flag. Its other fields are
+// edited directly.
+type FlagDefinitionPut struct {
+	AutomaticExposure bool `json:"automatic_exposure"`
+
+	// Variations Every variation, in order, matched to the current ones by key.
+	Variations []VariationInput `json:"variations"`
 }
 
 // FlagEvaluationDay defines model for FlagEvaluationDay.
@@ -2140,6 +2219,15 @@ type MemberStatus string
 // Name defines model for Name.
 type Name = string
 
+// NoExposuresAlertDetails defines model for NoExposuresAlertDetails.
+type NoExposuresAlertDetails struct {
+	// LastExposureAt When the server last received an exposure in the environment, overrides aside; null when it never did.
+	LastExposureAt *time.Time `json:"last_exposure_at"`
+
+	// Since Since when no exposure came, the later of the start and the last exposure.
+	Since time.Time `json:"since"`
+}
+
 // Override A variation pinned for one unit. Its note and author stay on the server; SDKs receive neither.
 type Override struct {
 	// AddedBy The member who last wrote the override; null when a project token did.
@@ -2178,6 +2266,12 @@ type PasswordChange struct {
 
 	// NewPassword 12 to 128 characters, or the instance's minimum length; not containing the part of the email before the @, nor a common password.
 	NewPassword string `json:"new_password"`
+}
+
+// PastExpectedEndAlertDetails defines model for PastExpectedEndAlertDetails.
+type PastExpectedEndAlertDetails struct {
+	// ExpectedEndAt The expected end the experiment passed.
+	ExpectedEndAt openapi_types.Date `json:"expected_end_at"`
 }
 
 // PatchOperation One operation of an RFC 6902 JSON Patch; `value` is absent from a `remove`.
@@ -2355,12 +2449,33 @@ type ProposedConfiguration struct {
 	Rules         []Rule             `json:"rules"`
 }
 
+// ProposedFlagDefinition A flag's definition as a change request proposes it.
+type ProposedFlagDefinition struct {
+	AutomaticExposure bool        `json:"automatic_exposure"`
+	Variations        []Variation `json:"variations"`
+}
+
+// ProposedInput What a change request proposes, as a direct write would give it,
+// read by the change request's kind and the entity it names: a
+// `FlagConfigurationPut` for `flag_configuration`, a
+// `FlagDefinitionPut` for a flag's `definition`, a
+// `SegmentDefinitionPut` for a segment's.
+type ProposedInput struct {
+	union json.RawMessage
+}
+
 // ProposedOverride defines model for ProposedOverride.
 type ProposedOverride struct {
 	Note      *string `json:"note"`
 	UnitId    string  `json:"unit_id"`
 	UnitType  string  `json:"unit_type"`
 	Variation string  `json:"variation"`
+}
+
+// ProposedSegmentDefinition A segment's definition as a change request proposes it.
+type ProposedSegmentDefinition struct {
+	Conditions []Condition `json:"conditions"`
+	Private    bool        `json:"private"`
 }
 
 // Reference defines model for Reference.
@@ -2635,6 +2750,14 @@ type SegmentCreate struct {
 	Key     Key   `json:"key"`
 	Name    Name  `json:"name"`
 	Private *bool `json:"private,omitempty"`
+}
+
+// SegmentDefinitionPut A segment's definition as a change request proposes it: what every
+// environment's ruleset carries of the segment. Its name and
+// description are edited directly.
+type SegmentDefinitionPut struct {
+	Conditions []Condition `json:"conditions"`
+	Private    bool        `json:"private"`
 }
 
 // SegmentList defines model for SegmentList.
@@ -3330,9 +3453,12 @@ type ListChangeRequestsParams struct {
 	Flag *string `form:"flag,omitempty" json:"flag,omitempty"`
 
 	// Environment Only those naming the environment with this key.
-	Environment *string             `form:"environment,omitempty" json:"environment,omitempty"`
-	Kind        *ChangeRequestKind  `form:"kind,omitempty" json:"kind,omitempty"`
-	State       *ChangeRequestState `form:"state,omitempty" json:"state,omitempty"`
+	Environment *string `form:"environment,omitempty" json:"environment,omitempty"`
+
+	// Segment Only those naming the segment with this key.
+	Segment *string             `form:"segment,omitempty" json:"segment,omitempty"`
+	Kind    *ChangeRequestKind  `form:"kind,omitempty" json:"kind,omitempty"`
+	State   *ChangeRequestState `form:"state,omitempty" json:"state,omitempty"`
 
 	// Author Only those authored by the member or the project token with this identifier.
 	Author *openapi_types.UUID `form:"author,omitempty" json:"author,omitempty"`
@@ -3475,6 +3601,18 @@ type ListExperimentsParams struct {
 
 	// IncludeArchived Lists archived experiments too.
 	IncludeArchived *bool `form:"include_archived,omitempty" json:"include_archived,omitempty"`
+
+	// PastExpectedEnd `true` lists only running experiments past their expected end:
+	// from the UTC day after the `expected_end_at` date, as the
+	// `past_expected_end` alert. `false` or absent filters nothing.
+	PastExpectedEnd *bool `form:"past_expected_end,omitempty" json:"past_expected_end,omitempty"`
+
+	// AwaitingCodeRemoval `true` lists only stopped experiments whose flag SDKs still
+	// evaluate: in some environment, an SDK reported evaluations of
+	// the flag on one of the last 7 UTC days, today included, and
+	// evaluated it after the stop. Remote evaluations the server
+	// answered do not count. `false` or absent filters nothing.
+	AwaitingCodeRemoval *bool `form:"awaiting_code_removal,omitempty" json:"awaiting_code_removal,omitempty"`
 
 	// Cursor The `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -3940,6 +4078,182 @@ type CreateWebhookJSONRequestBody = WebhookCreate
 
 // UpdateWebhookJSONRequestBody defines body for UpdateWebhook for application/json ContentType.
 type UpdateWebhookJSONRequestBody = WebhookPatch
+
+// AsProposedConfiguration returns the union data inside the ChangeRequest_Proposed as a ProposedConfiguration
+func (t ChangeRequest_Proposed) AsProposedConfiguration() (ProposedConfiguration, error) {
+	var body ProposedConfiguration
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProposedConfiguration overwrites any union data inside the ChangeRequest_Proposed as the provided ProposedConfiguration
+func (t *ChangeRequest_Proposed) FromProposedConfiguration(v ProposedConfiguration) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProposedConfiguration performs a merge with any union data inside the ChangeRequest_Proposed, using the provided ProposedConfiguration
+func (t *ChangeRequest_Proposed) MergeProposedConfiguration(v ProposedConfiguration) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsProposedFlagDefinition returns the union data inside the ChangeRequest_Proposed as a ProposedFlagDefinition
+func (t ChangeRequest_Proposed) AsProposedFlagDefinition() (ProposedFlagDefinition, error) {
+	var body ProposedFlagDefinition
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProposedFlagDefinition overwrites any union data inside the ChangeRequest_Proposed as the provided ProposedFlagDefinition
+func (t *ChangeRequest_Proposed) FromProposedFlagDefinition(v ProposedFlagDefinition) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProposedFlagDefinition performs a merge with any union data inside the ChangeRequest_Proposed, using the provided ProposedFlagDefinition
+func (t *ChangeRequest_Proposed) MergeProposedFlagDefinition(v ProposedFlagDefinition) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsProposedSegmentDefinition returns the union data inside the ChangeRequest_Proposed as a ProposedSegmentDefinition
+func (t ChangeRequest_Proposed) AsProposedSegmentDefinition() (ProposedSegmentDefinition, error) {
+	var body ProposedSegmentDefinition
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProposedSegmentDefinition overwrites any union data inside the ChangeRequest_Proposed as the provided ProposedSegmentDefinition
+func (t *ChangeRequest_Proposed) FromProposedSegmentDefinition(v ProposedSegmentDefinition) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProposedSegmentDefinition performs a merge with any union data inside the ChangeRequest_Proposed, using the provided ProposedSegmentDefinition
+func (t *ChangeRequest_Proposed) MergeProposedSegmentDefinition(v ProposedSegmentDefinition) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ChangeRequest_Proposed) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ChangeRequest_Proposed) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsFlagConfigurationPut returns the union data inside the ProposedInput as a FlagConfigurationPut
+func (t ProposedInput) AsFlagConfigurationPut() (FlagConfigurationPut, error) {
+	var body FlagConfigurationPut
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFlagConfigurationPut overwrites any union data inside the ProposedInput as the provided FlagConfigurationPut
+func (t *ProposedInput) FromFlagConfigurationPut(v FlagConfigurationPut) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFlagConfigurationPut performs a merge with any union data inside the ProposedInput, using the provided FlagConfigurationPut
+func (t *ProposedInput) MergeFlagConfigurationPut(v FlagConfigurationPut) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsFlagDefinitionPut returns the union data inside the ProposedInput as a FlagDefinitionPut
+func (t ProposedInput) AsFlagDefinitionPut() (FlagDefinitionPut, error) {
+	var body FlagDefinitionPut
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFlagDefinitionPut overwrites any union data inside the ProposedInput as the provided FlagDefinitionPut
+func (t *ProposedInput) FromFlagDefinitionPut(v FlagDefinitionPut) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFlagDefinitionPut performs a merge with any union data inside the ProposedInput, using the provided FlagDefinitionPut
+func (t *ProposedInput) MergeFlagDefinitionPut(v FlagDefinitionPut) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsSegmentDefinitionPut returns the union data inside the ProposedInput as a SegmentDefinitionPut
+func (t ProposedInput) AsSegmentDefinitionPut() (SegmentDefinitionPut, error) {
+	var body SegmentDefinitionPut
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromSegmentDefinitionPut overwrites any union data inside the ProposedInput as the provided SegmentDefinitionPut
+func (t *ProposedInput) FromSegmentDefinitionPut(v SegmentDefinitionPut) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeSegmentDefinitionPut performs a merge with any union data inside the ProposedInput, using the provided SegmentDefinitionPut
+func (t *ProposedInput) MergeSegmentDefinitionPut(v SegmentDefinitionPut) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ProposedInput) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ProposedInput) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -4626,18 +4940,23 @@ type ClientInterface interface {
 
 	// CreateChangeRequestWithBody Propose a change
 	//
-	// Proposes a flag's configuration in one environment as a change
-	// request, as a draft or, with `open`, opened for review at once. The
-	// caller, a member or a project token, is its author. It is based on
-	// the configuration as it is now, and `diff` is the RFC 6902 patch from
-	// that configuration to `proposed`. `proposed` is checked as replacing
-	// the configuration would be, with the same refusals under
-	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-	// configuration has no rule with, and a `salt` that is not that rule's,
-	// are left out, so the rule is a new one. New rules and rollouts are
-	// given an identifier and a salt, which `proposed` holds. A title of 1
-	// to 200 characters is required and a description has at most 10,000
-	// (`invalid_change_request`).
+	// Proposes a change as a change request, as a draft or, with `open`,
+	// opened for review at once. The caller, a member or a project token,
+	// is its author. A `flag_configuration` change request names a `flag`
+	// and an `environment` and proposes a `FlagConfigurationPut`; a
+	// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+	// one `segment`, proposing a `SegmentDefinitionPut`, and no
+	// environment, since a definition is applied in every environment
+	// (`invalid_change_request` naming the field otherwise). It is based on
+	// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+	// `proposed`. `proposed` is checked as writing it directly would be,
+	// with the same refusals under `/proposed` (`invalid_configuration`,
+	// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+	// configuration, a rule `id` the configuration has no rule with, and a
+	// `salt` that is not that rule's, are left out, so the rule is a new
+	// one; new rules and rollouts are given an identifier and a salt,
+	// which `proposed` holds. A title of 1 to 200 characters is required
+	// and a description has at most 10,000 (`invalid_change_request`).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4646,18 +4965,23 @@ type ClientInterface interface {
 
 	// CreateChangeRequest Propose a change
 	//
-	// Proposes a flag's configuration in one environment as a change
-	// request, as a draft or, with `open`, opened for review at once. The
-	// caller, a member or a project token, is its author. It is based on
-	// the configuration as it is now, and `diff` is the RFC 6902 patch from
-	// that configuration to `proposed`. `proposed` is checked as replacing
-	// the configuration would be, with the same refusals under
-	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-	// configuration has no rule with, and a `salt` that is not that rule's,
-	// are left out, so the rule is a new one. New rules and rollouts are
-	// given an identifier and a salt, which `proposed` holds. A title of 1
-	// to 200 characters is required and a description has at most 10,000
-	// (`invalid_change_request`).
+	// Proposes a change as a change request, as a draft or, with `open`,
+	// opened for review at once. The caller, a member or a project token,
+	// is its author. A `flag_configuration` change request names a `flag`
+	// and an `environment` and proposes a `FlagConfigurationPut`; a
+	// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+	// one `segment`, proposing a `SegmentDefinitionPut`, and no
+	// environment, since a definition is applied in every environment
+	// (`invalid_change_request` naming the field otherwise). It is based on
+	// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+	// `proposed`. `proposed` is checked as writing it directly would be,
+	// with the same refusals under `/proposed` (`invalid_configuration`,
+	// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+	// configuration, a rule `id` the configuration has no rule with, and a
+	// `salt` that is not that rule's, are left out, so the rule is a new
+	// one; new rules and rollouts are given an identifier and a salt,
+	// which `proposed` holds. A title of 1 to 200 characters is required
+	// and a description has at most 10,000 (`invalid_change_request`).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4673,10 +4997,11 @@ type ClientInterface interface {
 	//
 	// Changes the title, the description or what is proposed, each left
 	// as it is when absent. Only the author edits (`not_author`), a draft
-	// or an open change request (`invalid_state`). A new `proposed` is
-	// checked as on creation, against the configuration as it is now, and
-	// `diff` is recomputed from the configuration the change request is
-	// based on; a rebase moves that. An edit that changes nothing changes
+	// or an open change request (`invalid_state`). A new `proposed`, the
+	// document the change request's kind and entity call for, is checked
+	// as on creation, against the entity as it is now, and `diff` is
+	// recomputed from the entity as the change request is based on it; a
+	// rebase moves that. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type.
@@ -4688,10 +5013,11 @@ type ClientInterface interface {
 	//
 	// Changes the title, the description or what is proposed, each left
 	// as it is when absent. Only the author edits (`not_author`), a draft
-	// or an open change request (`invalid_state`). A new `proposed` is
-	// checked as on creation, against the configuration as it is now, and
-	// `diff` is recomputed from the configuration the change request is
-	// based on; a rebase moves that. An edit that changes nothing changes
+	// or an open change request (`invalid_state`). A new `proposed`, the
+	// document the change request's kind and entity call for, is checked
+	// as on creation, against the entity as it is now, and `diff` is
+	// recomputed from the entity as the change request is based on it; a
+	// rebase moves that. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type.
@@ -4701,15 +5027,18 @@ type ClientInterface interface {
 
 	// ApplyChangeRequest Apply an approved change request
 	//
-	// Writes the configuration proposed, in a protected environment too,
-	// as one write whose audit entries carry the change request's
-	// identifier. Its author or a member holding `change_request.approve`
-	// applies it (`not_author`), once approved (`invalid_state`). When the
-	// configuration was written since the change request was based on it,
-	// the change request is superseded and the application refused
-	// (`base_moved`). The configuration is checked again as a replace is,
-	// since what it names may be gone since the approval: a refusal
-	// writes nothing and leaves the change request approved.
+	// Writes what is proposed as one write whose audit entries carry the
+	// change request's identifier: a configuration in its environment,
+	// protected or not; a definition in every environment, changing the
+	// protected ones its approval covers. Its author or a member holding
+	// `change_request.approve` applies it (`not_author`), once approved
+	// (`invalid_state`). When the entity was written since the change
+	// request was based on it, or, for a definition, an environment was
+	// protected since it was approved, the change request is superseded
+	// and the application refused (`base_moved`). What is proposed is
+	// checked again as writing it directly is, since what it names may be
+	// gone since the approval: a refusal writes nothing and leaves the
+	// change request approved.
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/apply (the `ApplyChangeRequest` operationId).
 	ApplyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *ApplyChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4720,9 +5049,10 @@ type ClientInterface interface {
 	// request (`invalid_state`) with an optional comment of at most 2,000
 	// characters, unless they are its author (`author_cannot_approve`); a
 	// project token never decides one (`token_cannot_approve`). When the
-	// configuration was written since the change request was based on it,
-	// what would be approved is no longer what was reviewed: the change
-	// request is superseded and the approval refused (`base_moved`).
+	// entity was written since the change request was based on it, what
+	// would be approved is no longer what was reviewed: the change request
+	// is superseded and the approval refused (`base_moved`). A definition's
+	// approval covers the environments protected when it is given.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4735,9 +5065,10 @@ type ClientInterface interface {
 	// request (`invalid_state`) with an optional comment of at most 2,000
 	// characters, unless they are its author (`author_cannot_approve`); a
 	// project token never decides one (`token_cannot_approve`). When the
-	// configuration was written since the change request was based on it,
-	// what would be approved is no longer what was reviewed: the change
-	// request is superseded and the approval refused (`base_moved`).
+	// entity was written since the change request was based on it, what
+	// would be approved is no longer what was reviewed: the change request
+	// is superseded and the approval refused (`base_moved`). A definition's
+	// approval covers the environments protected when it is given.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4758,8 +5089,8 @@ type ClientInterface interface {
 	//
 	// Copies any change request, whatever its state and whoever wrote it,
 	// into a new draft of the caller's with the same title, description
-	// and proposal, based on the configuration as it is now and checked
-	// against it as a new change request is.
+	// and proposal, based on the entity as it is now and checked against
+	// it as a new change request is.
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
 	CopyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4767,17 +5098,18 @@ type ClientInterface interface {
 	// OpenChangeRequest Open a draft change request for review
 	//
 	// Only the author opens (`not_author`), and only a draft
-	// (`invalid_state`). When the configuration was written since the
-	// change request was based on it, its diff no longer shows what it
-	// would do, and opening is refused (`base_moved`) until it is rebased.
+	// (`invalid_state`). When its flag's configuration, its flag or its
+	// segment was written since the change request was based on it, its
+	// diff no longer shows what it would do, and opening is refused
+	// (`base_moved`) until it is rebased.
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/open (the `OpenChangeRequest` operationId).
 	OpenChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *OpenChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RebaseChangeRequest Base a draft change request on the configuration as it is now
 	//
-	// Keeps what is proposed and recomputes `diff` from the configuration
-	// as it is now, which becomes `base_version`. Only the author rebases
+	// Keeps what is proposed and recomputes `diff` from the entity as it
+	// is now, whose version becomes `base_version`. Only the author rebases
 	// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
 	// base it has changes nothing and records nothing.
 	//
@@ -5191,10 +5523,28 @@ type ClientInterface interface {
 	// returning after it cleared raises a new alert. At most one alert of a
 	// kind is active per environment.
 	//
-	// `srm` is raised by the sample-ratio check in an environment holding
-	// the experiment's rule, at a p-value below 0.001, and cleared above
-	// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-	// the audit log as `experiment.alert_raised` and
+	// The checks run every 10 minutes over every running experiment.
+	//
+	// - `srm` is raised by the sample-ratio check in an environment
+	//   holding the experiment's rule, at a p-value below 0.001, and
+	//   cleared above 0.01 (see `GET .../exposures`).
+	// - `no_exposures` is raised in an environment holding the rule once
+	//   the server received no exposure there, overrides aside, for 24
+	//   hours since the start or since the last one; it clears with the
+	//   next exposure, when the environment stops holding the rule, and
+	//   at the stop.
+	// - `exposure_conflicts` is raised in an environment holding the rule
+	//   once the exposures naming another variation than their unit's
+	//   first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+	//   and cleared when they fall below it as first exposures grow.
+	// - `past_expected_end`, about the experiment as a whole
+	//   (`environment` null), is raised from the UTC day after the
+	//   expected end, once until it clears: when the expected end moves
+	//   to today or later, and at the stop.
+	//
+	// A stop leaves `srm` and `exposure_conflicts` active: they are what
+	// the exposures came to. Raising and clearing are recorded in the
+	// audit log as `experiment.alert_raised` and
 	// `experiment.alert_cleared` by the system.
 	//
 	// Corresponds with GET /projects/{project}/experiments/{experiment}/alerts (the `ListExperimentAlerts` operationId).
@@ -6214,6 +6564,30 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/webhooks/{webhook}/deliveries/{delivery} (the `GetWebhookDelivery` operationId).
 	GetWebhookDelivery(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RedeliverWebhookDelivery Send a delivery's event again
+	//
+	// Queues the delivery's event again as a new delivery, with the same
+	// event `id` and body byte for byte, and answers it pending; the
+	// delivery redelivered is left as it is. A receiver deduplicating on
+	// the event `id` recognises it, and one that lost it takes it. A
+	// disabled subscription is refused `409 webhook_disabled`.
+	//
+	// Corresponds with POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverWebhookDelivery` operationId).
+	RedeliverWebhookDelivery(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TestWebhook Send a test ping
+	//
+	// Queues a `ping` event for this subscription alone, whatever event
+	// types it names, and answers the pending delivery; the delivery
+	// worker sends it within a few seconds, signed like every event, and
+	// its attempts show in the delivery log. The ping names the project
+	// and the caller; its environment, entity and audit entry are null.
+	// A disabled subscription is refused `409 webhook_disabled`, since
+	// the ping would wait unsent until it is enabled.
+	//
+	// Corresponds with POST /projects/{project}/webhooks/{webhook}/test (the `TestWebhook` operationId).
+	TestWebhook(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListRoles The roles and their permissions
 	//
@@ -7413,18 +7787,23 @@ func (c *Client) ListChangeRequests(ctx context.Context, project ProjectKey, par
 
 // CreateChangeRequestWithBody Propose a change
 //
-// Proposes a flag's configuration in one environment as a change
-// request, as a draft or, with `open`, opened for review at once. The
-// caller, a member or a project token, is its author. It is based on
-// the configuration as it is now, and `diff` is the RFC 6902 patch from
-// that configuration to `proposed`. `proposed` is checked as replacing
-// the configuration would be, with the same refusals under
-// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-// configuration has no rule with, and a `salt` that is not that rule's,
-// are left out, so the rule is a new one. New rules and rollouts are
-// given an identifier and a salt, which `proposed` holds. A title of 1
-// to 200 characters is required and a description has at most 10,000
-// (`invalid_change_request`).
+// Proposes a change as a change request, as a draft or, with `open`,
+// opened for review at once. The caller, a member or a project token,
+// is its author. A `flag_configuration` change request names a `flag`
+// and an `environment` and proposes a `FlagConfigurationPut`; a
+// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+// one `segment`, proposing a `SegmentDefinitionPut`, and no
+// environment, since a definition is applied in every environment
+// (`invalid_change_request` naming the field otherwise). It is based on
+// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+// `proposed`. `proposed` is checked as writing it directly would be,
+// with the same refusals under `/proposed` (`invalid_configuration`,
+// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+// configuration, a rule `id` the configuration has no rule with, and a
+// `salt` that is not that rule's, are left out, so the rule is a new
+// one; new rules and rollouts are given an identifier and a salt,
+// which `proposed` holds. A title of 1 to 200 characters is required
+// and a description has at most 10,000 (`invalid_change_request`).
 //
 // Takes any type of body and a specified content type.
 //
@@ -7443,18 +7822,23 @@ func (c *Client) CreateChangeRequestWithBody(ctx context.Context, project Projec
 
 // CreateChangeRequest Propose a change
 //
-// Proposes a flag's configuration in one environment as a change
-// request, as a draft or, with `open`, opened for review at once. The
-// caller, a member or a project token, is its author. It is based on
-// the configuration as it is now, and `diff` is the RFC 6902 patch from
-// that configuration to `proposed`. `proposed` is checked as replacing
-// the configuration would be, with the same refusals under
-// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-// configuration has no rule with, and a `salt` that is not that rule's,
-// are left out, so the rule is a new one. New rules and rollouts are
-// given an identifier and a salt, which `proposed` holds. A title of 1
-// to 200 characters is required and a description has at most 10,000
-// (`invalid_change_request`).
+// Proposes a change as a change request, as a draft or, with `open`,
+// opened for review at once. The caller, a member or a project token,
+// is its author. A `flag_configuration` change request names a `flag`
+// and an `environment` and proposes a `FlagConfigurationPut`; a
+// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+// one `segment`, proposing a `SegmentDefinitionPut`, and no
+// environment, since a definition is applied in every environment
+// (`invalid_change_request` naming the field otherwise). It is based on
+// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+// `proposed`. `proposed` is checked as writing it directly would be,
+// with the same refusals under `/proposed` (`invalid_configuration`,
+// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+// configuration, a rule `id` the configuration has no rule with, and a
+// `salt` that is not that rule's, are left out, so the rule is a new
+// one; new rules and rollouts are given an identifier and a salt,
+// which `proposed` holds. A title of 1 to 200 characters is required
+// and a description has at most 10,000 (`invalid_change_request`).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7490,10 +7874,11 @@ func (c *Client) GetChangeRequest(ctx context.Context, project ProjectKey, chang
 //
 // Changes the title, the description or what is proposed, each left
 // as it is when absent. Only the author edits (`not_author`), a draft
-// or an open change request (`invalid_state`). A new `proposed` is
-// checked as on creation, against the configuration as it is now, and
-// `diff` is recomputed from the configuration the change request is
-// based on; a rebase moves that. An edit that changes nothing changes
+// or an open change request (`invalid_state`). A new `proposed`, the
+// document the change request's kind and entity call for, is checked
+// as on creation, against the entity as it is now, and `diff` is
+// recomputed from the entity as the change request is based on it; a
+// rebase moves that. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes any type of body and a specified content type.
@@ -7515,10 +7900,11 @@ func (c *Client) UpdateChangeRequestWithBody(ctx context.Context, project Projec
 //
 // Changes the title, the description or what is proposed, each left
 // as it is when absent. Only the author edits (`not_author`), a draft
-// or an open change request (`invalid_state`). A new `proposed` is
-// checked as on creation, against the configuration as it is now, and
-// `diff` is recomputed from the configuration the change request is
-// based on; a rebase moves that. An edit that changes nothing changes
+// or an open change request (`invalid_state`). A new `proposed`, the
+// document the change request's kind and entity call for, is checked
+// as on creation, against the entity as it is now, and `diff` is
+// recomputed from the entity as the change request is based on it; a
+// rebase moves that. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes a body of the `application/json` content type.
@@ -7538,15 +7924,18 @@ func (c *Client) UpdateChangeRequest(ctx context.Context, project ProjectKey, ch
 
 // ApplyChangeRequest Apply an approved change request
 //
-// Writes the configuration proposed, in a protected environment too,
-// as one write whose audit entries carry the change request's
-// identifier. Its author or a member holding `change_request.approve`
-// applies it (`not_author`), once approved (`invalid_state`). When the
-// configuration was written since the change request was based on it,
-// the change request is superseded and the application refused
-// (`base_moved`). The configuration is checked again as a replace is,
-// since what it names may be gone since the approval: a refusal
-// writes nothing and leaves the change request approved.
+// Writes what is proposed as one write whose audit entries carry the
+// change request's identifier: a configuration in its environment,
+// protected or not; a definition in every environment, changing the
+// protected ones its approval covers. Its author or a member holding
+// `change_request.approve` applies it (`not_author`), once approved
+// (`invalid_state`). When the entity was written since the change
+// request was based on it, or, for a definition, an environment was
+// protected since it was approved, the change request is superseded
+// and the application refused (`base_moved`). What is proposed is
+// checked again as writing it directly is, since what it names may be
+// gone since the approval: a refusal writes nothing and leaves the
+// change request approved.
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/apply (the `ApplyChangeRequest` operationId).
 func (c *Client) ApplyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *ApplyChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7567,9 +7956,10 @@ func (c *Client) ApplyChangeRequest(ctx context.Context, project ProjectKey, cha
 // request (`invalid_state`) with an optional comment of at most 2,000
 // characters, unless they are its author (`author_cannot_approve`); a
 // project token never decides one (`token_cannot_approve`). When the
-// configuration was written since the change request was based on it,
-// what would be approved is no longer what was reviewed: the change
-// request is superseded and the approval refused (`base_moved`).
+// entity was written since the change request was based on it, what
+// would be approved is no longer what was reviewed: the change request
+// is superseded and the approval refused (`base_moved`). A definition's
+// approval covers the environments protected when it is given.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7592,9 +7982,10 @@ func (c *Client) ApproveChangeRequestWithBody(ctx context.Context, project Proje
 // request (`invalid_state`) with an optional comment of at most 2,000
 // characters, unless they are its author (`author_cannot_approve`); a
 // project token never decides one (`token_cannot_approve`). When the
-// configuration was written since the change request was based on it,
-// what would be approved is no longer what was reviewed: the change
-// request is superseded and the approval refused (`base_moved`).
+// entity was written since the change request was based on it, what
+// would be approved is no longer what was reviewed: the change request
+// is superseded and the approval refused (`base_moved`). A definition's
+// approval covers the environments protected when it is given.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7635,8 +8026,8 @@ func (c *Client) CancelChangeRequest(ctx context.Context, project ProjectKey, ch
 //
 // Copies any change request, whatever its state and whoever wrote it,
 // into a new draft of the caller's with the same title, description
-// and proposal, based on the configuration as it is now and checked
-// against it as a new change request is.
+// and proposal, based on the entity as it is now and checked against
+// it as a new change request is.
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/copy (the `CopyChangeRequest` operationId).
 func (c *Client) CopyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7654,9 +8045,10 @@ func (c *Client) CopyChangeRequest(ctx context.Context, project ProjectKey, chan
 // OpenChangeRequest Open a draft change request for review
 //
 // Only the author opens (`not_author`), and only a draft
-// (`invalid_state`). When the configuration was written since the
-// change request was based on it, its diff no longer shows what it
-// would do, and opening is refused (`base_moved`) until it is rebased.
+// (`invalid_state`). When its flag's configuration, its flag or its
+// segment was written since the change request was based on it, its
+// diff no longer shows what it would do, and opening is refused
+// (`base_moved`) until it is rebased.
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/open (the `OpenChangeRequest` operationId).
 func (c *Client) OpenChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *OpenChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7673,8 +8065,8 @@ func (c *Client) OpenChangeRequest(ctx context.Context, project ProjectKey, chan
 
 // RebaseChangeRequest Base a draft change request on the configuration as it is now
 //
-// Keeps what is proposed and recomputes `diff` from the configuration
-// as it is now, which becomes `base_version`. Only the author rebases
+// Keeps what is proposed and recomputes `diff` from the entity as it
+// is now, whose version becomes `base_version`. Only the author rebases
 // (`not_author`), and only a draft (`invalid_state`). Rebasing on the
 // base it has changes nothing and records nothing.
 //
@@ -8408,10 +8800,28 @@ func (c *Client) UpdateExperiment(ctx context.Context, project ProjectKey, exper
 // returning after it cleared raises a new alert. At most one alert of a
 // kind is active per environment.
 //
-// `srm` is raised by the sample-ratio check in an environment holding
-// the experiment's rule, at a p-value below 0.001, and cleared above
-// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-// the audit log as `experiment.alert_raised` and
+// The checks run every 10 minutes over every running experiment.
+//
+//   - `srm` is raised by the sample-ratio check in an environment
+//     holding the experiment's rule, at a p-value below 0.001, and
+//     cleared above 0.01 (see `GET .../exposures`).
+//   - `no_exposures` is raised in an environment holding the rule once
+//     the server received no exposure there, overrides aside, for 24
+//     hours since the start or since the last one; it clears with the
+//     next exposure, when the environment stops holding the rule, and
+//     at the stop.
+//   - `exposure_conflicts` is raised in an environment holding the rule
+//     once the exposures naming another variation than their unit's
+//     first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+//     and cleared when they fall below it as first exposures grow.
+//   - `past_expected_end`, about the experiment as a whole
+//     (`environment` null), is raised from the UTC day after the
+//     expected end, once until it clears: when the expected end moves
+//     to today or later, and at the stop.
+//
+// A stop leaves `srm` and `exposure_conflicts` active: they are what
+// the exposures came to. Raising and clearing are recorded in the
+// audit log as `experiment.alert_raised` and
 // `experiment.alert_cleared` by the system.
 //
 // Corresponds with GET /projects/{project}/experiments/{experiment}/alerts (the `ListExperimentAlerts` operationId).
@@ -10172,6 +10582,50 @@ func (c *Client) ListWebhookDeliveries(ctx context.Context, project ProjectKey, 
 // Corresponds with GET /projects/{project}/webhooks/{webhook}/deliveries/{delivery} (the `GetWebhookDelivery` operationId).
 func (c *Client) GetWebhookDelivery(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetWebhookDeliveryRequest(c.Server, project, webhook, delivery)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RedeliverWebhookDelivery Send a delivery's event again
+//
+// Queues the delivery's event again as a new delivery, with the same
+// event `id` and body byte for byte, and answers it pending; the
+// delivery redelivered is left as it is. A receiver deduplicating on
+// the event `id` recognises it, and one that lost it takes it. A
+// disabled subscription is refused `409 webhook_disabled`.
+//
+// Corresponds with POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverWebhookDelivery` operationId).
+func (c *Client) RedeliverWebhookDelivery(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRedeliverWebhookDeliveryRequest(c.Server, project, webhook, delivery)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TestWebhook Send a test ping
+//
+// Queues a `ping` event for this subscription alone, whatever event
+// types it names, and answers the pending delivery; the delivery
+// worker sends it within a few seconds, signed like every event, and
+// its attempts show in the delivery log. The ping names the project
+// and the caller; its environment, entity and audit entry are null.
+// A disabled subscription is refused `409 webhook_disabled`, since
+// the ping would wait unsent until it is enabled.
+//
+// Corresponds with POST /projects/{project}/webhooks/{webhook}/test (the `TestWebhook` operationId).
+func (c *Client) TestWebhook(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTestWebhookRequest(c.Server, project, webhook)
 	if err != nil {
 		return nil, err
 	}
@@ -12318,6 +12772,18 @@ func NewListChangeRequestsRequest(server string, project ProjectKey, params *Lis
 
 		}
 
+		if params.Segment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "segment", *params.Segment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Kind != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "kind", *params.Kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
@@ -13840,6 +14306,30 @@ func NewListExperimentsRequest(server string, project ProjectKey, params *ListEx
 		if params.IncludeArchived != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "include_archived", *params.IncludeArchived, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PastExpectedEnd != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "past_expected_end", *params.PastExpectedEnd, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.AwaitingCodeRemoval != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "awaiting_code_removal", *params.AwaitingCodeRemoval, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -17344,6 +17834,95 @@ func NewGetWebhookDeliveryRequest(server string, project ProjectKey, webhook Web
 	return req, nil
 }
 
+// NewRedeliverWebhookDeliveryRequest constructs an http.Request for the RedeliverWebhookDelivery method
+func NewRedeliverWebhookDeliveryRequest(server string, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "delivery", delivery, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/webhooks/%s/deliveries/%s/redeliver", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewTestWebhookRequest constructs an http.Request for the TestWebhook method
+func NewTestWebhookRequest(server string, project ProjectKey, webhook WebhookID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "project", project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/projects/%s/webhooks/%s/test", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListRolesRequest constructs an http.Request for the ListRoles method
 func NewListRolesRequest(server string) (*http.Request, error) {
 	var err error
@@ -18117,18 +18696,23 @@ type ClientWithResponsesInterface interface {
 
 	// CreateChangeRequestWithBodyWithResponse Propose a change
 	//
-	// Proposes a flag's configuration in one environment as a change
-	// request, as a draft or, with `open`, opened for review at once. The
-	// caller, a member or a project token, is its author. It is based on
-	// the configuration as it is now, and `diff` is the RFC 6902 patch from
-	// that configuration to `proposed`. `proposed` is checked as replacing
-	// the configuration would be, with the same refusals under
-	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-	// configuration has no rule with, and a `salt` that is not that rule's,
-	// are left out, so the rule is a new one. New rules and rollouts are
-	// given an identifier and a salt, which `proposed` holds. A title of 1
-	// to 200 characters is required and a description has at most 10,000
-	// (`invalid_change_request`).
+	// Proposes a change as a change request, as a draft or, with `open`,
+	// opened for review at once. The caller, a member or a project token,
+	// is its author. A `flag_configuration` change request names a `flag`
+	// and an `environment` and proposes a `FlagConfigurationPut`; a
+	// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+	// one `segment`, proposing a `SegmentDefinitionPut`, and no
+	// environment, since a definition is applied in every environment
+	// (`invalid_change_request` naming the field otherwise). It is based on
+	// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+	// `proposed`. `proposed` is checked as writing it directly would be,
+	// with the same refusals under `/proposed` (`invalid_configuration`,
+	// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+	// configuration, a rule `id` the configuration has no rule with, and a
+	// `salt` that is not that rule's, are left out, so the rule is a new
+	// one; new rules and rollouts are given an identifier and a salt,
+	// which `proposed` holds. A title of 1 to 200 characters is required
+	// and a description has at most 10,000 (`invalid_change_request`).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18137,18 +18721,23 @@ type ClientWithResponsesInterface interface {
 
 	// CreateChangeRequestWithResponse Propose a change
 	//
-	// Proposes a flag's configuration in one environment as a change
-	// request, as a draft or, with `open`, opened for review at once. The
-	// caller, a member or a project token, is its author. It is based on
-	// the configuration as it is now, and `diff` is the RFC 6902 patch from
-	// that configuration to `proposed`. `proposed` is checked as replacing
-	// the configuration would be, with the same refusals under
-	// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-	// configuration has no rule with, and a `salt` that is not that rule's,
-	// are left out, so the rule is a new one. New rules and rollouts are
-	// given an identifier and a salt, which `proposed` holds. A title of 1
-	// to 200 characters is required and a description has at most 10,000
-	// (`invalid_change_request`).
+	// Proposes a change as a change request, as a draft or, with `open`,
+	// opened for review at once. The caller, a member or a project token,
+	// is its author. A `flag_configuration` change request names a `flag`
+	// and an `environment` and proposes a `FlagConfigurationPut`; a
+	// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+	// one `segment`, proposing a `SegmentDefinitionPut`, and no
+	// environment, since a definition is applied in every environment
+	// (`invalid_change_request` naming the field otherwise). It is based on
+	// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+	// `proposed`. `proposed` is checked as writing it directly would be,
+	// with the same refusals under `/proposed` (`invalid_configuration`,
+	// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+	// configuration, a rule `id` the configuration has no rule with, and a
+	// `salt` that is not that rule's, are left out, so the rule is a new
+	// one; new rules and rollouts are given an identifier and a salt,
+	// which `proposed` holds. A title of 1 to 200 characters is required
+	// and a description has at most 10,000 (`invalid_change_request`).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18166,10 +18755,11 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes the title, the description or what is proposed, each left
 	// as it is when absent. Only the author edits (`not_author`), a draft
-	// or an open change request (`invalid_state`). A new `proposed` is
-	// checked as on creation, against the configuration as it is now, and
-	// `diff` is recomputed from the configuration the change request is
-	// based on; a rebase moves that. An edit that changes nothing changes
+	// or an open change request (`invalid_state`). A new `proposed`, the
+	// document the change request's kind and entity call for, is checked
+	// as on creation, against the entity as it is now, and `diff` is
+	// recomputed from the entity as the change request is based on it; a
+	// rebase moves that. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -18181,10 +18771,11 @@ type ClientWithResponsesInterface interface {
 	//
 	// Changes the title, the description or what is proposed, each left
 	// as it is when absent. Only the author edits (`not_author`), a draft
-	// or an open change request (`invalid_state`). A new `proposed` is
-	// checked as on creation, against the configuration as it is now, and
-	// `diff` is recomputed from the configuration the change request is
-	// based on; a rebase moves that. An edit that changes nothing changes
+	// or an open change request (`invalid_state`). A new `proposed`, the
+	// document the change request's kind and entity call for, is checked
+	// as on creation, against the entity as it is now, and `diff` is
+	// recomputed from the entity as the change request is based on it; a
+	// rebase moves that. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -18194,15 +18785,18 @@ type ClientWithResponsesInterface interface {
 
 	// ApplyChangeRequestWithResponse Apply an approved change request
 	//
-	// Writes the configuration proposed, in a protected environment too,
-	// as one write whose audit entries carry the change request's
-	// identifier. Its author or a member holding `change_request.approve`
-	// applies it (`not_author`), once approved (`invalid_state`). When the
-	// configuration was written since the change request was based on it,
-	// the change request is superseded and the application refused
-	// (`base_moved`). The configuration is checked again as a replace is,
-	// since what it names may be gone since the approval: a refusal
-	// writes nothing and leaves the change request approved.
+	// Writes what is proposed as one write whose audit entries carry the
+	// change request's identifier: a configuration in its environment,
+	// protected or not; a definition in every environment, changing the
+	// protected ones its approval covers. Its author or a member holding
+	// `change_request.approve` applies it (`not_author`), once approved
+	// (`invalid_state`). When the entity was written since the change
+	// request was based on it, or, for a definition, an environment was
+	// protected since it was approved, the change request is superseded
+	// and the application refused (`base_moved`). What is proposed is
+	// checked again as writing it directly is, since what it names may be
+	// gone since the approval: a refusal writes nothing and leaves the
+	// change request approved.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -18215,9 +18809,10 @@ type ClientWithResponsesInterface interface {
 	// request (`invalid_state`) with an optional comment of at most 2,000
 	// characters, unless they are its author (`author_cannot_approve`); a
 	// project token never decides one (`token_cannot_approve`). When the
-	// configuration was written since the change request was based on it,
-	// what would be approved is no longer what was reviewed: the change
-	// request is superseded and the approval refused (`base_moved`).
+	// entity was written since the change request was based on it, what
+	// would be approved is no longer what was reviewed: the change request
+	// is superseded and the approval refused (`base_moved`). A definition's
+	// approval covers the environments protected when it is given.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18230,9 +18825,10 @@ type ClientWithResponsesInterface interface {
 	// request (`invalid_state`) with an optional comment of at most 2,000
 	// characters, unless they are its author (`author_cannot_approve`); a
 	// project token never decides one (`token_cannot_approve`). When the
-	// configuration was written since the change request was based on it,
-	// what would be approved is no longer what was reviewed: the change
-	// request is superseded and the approval refused (`base_moved`).
+	// entity was written since the change request was based on it, what
+	// would be approved is no longer what was reviewed: the change request
+	// is superseded and the approval refused (`base_moved`). A definition's
+	// approval covers the environments protected when it is given.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18255,8 +18851,8 @@ type ClientWithResponsesInterface interface {
 	//
 	// Copies any change request, whatever its state and whoever wrote it,
 	// into a new draft of the caller's with the same title, description
-	// and proposal, based on the configuration as it is now and checked
-	// against it as a new change request is.
+	// and proposal, based on the entity as it is now and checked against
+	// it as a new change request is.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -18266,9 +18862,10 @@ type ClientWithResponsesInterface interface {
 	// OpenChangeRequestWithResponse Open a draft change request for review
 	//
 	// Only the author opens (`not_author`), and only a draft
-	// (`invalid_state`). When the configuration was written since the
-	// change request was based on it, its diff no longer shows what it
-	// would do, and opening is refused (`base_moved`) until it is rebased.
+	// (`invalid_state`). When its flag's configuration, its flag or its
+	// segment was written since the change request was based on it, its
+	// diff no longer shows what it would do, and opening is refused
+	// (`base_moved`) until it is rebased.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -18277,8 +18874,8 @@ type ClientWithResponsesInterface interface {
 
 	// RebaseChangeRequestWithResponse Base a draft change request on the configuration as it is now
 	//
-	// Keeps what is proposed and recomputes `diff` from the configuration
-	// as it is now, which becomes `base_version`. Only the author rebases
+	// Keeps what is proposed and recomputes `diff` from the entity as it
+	// is now, whose version becomes `base_version`. Only the author rebases
 	// (`not_author`), and only a draft (`invalid_state`). Rebasing on the
 	// base it has changes nothing and records nothing.
 	//
@@ -18720,10 +19317,28 @@ type ClientWithResponsesInterface interface {
 	// returning after it cleared raises a new alert. At most one alert of a
 	// kind is active per environment.
 	//
-	// `srm` is raised by the sample-ratio check in an environment holding
-	// the experiment's rule, at a p-value below 0.001, and cleared above
-	// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-	// the audit log as `experiment.alert_raised` and
+	// The checks run every 10 minutes over every running experiment.
+	//
+	// - `srm` is raised by the sample-ratio check in an environment
+	//   holding the experiment's rule, at a p-value below 0.001, and
+	//   cleared above 0.01 (see `GET .../exposures`).
+	// - `no_exposures` is raised in an environment holding the rule once
+	//   the server received no exposure there, overrides aside, for 24
+	//   hours since the start or since the last one; it clears with the
+	//   next exposure, when the environment stops holding the rule, and
+	//   at the stop.
+	// - `exposure_conflicts` is raised in an environment holding the rule
+	//   once the exposures naming another variation than their unit's
+	//   first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+	//   and cleared when they fall below it as first exposures grow.
+	// - `past_expected_end`, about the experiment as a whole
+	//   (`environment` null), is raised from the UTC day after the
+	//   expected end, once until it clears: when the expected end moves
+	//   to today or later, and at the stop.
+	//
+	// A stop leaves `srm` and `exposure_conflicts` active: they are what
+	// the exposures came to. Raising and clearing are recorded in the
+	// audit log as `experiment.alert_raised` and
 	// `experiment.alert_cleared` by the system.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -19819,6 +20434,34 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /projects/{project}/webhooks/{webhook}/deliveries/{delivery} (the `GetWebhookDelivery` operationId).
 	GetWebhookDeliveryWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetWebhookDeliveryResponse, error)
+
+	// RedeliverWebhookDeliveryWithResponse Send a delivery's event again
+	//
+	// Queues the delivery's event again as a new delivery, with the same
+	// event `id` and body byte for byte, and answers it pending; the
+	// delivery redelivered is left as it is. A receiver deduplicating on
+	// the event `id` recognises it, and one that lost it takes it. A
+	// disabled subscription is refused `409 webhook_disabled`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverWebhookDelivery` operationId).
+	RedeliverWebhookDeliveryWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*RedeliverWebhookDeliveryResponse, error)
+
+	// TestWebhookWithResponse Send a test ping
+	//
+	// Queues a `ping` event for this subscription alone, whatever event
+	// types it names, and answers the pending delivery; the delivery
+	// worker sends it within a few seconds, signed like every event, and
+	// its attempts show in the delivery log. The ping names the project
+	// and the caller; its environment, entity and audit entry are null.
+	// A disabled subscription is refused `409 webhook_disabled`, since
+	// the ping would wait unsent until it is enabled.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /projects/{project}/webhooks/{webhook}/test (the `TestWebhook` operationId).
+	TestWebhookWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*TestWebhookResponse, error)
 
 	// ListRolesWithResponse The roles and their permissions
 	//
@@ -30632,6 +31275,158 @@ func (r GetWebhookDeliveryResponse) ContentType() string {
 	return ""
 }
 
+// RedeliverWebhookDeliveryResponse401Headers the declared response headers of an HTTP 401 response for RedeliverWebhookDelivery
+type RedeliverWebhookDeliveryResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RedeliverWebhookDeliveryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *WebhookDelivery
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RedeliverWebhookDeliveryResponse401Headers
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r RedeliverWebhookDeliveryResponse) GetJSON202() *WebhookDelivery {
+	return r.JSON202
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RedeliverWebhookDeliveryResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RedeliverWebhookDeliveryResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RedeliverWebhookDeliveryResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RedeliverWebhookDeliveryResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r RedeliverWebhookDeliveryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RedeliverWebhookDeliveryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RedeliverWebhookDeliveryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RedeliverWebhookDeliveryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// TestWebhookResponse401Headers the declared response headers of an HTTP 401 response for TestWebhook
+type TestWebhookResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type TestWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *WebhookDelivery
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *TestWebhookResponse401Headers
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r TestWebhookResponse) GetJSON202() *WebhookDelivery {
+	return r.JSON202
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r TestWebhookResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r TestWebhookResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r TestWebhookResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r TestWebhookResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r TestWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TestWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TestWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TestWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListRolesResponse401Headers the declared response headers of an HTTP 401 response for ListRoles
 type ListRolesResponse401Headers struct {
 	WWWAuthenticate *string
@@ -31773,18 +32568,23 @@ func (c *ClientWithResponses) ListChangeRequestsWithResponse(ctx context.Context
 
 // CreateChangeRequestWithBodyWithResponse Propose a change
 //
-// Proposes a flag's configuration in one environment as a change
-// request, as a draft or, with `open`, opened for review at once. The
-// caller, a member or a project token, is its author. It is based on
-// the configuration as it is now, and `diff` is the RFC 6902 patch from
-// that configuration to `proposed`. `proposed` is checked as replacing
-// the configuration would be, with the same refusals under
-// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-// configuration has no rule with, and a `salt` that is not that rule's,
-// are left out, so the rule is a new one. New rules and rollouts are
-// given an identifier and a salt, which `proposed` holds. A title of 1
-// to 200 characters is required and a description has at most 10,000
-// (`invalid_change_request`).
+// Proposes a change as a change request, as a draft or, with `open`,
+// opened for review at once. The caller, a member or a project token,
+// is its author. A `flag_configuration` change request names a `flag`
+// and an `environment` and proposes a `FlagConfigurationPut`; a
+// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+// one `segment`, proposing a `SegmentDefinitionPut`, and no
+// environment, since a definition is applied in every environment
+// (`invalid_change_request` naming the field otherwise). It is based on
+// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+// `proposed`. `proposed` is checked as writing it directly would be,
+// with the same refusals under `/proposed` (`invalid_configuration`,
+// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+// configuration, a rule `id` the configuration has no rule with, and a
+// `salt` that is not that rule's, are left out, so the rule is a new
+// one; new rules and rollouts are given an identifier and a salt,
+// which `proposed` holds. A title of 1 to 200 characters is required
+// and a description has at most 10,000 (`invalid_change_request`).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -31799,18 +32599,23 @@ func (c *ClientWithResponses) CreateChangeRequestWithBodyWithResponse(ctx contex
 
 // CreateChangeRequestWithResponse Propose a change
 //
-// Proposes a flag's configuration in one environment as a change
-// request, as a draft or, with `open`, opened for review at once. The
-// caller, a member or a project token, is its author. It is based on
-// the configuration as it is now, and `diff` is the RFC 6902 patch from
-// that configuration to `proposed`. `proposed` is checked as replacing
-// the configuration would be, with the same refusals under
-// `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
-// configuration has no rule with, and a `salt` that is not that rule's,
-// are left out, so the rule is a new one. New rules and rollouts are
-// given an identifier and a salt, which `proposed` holds. A title of 1
-// to 200 characters is required and a description has at most 10,000
-// (`invalid_change_request`).
+// Proposes a change as a change request, as a draft or, with `open`,
+// opened for review at once. The caller, a member or a project token,
+// is its author. A `flag_configuration` change request names a `flag`
+// and an `environment` and proposes a `FlagConfigurationPut`; a
+// `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+// one `segment`, proposing a `SegmentDefinitionPut`, and no
+// environment, since a definition is applied in every environment
+// (`invalid_change_request` naming the field otherwise). It is based on
+// the entity as it is now, and `diff` is the RFC 6902 patch from it to
+// `proposed`. `proposed` is checked as writing it directly would be,
+// with the same refusals under `/proposed` (`invalid_configuration`,
+// `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+// configuration, a rule `id` the configuration has no rule with, and a
+// `salt` that is not that rule's, are left out, so the rule is a new
+// one; new rules and rollouts are given an identifier and a salt,
+// which `proposed` holds. A title of 1 to 200 characters is required
+// and a description has at most 10,000 (`invalid_change_request`).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -31840,10 +32645,11 @@ func (c *ClientWithResponses) GetChangeRequestWithResponse(ctx context.Context, 
 //
 // Changes the title, the description or what is proposed, each left
 // as it is when absent. Only the author edits (`not_author`), a draft
-// or an open change request (`invalid_state`). A new `proposed` is
-// checked as on creation, against the configuration as it is now, and
-// `diff` is recomputed from the configuration the change request is
-// based on; a rebase moves that. An edit that changes nothing changes
+// or an open change request (`invalid_state`). A new `proposed`, the
+// document the change request's kind and entity call for, is checked
+// as on creation, against the entity as it is now, and `diff` is
+// recomputed from the entity as the change request is based on it; a
+// rebase moves that. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -31861,10 +32667,11 @@ func (c *ClientWithResponses) UpdateChangeRequestWithBodyWithResponse(ctx contex
 //
 // Changes the title, the description or what is proposed, each left
 // as it is when absent. Only the author edits (`not_author`), a draft
-// or an open change request (`invalid_state`). A new `proposed` is
-// checked as on creation, against the configuration as it is now, and
-// `diff` is recomputed from the configuration the change request is
-// based on; a rebase moves that. An edit that changes nothing changes
+// or an open change request (`invalid_state`). A new `proposed`, the
+// document the change request's kind and entity call for, is checked
+// as on creation, against the entity as it is now, and `diff` is
+// recomputed from the entity as the change request is based on it; a
+// rebase moves that. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -31880,15 +32687,18 @@ func (c *ClientWithResponses) UpdateChangeRequestWithResponse(ctx context.Contex
 
 // ApplyChangeRequestWithResponse Apply an approved change request
 //
-// Writes the configuration proposed, in a protected environment too,
-// as one write whose audit entries carry the change request's
-// identifier. Its author or a member holding `change_request.approve`
-// applies it (`not_author`), once approved (`invalid_state`). When the
-// configuration was written since the change request was based on it,
-// the change request is superseded and the application refused
-// (`base_moved`). The configuration is checked again as a replace is,
-// since what it names may be gone since the approval: a refusal
-// writes nothing and leaves the change request approved.
+// Writes what is proposed as one write whose audit entries carry the
+// change request's identifier: a configuration in its environment,
+// protected or not; a definition in every environment, changing the
+// protected ones its approval covers. Its author or a member holding
+// `change_request.approve` applies it (`not_author`), once approved
+// (`invalid_state`). When the entity was written since the change
+// request was based on it, or, for a definition, an environment was
+// protected since it was approved, the change request is superseded
+// and the application refused (`base_moved`). What is proposed is
+// checked again as writing it directly is, since what it names may be
+// gone since the approval: a refusal writes nothing and leaves the
+// change request approved.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -31907,9 +32717,10 @@ func (c *ClientWithResponses) ApplyChangeRequestWithResponse(ctx context.Context
 // request (`invalid_state`) with an optional comment of at most 2,000
 // characters, unless they are its author (`author_cannot_approve`); a
 // project token never decides one (`token_cannot_approve`). When the
-// configuration was written since the change request was based on it,
-// what would be approved is no longer what was reviewed: the change
-// request is superseded and the approval refused (`base_moved`).
+// entity was written since the change request was based on it, what
+// would be approved is no longer what was reviewed: the change request
+// is superseded and the approval refused (`base_moved`). A definition's
+// approval covers the environments protected when it is given.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -31928,9 +32739,10 @@ func (c *ClientWithResponses) ApproveChangeRequestWithBodyWithResponse(ctx conte
 // request (`invalid_state`) with an optional comment of at most 2,000
 // characters, unless they are its author (`author_cannot_approve`); a
 // project token never decides one (`token_cannot_approve`). When the
-// configuration was written since the change request was based on it,
-// what would be approved is no longer what was reviewed: the change
-// request is superseded and the approval refused (`base_moved`).
+// entity was written since the change request was based on it, what
+// would be approved is no longer what was reviewed: the change request
+// is superseded and the approval refused (`base_moved`). A definition's
+// approval covers the environments protected when it is given.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -31965,8 +32777,8 @@ func (c *ClientWithResponses) CancelChangeRequestWithResponse(ctx context.Contex
 //
 // Copies any change request, whatever its state and whoever wrote it,
 // into a new draft of the caller's with the same title, description
-// and proposal, based on the configuration as it is now and checked
-// against it as a new change request is.
+// and proposal, based on the entity as it is now and checked against
+// it as a new change request is.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -31982,9 +32794,10 @@ func (c *ClientWithResponses) CopyChangeRequestWithResponse(ctx context.Context,
 // OpenChangeRequestWithResponse Open a draft change request for review
 //
 // Only the author opens (`not_author`), and only a draft
-// (`invalid_state`). When the configuration was written since the
-// change request was based on it, its diff no longer shows what it
-// would do, and opening is refused (`base_moved`) until it is rebased.
+// (`invalid_state`). When its flag's configuration, its flag or its
+// segment was written since the change request was based on it, its
+// diff no longer shows what it would do, and opening is refused
+// (`base_moved`) until it is rebased.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -31999,8 +32812,8 @@ func (c *ClientWithResponses) OpenChangeRequestWithResponse(ctx context.Context,
 
 // RebaseChangeRequestWithResponse Base a draft change request on the configuration as it is now
 //
-// Keeps what is proposed and recomputes `diff` from the configuration
-// as it is now, which becomes `base_version`. Only the author rebases
+// Keeps what is proposed and recomputes `diff` from the entity as it
+// is now, whose version becomes `base_version`. Only the author rebases
 // (`not_author`), and only a draft (`invalid_state`). Rebasing on the
 // base it has changes nothing and records nothing.
 //
@@ -32634,10 +33447,28 @@ func (c *ClientWithResponses) UpdateExperimentWithResponse(ctx context.Context, 
 // returning after it cleared raises a new alert. At most one alert of a
 // kind is active per environment.
 //
-// `srm` is raised by the sample-ratio check in an environment holding
-// the experiment's rule, at a p-value below 0.001, and cleared above
-// 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
-// the audit log as `experiment.alert_raised` and
+// The checks run every 10 minutes over every running experiment.
+//
+//   - `srm` is raised by the sample-ratio check in an environment
+//     holding the experiment's rule, at a p-value below 0.001, and
+//     cleared above 0.01 (see `GET .../exposures`).
+//   - `no_exposures` is raised in an environment holding the rule once
+//     the server received no exposure there, overrides aside, for 24
+//     hours since the start or since the last one; it clears with the
+//     next exposure, when the environment stops holding the rule, and
+//     at the stop.
+//   - `exposure_conflicts` is raised in an environment holding the rule
+//     once the exposures naming another variation than their unit's
+//     first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+//     and cleared when they fall below it as first exposures grow.
+//   - `past_expected_end`, about the experiment as a whole
+//     (`environment` null), is raised from the UTC day after the
+//     expected end, once until it clears: when the expected end moves
+//     to today or later, and at the stop.
+//
+// A stop leaves `srm` and `exposure_conflicts` active: they are what
+// the exposures came to. Raising and clearing are recorded in the
+// audit log as `experiment.alert_raised` and
 // `experiment.alert_cleared` by the system.
 //
 // Returns a wrapper object for the known response body format(s).
@@ -34182,6 +35013,46 @@ func (c *ClientWithResponses) GetWebhookDeliveryWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseGetWebhookDeliveryResponse(rsp)
+}
+
+// RedeliverWebhookDeliveryWithResponse Send a delivery's event again
+//
+// Queues the delivery's event again as a new delivery, with the same
+// event `id` and body byte for byte, and answers it pending; the
+// delivery redelivered is left as it is. A receiver deduplicating on
+// the event `id` recognises it, and one that lost it takes it. A
+// disabled subscription is refused `409 webhook_disabled`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverWebhookDelivery` operationId).
+func (c *ClientWithResponses) RedeliverWebhookDeliveryWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*RedeliverWebhookDeliveryResponse, error) {
+	rsp, err := c.RedeliverWebhookDelivery(ctx, project, webhook, delivery, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRedeliverWebhookDeliveryResponse(rsp)
+}
+
+// TestWebhookWithResponse Send a test ping
+//
+// Queues a `ping` event for this subscription alone, whatever event
+// types it names, and answers the pending delivery; the delivery
+// worker sends it within a few seconds, signed like every event, and
+// its attempts show in the delivery log. The ping names the project
+// and the caller; its environment, entity and audit entry are null.
+// A disabled subscription is refused `409 webhook_disabled`, since
+// the ping would wait unsent until it is enabled.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /projects/{project}/webhooks/{webhook}/test (the `TestWebhook` operationId).
+func (c *ClientWithResponses) TestWebhookWithResponse(ctx context.Context, project ProjectKey, webhook WebhookID, reqEditors ...RequestEditorFn) (*TestWebhookResponse, error) {
+	rsp, err := c.TestWebhook(ctx, project, webhook, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTestWebhookResponse(rsp)
 }
 
 // ListRolesWithResponse The roles and their permissions
@@ -44095,6 +44966,140 @@ func ParseGetWebhookDeliveryResponse(rsp *http.Response) (*GetWebhookDeliveryRes
 	return response, nil
 }
 
+// ParseRedeliverWebhookDeliveryResponse parses an HTTP response from a RedeliverWebhookDeliveryWithResponse call
+func ParseRedeliverWebhookDeliveryResponse(rsp *http.Response) (*RedeliverWebhookDeliveryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RedeliverWebhookDeliveryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest WebhookDelivery
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RedeliverWebhookDeliveryResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseTestWebhookResponse parses an HTTP response from a TestWebhookWithResponse call
+func ParseTestWebhookResponse(rsp *http.Response) (*TestWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TestWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest WebhookDelivery
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers TestWebhookResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ParseListRolesResponse parses an HTTP response from a ListRolesWithResponse call
 func ParseListRolesResponse(rsp *http.Response) (*ListRolesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -44593,6 +45598,12 @@ type ServerInterface interface {
 	// GetWebhookDelivery One delivery of a webhook subscription
 	// (GET /projects/{project}/webhooks/{webhook}/deliveries/{delivery})
 	GetWebhookDelivery(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID)
+	// RedeliverWebhookDelivery Send a delivery's event again
+	// (POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver)
+	RedeliverWebhookDelivery(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID)
+	// TestWebhook Send a test ping
+	// (POST /projects/{project}/webhooks/{webhook}/test)
+	TestWebhook(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID)
 	// ListRoles The roles and their permissions
 	// (GET /roles)
 	ListRoles(w http.ResponseWriter, r *http.Request)
@@ -46138,6 +47149,19 @@ func (siw *ServerInterfaceWrapper) ListChangeRequests(w http.ResponseWriter, r *
 		return
 	}
 
+	// ------------- Optional query parameter "segment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "segment", r.URL.Query(), &params.Segment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "segment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "segment", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "kind" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -47441,6 +48465,32 @@ func (siw *ServerInterfaceWrapper) ListExperiments(w http.ResponseWriter, r *htt
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "include_archived"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_archived", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "past_expected_end" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "past_expected_end", r.URL.Query(), &params.PastExpectedEnd, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "past_expected_end"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "past_expected_end", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "awaiting_code_removal" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "awaiting_code_removal", r.URL.Query(), &params.AwaitingCodeRemoval, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "awaiting_code_removal"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "awaiting_code_removal", Err: err})
 		}
 		return
 	}
@@ -50439,6 +51489,85 @@ func (siw *ServerInterfaceWrapper) GetWebhookDelivery(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// RedeliverWebhookDelivery operation middleware
+func (siw *ServerInterfaceWrapper) RedeliverWebhookDelivery(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "delivery" -------------
+	var delivery openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "delivery", r.PathValue("delivery"), &delivery, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "delivery", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RedeliverWebhookDelivery(w, r, project, webhook, delivery)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TestWebhook operation middleware
+func (siw *ServerInterfaceWrapper) TestWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "project" -------------
+	var project ProjectKey
+
+	err = runtime.BindStyledParameterWithOptions("simple", "project", r.PathValue("project"), &project, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "project", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TestWebhook(w, r, project, webhook)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListRoles operation middleware
 func (siw *ServerInterfaceWrapper) ListRoles(w http.ResponseWriter, r *http.Request) {
 
@@ -50717,8 +51846,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}", wrapper.DeleteWebhook)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}", wrapper.GetWebhook)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}", wrapper.UpdateWebhook)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/test", wrapper.TestWebhook)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries", wrapper.ListWebhookDeliveries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}", wrapper.GetWebhookDelivery)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver", wrapper.RedeliverWebhookDelivery)
 
 	return m
 }
@@ -64337,6 +65468,187 @@ func (response GetWebhookDelivery404ApplicationProblemPlusJSONResponse) VisitGet
 	return err
 }
 
+type RedeliverWebhookDeliveryRequestObject struct {
+	Project  ProjectKey         `json:"project"`
+	Webhook  WebhookID          `json:"webhook"`
+	Delivery openapi_types.UUID `json:"delivery"`
+}
+
+type RedeliverWebhookDeliveryResponseObject interface {
+	VisitRedeliverWebhookDeliveryResponse(w http.ResponseWriter) error
+}
+
+type RedeliverWebhookDelivery202JSONResponse WebhookDelivery
+
+func (response RedeliverWebhookDelivery202JSONResponse) VisitRedeliverWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverWebhookDelivery401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverWebhookDelivery401ApplicationProblemPlusJSONResponse) VisitRedeliverWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverWebhookDelivery403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverWebhookDelivery403ApplicationProblemPlusJSONResponse) VisitRedeliverWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverWebhookDelivery404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverWebhookDelivery404ApplicationProblemPlusJSONResponse) VisitRedeliverWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverWebhookDelivery409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverWebhookDelivery409ApplicationProblemPlusJSONResponse) VisitRedeliverWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestWebhookRequestObject struct {
+	Project ProjectKey `json:"project"`
+	Webhook WebhookID  `json:"webhook"`
+}
+
+type TestWebhookResponseObject interface {
+	VisitTestWebhookResponse(w http.ResponseWriter) error
+}
+
+type TestWebhook202JSONResponse WebhookDelivery
+
+func (response TestWebhook202JSONResponse) VisitTestWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestWebhook401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response TestWebhook401ApplicationProblemPlusJSONResponse) VisitTestWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestWebhook403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response TestWebhook403ApplicationProblemPlusJSONResponse) VisitTestWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestWebhook404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TestWebhook404ApplicationProblemPlusJSONResponse) VisitTestWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestWebhook409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response TestWebhook409ApplicationProblemPlusJSONResponse) VisitTestWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListRolesRequestObject struct {
 }
 
@@ -64841,6 +66153,12 @@ type StrictServerInterface interface {
 	// GetWebhookDelivery One delivery of a webhook subscription
 	// (GET /projects/{project}/webhooks/{webhook}/deliveries/{delivery})
 	GetWebhookDelivery(ctx context.Context, request GetWebhookDeliveryRequestObject) (GetWebhookDeliveryResponseObject, error)
+	// RedeliverWebhookDelivery Send a delivery's event again
+	// (POST /projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver)
+	RedeliverWebhookDelivery(ctx context.Context, request RedeliverWebhookDeliveryRequestObject) (RedeliverWebhookDeliveryResponseObject, error)
+	// TestWebhook Send a test ping
+	// (POST /projects/{project}/webhooks/{webhook}/test)
+	TestWebhook(ctx context.Context, request TestWebhookRequestObject) (TestWebhookResponseObject, error)
 	// ListRoles The roles and their permissions
 	// (GET /roles)
 	ListRoles(ctx context.Context, request ListRolesRequestObject) (ListRolesResponseObject, error)
@@ -68691,6 +70009,61 @@ func (sh *strictHandler) GetWebhookDelivery(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetWebhookDeliveryResponseObject); ok {
 		if err := validResponse.VisitGetWebhookDeliveryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RedeliverWebhookDelivery operation middleware
+func (sh *strictHandler) RedeliverWebhookDelivery(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID, delivery openapi_types.UUID) {
+	var request RedeliverWebhookDeliveryRequestObject
+
+	request.Project = project
+	request.Webhook = webhook
+	request.Delivery = delivery
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RedeliverWebhookDelivery(ctx, request.(RedeliverWebhookDeliveryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RedeliverWebhookDelivery")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RedeliverWebhookDeliveryResponseObject); ok {
+		if err := validResponse.VisitRedeliverWebhookDeliveryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TestWebhook operation middleware
+func (sh *strictHandler) TestWebhook(w http.ResponseWriter, r *http.Request, project ProjectKey, webhook WebhookID) {
+	var request TestWebhookRequestObject
+
+	request.Project = project
+	request.Webhook = webhook
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TestWebhook(ctx, request.(TestWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TestWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TestWebhookResponseObject); ok {
+		if err := validResponse.VisitTestWebhookResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

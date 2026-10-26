@@ -25,7 +25,7 @@ Wrap the evaluator in getters that never throw or panic: a missing flag, a type 
 - **Errors** are problem documents in the management API's shape (`server/problems/`): `type`, `title`, `status`, a stable `code`, `detail`, the `request_id` of the request, and for a refused body `errors`, each with a JSON Pointer into the body, a `code` and the rule's `params`. Act on the status and `Retry-After` (and the `code` where it helps a log line), never on `title` or `detail`.
 - **Events answers** list each refused event in `rejected` with a `code`. The codes are an open set: treat a code you do not know like any other rejection and never send that event again.
 
-Your runner should fail when a scenario of a mode you support runs nowhere, as the Go SDK's `TestEveryServerScenarioIsCovered` does, and generate your section of the [behaviour matrix](behaviour-matrix.md) from what it ran.
+Your runner should fail when a scenario of a mode you support runs nowhere, as the Go SDK's `TestEveryServerScenarioIsCovered` does, and write the scenarios that passed to a report from which `.github/scripts/behaviour-matrix.sh` builds your column of the [behaviour matrix](behaviour-matrix.md).
 
 ## 4. OpenFeature
 

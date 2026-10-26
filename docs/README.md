@@ -14,6 +14,7 @@
 ## SDKs
 
 - [Go SDK](../sdks/go/README.md), its [OpenFeature provider](../sdks/go-openfeature/README.md), and the [evaluator](../eval/README.md) every Go program shares.
+- [Ruby SDK](sdks/ruby.md): the `flagnetic` gem with its Rails integration and test helper, and the `flagnetic-openfeature` provider.
 - [JavaScript SDK](sdks/javascript.md): the npm package `flagnetic`, its server mode, browser client, React bindings and OpenFeature providers, and how soon each serves a change.
 - [SDK keys](sdks/keys.md): server and client keys, rotation with an overlap, revocation, allowed origins, calls from browsers, and which SDKs use an environment.
 - [Downloading the ruleset](sdks/ruleset.md): the server SDK's ruleset, its versions, conditional requests, compression and schema versions.

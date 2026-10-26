@@ -168,7 +168,8 @@ jobs:
   # the generated client left out, as it changes with every edit of the
   # management API; server changes behind it are covered by the runs on main,
   # on release pull requests and nightly. For the Ruby gems: their
-  # directories, the conformance suite, the SDK contract and their workflow.
+  # directories, the conformance suite, the SDK contract, the behaviour
+  # matrix their runner fills in and their workflow.
   changes:
     name: what changed
     runs-on: ubuntu-latest
@@ -194,7 +195,7 @@ jobs:
             echo "e2e=false" >> "$GITHUB_OUTPUT"
           fi
           if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/ruby/|sdks/ruby-openfeature/|conformance/|api/sdk\.yaml$|go\.mod$|\.github/workflows/(ci|sdk-ruby)\.yml$)'; then
+            grep -qE '^(sdks/ruby/|sdks/ruby-openfeature/|conformance/|api/sdk\.yaml$|go\.mod$|docs/sdks/behaviour-matrix\.md$|\.github/scripts/behaviour-matrix\.sh$|\.github/workflows/(ci|sdk-ruby)\.yml$)'; then
             echo "ruby=true" >> "$GITHUB_OUTPUT"
           else
             echo "ruby=false" >> "$GITHUB_OUTPUT"
@@ -204,7 +205,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/js/|conformance/|api/sdk\.yaml$|go\.mod$|\.github/workflows/(ci|sdk-js)\.yml$)'; then
+            grep -qE '^(sdks/js/|conformance/|api/sdk\.yaml$|go\.mod$|docs/sdks/behaviour-matrix\.md$|\.github/scripts/behaviour-matrix\.sh$|\.github/workflows/(ci|sdk-js)\.yml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -426,7 +427,16 @@ jobs:
           working-directory: ${{ matrix.dir }}
           args: --config=${{ github.workspace }}/.golangci.yml
       - name: Test with the race detector
+        env:
+          FLAGNETIC_SCENARIO_REPORT: ${{ runner.temp }}/scenarios.json
         run: go test -race -coverprofile=coverage.out ./...
+      - name: Behaviour matrix
+        # The Go column of docs/sdks/behaviour-matrix.md is what the
+        # protocol runners report as passed in the run above.
+        if: matrix.dir == 'sdks/go'
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/behaviour-matrix.sh" Go "$RUNNER_TEMP/scenarios.json"
+          git diff --exit-code -- "$GITHUB_WORKSPACE/docs/sdks/behaviour-matrix.md"
       - name: Coverage floors
         env:
           MODULE: ${{ matrix.dir }}
@@ -491,9 +501,10 @@ jobs:
   # the management API, and the Go SDK and its OpenFeature provider run
   # against them; the kill-switch propagation it measures goes to the job
   # summary. The harness module is linted, tidied and scanned here, since
-  # the module matrix leaves it out. The JavaScript SDK's smokes, in Node
-  # and in Chromium, run against `flagnetic-e2e up` afterwards when the
-  # sdk-js job runs too.
+  # the module matrix leaves it out.
+  # The harness and the Go SDK on every run; each other SDK's smoke against
+  # the replicas `flagnetic-e2e up` brings up, when its tree changes and on
+  # every run that is not a pull request.
   sdk-e2e:
     name: SDK end to end
     needs: changes
@@ -515,6 +526,7 @@ jobs:
     env:
       DATABASE_URL: postgres://flagnetic:flagnetic@localhost:5432/flagnetic?sslmode=disable
       FLAGNETIC_E2E: "1"
+      RUBY_SMOKE: ${{ github.event_name != 'pull_request' || needs.changes.outputs.ruby == 'true' || startsWith(github.head_ref, 'release-please--') }}
       SDK_JS: ${{ github.event_name != 'pull_request' || needs.changes.outputs.sdk-js == 'true' || startsWith(github.head_ref, 'release-please--') }}
     steps:
       - uses: actions/checkout@v7
@@ -537,8 +549,29 @@ jobs:
       - name: Run the harness and the Go SDK against two replicas
         working-directory: e2e
         run: go test -count=1 -v ./...
-      # `up` seeds the same database again with new keys, revoking the Go
-      # test's, and serves until the job ends.
+      - uses: ruby/setup-ruby@v1
+        if: env.RUBY_SMOKE == 'true'
+        with:
+          ruby-version: "4.0"
+          bundler-cache: true
+          working-directory: sdks/ruby
+      - name: Ruby SDK smoke against two replicas
+        if: env.RUBY_SMOKE == 'true'
+        run: |
+          go build -o "$RUNNER_TEMP/flagnetic-e2e" ./e2e/cmd/flagnetic-e2e
+          export FLAGNETIC_E2E_SEED="$RUNNER_TEMP/seed.json" FLAGNETIC_E2E_COMMAND="$RUNNER_TEMP/flagnetic-e2e"
+          "$FLAGNETIC_E2E_COMMAND" up > "$RUNNER_TEMP/up.log" 2>&1 &
+          up=$!
+          trap 'kill "$up"; wait "$up" || true' EXIT
+          for _ in $(seq 180); do
+            [[ -s "$FLAGNETIC_E2E_SEED" ]] && break
+            kill -0 "$up" 2>/dev/null || { cat "$RUNNER_TEMP/up.log"; exit 1; }
+            sleep 1
+          done
+          [[ -s "$FLAGNETIC_E2E_SEED" ]] || { echo "no seed after 180 s"; cat "$RUNNER_TEMP/up.log"; exit 1; }
+          (cd sdks/ruby && bundle exec rake e2e) || { cat "$RUNNER_TEMP/up.log"; exit 1; }
+      # `up` seeds the same database again with new keys, revoking the
+      # earlier ones, and serves until the job ends.
       - name: Bring up two replicas for the JavaScript SDK
         if: env.SDK_JS == 'true'
         run: |

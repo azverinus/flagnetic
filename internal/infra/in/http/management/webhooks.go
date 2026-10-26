@@ -175,6 +175,31 @@ func (a *api) GetWebhookDelivery(ctx context.Context, req GetWebhookDeliveryRequ
 	return GetWebhookDelivery200JSONResponse(deliveryOut(d)), nil
 }
 
+// TestWebhook queues a ping for the subscription and answers its pending
+// delivery.
+func (a *api) TestWebhook(ctx context.Context, req TestWebhookRequestObject) (TestWebhookResponseObject, error) {
+	d, err := a.h.TestWebhook.Handle(ctx, appgovernance.TestWebhookCommand{
+		Project: projectID(ctx), Webhook: id.FromBytes[governance.Webhook](req.Webhook), Request: requestOf(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return TestWebhook202JSONResponse(deliveryOut(d)), nil
+}
+
+// RedeliverWebhookDelivery queues a delivery's event again and answers the
+// new delivery, pending.
+func (a *api) RedeliverWebhookDelivery(ctx context.Context, req RedeliverWebhookDeliveryRequestObject) (RedeliverWebhookDeliveryResponseObject, error) {
+	d, err := a.h.RedeliverWebhook.Handle(ctx, appgovernance.RedeliverCommand{
+		Project: projectID(ctx), Webhook: id.FromBytes[governance.Webhook](req.Webhook),
+		Delivery: id.FromBytes[governance.Delivery](req.Delivery),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return RedeliverWebhookDelivery202JSONResponse(deliveryOut(d)), nil
+}
+
 func deliveryOut(d governance.Delivery) WebhookDelivery {
 	return WebhookDelivery{
 		Id: openapi_types.UUID(d.ID.Bytes()), EventId: openapi_types.UUID(d.Event.Bytes()), EventType: d.Type,

@@ -1280,9 +1280,15 @@ export type ExperimentAlertList = {
 };
 
 /**
- * `srm`: the sample-ratio check found first exposures out of line with the weights.
+ * `srm`: the sample-ratio check found first exposures out of line
+ * with the weights. `no_exposures`: no exposure for 24 hours in an
+ * environment holding the rule. `exposure_conflicts`: too many units
+ * exposed to another variation than their first one.
+ * `past_expected_end`: the experiment runs past its expected end.
+ *
  */
-export type ExperimentAlertKind = "srm";
+export type ExperimentAlertKind =
+  "srm" | "no_exposures" | "exposure_conflicts" | "past_expected_end";
 
 export type ExperimentAlert = {
   id: string;
@@ -1308,6 +1314,46 @@ export type ExperimentAlert = {
  */
 export type ExperimentAlertDetails = {
   sample_ratio: SampleRatioAlertDetails | null;
+  no_exposures: NoExposuresAlertDetails | null;
+  exposure_conflicts: ExposureConflictsAlertDetails | null;
+  past_expected_end: PastExpectedEndAlertDetails | null;
+};
+
+export type NoExposuresAlertDetails = {
+  /**
+   * When the server last received an exposure in the environment, overrides aside; null when it never did.
+   */
+  last_exposure_at: string | null;
+  /**
+   * Since when no exposure came, the later of the start and the last exposure.
+   */
+  since: string;
+};
+
+export type ExposureConflictsAlertDetails = {
+  /**
+   * The exposures naming another variation than their unit's first exposure.
+   */
+  conflicts: number;
+  /**
+   * The units with at least one such exposure.
+   */
+  conflicting_units: number;
+  /**
+   * The first exposures in the environment.
+   */
+  first_exposures: number;
+  /**
+   * `max(3, min(10, ceil(first_exposures / 1000)))`, which `conflicts` reached.
+   */
+  threshold: number;
+};
+
+export type PastExpectedEndAlertDetails = {
+  /**
+   * The expected end the experiment passed.
+   */
+  expected_end_at: string;
 };
 
 export type SampleRatioAlertDetails = {
@@ -1627,8 +1673,10 @@ export type FlagConfigurationRevert = {
 
 /**
  * What a change request proposes: `flag_configuration`, a flag's
- * configuration in one environment. Other kinds are to come; a client
- * reads `proposed` by the kind.
+ * configuration in one environment; `definition`, a flag's variations
+ * and automatic exposure, or a segment's conditions and private
+ * switch, in every environment. `experiment` is to come. A client
+ * reads `proposed` by the kind and the entity named.
  *
  */
 export type ChangeRequestKind = "flag_configuration" | "definition" | "experiment";
@@ -1751,16 +1799,27 @@ export type ChangeRequest = {
    * The key of the environment of a `flag_configuration` change request.
    */
   environment?: string;
+  /**
+   * The key of the segment of a segment's `definition`.
+   */
+  segment?: string;
   state: ChangeRequestState;
   title: string;
   description: string;
   /**
-   * The version of the configuration the change request is based on.
+   * The version of the configuration, the flag or the segment the change request is based on.
    */
   base_version: number;
-  proposed: ProposedConfiguration;
   /**
-   * The RFC 6902 patch from the configuration the change request is based on to `proposed`.
+   * What the change request proposes, by its kind and the entity it
+   * names: a `ProposedConfiguration` for `flag_configuration`, a
+   * `ProposedFlagDefinition` for a flag's `definition`, a
+   * `ProposedSegmentDefinition` for a segment's.
+   *
+   */
+  proposed: ProposedConfiguration | ProposedFlagDefinition | ProposedSegmentDefinition;
+  /**
+   * The RFC 6902 patch from the entity as the change request is based on it to `proposed`.
    */
   diff: Array<PatchOperation>;
   author: ChangeRequestAuthor;
@@ -1781,7 +1840,7 @@ export type ChangeRequest = {
    */
   applied_by: ChangeRequestApplier | null;
   /**
-   * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, or deleting its environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
+   * The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
    */
   superseded_by: string | null;
   created_at: string;
@@ -1798,18 +1857,22 @@ export type ChangeRequestList = {
 };
 
 export type ChangeRequestCreate = {
-  kind: "flag_configuration";
+  kind: "flag_configuration" | "definition";
   /**
-   * The key of the flag.
+   * The key of the flag, for a configuration or a flag's definition.
    */
-  flag: string;
+  flag?: string;
   /**
-   * The key of the environment.
+   * The key of the environment, for a configuration only.
    */
-  environment: string;
+  environment?: string;
+  /**
+   * The key of the segment, for a segment's definition only.
+   */
+  segment?: string;
   title: string;
   description?: string;
-  proposed: FlagConfigurationPut;
+  proposed: ProposedInput;
   /**
    * Open the change request for review at once instead of drafting it.
    */
@@ -1819,7 +1882,58 @@ export type ChangeRequestCreate = {
 export type ChangeRequestPatch = {
   title?: string;
   description?: string;
-  proposed?: FlagConfigurationPut;
+  proposed?: ProposedInput;
+};
+
+/**
+ * What a change request proposes, as a direct write would give it,
+ * read by the change request's kind and the entity it names: a
+ * `FlagConfigurationPut` for `flag_configuration`, a
+ * `FlagDefinitionPut` for a flag's `definition`, a
+ * `SegmentDefinitionPut` for a segment's.
+ *
+ */
+export type ProposedInput = FlagConfigurationPut | FlagDefinitionPut | SegmentDefinitionPut;
+
+/**
+ * A flag's definition as a change request proposes it: what every
+ * environment's ruleset carries of the flag. Its other fields are
+ * edited directly.
+ *
+ */
+export type FlagDefinitionPut = {
+  automatic_exposure: boolean;
+  /**
+   * Every variation, in order, matched to the current ones by key.
+   */
+  variations: Array<VariationInput>;
+};
+
+/**
+ * A segment's definition as a change request proposes it: what every
+ * environment's ruleset carries of the segment. Its name and
+ * description are edited directly.
+ *
+ */
+export type SegmentDefinitionPut = {
+  conditions: Array<Condition>;
+  private: boolean;
+};
+
+/**
+ * A flag's definition as a change request proposes it.
+ */
+export type ProposedFlagDefinition = {
+  automatic_exposure: boolean;
+  variations: Array<Variation>;
+};
+
+/**
+ * A segment's definition as a change request proposes it.
+ */
+export type ProposedSegmentDefinition = {
+  conditions: Array<Condition>;
+  private: boolean;
 };
 
 export type FlagConfigurationCopy = {
@@ -6790,6 +6904,22 @@ export type ListExperimentsData = {
      */
     include_archived?: boolean;
     /**
+     * `true` lists only running experiments past their expected end:
+     * from the UTC day after the `expected_end_at` date, as the
+     * `past_expected_end` alert. `false` or absent filters nothing.
+     *
+     */
+    past_expected_end?: boolean;
+    /**
+     * `true` lists only stopped experiments whose flag SDKs still
+     * evaluate: in some environment, an SDK reported evaluations of
+     * the flag on one of the last 7 UTC days, today included, and
+     * evaluated it after the stop. Remote evaluations the server
+     * answered do not count. `false` or absent filters nothing.
+     *
+     */
+    awaiting_code_removal?: boolean;
+    /**
      * The `next_cursor` of the previous page.
      */
     cursor?: string;
@@ -8100,6 +8230,10 @@ export type ListChangeRequestsData = {
      * Only those naming the environment with this key.
      */
     environment?: string;
+    /**
+     * Only those naming the segment with this key.
+     */
+    segment?: string;
     kind?: ChangeRequestKind;
     state?: ChangeRequestState;
     /**
@@ -11052,6 +11186,65 @@ export type UpdateWebhookResponses = {
 
 export type UpdateWebhookResponse = UpdateWebhookResponses[keyof UpdateWebhookResponses];
 
+export type TestWebhookData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The webhook subscription's identifier.
+     */
+    webhook: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks/{webhook}/test";
+};
+
+export type TestWebhookErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type TestWebhookError = TestWebhookErrors[keyof TestWebhookErrors];
+
+export type TestWebhookResponses = {
+  /**
+   * The ping's delivery, pending.
+   */
+  202: WebhookDelivery;
+};
+
+export type TestWebhookResponse = TestWebhookResponses[keyof TestWebhookResponses];
+
 export type ListWebhookDeliveriesData = {
   body?: never;
   path: {
@@ -11194,3 +11387,68 @@ export type GetWebhookDeliveryResponses = {
 
 export type GetWebhookDeliveryResponse =
   GetWebhookDeliveryResponses[keyof GetWebhookDeliveryResponses];
+
+export type RedeliverWebhookDeliveryData = {
+  body?: never;
+  path: {
+    /**
+     * The project's key.
+     */
+    project: string;
+    /**
+     * The webhook subscription's identifier.
+     */
+    webhook: string;
+    /**
+     * The delivery whose event to send again.
+     */
+    delivery: string;
+  };
+  query?: never;
+  url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver";
+};
+
+export type RedeliverWebhookDeliveryErrors = {
+  /**
+   * No credential, or one that is not accepted: `unauthenticated` without
+   * a credential (a session cookie the server did not issue counts as
+   * none); `invalid_token`, `token_revoked` or `token_expired` for an API
+   * token, with a `WWW-Authenticate` header naming the code;
+   * `session_expired` for a session that has ended, whose cookie is
+   * cleared; `invalid_credentials` for a sign-in.
+   *
+   */
+  401: Problem;
+  /**
+   * The caller may not perform the operation: `forbidden` (with the
+   * missing `permission`), `session_required`, `insufficient_scope`,
+   * `cross_origin` for a request signed in by the session cookie, a read
+   * included, that the browser says comes from another origin, or, for a
+   * write, `change_request_required` when it would change what a
+   * protected environment's SDKs receive; `detail` names those
+   * environments.
+   *
+   */
+  403: Problem;
+  /**
+   * `not_found`: no such project, or nothing under that identifier in it. An unknown project is answered before any permission is judged.
+   */
+  404: Problem;
+  /**
+   * The change conflicts with what exists, such as `already_exists` for a key already in use.
+   */
+  409: Problem;
+};
+
+export type RedeliverWebhookDeliveryError =
+  RedeliverWebhookDeliveryErrors[keyof RedeliverWebhookDeliveryErrors];
+
+export type RedeliverWebhookDeliveryResponses = {
+  /**
+   * The new delivery, pending.
+   */
+  202: WebhookDelivery;
+};
+
+export type RedeliverWebhookDeliveryResponse =
+  RedeliverWebhookDeliveryResponses[keyof RedeliverWebhookDeliveryResponses];

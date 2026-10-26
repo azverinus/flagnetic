@@ -304,6 +304,9 @@ import type {
   RebaseChangeRequestData,
   RebaseChangeRequestErrors,
   RebaseChangeRequestResponses,
+  RedeliverWebhookDeliveryData,
+  RedeliverWebhookDeliveryErrors,
+  RedeliverWebhookDeliveryResponses,
   RegenerateExperimentSaltsData,
   RegenerateExperimentSaltsErrors,
   RegenerateExperimentSaltsResponses,
@@ -368,6 +371,9 @@ import type {
   StreamProjectChangesErrors,
   StreamProjectChangesResponse,
   StreamProjectChangesResponses,
+  TestWebhookData,
+  TestWebhookErrors,
+  TestWebhookResponses,
   UpdateAttributeData,
   UpdateAttributeErrors,
   UpdateAttributeResponses,
@@ -2758,10 +2764,28 @@ export const getExperimentConflicts = <ThrowOnError extends boolean = false>(
  * returning after it cleared raises a new alert. At most one alert of a
  * kind is active per environment.
  *
- * `srm` is raised by the sample-ratio check in an environment holding
- * the experiment's rule, at a p-value below 0.001, and cleared above
- * 0.01 (see `GET .../exposures`). Raising and clearing are recorded in
- * the audit log as `experiment.alert_raised` and
+ * The checks run every 10 minutes over every running experiment.
+ *
+ * - `srm` is raised by the sample-ratio check in an environment
+ * holding the experiment's rule, at a p-value below 0.001, and
+ * cleared above 0.01 (see `GET .../exposures`).
+ * - `no_exposures` is raised in an environment holding the rule once
+ * the server received no exposure there, overrides aside, for 24
+ * hours since the start or since the last one; it clears with the
+ * next exposure, when the environment stops holding the rule, and
+ * at the stop.
+ * - `exposure_conflicts` is raised in an environment holding the rule
+ * once the exposures naming another variation than their unit's
+ * first one reach `max(3, min(10, ceil(first_exposures / 1000)))`,
+ * and cleared when they fall below it as first exposures grow.
+ * - `past_expected_end`, about the experiment as a whole
+ * (`environment` null), is raised from the UTC day after the
+ * expected end, once until it clears: when the expected end moves
+ * to today or later, and at the stop.
+ *
+ * A stop leaves `srm` and `exposure_conflicts` active: they are what
+ * the exposures came to. Raising and clearing are recorded in the
+ * audit log as `experiment.alert_raised` and
  * `experiment.alert_cleared` by the system.
  *
  */
@@ -2850,18 +2874,23 @@ export const listChangeRequests = <ThrowOnError extends boolean = false>(
 /**
  * Propose a change
  *
- * Proposes a flag's configuration in one environment as a change
- * request, as a draft or, with `open`, opened for review at once. The
- * caller, a member or a project token, is its author. It is based on
- * the configuration as it is now, and `diff` is the RFC 6902 patch from
- * that configuration to `proposed`. `proposed` is checked as replacing
- * the configuration would be, with the same refusals under
- * `/proposed` (`invalid_configuration`, `archived`); a rule `id` the
- * configuration has no rule with, and a `salt` that is not that rule's,
- * are left out, so the rule is a new one. New rules and rollouts are
- * given an identifier and a salt, which `proposed` holds. A title of 1
- * to 200 characters is required and a description has at most 10,000
- * (`invalid_change_request`).
+ * Proposes a change as a change request, as a draft or, with `open`,
+ * opened for review at once. The caller, a member or a project token,
+ * is its author. A `flag_configuration` change request names a `flag`
+ * and an `environment` and proposes a `FlagConfigurationPut`; a
+ * `definition` names one `flag`, proposing a `FlagDefinitionPut`, or
+ * one `segment`, proposing a `SegmentDefinitionPut`, and no
+ * environment, since a definition is applied in every environment
+ * (`invalid_change_request` naming the field otherwise). It is based on
+ * the entity as it is now, and `diff` is the RFC 6902 patch from it to
+ * `proposed`. `proposed` is checked as writing it directly would be,
+ * with the same refusals under `/proposed` (`invalid_configuration`,
+ * `archived`, `invalid_flag`, `invalid_segment`, `in_use`). In a
+ * configuration, a rule `id` the configuration has no rule with, and a
+ * `salt` that is not that rule's, are left out, so the rule is a new
+ * one; new rules and rollouts are given an identifier and a salt,
+ * which `proposed` holds. A title of 1 to 200 characters is required
+ * and a description has at most 10,000 (`invalid_change_request`).
  *
  */
 export const createChangeRequest = <ThrowOnError extends boolean = false>(
@@ -2912,10 +2941,11 @@ export const getChangeRequest = <ThrowOnError extends boolean = false>(
  *
  * Changes the title, the description or what is proposed, each left
  * as it is when absent. Only the author edits (`not_author`), a draft
- * or an open change request (`invalid_state`). A new `proposed` is
- * checked as on creation, against the configuration as it is now, and
- * `diff` is recomputed from the configuration the change request is
- * based on; a rebase moves that. An edit that changes nothing changes
+ * or an open change request (`invalid_state`). A new `proposed`, the
+ * document the change request's kind and entity call for, is checked
+ * as on creation, against the entity as it is now, and `diff` is
+ * recomputed from the entity as the change request is based on it; a
+ * rebase moves that. An edit that changes nothing changes
  * nothing and records nothing.
  *
  */
@@ -2947,9 +2977,10 @@ export const updateChangeRequest = <ThrowOnError extends boolean = false>(
  * Open a draft change request for review
  *
  * Only the author opens (`not_author`), and only a draft
- * (`invalid_state`). When the configuration was written since the
- * change request was based on it, its diff no longer shows what it
- * would do, and opening is refused (`base_moved`) until it is rebased.
+ * (`invalid_state`). When its flag's configuration, its flag or its
+ * segment was written since the change request was based on it, its
+ * diff no longer shows what it would do, and opening is refused
+ * (`base_moved`) until it is rebased.
  *
  */
 export const openChangeRequest = <ThrowOnError extends boolean = false>(
@@ -2975,8 +3006,8 @@ export const openChangeRequest = <ThrowOnError extends boolean = false>(
 /**
  * Base a draft change request on the configuration as it is now
  *
- * Keeps what is proposed and recomputes `diff` from the configuration
- * as it is now, which becomes `base_version`. Only the author rebases
+ * Keeps what is proposed and recomputes `diff` from the entity as it
+ * is now, whose version becomes `base_version`. Only the author rebases
  * (`not_author`), and only a draft (`invalid_state`). Rebasing on the
  * base it has changes nothing and records nothing.
  *
@@ -3035,8 +3066,8 @@ export const cancelChangeRequest = <ThrowOnError extends boolean = false>(
  *
  * Copies any change request, whatever its state and whoever wrote it,
  * into a new draft of the caller's with the same title, description
- * and proposal, based on the configuration as it is now and checked
- * against it as a new change request is.
+ * and proposal, based on the entity as it is now and checked against
+ * it as a new change request is.
  *
  */
 export const copyChangeRequest = <ThrowOnError extends boolean = false>(
@@ -3066,9 +3097,10 @@ export const copyChangeRequest = <ThrowOnError extends boolean = false>(
  * request (`invalid_state`) with an optional comment of at most 2,000
  * characters, unless they are its author (`author_cannot_approve`); a
  * project token never decides one (`token_cannot_approve`). When the
- * configuration was written since the change request was based on it,
- * what would be approved is no longer what was reviewed: the change
- * request is superseded and the approval refused (`base_moved`).
+ * entity was written since the change request was based on it, what
+ * would be approved is no longer what was reviewed: the change request
+ * is superseded and the approval refused (`base_moved`). A definition's
+ * approval covers the environments protected when it is given.
  *
  */
 export const approveChangeRequest = <ThrowOnError extends boolean = false>(
@@ -3133,15 +3165,18 @@ export const rejectChangeRequest = <ThrowOnError extends boolean = false>(
 /**
  * Apply an approved change request
  *
- * Writes the configuration proposed, in a protected environment too,
- * as one write whose audit entries carry the change request's
- * identifier. Its author or a member holding `change_request.approve`
- * applies it (`not_author`), once approved (`invalid_state`). When the
- * configuration was written since the change request was based on it,
- * the change request is superseded and the application refused
- * (`base_moved`). The configuration is checked again as a replace is,
- * since what it names may be gone since the approval: a refusal
- * writes nothing and leaves the change request approved.
+ * Writes what is proposed as one write whose audit entries carry the
+ * change request's identifier: a configuration in its environment,
+ * protected or not; a definition in every environment, changing the
+ * protected ones its approval covers. Its author or a member holding
+ * `change_request.approve` applies it (`not_author`), once approved
+ * (`invalid_state`). When the entity was written since the change
+ * request was based on it, or, for a definition, an environment was
+ * protected since it was approved, the change request is superseded
+ * and the application refused (`base_moved`). What is proposed is
+ * checked again as writing it directly is, since what it names may be
+ * gone since the approval: a refusal writes nothing and leaves the
+ * change request approved.
  *
  */
 export const applyChangeRequest = <ThrowOnError extends boolean = false>(
@@ -4121,6 +4156,34 @@ export const updateWebhook = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Send a test ping
+ *
+ * Queues a `ping` event for this subscription alone, whatever event
+ * types it names, and answers the pending delivery; the delivery
+ * worker sends it within a few seconds, signed like every event, and
+ * its attempts show in the delivery log. The ping names the project
+ * and the caller; its environment, entity and audit entry are null.
+ * A disabled subscription is refused `409 webhook_disabled`, since
+ * the ping would wait unsent until it is enabled.
+ *
+ */
+export const testWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<TestWebhookData, ThrowOnError>,
+): RequestResult<TestWebhookResponses, TestWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<TestWebhookResponses, TestWebhookErrors, ThrowOnError>({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}/test",
+    ...options,
+  });
+
+/**
  * A webhook subscription's delivery log
  *
  * Every event made a delivery to the subscription, newest first,
@@ -4170,5 +4233,35 @@ export const getWebhookDelivery = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}",
+    ...options,
+  });
+
+/**
+ * Send a delivery's event again
+ *
+ * Queues the delivery's event again as a new delivery, with the same
+ * event `id` and body byte for byte, and answers it pending; the
+ * delivery redelivered is left as it is. A receiver deduplicating on
+ * the event `id` recognises it, and one that lost it takes it. A
+ * disabled subscription is refused `409 webhook_disabled`.
+ *
+ */
+export const redeliverWebhookDelivery = <ThrowOnError extends boolean = false>(
+  options: Options<RedeliverWebhookDeliveryData, ThrowOnError>,
+): RequestResult<RedeliverWebhookDeliveryResponses, RedeliverWebhookDeliveryErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    RedeliverWebhookDeliveryResponses,
+    RedeliverWebhookDeliveryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver",
     ...options,
   });

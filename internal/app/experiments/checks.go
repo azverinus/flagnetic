@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/azverinus/flagnetic/internal/domain/experiments"
@@ -14,7 +15,7 @@ import (
 
 // CheckInterval is how often the checks run over every running experiment:
 // often enough that a broken split is caught within the hour, rarely enough
-// that a check reads the rollup's aggregates and not the raw events.
+// that the round stays small beside the traffic it judges.
 const CheckInterval = 10 * time.Minute
 
 // experimentCheckTimeout bounds the checks of one experiment, so one that
@@ -30,6 +31,21 @@ type FirstExposures interface {
 	// FirstExposureCounts returns the experiment's first exposures in
 	// environment, summed over every day, by variation.
 	FirstExposureCounts(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID) (map[string]int64, error)
+}
+
+// ExposureActivity reads what the exposures of an experiment came to beyond
+// the first exposures.
+type ExposureActivity interface {
+	// ConflictTotals returns how many exposures of experiment in
+	// environment named another variation than their unit's first one,
+	// and how many units had one.
+	ConflictTotals(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID) (total, units int64, err error)
+	// LastExposureAt returns when the server last received, after after
+	// and at or before at, an exposure of experiment in environment that
+	// no override decided; nil when it did not. A zero after sets no lower
+	// bound.
+	LastExposureAt(ctx context.Context, environment workspace.EnvironmentID, experiment experiments.ExperimentID, after, at time.Time,
+	) (*time.Time, error)
 }
 
 // SampleRatioState is the latest sample-ratio check of an experiment in one
@@ -53,32 +69,70 @@ type CheckStore interface {
 		kind experiments.AlertKind) (*experiments.Alert, error)
 	// SaveAlert stores a, new or changed.
 	SaveAlert(ctx context.Context, a experiments.Alert) error
+	// ActiveAlerts returns the active alerts of kind of experiment, in
+	// every environment, held until the unit of work ends.
+	ActiveAlerts(ctx context.Context, experiment experiments.ExperimentID, kind experiments.AlertKind) ([]experiments.Alert, error)
 }
 
-// sampleRatioCheck runs the sample-ratio check of a running experiment in
-// the environments holding its rule, in one unit of work with whatever
-// started it.
-type sampleRatioCheck struct {
-	holders  Holders
-	counts   FirstExposures
-	store    CheckStore
-	recorder Recorder
+// checker runs the checks of an experiment in one unit of work with
+// whatever started them, as the system: a round of the checks or a stop.
+type checker struct {
+	holders   Holders
+	counts    FirstExposures
+	exposures ExposureActivity
+	store     CheckStore
+	recorder  Recorder
 }
 
-// run checks e in every environment holding its rule as of now, req naming
-// the request the check runs in.
-func (c sampleRatioCheck) run(ctx context.Context, e experiments.Experiment, now time.Time, req governance.Request) error {
+// run takes every check of the running experiment e at now: the
+// sample-ratio, no-exposures and conflicts checks in each environment
+// holding its rule, then the past-expected-end check of the experiment as a
+// whole. An environment no longer holding the rule awaits no exposure, so
+// its no-exposures alert clears; its other alerts stay, as nothing checks
+// them there any more.
+func (c checker) run(ctx context.Context, e experiments.Experiment, now time.Time, req governance.Request) error {
+	req.Actor = checksActor
 	envs, err := c.holders.HoldingEnvironments(ctx, e.Project, e.Key)
 	if err != nil {
 		return err
 	}
-	return c.in(ctx, e, envs, now, req)
+	if err = c.sampleRatio(ctx, e, envs, now, req); err != nil {
+		return err
+	}
+	for _, env := range envs {
+		if err = c.noExposures(ctx, e, env, now, req); err != nil {
+			return err
+		}
+		if err = c.conflicts(ctx, e, env, now, req); err != nil {
+			return err
+		}
+	}
+	silent, err := c.store.ActiveAlerts(ctx, e.ID, experiments.AlertKindNoExposures)
+	if err != nil {
+		return err
+	}
+	for _, a := range silent {
+		if a.Environment != nil && !slices.Contains(envs, *a.Environment) {
+			if err = c.clear(ctx, e, a, now, req); err != nil {
+				return err
+			}
+		}
+	}
+	active, err := c.store.ActiveAlert(ctx, e.ID, nil, experiments.AlertKindPastExpectedEnd)
+	if err != nil {
+		return err
+	}
+	details := e.PastExpectedEndDetails()
+	return c.apply(ctx, e, nil, experiments.AlertKindPastExpectedEnd, active,
+		experiments.ConditionChange(e.PastExpectedEnd(now), active != nil),
+		experiments.AlertDetails{PastExpectedEnd: &details}, now, req)
 }
 
-// in checks e in envs at now: it stores each result as the environment's
-// latest, raises a sample-ratio alert where none is active and the split is
-// out of line, and clears the active one once the split is back in line.
-func (c sampleRatioCheck) in(ctx context.Context, e experiments.Experiment, envs []workspace.EnvironmentID, now time.Time,
+// sampleRatio checks e in envs at now: it stores each result as the
+// environment's latest, raises a sample-ratio alert where none is active and
+// the split is out of line, and clears the active one once the split is
+// back in line.
+func (c checker) sampleRatio(ctx context.Context, e experiments.Experiment, envs []workspace.EnvironmentID, now time.Time,
 	req governance.Request,
 ) error {
 	req.Actor = checksActor
@@ -95,27 +149,119 @@ func (c sampleRatioCheck) in(ctx context.Context, e experiments.Experiment, envs
 		if err != nil {
 			return err
 		}
-		switch r.AlertChange(active != nil) {
-		case experiments.AlertRaise:
-			a := experiments.RaiseAlert(id.New[experiments.Alert](c.recorder.ids), e.ID, &env,
-				experiments.AlertKindSampleRatio, now, experiments.AlertDetails{SampleRatio: &r})
-			if err = c.store.SaveAlert(ctx, a); err != nil {
-				return err
-			}
-			err = c.recorder.record(ctx, now, req, alertRecord(e, a, "experiment.alert_raised", nil))
-		case experiments.AlertClear:
-			cleared := active.Clear(now)
-			if err = c.store.SaveAlert(ctx, cleared); err != nil {
-				return err
-			}
-			err = c.recorder.record(ctx, now, req, alertRecord(e, cleared, "experiment.alert_cleared", active))
-		case experiments.AlertKeep:
-		}
+		err = c.apply(ctx, e, &env, experiments.AlertKindSampleRatio, active, r.AlertChange(active != nil),
+			experiments.AlertDetails{SampleRatio: &r}, now, req)
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// noExposures raises the no-exposures alert of e in env once a day passed
+// without an exposure there, and clears it with the next one.
+func (c checker) noExposures(ctx context.Context, e experiments.Experiment, env workspace.EnvironmentID, now time.Time,
+	req governance.Request,
+) error {
+	if e.StartedAt == nil {
+		return nil
+	}
+	// The condition needs the last day alone: an exposure within it keeps
+	// the alert down, and without one the alert is due once the experiment
+	// ran a day. Reading only that day keeps the round from walking a busy
+	// experiment's whole history every time in an environment that stays
+	// silent; the latest exposure before it is read for the details of a
+	// raise alone.
+	last, err := c.exposures.LastExposureAt(ctx, env, e.ID, now.Add(-experiments.NoExposuresAfter), now)
+	if err != nil {
+		return err
+	}
+	found, holds := experiments.CheckNoExposures(*e.StartedAt, last, now)
+	active, err := c.store.ActiveAlert(ctx, e.ID, &env, experiments.AlertKindNoExposures)
+	if err != nil {
+		return err
+	}
+	if holds && active == nil {
+		if last, err = c.exposures.LastExposureAt(ctx, env, e.ID, time.Time{}, now); err != nil {
+			return err
+		}
+		found, holds = experiments.CheckNoExposures(*e.StartedAt, last, now)
+	}
+	return c.apply(ctx, e, &env, experiments.AlertKindNoExposures, active, experiments.ConditionChange(holds, active != nil),
+		experiments.AlertDetails{NoExposures: &found}, now, req)
+}
+
+// conflicts raises the conflicts alert of e in env once its conflicts reach
+// the threshold, and clears it once they fall below it.
+func (c checker) conflicts(ctx context.Context, e experiments.Experiment, env workspace.EnvironmentID, now time.Time,
+	req governance.Request,
+) error {
+	total, units, err := c.exposures.ConflictTotals(ctx, env, e.ID)
+	if err != nil {
+		return err
+	}
+	counts, err := c.counts.FirstExposureCounts(ctx, env, e.ID)
+	if err != nil {
+		return err
+	}
+	var first int64
+	for _, n := range counts {
+		first += n
+	}
+	found := experiments.CheckExposureConflicts(total, units, first)
+	active, err := c.store.ActiveAlert(ctx, e.ID, &env, experiments.AlertKindExposureConflicts)
+	if err != nil {
+		return err
+	}
+	return c.apply(ctx, e, &env, experiments.AlertKindExposureConflicts, active,
+		experiments.ConditionChange(found.Exceeded(), active != nil), experiments.AlertDetails{ExposureConflicts: &found}, now, req)
+}
+
+// atStop clears what a stop ends: the experiment is no longer past its
+// expected end, and awaits no exposure. The sample-ratio and conflicts
+// alerts stay, since they are what its exposures came to.
+func (c checker) atStop(ctx context.Context, e experiments.Experiment, now time.Time, req governance.Request) error {
+	req.Actor = checksActor
+	for _, kind := range []experiments.AlertKind{experiments.AlertKindPastExpectedEnd, experiments.AlertKindNoExposures} {
+		active, err := c.store.ActiveAlerts(ctx, e.ID, kind)
+		if err != nil {
+			return err
+		}
+		for _, a := range active {
+			if err = c.clear(ctx, e, a, now, req); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// apply makes change to the alert of kind of e in env, nil for the
+// experiment as a whole, active being the active one, nil when none is: a
+// raise stores a new alert with details, a clear clears the active one.
+func (c checker) apply(ctx context.Context, e experiments.Experiment, env *workspace.EnvironmentID, kind experiments.AlertKind,
+	active *experiments.Alert, change experiments.AlertChange, details experiments.AlertDetails, now time.Time, req governance.Request,
+) error {
+	switch change {
+	case experiments.AlertRaise:
+		a := experiments.RaiseAlert(id.New[experiments.Alert](c.recorder.ids), e.ID, env, kind, now, details)
+		if err := c.store.SaveAlert(ctx, a); err != nil {
+			return err
+		}
+		return c.recorder.record(ctx, now, req, alertRecord(e, a, "experiment.alert_raised", nil))
+	case experiments.AlertClear:
+		return c.clear(ctx, e, *active, now, req)
+	case experiments.AlertKeep:
+	}
+	return nil
+}
+
+func (c checker) clear(ctx context.Context, e experiments.Experiment, active experiments.Alert, now time.Time, req governance.Request) error {
+	cleared := active.Clear(now)
+	if err := c.store.SaveAlert(ctx, cleared); err != nil {
+		return err
+	}
+	return c.recorder.record(ctx, now, req, alertRecord(e, cleared, "experiment.alert_cleared", &active))
 }
 
 // alertRecord is the audit record of action on alert a of e, before being the
@@ -137,9 +283,21 @@ func alertValues(a experiments.Alert) map[string]any {
 	if a.Environment != nil {
 		env = a.Environment.String()
 	}
-	details := map[string]any{"sample_ratio": nil}
+	details := map[string]any{"sample_ratio": nil, "no_exposures": nil, "exposure_conflicts": nil, "past_expected_end": nil}
 	if r := a.Details.SampleRatio; r != nil {
 		details["sample_ratio"] = sampleRatioValues(*r)
+	}
+	if r := a.Details.NoExposures; r != nil {
+		details["no_exposures"] = map[string]any{"last_exposure_at": r.LastExposureAt, "since": r.Since}
+	}
+	if r := a.Details.ExposureConflicts; r != nil {
+		details["exposure_conflicts"] = map[string]any{
+			"conflicts": r.Conflicts, "conflicting_units": r.ConflictingUnits, "first_exposures": r.FirstExposures,
+			"threshold": r.Threshold,
+		}
+	}
+	if r := a.Details.PastExpectedEnd; r != nil {
+		details["past_expected_end"] = map[string]any{"expected_end_at": r.ExpectedEndAt.Format(time.DateOnly)}
 	}
 	return map[string]any{
 		"id": a.ID.String(), "kind": string(a.Kind), "environment": env, "raised_at": a.RaisedAt,
@@ -181,6 +339,7 @@ type RunChecksDeps struct {
 	Store          Reader
 	Holders        Holders
 	FirstExposures FirstExposures
+	Exposures      ExposureActivity
 	Checks         CheckStore
 	Recorder       Recorder
 }
@@ -206,7 +365,9 @@ func (h *RunChecks) Handle(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	check := sampleRatioCheck{holders: h.d.Holders, counts: h.d.FirstExposures, store: h.d.Checks, recorder: h.d.Recorder}
+	check := checker{
+		holders: h.d.Holders, counts: h.d.FirstExposures, exposures: h.d.Exposures, store: h.d.Checks, recorder: h.d.Recorder,
+	}
 	var failed []error
 	for _, e := range running {
 		if err := h.one(ctx, check, e); err != nil {
@@ -222,7 +383,7 @@ func (h *RunChecks) Handle(ctx context.Context) error {
 // one checks e under its project's row lock, the lock a stop takes too: an
 // experiment stopped since the round listed it is left to the check its stop
 // took, which stays its last.
-func (h *RunChecks) one(ctx context.Context, check sampleRatioCheck, listed experiments.Experiment) error {
+func (h *RunChecks) one(ctx context.Context, check checker, listed experiments.Experiment) error {
 	ctx, cancel := context.WithTimeout(ctx, experimentCheckTimeout)
 	defer cancel()
 	now := h.d.Recorder.now()

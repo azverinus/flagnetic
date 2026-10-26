@@ -197,3 +197,120 @@ func (h *GetDelivery) Handle(ctx context.Context, project workspace.ProjectID, w
 	}
 	return d, err
 }
+
+// DeliveryQueue queues deliveries a member asks for.
+type DeliveryQueue interface {
+	// ScopeKeys returns the keys of project and environment, "" for a zero
+	// identifier.
+	ScopeKeys(ctx context.Context, project workspace.ProjectID, environment workspace.EnvironmentID) (string, string, error)
+	CreateDeliveries(ctx context.Context, deliveries []governance.Delivery) error
+}
+
+// ErrWebhookDisabled answers a delivery asked of a disabled subscription,
+// which would wait unsent until it is enabled again.
+var ErrWebhookDisabled = apperrors.Conflict("webhook_disabled",
+	"the webhook subscription is disabled; enable it before sending it anything")
+
+// DeliveryRequestDeps are what the deliveries a member asks for run on.
+type DeliveryRequestDeps struct {
+	Tx         Transactor
+	Webhooks   WebhookStore
+	Deliveries DeliveryReader
+	Queue      DeliveryQueue
+	Clock      clock.Clock
+	IDs        *id.Source
+}
+
+// queue stores the delivery build returns for project's enabled subscription
+// webhook, under the project's lock, so it is never queued for a
+// subscription disabled or deleted meanwhile.
+func (d DeliveryRequestDeps) queue(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID,
+	build func(ctx context.Context, w governance.Webhook, now time.Time) (governance.Delivery, error),
+) (governance.Delivery, error) {
+	now := d.Clock.Now().UTC().Truncate(time.Microsecond)
+	var out governance.Delivery
+	err := d.Tx.Within(ctx, func(ctx context.Context) error {
+		err := d.Webhooks.LockProject(ctx, project)
+		if errors.Is(err, ErrNotFound) {
+			return errProjectNotFound
+		}
+		if err != nil {
+			return err
+		}
+		w, err := webhookOf(ctx, d.Webhooks, project, webhook)
+		if err != nil {
+			return err
+		}
+		if !w.Enabled {
+			return ErrWebhookDisabled
+		}
+		if out, err = build(ctx, w, now); err != nil {
+			return err
+		}
+		return d.Queue.CreateDeliveries(ctx, []governance.Delivery{out})
+	})
+	return out, err
+}
+
+// TestWebhookCommand asks for a ping to the subscription Webhook of
+// Project.
+type TestWebhookCommand struct {
+	Project workspace.ProjectID
+	Webhook governance.WebhookID
+	Request governance.Request
+}
+
+// TestWebhook sends a subscription a ping.
+type TestWebhook struct{ d DeliveryRequestDeps }
+
+// NewTestWebhook returns the handler.
+func NewTestWebhook(d DeliveryRequestDeps) *TestWebhook { return &TestWebhook{d: d} }
+
+// Handle queues a ping for the subscription alone, whatever event types it
+// names: a member asking whether the receiver answers wants an answer. It
+// returns the pending delivery; the delivery worker sends it. A disabled
+// subscription is refused webhook_disabled rather than left a delivery that
+// would wait unsent.
+func (h *TestWebhook) Handle(ctx context.Context, cmd TestWebhookCommand) (governance.Delivery, error) {
+	return h.d.queue(ctx, cmd.Project, cmd.Webhook, func(ctx context.Context, w governance.Webhook, now time.Time) (governance.Delivery, error) {
+		projectKey, _, err := h.d.Queue.ScopeKeys(ctx, cmd.Project, workspace.EnvironmentID{})
+		if err != nil {
+			return governance.Delivery{}, err
+		}
+		e, err := governance.PingEvent(id.New[governance.Event](h.d.IDs), cmd.Project, projectKey, cmd.Request.Actor, now).Queue()
+		if err != nil {
+			return governance.Delivery{}, err
+		}
+		return governance.NewDelivery(id.New[governance.Delivery](h.d.IDs), w.ID, e, now), nil
+	})
+}
+
+// RedeliverCommand asks for the event of the delivery Delivery of the
+// subscription Webhook of Project to be sent again.
+type RedeliverCommand struct {
+	Project  workspace.ProjectID
+	Webhook  governance.WebhookID
+	Delivery governance.DeliveryID
+}
+
+// Redeliver sends a delivery's event again.
+type Redeliver struct{ d DeliveryRequestDeps }
+
+// NewRedeliver returns the handler.
+func NewRedeliver(d DeliveryRequestDeps) *Redeliver { return &Redeliver{d: d} }
+
+// Handle queues the event of the delivery again as a new delivery, with the
+// same event id and body, and returns it pending; the original is left as
+// it is. A disabled subscription is refused webhook_disabled.
+func (h *Redeliver) Handle(ctx context.Context, cmd RedeliverCommand) (governance.Delivery, error) {
+	return h.d.queue(ctx, cmd.Project, cmd.Webhook, func(ctx context.Context, w governance.Webhook, now time.Time) (governance.Delivery, error) {
+		sent, err := h.d.Deliveries.Delivery(ctx, w.ID, cmd.Delivery)
+		if errors.Is(err, ErrNotFound) {
+			return sent, ErrDeliveryNotFound
+		}
+		if err != nil {
+			return sent, err
+		}
+		return sent.Redeliver(id.New[governance.Delivery](h.d.IDs), now), nil
+	})
+}

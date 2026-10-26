@@ -854,9 +854,63 @@ export const zSampleRatioCheck = z.object({
 });
 
 /**
- * `srm`: the sample-ratio check found first exposures out of line with the weights.
+ * `srm`: the sample-ratio check found first exposures out of line
+ * with the weights. `no_exposures`: no exposure for 24 hours in an
+ * environment holding the rule. `exposure_conflicts`: too many units
+ * exposed to another variation than their first one.
+ * `past_expected_end`: the experiment runs past its expected end.
+ *
  */
-export const zExperimentAlertKind = z.enum(["srm"]);
+export const zExperimentAlertKind = z.enum([
+  "srm",
+  "no_exposures",
+  "exposure_conflicts",
+  "past_expected_end",
+]);
+
+export const zNoExposuresAlertDetails = z.object({
+  last_exposure_at: z.iso.datetime().nullable(),
+  since: z.iso.datetime(),
+});
+
+export const zExposureConflictsAlertDetails = z.object({
+  conflicts: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  conflicting_units: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  first_exposures: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+  threshold: z.coerce
+    .bigint()
+    .min(BigInt("-9223372036854775808"), {
+      error: "Invalid value: Expected int64 to be >= -9223372036854775808",
+    })
+    .max(BigInt("9223372036854775807"), {
+      error: "Invalid value: Expected int64 to be <= 9223372036854775807",
+    }),
+});
+
+export const zPastExpectedEndAlertDetails = z.object({
+  expected_end_at: z.iso.date(),
+});
 
 export const zSampleRatioVariation = z.object({
   variation: z.string(),
@@ -892,6 +946,9 @@ export const zSampleRatioAlertDetails = z.object({
  */
 export const zExperimentAlertDetails = z.object({
   sample_ratio: zSampleRatioAlertDetails.nullable(),
+  no_exposures: zNoExposuresAlertDetails.nullable(),
+  exposure_conflicts: zExposureConflictsAlertDetails.nullable(),
+  past_expected_end: zPastExpectedEndAlertDetails.nullable(),
 });
 
 export const zExperimentAlert = z.object({
@@ -1112,8 +1169,10 @@ export const zFlagConfigurationRevert = z.object({
 
 /**
  * What a change request proposes: `flag_configuration`, a flag's
- * configuration in one environment. Other kinds are to come; a client
- * reads `proposed` by the kind.
+ * configuration in one environment; `definition`, a flag's variations
+ * and automatic exposure, or a segment's conditions and private
+ * switch, in every environment. `experiment` is to come. A client
+ * reads `proposed` by the kind and the entity named.
  *
  */
 export const zChangeRequestKind = z.enum(["flag_configuration", "definition", "experiment"]);
@@ -1188,6 +1247,25 @@ export const zProposedOverride = z.object({
   unit_id: z.string(),
   variation: z.string(),
   note: z.string().nullable(),
+});
+
+/**
+ * A flag's definition as a change request proposes it: what every
+ * environment's ruleset carries of the flag. Its other fields are
+ * edited directly.
+ *
+ */
+export const zFlagDefinitionPut = z.object({
+  automatic_exposure: z.boolean(),
+  variations: z.array(zVariationInput),
+});
+
+/**
+ * A flag's definition as a change request proposes it.
+ */
+export const zProposedFlagDefinition = z.object({
+  automatic_exposure: z.boolean(),
+  variations: z.array(zVariation),
 });
 
 export const zFlagConfigurationCopy = z.object({
@@ -1421,11 +1499,62 @@ export const zProposedConfiguration = z.object({
   rules: z.array(zRule),
 });
 
+/**
+ * A segment's definition as a change request proposes it: what every
+ * environment's ruleset carries of the segment. Its name and
+ * description are edited directly.
+ *
+ */
+export const zSegmentDefinitionPut = z.object({
+  conditions: z.array(zCondition).max(20),
+  private: z.boolean(),
+});
+
+/**
+ * What a change request proposes, as a direct write would give it,
+ * read by the change request's kind and the entity it names: a
+ * `FlagConfigurationPut` for `flag_configuration`, a
+ * `FlagDefinitionPut` for a flag's `definition`, a
+ * `SegmentDefinitionPut` for a segment's.
+ *
+ */
+export const zProposedInput = z.union([
+  zFlagConfigurationPut,
+  zFlagDefinitionPut,
+  zSegmentDefinitionPut,
+]);
+
+export const zChangeRequestCreate = z.object({
+  kind: z.enum(["flag_configuration", "definition"]),
+  flag: z.string().optional(),
+  environment: z.string().optional(),
+  segment: z.string().optional(),
+  title: z.string(),
+  description: z.string().optional(),
+  proposed: zProposedInput,
+  open: z.boolean().optional().default(false),
+});
+
+export const zChangeRequestPatch = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  proposed: zProposedInput.optional(),
+});
+
+/**
+ * A segment's definition as a change request proposes it.
+ */
+export const zProposedSegmentDefinition = z.object({
+  conditions: z.array(zCondition),
+  private: z.boolean(),
+});
+
 export const zChangeRequest = z.object({
   id: z.uuid(),
   kind: zChangeRequestKind,
   flag: z.string().optional(),
   environment: z.string().optional(),
+  segment: z.string().optional(),
   state: zChangeRequestState,
   title: z.string(),
   description: z.string(),
@@ -1437,7 +1566,7 @@ export const zChangeRequest = z.object({
     .max(BigInt("9223372036854775807"), {
       error: "Invalid value: Expected int64 to be <= 9223372036854775807",
     }),
-  proposed: zProposedConfiguration,
+  proposed: z.union([zProposedConfiguration, zProposedFlagDefinition, zProposedSegmentDefinition]),
   diff: z.array(zPatchOperation),
   author: zChangeRequestAuthor,
   approval: zChangeRequestDecision.nullable(),
@@ -1453,22 +1582,6 @@ export const zChangeRequest = z.object({
 export const zChangeRequestList = z.object({
   items: z.array(zChangeRequest),
   next_cursor: z.string().nullable(),
-});
-
-export const zChangeRequestCreate = z.object({
-  kind: z.enum(["flag_configuration"]),
-  flag: z.string(),
-  environment: z.string(),
-  title: z.string(),
-  description: z.string().optional(),
-  proposed: zFlagConfigurationPut,
-  open: z.boolean().optional().default(false),
-});
-
-export const zChangeRequestPatch = z.object({
-  title: z.string().optional(),
-  description: z.string().optional(),
-  proposed: zFlagConfigurationPut.optional(),
 });
 
 export const zKillResult = z.object({
@@ -2649,6 +2762,8 @@ export const zListExperimentsQuery = z.object({
   owner: z.uuid().optional(),
   tag: z.string().optional(),
   include_archived: z.boolean().optional().default(false),
+  past_expected_end: z.boolean().optional().default(false),
+  awaiting_code_removal: z.boolean().optional().default(false),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });
@@ -2896,6 +3011,7 @@ export const zListChangeRequestsPath = z.object({
 export const zListChangeRequestsQuery = z.object({
   flag: z.string().optional(),
   environment: z.string().optional(),
+  segment: z.string().optional(),
   kind: zChangeRequestKind.optional(),
   state: zChangeRequestState.optional(),
   author: z.uuid().optional(),
@@ -3427,6 +3543,16 @@ export const zUpdateWebhookPath = z.object({
  */
 export const zUpdateWebhookResponse = zWebhook;
 
+export const zTestWebhookPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+});
+
+/**
+ * The ping's delivery, pending.
+ */
+export const zTestWebhookResponse = zWebhookDelivery;
+
 export const zListWebhookDeliveriesPath = z.object({
   project: z.string(),
   webhook: z.uuid(),
@@ -3456,3 +3582,14 @@ export const zGetWebhookDeliveryPath = z.object({
  * The delivery with every attempt.
  */
 export const zGetWebhookDeliveryResponse = zWebhookDelivery;
+
+export const zRedeliverWebhookDeliveryPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+  delivery: z.uuid(),
+});
+
+/**
+ * The new delivery, pending.
+ */
+export const zRedeliverWebhookDeliveryResponse = zWebhookDelivery;

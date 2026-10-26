@@ -126,7 +126,10 @@ const AlertKindSampleRatio AlertKind = "srm"
 // AlertDetails is what the check found when it raised an alert: the block of
 // the alert's kind, every other one nil.
 type AlertDetails struct {
-	SampleRatio *SampleRatio
+	SampleRatio       *SampleRatio
+	NoExposures       *NoExposures
+	ExposureConflicts *ExposureConflicts
+	PastExpectedEnd   *PastExpectedEnd
 }
 
 // Alert is a condition a check found on an experiment in one environment, or

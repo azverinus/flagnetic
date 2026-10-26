@@ -6,10 +6,12 @@ import (
 	"os"
 	"testing"
 
+	appflags "github.com/azverinus/flagnetic/internal/app/flags"
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/infra/out/postgres"
+	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 	"github.com/azverinus/flagnetic/internal/testkit"
@@ -38,7 +40,7 @@ func TestAnEntryRecordedInACommittedWriteIsKept(t *testing.T) {
 	pool := testkit.FreshPool(t)
 	log := pggovernance.NewAuditLog(pool)
 	ids := testkit.IDs(testkit.Clock())
-	record := appgovernance.NewRecord(log, pggovernance.NewChangeRequests(pool), ids)
+	record := appgovernance.NewRecord(log, pggovernance.NewChangeRequests(pool), appflags.NewSegmentReferrers(pgflags.NewStore(pool)), ids)
 	e := entry(t, ids)
 
 	err := postgres.NewTransactor(pool).Within(t.Context(), func(ctx context.Context) error {
@@ -60,7 +62,7 @@ func TestAnEntryRecordedInARolledBackWriteIsNotKept(t *testing.T) {
 	pool := testkit.FreshPool(t)
 	log := pggovernance.NewAuditLog(pool)
 	ids := testkit.IDs(testkit.Clock())
-	record := appgovernance.NewRecord(log, pggovernance.NewChangeRequests(pool), ids)
+	record := appgovernance.NewRecord(log, pggovernance.NewChangeRequests(pool), appflags.NewSegmentReferrers(pgflags.NewStore(pool)), ids)
 	e := entry(t, ids)
 	refused := errors.New("the write failed after its entry was recorded")
 

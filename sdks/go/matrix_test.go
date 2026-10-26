@@ -1,55 +1,52 @@
 package flagnetic_test
 
 import (
-	"flag"
+	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
+	"slices"
+	"sync"
 	"testing"
 )
 
-var updateMatrix = flag.Bool("update-matrix", false, "rewrite the Go section of docs/sdks/behaviour-matrix.md")
+// scenarioReport names the file a test run writes the protocol scenarios
+// that passed to, the report .github/scripts/behaviour-matrix.sh builds the
+// Go column of docs/sdks/behaviour-matrix.md from. Unset, no report is
+// written.
+const scenarioReport = "FLAGNETIC_SCENARIO_REPORT"
 
-// matrixPath is the behaviour matrix every SDK writes its section of.
-const matrixPath = "../../docs/sdks/behaviour-matrix.md"
+var passed struct {
+	sync.Mutex
+	names []string
+}
 
-const (
-	matrixBegin = "<!-- generated:go:begin -->"
-	matrixEnd   = "<!-- generated:go:end -->"
-)
+// reportScenario records the scenario t runs as passed once t ends neither
+// failed nor skipped, so the report holds only what this run proved.
+func reportScenario(t *testing.T, name string) {
+	t.Cleanup(func() {
+		if t.Failed() || t.Skipped() {
+			return
+		}
+		passed.Lock()
+		defer passed.Unlock()
+		passed.names = append(passed.names, name)
+	})
+}
 
-// TestBehaviourMatrixIsCurrent fails when the Go section of the behaviour
-// matrix differs from what this SDK's protocol runners cover, so the page
-// can never claim more or less than the runners prove. Every server-mode
-// scenario runs (TestEveryServerScenarioIsCovered), so the section lists
-// them all, in the order of the scenario files. Run with -update-matrix to
-// rewrite the section.
-func TestBehaviourMatrixIsCurrent(t *testing.T) {
-	data, err := os.ReadFile(matrixPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	doc := string(data)
-	start, end := strings.Index(doc, matrixBegin), strings.Index(doc, matrixEnd)
-	if start < 0 || end < start {
-		t.Fatalf("%s has no Go section between %s and %s", matrixPath, matrixBegin, matrixEnd)
-	}
-	var b strings.Builder
-	b.WriteString("\n| Scenario | Mode |\n|---|---|\n")
-	for _, sc := range readScenarios(t).Scenarios {
-		if sc.Mode == "server" {
-			fmt.Fprintf(&b, "| %s | %s |\n", sc.Name, sc.Mode)
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if path := os.Getenv(scenarioReport); path != "" {
+		passed.Lock()
+		names := slices.Sorted(slices.Values(passed.names))
+		passed.Unlock()
+		if names == nil {
+			names = []string{}
+		}
+		data, _ := json.Marshal(names)
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			fmt.Fprintf(os.Stderr, "write the scenario report: %v\n", err)
+			code = 1
 		}
 	}
-	want := doc[:start+len(matrixBegin)] + b.String() + doc[end:]
-	if want == doc {
-		return
-	}
-	if *updateMatrix {
-		if err := os.WriteFile(matrixPath, []byte(want), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		return
-	}
-	t.Errorf("docs/sdks/behaviour-matrix.md is out of date: run go test -run TestBehaviourMatrixIsCurrent -update-matrix . in sdks/go")
+	os.Exit(code)
 }

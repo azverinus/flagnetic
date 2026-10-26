@@ -95,6 +95,8 @@ type ChangeRequestDeps struct {
 	Store          ChangeRequestStore
 	Configurations Configurations
 	Proposals      ProposalApplier
+	Definitions    Definitions
+	Environments   ProtectedEnvironments
 	Audit          AuditLog
 	Clock          clock.Clock
 	IDs            *id.Source
@@ -288,6 +290,9 @@ func changeRequestValues(cr governance.ChangeRequest) map[string]any {
 	}
 	if cr.Environment != nil {
 		out["environment"] = cr.Environment.Key
+	}
+	if cr.Segment != nil {
+		out["segment"] = cr.Segment.Key
 	}
 	if !cr.SupersededBy.IsZero() {
 		out["superseded_by"] = cr.SupersededBy.String()

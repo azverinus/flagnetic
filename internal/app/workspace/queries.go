@@ -164,3 +164,28 @@ func NewListAttributes(snapshots Snapshotter, store AttributeReader, usages Decl
 func NewGetAttribute(store AttributeReader) *Get[workspace.Attribute] {
 	return &Get[workspace.Attribute]{get: store.AttributeByKey, what: "attribute"}
 }
+
+// ProtectedEnvironments reads which of a project's environments are
+// protected, for the governance context to record what an approval covers.
+type ProtectedEnvironments struct{ store EnvironmentReader }
+
+// NewProtectedEnvironments returns the query.
+func NewProtectedEnvironments(store EnvironmentReader) *ProtectedEnvironments {
+	return &ProtectedEnvironments{store: store}
+}
+
+// Protected returns project's protected environments by sort order, read
+// in the unit of work ctx carries.
+func (h *ProtectedEnvironments) Protected(ctx context.Context, project workspace.ProjectID) ([]workspace.EnvironmentID, error) {
+	all, err := h.store.Environments(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	var out []workspace.EnvironmentID
+	for _, e := range all {
+		if e.Protected {
+			out = append(out, e.ID)
+		}
+	}
+	return out, nil
+}
