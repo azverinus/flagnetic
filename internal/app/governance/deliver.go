@@ -16,9 +16,10 @@ import (
 // LeaseToken names one claim of a replica on the deliveries it leased, so
 // that a replica whose lease ran out finds out the delivery is no longer its
 // own.
-type LeaseToken = id.Of[lease]
+type LeaseToken = id.Of[Lease]
 
-type lease struct{}
+// Lease is a replica's hold on the deliveries of one claim.
+type Lease struct{}
 
 // Leased is a delivery a replica holds the lease on, as its attempt needs
 // it.
@@ -140,7 +141,7 @@ func leaseUntil(now time.Time) time.Time { return now.Add(governance.DeliveryTim
 
 // Claim leases a batch of the deliveries due, empty when none is.
 func (h *Deliver) Claim(ctx context.Context) (Claim, error) {
-	c := Claim{Token: id.New[lease](h.d.IDs)}
+	c := Claim{Token: id.New[Lease](h.d.IDs)}
 	now := h.now()
 	err := h.d.Tx.Within(ctx, func(ctx context.Context) error {
 		var err error
