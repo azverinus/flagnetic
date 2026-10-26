@@ -74,6 +74,14 @@ func TestAPersistentlyFailingSubscriptionIsDisabledAndEnabledAgain(t *testing.T)
 	failing := receiving(t, admin, p.Key, dead, "flag.created")
 	watcher := testkit.StartReceiver(t)
 	watching := receiving(t, admin, p.Key, watcher, "webhook.disabled")
+	// A subscription a member disabled is told nothing, however much it
+	// wants the event.
+	sleeping := receiving(t, admin, p.Key, testkit.StartReceiver(t), "webhook.disabled")
+	off := false
+	if res := do(admin.UpdateWebhookWithResponse(t.Context(), p.Key, sleeping.Id,
+		&management.UpdateWebhookParams{IfMatch: ifMatch(1)}, management.WebhookPatch{Enabled: &off})); res.JSON200 == nil {
+		t.Fatalf("PATCH enabled false = %d: %s", res.StatusCode(), res.Body)
+	}
 
 	// A day on, twenty-five attempts in a row fail.
 	c.Advance(24 * time.Hour)
@@ -126,6 +134,9 @@ func TestAPersistentlyFailingSubscriptionIsDisabledAndEnabledAgain(t *testing.T)
 	if log := deliveredTypes(t, admin, p.Key, failing.Id); slices.Contains(log, "flag.created") {
 		t.Errorf("the disabled subscription was queued %v", log)
 	}
+	if log := deliveredTypes(t, admin, p.Key, sleeping.Id); len(log) != 0 {
+		t.Errorf("the subscription a member disabled was queued %v", log)
+	}
 
 	// An edit cannot enable it, and nothing is sent to it meanwhile.
 	on := true
@@ -163,6 +174,47 @@ func TestAPersistentlyFailingSubscriptionIsDisabledAndEnabledAgain(t *testing.T)
 	}
 	if w := subscription(t, admin, p.Key, failing.Id); !w.Enabled || w.LastSuccessAt == nil || w.ConsecutiveFailures != 0 {
 		t.Errorf("after a success the subscription is %+v", w)
+	}
+}
+
+// A subscription a member disabled can have its secret rotated meanwhile,
+// and the enable clears its failures and starts its window again: a day
+// after its creation, twenty-five failures right after the enable disable
+// nothing.
+func TestAMemberDisabledSubscriptionIsRotatedAndEnabledWithItsWindowStartingAgain(t *testing.T) {
+	c := clock.NewFake(time.Now().UTC())
+	srv := testkit.StartServer(t, reachable, testkit.WithClock(c))
+	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
+	p := createProject(t, admin, projectKey())
+	r := testkit.StartReceiver(t, testkit.Reply{Status: http.StatusBadRequest})
+	created := receiving(t, admin, p.Key, r)
+	pings(t, admin, p.Key, created.Id, 3)
+	deliverAll(t, srv, r, 3)
+	off := false
+	res := do(admin.UpdateWebhookWithResponse(t.Context(), p.Key, created.Id,
+		&management.UpdateWebhookParams{IfMatch: ifMatch(1)}, management.WebhookPatch{Enabled: &off}))
+	if res.JSON200 == nil || res.JSON200.ConsecutiveFailures != 3 {
+		t.Fatalf("PATCH enabled false = %d: %s", res.StatusCode(), res.Body)
+	}
+
+	rotated := rotateSecret(t, admin, p.Key, created.Id)
+	if rotated.Secret == "" || rotated.Secret == created.Secret || rotated.Enabled || rotated.Version != 3 {
+		t.Fatalf("rotating a disabled subscription answered %+v", rotated)
+	}
+
+	c.Advance(25 * time.Hour)
+	enabled := enable(t, admin, p.Key, created.Id)
+	if !enabled.Enabled || enabled.DisabledReason != nil || enabled.ConsecutiveFailures != 0 || enabled.Version != 4 {
+		t.Fatalf("enabling a subscription a member disabled answered %+v", enabled)
+	}
+	if _, before, after := webhookEntry(t, srv, "webhook.enabled", created); before["enabled"] != false || after["enabled"] != true {
+		t.Errorf("webhook.enabled %v -> %v", before, after)
+	}
+
+	pings(t, admin, p.Key, created.Id, 25)
+	deliverAll(t, srv, r, 28)
+	if w := subscription(t, admin, p.Key, created.Id); !w.Enabled || w.ConsecutiveFailures != 25 {
+		t.Errorf("twenty-five failures right after the enable left the subscription %+v, want enabled", w)
 	}
 }
 
@@ -267,8 +319,19 @@ func TestTheRetentionRoundPrunesOldDeliveriesAndExpiredSecretsOnly(t *testing.T)
 	recent := ping(t, admin, p.Key, created.Id)
 	deliver(t, srv)
 	entries := len(auditOf(t, srv, "webhook.secret_rotated", created.Id.String()))
+	scraped := srv.Scrape(t)
 	if err := srv.Tick(t, worker.WebhookRetentionName); err != nil {
 		t.Fatalf("retention round: %v", err)
+	}
+	pruned := srv.Scrape(t)
+	for kind, want := range map[string]float64{"deliveries": 2, "secrets": 1} {
+		series := `flagnetic_webhook_pruned_total{kind="` + kind + `"}`
+		// A series shows once it first moves, so its absence counts as 0.
+		// The package's tests share one database, so the round also prunes
+		// what other tests left behind: this one's are a floor.
+		if got := testkit.Metric(t, pruned, series) - max(testkit.Metric(t, scraped, series), 0); got < want {
+			t.Errorf("%s moved by %v, want at least %v", series, got, want)
+		}
 	}
 
 	for _, gone := range []management.WebhookDelivery{failed, old} {

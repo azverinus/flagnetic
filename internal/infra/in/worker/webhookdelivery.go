@@ -64,7 +64,7 @@ func WebhookDelivery(d Deliverer, interval time.Duration, log *slog.Logger, reg 
 		}
 		if done.Disabled {
 			log.WarnContext(ctx, "webhook subscription disabled for failing persistently",
-				"delivery", delivery.String())
+				"webhook", done.Webhook.String(), "delivery", delivery.String())
 		}
 	}
 	return Worker{

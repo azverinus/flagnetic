@@ -175,6 +175,9 @@ type Attempted struct {
 	// Disabled is set when the attempt was the failure that made the
 	// platform disable the subscription.
 	Disabled bool
+	// Webhook is the subscription the delivery belongs to, so whoever
+	// reports a disable can name it; zero when there was no attempt.
+	Webhook governance.WebhookID
 }
 
 // Attempt makes the next attempt at delivery under token and records it.
@@ -237,10 +240,10 @@ func (h *Deliver) Attempt(ctx context.Context, token LeaseToken, delivery govern
 		return Attempted{}, err
 	}
 	if a.Succeeded() {
-		return Attempted{Status: status}, nil
+		return Attempted{Status: status, Webhook: l.Delivery.Webhook}, nil
 	}
 	disabled, err := h.disableIfFailing(ctx, l.Delivery.Webhook, a)
-	return Attempted{Status: status, Disabled: disabled}, err
+	return Attempted{Status: status, Disabled: disabled, Webhook: l.Delivery.Webhook}, err
 }
 
 // disableIfFailing disables the subscription webhook when the failed attempt
