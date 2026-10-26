@@ -76,3 +76,22 @@ func Inventory(ctx context.Context, s State) ([]management.SdkInventoryItem, err
 	}
 	return res.JSON200.Items, nil
 }
+
+// EventVolume returns the events the seed project received per day and
+// type, read through replica A. It is how a smoke sees that events it sent
+// arrived, a closing page's beacon among them: the counts lag the SDK by
+// the rollups' round, ten seconds.
+func EventVolume(ctx context.Context, s State) (management.EventVolume, error) {
+	m, err := SignIn(ctx, s.Seed.Replicas.A)
+	if err != nil {
+		return management.EventVolume{}, err
+	}
+	res, err := m.GetEventVolumeWithResponse(ctx, ProjectKey, &management.GetEventVolumeParams{})
+	if err != nil {
+		return management.EventVolume{}, err
+	}
+	if res.JSON200 == nil {
+		return management.EventVolume{}, unexpected("read the event volume", res.StatusCode(), res.Body)
+	}
+	return *res.JSON200, nil
+}

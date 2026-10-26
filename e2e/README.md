@@ -62,6 +62,7 @@ Each reads the state `up` wrote (`FLAGNETIC_E2E_STATE`, a file in the system tem
 | `flagnetic-e2e restore` | writes the seed's segment and flag configurations back, keeping the keys; prints nothing |
 | `flagnetic-e2e revoke <server\|client>` | revokes the seed's key of that kind; prints nothing |
 | `flagnetic-e2e inventory` | the environment's SDK inventory, as the management API lists it |
+| `flagnetic-e2e events` | the project's events per UTC day and type, as the management API counts them (`{"days": [{"day", "type", "events"}], "gaps"}`); the counts lag the SDK by ten seconds |
 | `flagnetic-e2e seed` | seeds the running instance again, keeping its keys, and prints the seed |
 
 ## In CI
