@@ -39,6 +39,8 @@ function changeRequest(patch: Partial<ChangeRequest> = {}): ChangeRequest {
     applied_at: null,
     applied_by: null,
     superseded_by: null,
+    apply_at: null,
+    schedule_failure: null,
     created_at: "2026-10-25T10:00:00Z",
     updated_at: "2026-10-25T10:00:00Z",
     version: 1,

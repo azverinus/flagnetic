@@ -471,3 +471,152 @@ func TestARebaseTakesTheReferrersOfTheNewBase(t *testing.T) {
 		t.Errorf("rebased = %+v, %v, %v; want checkout as its referrer", rebased, changed, err)
 	}
 }
+
+func TestAnApplyTimeIsBetweenTheLeadAndAYearAhead(t *testing.T) {
+	lead := time.Minute
+	for name, tc := range map[string]struct {
+		at   time.Time
+		code string
+	}{
+		"in the past":          {at: now.Add(-time.Second), code: "too_soon"},
+		"inside the lead":      {at: now.Add(lead - time.Microsecond), code: "too_soon"},
+		"at the lead":          {at: now.Add(lead)},
+		"a year ahead":         {at: now.Add(governance.MaxScheduleLead)},
+		"more than a year":     {at: now.Add(governance.MaxScheduleLead + time.Microsecond), code: "too_late"},
+		"in another time zone": {at: now.Add(time.Hour).In(time.FixedZone("UTC+3", 3*3600))},
+	} {
+		in := proposal(t)
+		in.ApplyAt, in.MinLead = &tc.at, lead
+		cr, err := governance.NewChangeRequest(in)
+		if tc.code != "" {
+			e, ok := apperrors.From(err)
+			if !ok || e.Code != "invalid_change_request" || len(e.Violations) != 1 || e.Violations[0].Pointer != "/apply_at" ||
+				e.Violations[0].Code != tc.code {
+				t.Errorf("%s: %v, want /apply_at %s", name, err, tc.code)
+			}
+			continue
+		}
+		if err != nil || cr.ApplyAt == nil || !cr.ApplyAt.Equal(tc.at) || cr.ApplyAt.Location() != time.UTC {
+			t.Errorf("%s: apply time %v, %v; want %v in UTC", name, cr.ApplyAt, err, tc.at)
+		}
+	}
+	if cr := newChangeRequest(t, proposal(t)); cr.ApplyAt != nil {
+		t.Errorf("unscheduled change request has apply time %v", cr.ApplyAt)
+	}
+}
+
+func TestAnEditSetsOrClearsTheApplyTime(t *testing.T) {
+	cr := newChangeRequest(t, proposal(t))
+	later := now.Add(time.Minute)
+	at := later.Add(time.Hour)
+	scheduled, changed, err := cr.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{At: &at}, MinLead: time.Minute}, later)
+	if err != nil || !changed || scheduled.ApplyAt == nil || !scheduled.ApplyAt.Equal(at) || scheduled.Version != 2 {
+		t.Fatalf("scheduled = %+v, %v, %v", scheduled.ApplyAt, changed, err)
+	}
+	if _, again, againErr := scheduled.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{At: &at}}, later); againErr != nil || again {
+		t.Errorf("the same apply time again: changed %v, %v", again, againErr)
+	}
+	// An apply time sent back unchanged is not judged again, though it is
+	// now inside the lead.
+	near := at.Add(-30 * time.Second)
+	if kept, again, againErr := scheduled.Edit(byAda, governance.Edit{Title: ptrTo("Other"),
+		Schedule: &governance.ScheduleEdit{At: &at}, MinLead: time.Minute}, near); againErr != nil || !again ||
+		kept.ApplyAt == nil || !kept.ApplyAt.Equal(at) {
+		t.Errorf("the same apply time inside the lead: %v, changed %v, %v", kept.ApplyAt, again, againErr)
+	}
+	// The lead is judged from the edit, not from when the change request
+	// was created.
+	soon := later.Add(30 * time.Second)
+	if _, _, soonErr := scheduled.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{At: &soon}, MinLead: time.Minute},
+		later); codeOf(soonErr) != "invalid_change_request" {
+		t.Errorf("an apply time inside the lead = %v", soonErr)
+	}
+	cleared, changed, err := scheduled.Edit(byAda, governance.Edit{Schedule: &governance.ScheduleEdit{}}, later)
+	if err != nil || !changed || cleared.ApplyAt != nil || cleared.Version != 3 {
+		t.Errorf("cleared = %+v, %v, %v", cleared.ApplyAt, changed, err)
+	}
+	if kept, changed, err := scheduled.Edit(byAda, governance.Edit{Title: ptrTo("Other")}, later); err != nil || !changed ||
+		kept.ApplyAt == nil || !kept.ApplyAt.Equal(at) {
+		t.Errorf("an edit of the title left the apply time %v, %v", kept.ApplyAt, err)
+	}
+}
+
+// scheduledApproved is an approved change request to be applied at at.
+func scheduledApproved(t *testing.T, at time.Time) governance.ChangeRequest {
+	t.Helper()
+	cr := inState(t, governance.StateApproved)
+	cr.ApplyAt = &at
+	return cr
+}
+
+func TestAScheduledChangeRequestIsAppliedByTheSystemAlone(t *testing.T) {
+	at := now.Add(time.Hour)
+	cr := scheduledApproved(t, at)
+	for name, by := range map[string]governance.Taker{"the author": byAda, "a decider": byDecider} {
+		_, err := cr.Apply(by, governance.Current{Version: 3}, at)
+		if e, ok := apperrors.From(err); !ok || e.Code != "scheduled" || e.Kind != apperrors.KindConflict {
+			t.Errorf("applied by %s = %v, want scheduled", name, err)
+		}
+	}
+	// Who may act is answered first.
+	if _, err := cr.Apply(byBob, governance.Current{Version: 3}, at); codeOf(err) != "not_author" {
+		t.Errorf("applied by another member = %v", err)
+	}
+	if applied, err := cr.Apply(bySystem, governance.Current{Version: 3}, at); err != nil || applied.State != governance.StateApplied {
+		t.Errorf("applied by the system = %v", err)
+	}
+}
+
+func TestAScheduledChangeRequestIsDueAtItsTimeUntilItsFailuresStopIt(t *testing.T) {
+	at := now.Add(time.Hour)
+	cr := scheduledApproved(t, at)
+	if cr.Due(at.Add(-time.Microsecond)) || !cr.Due(at) || !cr.Due(at.Add(24*time.Hour)) {
+		t.Errorf("due before, at and long after its time = %v %v %v", cr.Due(at.Add(-time.Microsecond)), cr.Due(at),
+			cr.Due(at.Add(24*time.Hour)))
+	}
+	if inState(t, governance.StateApproved).Due(at) {
+		t.Error("an unscheduled change request is due")
+	}
+	for _, s := range []governance.ChangeRequestState{governance.StateOpen, governance.StateCancelled, governance.StateApplied} {
+		other := cr
+		other.State = s
+		if other.Due(at) {
+			t.Errorf("a %s change request is due", s)
+		}
+	}
+	failing := cr
+	for n := 1; n <= 3; n++ {
+		failedAt := at.Add(time.Duration(n) * time.Second)
+		failing = failing.FailSchedule("invalid_configuration", "the gate is archived", failedAt, 3)
+		want := governance.ScheduleFailure{At: failedAt, Code: "invalid_configuration", Message: "the gate is archived",
+			Attempts: n, Stopped: n == 3}
+		if failing.ScheduleFailure == nil || *failing.ScheduleFailure != want {
+			t.Errorf("after %d failures: %+v, want %+v", n, failing.ScheduleFailure, want)
+		}
+		if failing.Version != cr.Version || !failing.UpdatedAt.Equal(cr.UpdatedAt) || failing.State != governance.StateApproved {
+			t.Errorf("a failure moved the change request: %+v", failing)
+		}
+		if due := failing.Due(failedAt); due != (n < 3) {
+			t.Errorf("due after %d failures = %v", n, due)
+		}
+	}
+}
+
+func TestAScheduleFailureIsClearedOnApplicationAndCancellationAndKeptOnSupersede(t *testing.T) {
+	at := now.Add(time.Hour)
+	failed := scheduledApproved(t, at).FailSchedule("invalid_configuration", "no", at, 5)
+	if applied, err := failed.Apply(bySystem, governance.Current{Version: 3}, at.Add(time.Second)); err != nil || applied.ScheduleFailure != nil {
+		t.Errorf("applied = %+v, %v; want the failure cleared", applied.ScheduleFailure, err)
+	}
+	if cancelled, err := failed.Cancel(byAda, at.Add(time.Second)); err != nil || cancelled.ScheduleFailure != nil {
+		t.Errorf("cancelled = %+v, %v; want the failure cleared", cancelled.ScheduleFailure, err)
+	}
+	if superseded, _ := failed.Apply(bySystem, governance.Current{Version: 4}, at.Add(time.Second)); superseded.State != governance.StateSuperseded ||
+		superseded.ScheduleFailure == nil || superseded.ScheduleFailure.Attempts != 1 {
+		t.Errorf("superseded = %+v, want the failure kept", superseded.ScheduleFailure)
+	}
+	if superseded, err := failed.Supersede(governance.EntryID{}, at.Add(time.Second)); err != nil ||
+		superseded.ScheduleFailure == nil {
+		t.Errorf("superseded by a write = %+v, %v; want the failure kept", superseded.ScheduleFailure, err)
+	}
+}

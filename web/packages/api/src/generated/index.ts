@@ -881,6 +881,7 @@ export type {
   SampleRatioCheck,
   SampleRatioSkippedReason,
   SampleRatioVariation,
+  ScheduleFailure,
   Scope,
   SdkInventory,
   SdkInventoryItem,

@@ -24,9 +24,9 @@ type changeRequestFixture struct {
 	devID   access.MemberID
 }
 
-func startChangeRequests(t *testing.T) changeRequestFixture {
+func startChangeRequests(t *testing.T, opts ...testkit.ServerOption) changeRequestFixture {
 	t.Helper()
-	srv := testkit.StartServer(t)
+	srv := testkit.StartServer(t, opts...)
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 	stringFlag(t, admin, p.Key, "checkout_title")

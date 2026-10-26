@@ -102,6 +102,9 @@ func serve(ctx, kill context.Context, cfg config.Config, log *slog.Logger, o opt
 		EventsRetention:       time.Duration(cfg.EventsRetentionDays) * 24 * time.Hour,
 		EventsPartitionsAhead: cfg.EventsPartitionsAhead,
 		SDKInventoryRetention: time.Duration(cfg.SDKInventoryRetentionDays) * 24 * time.Hour,
+		Schedule: compose.Schedule{
+			MinLead: cfg.ScheduleMinLead, Tick: cfg.ScheduleTick, MaxFailures: cfg.ScheduleMaxFailures,
+		},
 		WebhookTargets: governance.TargetPolicy{
 			AllowHTTP: cfg.WebhookAllowHTTP, AllowPrivateNetworks: cfg.WebhookAllowPrivateNetworks,
 		},

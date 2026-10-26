@@ -100,6 +100,9 @@ type ChangeRequestDeps struct {
 	Audit          AuditLog
 	Clock          clock.Clock
 	IDs            *id.Source
+	// MinLead is how far ahead of a create or an edit an apply time must
+	// be at least.
+	MinLead time.Duration
 }
 
 // now returns the instant a change is made at, to the microsecond in UTC as
@@ -183,40 +186,54 @@ func transition(ctx context.Context, d ChangeRequestDeps, cmd ChangeRequestComma
 		if err != nil {
 			return err
 		}
-		after, changed, err := change(ctx, before, now)
-		var moved superseding
-		if errors.As(err, &moved) {
-			action, refusal, err = "change_request.superseded", moved.refusal, nil
-		}
-		if err != nil {
-			return err
-		}
-		if err = precondition.Check(cmd.Expected, before.Version); err != nil {
-			return err
-		}
-		out = after
-		if !changed {
-			return nil
-		}
-		if err = d.Store.UpdateChangeRequest(ctx, after); err != nil {
-			return err
-		}
-		recordIn := ctx
-		if after.State == governance.StateApplied {
-			// The entry of the application is one of the entries the
-			// application wrote.
-			recordIn = applying(ctx, after.ID)
-		}
-		if err = d.record(recordIn, now, cmd.Request, action, &before, after, nil); err != nil {
-			return err
-		}
-		out, err = changeRequestOf(ctx, d.Store, cmd.Project, cmd.ChangeRequest)
+		out, refusal, err = transitionOf(ctx, d, before, cmd.Expected, cmd.Request, action, change, now)
 		return err
 	})
 	if err == nil && refusal != nil {
 		return out, refusal
 	}
 	return out, err
+}
+
+// transitionOf runs one transition of before, read under its project's lock,
+// at now in req: change decides what it becomes, the version the transition
+// was based on is judged, and the change request is stored and recorded as
+// action when it changed. A change refused as superseding answers the
+// change request superseded, stored and recorded, with the refusal apart
+// from the error, so the unit of work commits it.
+func transitionOf(ctx context.Context, d ChangeRequestDeps, before governance.ChangeRequest, expected precondition.Version,
+	req governance.Request, action string,
+	change func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error),
+	now time.Time,
+) (out governance.ChangeRequest, refusal error, err error) {
+	after, changed, err := change(ctx, before, now)
+	var moved superseding
+	if errors.As(err, &moved) {
+		action, refusal, err = "change_request.superseded", moved.refusal, nil
+	}
+	if err != nil {
+		return before, nil, err
+	}
+	if err = precondition.Check(expected, before.Version); err != nil {
+		return before, nil, err
+	}
+	if !changed {
+		return after, refusal, nil
+	}
+	if err = d.Store.UpdateChangeRequest(ctx, after); err != nil {
+		return before, nil, err
+	}
+	recordIn := ctx
+	if after.State == governance.StateApplied {
+		// The entry of the application is one of the entries the
+		// application wrote.
+		recordIn = applying(ctx, after.ID)
+	}
+	if err = d.record(recordIn, now, req, action, &before, after, nil); err != nil {
+		return before, nil, err
+	}
+	out, err = changeRequestOf(ctx, d.Store, before.Project, before.ID)
+	return out, refusal, err
 }
 
 // superseding is how a transition's change answers a change request it
@@ -296,6 +313,14 @@ func changeRequestValues(cr governance.ChangeRequest) map[string]any {
 	}
 	if !cr.SupersededBy.IsZero() {
 		out["superseded_by"] = cr.SupersededBy.String()
+	}
+	if cr.ApplyAt != nil {
+		out["apply_at"] = cr.ApplyAt.Format(time.RFC3339Nano)
+	}
+	if f := cr.ScheduleFailure; f != nil {
+		out["schedule_failure"] = map[string]any{
+			"at": f.At.Format(time.RFC3339Nano), "code": f.Code, "message": f.Message, "attempts": f.Attempts, "stopped": f.Stopped,
+		}
 	}
 	return out
 }

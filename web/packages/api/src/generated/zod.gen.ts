@@ -1225,6 +1225,20 @@ export const zChangeRequestApplier = z.object({
   name: z.string(),
 });
 
+/**
+ * Why the system failed to apply a scheduled change request, cleared
+ * when it is applied or cancelled and kept when it is superseded. The
+ * failure changes neither the change request's state nor its version.
+ *
+ */
+export const zScheduleFailure = z.object({
+  at: z.iso.datetime(),
+  code: z.string(),
+  message: z.string(),
+  attempts: z.int().gte(1),
+  stopped: z.boolean(),
+});
+
 export const zChangeRequestApprove = z.object({
   comment: z.string().optional(),
 });
@@ -1533,12 +1547,14 @@ export const zChangeRequestCreate = z.object({
   description: z.string().optional(),
   proposed: zProposedInput,
   open: z.boolean().optional().default(false),
+  apply_at: z.iso.datetime().optional(),
 });
 
 export const zChangeRequestPatch = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
   proposed: zProposedInput.optional(),
+  apply_at: z.iso.datetime().nullish(),
 });
 
 /**
@@ -1574,6 +1590,8 @@ export const zChangeRequest = z.object({
   applied_at: z.iso.datetime().nullable(),
   applied_by: zChangeRequestApplier.nullable(),
   superseded_by: z.uuid().nullable(),
+  apply_at: z.iso.datetime().nullable(),
+  schedule_failure: zScheduleFailure.nullable(),
   created_at: z.iso.datetime(),
   updated_at: z.iso.datetime(),
   version: zVersion,
@@ -3016,6 +3034,7 @@ export const zListChangeRequestsQuery = z.object({
   state: zChangeRequestState.optional(),
   author: z.uuid().optional(),
   awaiting_my_decision: z.boolean().optional(),
+  scheduled: z.boolean().optional(),
   cursor: z.string().optional(),
   limit: z.int().gte(1).lte(200).optional().default(50),
 });

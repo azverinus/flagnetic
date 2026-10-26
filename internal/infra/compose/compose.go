@@ -90,7 +90,19 @@ type Options struct {
 	// WebhookTick is how often the replica fans the outbox out and sends the
 	// webhook deliveries that are due.
 	WebhookTick time.Duration
+	// Schedule is how change requests are scheduled and applied at their
+	// time.
+	Schedule Schedule
 	management.Options
+}
+
+// Schedule is how change requests are scheduled: how far ahead an apply
+// time is at least, how often the scheduler runs, and after how many
+// failures in a row it stops trying a change request.
+type Schedule struct {
+	MinLead     time.Duration
+	Tick        time.Duration
+	MaxFailures int
 }
 
 // protectionGuardConns is the size of the protection guard's own pool: a
@@ -210,7 +222,7 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		}),
 		Definitions:  appflags.NewDefinitions(updateFlag, updateSegment, appflags.NewSegmentReferrers(flagStore)),
 		Environments: appworkspace.NewProtectedEnvironments(ws),
-		Audit:        audit, Clock: d.Clock, IDs: d.IDs,
+		Audit:        audit, Clock: d.Clock, IDs: d.IDs, MinLead: o.Schedule.MinLead,
 	}
 	// Deleting a unit type or attribute asks the flags context what still
 	// names it.
@@ -508,6 +520,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 				Opener: o.Keyring, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 			}), o.WebhookTick, edge.Logger(), reg),
 			worker.ProjectPurge(appworkspace.NewPurgeDeletedProjects(tx, ws)),
+			worker.ChangeRequestScheduler(o.Schedule.Tick,
+				appgovernance.NewRunScheduler(changeRequests, changeRequestStore, o.Schedule.MaxFailures).Handle),
 			worker.ExperimentChecks(appexperiments.CheckInterval, appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
 				Tx: tx, Lock: experimentStore, Running: experimentStore, Projects: experimentStore, Store: experimentStore,
 				Holders: flagStore, FirstExposures: eventStore, Exposures: eventStore, Checks: experimentStore, Recorder: experimentRec,

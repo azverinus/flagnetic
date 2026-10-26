@@ -47,6 +47,7 @@ func (a *api) ListChangeRequests(ctx context.Context, req ListChangeRequestsRequ
 	if p.Author != nil {
 		f.Author = p.Author.String()
 	}
+	f.Scheduled = p.Scheduled
 	if p.AwaitingMyDecision != nil && *p.AwaitingMyDecision {
 		f.AwaitingDecisionOf = &governance.Taker{As: authorOf(ctx), MayDecide: mayDecide(ctx)}
 	}
@@ -109,7 +110,7 @@ func (a *api) CreateChangeRequest(ctx context.Context, req CreateChangeRequestRe
 	}
 	cr, err := a.h.CreateChangeRequest.Handle(ctx, appgovernance.CreateChangeRequestCommand{
 		Project: projectID(ctx), Target: target, Title: b.Title, Description: valueOf(b.Description), Proposed: proposed,
-		Open: valueOr(b.Open, false), Author: authorOf(ctx), Request: requestOf(ctx),
+		Open: valueOr(b.Open, false), ApplyAt: b.ApplyAt, Author: authorOf(ctx), Request: requestOf(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -154,6 +155,13 @@ func (a *api) UpdateChangeRequest(ctx context.Context, req UpdateChangeRequestRe
 			return nil, readErr
 		}
 		update.Proposed = &in
+	}
+	if b.ApplyAt.IsSpecified() {
+		update.Schedule = &governance.ScheduleEdit{}
+		if !b.ApplyAt.IsNull() {
+			at := b.ApplyAt.MustGet()
+			update.Schedule.At = &at
+		}
 	}
 	cr, err := a.h.UpdateChangeRequest.Handle(ctx, update)
 	if err != nil {
@@ -383,6 +391,10 @@ func changeRequestOut(cr governance.ChangeRequest) (ChangeRequest, error) {
 	if !cr.SupersededBy.IsZero() {
 		entry := openapi_types.UUID(cr.SupersededBy.Bytes())
 		out.SupersededBy = &entry
+	}
+	out.ApplyAt = cr.ApplyAt
+	if f := cr.ScheduleFailure; f != nil {
+		out.ScheduleFailure = &ScheduleFailure{At: f.At, Code: f.Code, Message: f.Message, Attempts: f.Attempts, Stopped: f.Stopped}
 	}
 	if cr.Flag != nil {
 		out.Flag = &cr.Flag.Key

@@ -897,6 +897,9 @@ type ChangeRequest struct {
 	// AppliedBy Who applied the change request; null until it is applied.
 	AppliedBy *ChangeRequestApplier `json:"applied_by"`
 
+	// ApplyAt When the system applies the change request once approved, in UTC; null when it is applied by hand.
+	ApplyAt *time.Time `json:"apply_at"`
+
 	// Approval Who approved the change request, when and why; null unless it was approved.
 	Approval *ChangeRequestDecision `json:"approval"`
 
@@ -933,6 +936,9 @@ type ChangeRequest struct {
 
 	// Rejection Who rejected the change request, when and why; null unless it was rejected.
 	Rejection *ChangeRequestDecision `json:"rejection"`
+
+	// ScheduleFailure Why the last scheduled application failed; null when none did.
+	ScheduleFailure *ScheduleFailure `json:"schedule_failure"`
 
 	// Segment The key of the segment of a segment's `definition`.
 	Segment *string `json:"segment,omitempty"`
@@ -992,7 +998,9 @@ type ChangeRequestAuthorKind string
 
 // ChangeRequestCreate defines model for ChangeRequestCreate.
 type ChangeRequestCreate struct {
-	Description *string `json:"description,omitempty"`
+	// ApplyAt When the system applies the change request once approved; absent to apply it by hand.
+	ApplyAt     *time.Time `json:"apply_at,omitempty"`
+	Description *string    `json:"description,omitempty"`
 
 	// Environment The key of the environment, for a configuration only.
 	Environment *string `json:"environment,omitempty"`
@@ -1053,7 +1061,9 @@ type ChangeRequestMember struct {
 
 // ChangeRequestPatch defines model for ChangeRequestPatch.
 type ChangeRequestPatch struct {
-	Description *string `json:"description,omitempty"`
+	// ApplyAt The apply time; null removes it. Absent leaves it as it is.
+	ApplyAt     nullable.Nullable[time.Time] `json:"apply_at,omitempty"`
+	Description *string                      `json:"description,omitempty"`
 
 	// Proposed What a change request proposes, as a direct write would give it,
 	// read by the change request's kind and the entity it names: a
@@ -2608,6 +2618,26 @@ type SampleRatioVariation struct {
 	Variation     string  `json:"variation"`
 }
 
+// ScheduleFailure Why the system failed to apply a scheduled change request, cleared
+// when it is applied or cancelled and kept when it is superseded. The
+// failure changes neither the change request's state nor its version.
+type ScheduleFailure struct {
+	// At When the last attempt failed.
+	At time.Time `json:"at"`
+
+	// Attempts The attempts that failed in a row.
+	Attempts int `json:"attempts"`
+
+	// Code The code of the refusal, as a manual application would answer it, or `internal`.
+	Code    string `json:"code"`
+	Message string `json:"message"`
+
+	// Stopped Whether the system stopped trying, after
+	// `FLAGNETIC_SCHEDULE_MAX_FAILURES` attempts (5 by default). Cancel
+	// the change request and copy it to propose it again.
+	Stopped bool `json:"stopped"`
+}
+
 // Scope What an API token may touch. Each permission falls under one scope, and a token exercises it only when it carries that scope.
 type Scope string
 
@@ -3468,6 +3498,9 @@ type ListChangeRequestsParams struct {
 	// `change_request.approve`. None for anyone else, a project token
 	// included.
 	AwaitingMyDecision *bool `form:"awaiting_my_decision,omitempty" json:"awaiting_my_decision,omitempty"`
+
+	// Scheduled When true, only those with an apply time; when false, only those without one.
+	Scheduled *bool `form:"scheduled,omitempty" json:"scheduled,omitempty"`
 
 	// Cursor The `next_cursor` of the previous page.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
@@ -4957,6 +4990,11 @@ type ClientInterface interface {
 	// one; new rules and rollouts are given an identifier and a salt,
 	// which `proposed` holds. A title of 1 to 200 characters is required
 	// and a description has at most 10,000 (`invalid_change_request`).
+	// `apply_at` schedules the change request: once approved, the system
+	// applies it at that time, or as soon after as a replica runs. It is at
+	// least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+	// most 365 days ahead (`invalid_change_request`, `too_soon` or
+	// `too_late` under `/apply_at`), and answered in UTC.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4982,6 +5020,11 @@ type ClientInterface interface {
 	// one; new rules and rollouts are given an identifier and a salt,
 	// which `proposed` holds. A title of 1 to 200 characters is required
 	// and a description has at most 10,000 (`invalid_change_request`).
+	// `apply_at` schedules the change request: once approved, the system
+	// applies it at that time, or as soon after as a replica runs. It is at
+	// least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+	// most 365 days ahead (`invalid_change_request`, `too_soon` or
+	// `too_late` under `/apply_at`), and answered in UTC.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5001,7 +5044,8 @@ type ClientInterface interface {
 	// document the change request's kind and entity call for, is checked
 	// as on creation, against the entity as it is now, and `diff` is
 	// recomputed from the entity as the change request is based on it; a
-	// rebase moves that. An edit that changes nothing changes
+	// rebase moves that. `apply_at` sets the apply time, judged
+	// from now as on creation, and null removes it. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type.
@@ -5017,7 +5061,8 @@ type ClientInterface interface {
 	// document the change request's kind and entity call for, is checked
 	// as on creation, against the entity as it is now, and `diff` is
 	// recomputed from the entity as the change request is based on it; a
-	// rebase moves that. An edit that changes nothing changes
+	// rebase moves that. `apply_at` sets the apply time, judged
+	// from now as on creation, and null removes it. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type.
@@ -5038,7 +5083,8 @@ type ClientInterface interface {
 	// and the application refused (`base_moved`). What is proposed is
 	// checked again as writing it directly is, since what it names may be
 	// gone since the approval: a refusal writes nothing and leaves the
-	// change request approved.
+	// change request approved. A change request with an apply time is
+	// applied by the system alone (`scheduled`).
 	//
 	// Corresponds with POST /projects/{project}/change-requests/{change_request}/apply (the `ApplyChangeRequest` operationId).
 	ApplyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *ApplyChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7804,6 +7850,11 @@ func (c *Client) ListChangeRequests(ctx context.Context, project ProjectKey, par
 // one; new rules and rollouts are given an identifier and a salt,
 // which `proposed` holds. A title of 1 to 200 characters is required
 // and a description has at most 10,000 (`invalid_change_request`).
+// `apply_at` schedules the change request: once approved, the system
+// applies it at that time, or as soon after as a replica runs. It is at
+// least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+// most 365 days ahead (`invalid_change_request`, `too_soon` or
+// `too_late` under `/apply_at`), and answered in UTC.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7839,6 +7890,11 @@ func (c *Client) CreateChangeRequestWithBody(ctx context.Context, project Projec
 // one; new rules and rollouts are given an identifier and a salt,
 // which `proposed` holds. A title of 1 to 200 characters is required
 // and a description has at most 10,000 (`invalid_change_request`).
+// `apply_at` schedules the change request: once approved, the system
+// applies it at that time, or as soon after as a replica runs. It is at
+// least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+// most 365 days ahead (`invalid_change_request`, `too_soon` or
+// `too_late` under `/apply_at`), and answered in UTC.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7878,7 +7934,8 @@ func (c *Client) GetChangeRequest(ctx context.Context, project ProjectKey, chang
 // document the change request's kind and entity call for, is checked
 // as on creation, against the entity as it is now, and `diff` is
 // recomputed from the entity as the change request is based on it; a
-// rebase moves that. An edit that changes nothing changes
+// rebase moves that. `apply_at` sets the apply time, judged
+// from now as on creation, and null removes it. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes any type of body and a specified content type.
@@ -7904,7 +7961,8 @@ func (c *Client) UpdateChangeRequestWithBody(ctx context.Context, project Projec
 // document the change request's kind and entity call for, is checked
 // as on creation, against the entity as it is now, and `diff` is
 // recomputed from the entity as the change request is based on it; a
-// rebase moves that. An edit that changes nothing changes
+// rebase moves that. `apply_at` sets the apply time, judged
+// from now as on creation, and null removes it. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes a body of the `application/json` content type.
@@ -7935,7 +7993,8 @@ func (c *Client) UpdateChangeRequest(ctx context.Context, project ProjectKey, ch
 // and the application refused (`base_moved`). What is proposed is
 // checked again as writing it directly is, since what it names may be
 // gone since the approval: a refusal writes nothing and leaves the
-// change request approved.
+// change request approved. A change request with an apply time is
+// applied by the system alone (`scheduled`).
 //
 // Corresponds with POST /projects/{project}/change-requests/{change_request}/apply (the `ApplyChangeRequest` operationId).
 func (c *Client) ApplyChangeRequest(ctx context.Context, project ProjectKey, changeRequest ChangeRequestID, params *ApplyChangeRequestParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12823,6 +12882,18 @@ func NewListChangeRequestsRequest(server string, project ProjectKey, params *Lis
 		if params.AwaitingMyDecision != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "awaiting_my_decision", *params.AwaitingMyDecision, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Scheduled != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "scheduled", *params.Scheduled, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -18713,6 +18784,11 @@ type ClientWithResponsesInterface interface {
 	// one; new rules and rollouts are given an identifier and a salt,
 	// which `proposed` holds. A title of 1 to 200 characters is required
 	// and a description has at most 10,000 (`invalid_change_request`).
+	// `apply_at` schedules the change request: once approved, the system
+	// applies it at that time, or as soon after as a replica runs. It is at
+	// least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+	// most 365 days ahead (`invalid_change_request`, `too_soon` or
+	// `too_late` under `/apply_at`), and answered in UTC.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18738,6 +18814,11 @@ type ClientWithResponsesInterface interface {
 	// one; new rules and rollouts are given an identifier and a salt,
 	// which `proposed` holds. A title of 1 to 200 characters is required
 	// and a description has at most 10,000 (`invalid_change_request`).
+	// `apply_at` schedules the change request: once approved, the system
+	// applies it at that time, or as soon after as a replica runs. It is at
+	// least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+	// most 365 days ahead (`invalid_change_request`, `too_soon` or
+	// `too_late` under `/apply_at`), and answered in UTC.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -18759,7 +18840,8 @@ type ClientWithResponsesInterface interface {
 	// document the change request's kind and entity call for, is checked
 	// as on creation, against the entity as it is now, and `diff` is
 	// recomputed from the entity as the change request is based on it; a
-	// rebase moves that. An edit that changes nothing changes
+	// rebase moves that. `apply_at` sets the apply time, judged
+	// from now as on creation, and null removes it. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -18775,7 +18857,8 @@ type ClientWithResponsesInterface interface {
 	// document the change request's kind and entity call for, is checked
 	// as on creation, against the entity as it is now, and `diff` is
 	// recomputed from the entity as the change request is based on it; a
-	// rebase moves that. An edit that changes nothing changes
+	// rebase moves that. `apply_at` sets the apply time, judged
+	// from now as on creation, and null removes it. An edit that changes nothing changes
 	// nothing and records nothing.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -18796,7 +18879,8 @@ type ClientWithResponsesInterface interface {
 	// and the application refused (`base_moved`). What is proposed is
 	// checked again as writing it directly is, since what it names may be
 	// gone since the approval: a refusal writes nothing and leaves the
-	// change request approved.
+	// change request approved. A change request with an apply time is
+	// applied by the system alone (`scheduled`).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -32585,6 +32669,11 @@ func (c *ClientWithResponses) ListChangeRequestsWithResponse(ctx context.Context
 // one; new rules and rollouts are given an identifier and a salt,
 // which `proposed` holds. A title of 1 to 200 characters is required
 // and a description has at most 10,000 (`invalid_change_request`).
+// `apply_at` schedules the change request: once approved, the system
+// applies it at that time, or as soon after as a replica runs. It is at
+// least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+// most 365 days ahead (`invalid_change_request`, `too_soon` or
+// `too_late` under `/apply_at`), and answered in UTC.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32616,6 +32705,11 @@ func (c *ClientWithResponses) CreateChangeRequestWithBodyWithResponse(ctx contex
 // one; new rules and rollouts are given an identifier and a salt,
 // which `proposed` holds. A title of 1 to 200 characters is required
 // and a description has at most 10,000 (`invalid_change_request`).
+// `apply_at` schedules the change request: once approved, the system
+// applies it at that time, or as soon after as a replica runs. It is at
+// least `FLAGNETIC_SCHEDULE_MIN_LEAD` (60 seconds by default) and at
+// most 365 days ahead (`invalid_change_request`, `too_soon` or
+// `too_late` under `/apply_at`), and answered in UTC.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32649,7 +32743,8 @@ func (c *ClientWithResponses) GetChangeRequestWithResponse(ctx context.Context, 
 // document the change request's kind and entity call for, is checked
 // as on creation, against the entity as it is now, and `diff` is
 // recomputed from the entity as the change request is based on it; a
-// rebase moves that. An edit that changes nothing changes
+// rebase moves that. `apply_at` sets the apply time, judged
+// from now as on creation, and null removes it. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -32671,7 +32766,8 @@ func (c *ClientWithResponses) UpdateChangeRequestWithBodyWithResponse(ctx contex
 // document the change request's kind and entity call for, is checked
 // as on creation, against the entity as it is now, and `diff` is
 // recomputed from the entity as the change request is based on it; a
-// rebase moves that. An edit that changes nothing changes
+// rebase moves that. `apply_at` sets the apply time, judged
+// from now as on creation, and null removes it. An edit that changes nothing changes
 // nothing and records nothing.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
@@ -32698,7 +32794,8 @@ func (c *ClientWithResponses) UpdateChangeRequestWithResponse(ctx context.Contex
 // and the application refused (`base_moved`). What is proposed is
 // checked again as writing it directly is, since what it names may be
 // gone since the approval: a refusal writes nothing and leaves the
-// change request approved.
+// change request approved. A change request with an apply time is
+// applied by the system alone (`scheduled`).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -47210,6 +47307,19 @@ func (siw *ServerInterfaceWrapper) ListChangeRequests(w http.ResponseWriter, r *
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "awaiting_my_decision"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "awaiting_my_decision", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "scheduled" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "scheduled", r.URL.Query(), &params.Scheduled, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "scheduled"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "scheduled", Err: err})
 		}
 		return
 	}
