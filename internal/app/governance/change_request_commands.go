@@ -37,7 +37,7 @@ type CreateChangeRequestCommand struct {
 // is checked as writing it would be, so a change request that could never
 // be applied is refused now and not at review.
 func (h *CreateChangeRequest) Handle(ctx context.Context, cmd CreateChangeRequestCommand) (governance.ChangeRequest, error) {
-	if err := cmd.Target.check(); err != nil {
+	if err := cmd.check(); err != nil {
 		return governance.ChangeRequest{}, err
 	}
 	now := h.d.now()

@@ -145,13 +145,13 @@ func (a *api) UpdateChangeRequest(ctx context.Context, req UpdateChangeRequestRe
 	if b.Proposed != nil {
 		// What a change request proposes is read by its kind and entity,
 		// which only the change request knows.
-		current, err := a.h.GetChangeRequest.Handle(ctx, cmd.Project, cmd.ChangeRequest)
-		if err != nil {
-			return nil, err
+		current, readErr := a.h.GetChangeRequest.Handle(ctx, cmd.Project, cmd.ChangeRequest)
+		if readErr != nil {
+			return nil, readErr
 		}
-		in, err := proposedIn(appgovernance.TargetOf(current), *b.Proposed)
-		if err != nil {
-			return nil, err
+		in, readErr := proposedIn(appgovernance.TargetOf(current), *b.Proposed)
+		if readErr != nil {
+			return nil, readErr
 		}
 		update.Proposed = &in
 	}

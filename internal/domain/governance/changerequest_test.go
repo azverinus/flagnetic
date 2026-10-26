@@ -439,8 +439,8 @@ func TestADefinitionsApprovalCoversTheEnvironmentsProtectedThen(t *testing.T) {
 		t.Fatalf("approved = %+v, %v; want covering production", approved, err)
 	}
 	// An environment no longer protected needs no cover.
-	if applied, err := approved.Apply(byAda, governance.Current{Version: 3}, later); err != nil || applied.State != governance.StateApplied {
-		t.Errorf("applied once production is unprotected = %+v, %v", applied, err)
+	if applied, applyErr := approved.Apply(byAda, governance.Current{Version: 3}, later); applyErr != nil || applied.State != governance.StateApplied {
+		t.Errorf("applied once production is unprotected = %+v, %v", applied, applyErr)
 	}
 	superseded, err := approved.Apply(byAda, governance.Current{Version: 3, Protected: []workspace.EnvironmentID{production, staging}}, later)
 	if codeOf(err) != "base_moved" || superseded.State != governance.StateSuperseded || superseded.Applied != nil {
