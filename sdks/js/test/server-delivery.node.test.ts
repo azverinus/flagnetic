@@ -430,7 +430,10 @@ describe("the ruleset stream", () => {
 
   test("a lower version answering a streamed one is retried on the 1, 2, 4 s sequence (scaled), once", async () => {
     const p = await platform(rulesetOf(2, { a: true }));
-    const h = start(p, {}, { catchUp: [100, 200, 400], retryInitial: 5_000, retryMax: 5_000 });
+    // Once the sequence is spent the backoff retries, after a delay drawn
+    // from 0 to 5 s; drawing half of it keeps that retry out of the window
+    // asserted below.
+    const h = start(p, {}, { catchUp: [100, 200, 400], retryInitial: 5_000, retryMax: 5_000 }, () => 0.5);
     await expect(h.client.ready(2000)).resolves.toBe("fresh");
     await p.until(() => p.openStreams === 1 && p.rulesetRequests().length === 1);
     p.rulesetDefault = { kind: "body", body: JSON.stringify(rulesetOf(1, { a: false })) };
