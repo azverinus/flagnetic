@@ -24,6 +24,7 @@ function changeRequest(patch: Partial<ChangeRequest> = {}): ChangeRequest {
     title: "Switch it on",
     description: "",
     base_version: 3,
+    revert_to: null,
     proposed: {
       on: true,
       off_variation: "a",
