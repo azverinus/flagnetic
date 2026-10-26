@@ -49,6 +49,8 @@ To run the smoke yourself, with Docker running:
 
 ```bash
 go build -o /tmp/flagnetic-e2e ./e2e/cmd/flagnetic-e2e
+rm -f /tmp/seed.json
 FLAGNETIC_E2E_SEED=/tmp/seed.json /tmp/flagnetic-e2e up &
+until [ -s /tmp/seed.json ]; do sleep 1; done # up writes the seed once both replicas serve
 cd sdks/ruby && FLAGNETIC_E2E_SEED=/tmp/seed.json FLAGNETIC_E2E_COMMAND=/tmp/flagnetic-e2e bundle exec rake e2e
 ```

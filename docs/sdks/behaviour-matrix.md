@@ -7,7 +7,7 @@ Each SDK's column is built from the report its own protocol runner writes: the s
 To rebuild a column, run the SDK's tests with `FLAGNETIC_SCENARIO_REPORT` naming a file, then hand that file to the script:
 
 ```bash
-FLAGNETIC_SCENARIO_REPORT="$PWD/go.json" go test -run 'TestProtocol' ./sdks/go
+FLAGNETIC_SCENARIO_REPORT="$PWD/go.json" go test -count=1 -run 'TestProtocol' ./sdks/go
 .github/scripts/behaviour-matrix.sh Go go.json
 (cd sdks/ruby && FLAGNETIC_SCENARIO_REPORT="$PWD/ruby.json" bundle exec rake test)
 .github/scripts/behaviour-matrix.sh Ruby sdks/ruby/ruby.json
