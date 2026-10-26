@@ -31,6 +31,9 @@ jobs:
       sdk_js_released: ${{ steps.release.outputs['sdks/js--release_created'] }}
       sdk_js_tag: ${{ steps.release.outputs['sdks/js--tag_name'] }}
       sdk_js_version: ${{ steps.release.outputs['sdks/js--version'] }}
+      sdk_python_released: ${{ steps.release.outputs['sdks/python--release_created'] }}
+      sdk_python_tag: ${{ steps.release.outputs['sdks/python--tag_name'] }}
+      sdk_python_version: ${{ steps.release.outputs['sdks/python--version'] }}
     steps:
       # A GitHub App token makes the release pull request trigger CI; without
       # the app the built-in token still works, but CI must be run by hand.
@@ -194,3 +197,60 @@ jobs:
               echo "Publish the tarball of the artifact flagnetic-$VERSION by hand, then configure trusted publishing (CONTRIBUTING.md)."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  # The Python SDK's wheel and sdist, built from the tag and checked like
+  # every pull request checks them, after the tests prove the version is the
+  # tag's. Building apart from the publishing job keeps the build's tools
+  # away from the job that can publish.
+  sdk-python-build:
+    name: python wheel and sdist
+    needs: release-please
+    if: needs.release-please.outputs.sdk_python_released == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/python
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.sdk_python_tag }}
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: Version equals the tag
+        env:
+          FLAGNETIC_RELEASE_VERSION: ${{ needs.release-please.outputs.sdk_python_version }}
+        run: |
+          uv sync --locked
+          uv run pytest tests/test_version.py
+      - name: Build
+        run: uv build
+      - name: Check the metadata and the contents
+        run: |
+          python3 scripts/check_dist.py dist
+          uvx twine check --strict dist/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flagnetic-python-${{ needs.release-please.outputs.sdk_python_version }}
+          path: sdks/python/dist/
+          retention-days: 30
+
+  # PyPI trusts this workflow, in the pypi environment, by its OIDC token
+  # (trusted publishing), so no PyPI token is stored anywhere, and each file
+  # is published with an attestation. PyPI accepts the token only from a
+  # top-level job of the workflow it trusts, never from a reusable one. The
+  # pending publisher is configured before the first release
+  # (CONTRIBUTING.md), so the first version is published here too.
+  sdk-python-pypi:
+    name: PyPI (flagnetic)
+    needs: [release-please, sdk-python-build]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: flagnetic-python-${{ needs.release-please.outputs.sdk_python_version }}
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true

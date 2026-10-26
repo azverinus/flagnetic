@@ -6,7 +6,12 @@ Python SDK for [Flagnetic](https://github.com/azverinus/flagnetic), self-hosted 
 pip install flagnetic
 ```
 
-It needs Python 3.11 or later and installs no dependency.
+It needs Python 3.11 or later and installs no dependency: the package is pure Python, its regular expression engine
+included, so it installs the same on Alpine and on free-threaded builds. Supported: the Python releases still
+supported upstream (a release reaching its end of life is dropped in a minor version) and, with the extra,
+`openfeature-sdk` 0.9 and later. The package speaks the SDK API `/sdk/v1` and works with every Flagnetic server from
+0.1.0 on ([compatibility](../../docs/sdks/compatibility.md)); [docs/sdks/python.md](../../docs/sdks/python.md) is how
+it is deployed and tested.
 
 ## Quick start
 
@@ -25,8 +30,8 @@ client.close()
 
 The getters never block and never raise: they read the ruleset the client holds and serve the default you pass when
 they cannot serve the flag. One background thread fetches the ruleset with `If-None-Match`, holds the ruleset stream
-(a kill switch reaches the client within two seconds), polls while the stream is down, and backs off with jitter.
-`store="/var/lib/app/flagnetic.json"` keeps the last good ruleset across restarts.
+(a kill switch reaches the client within two seconds), polls every 30 seconds while the stream is down, and backs
+off with jitter. `store="/var/lib/app/flagnetic.json"` keeps the last good ruleset across restarts.
 
 ## Experiments and events
 
@@ -130,6 +135,12 @@ is fresh again and `PROVIDER_ERROR` when the SDK key is revoked. Initialization 
 uv sync --extra openfeature
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run pytest
+uv run pytest e2e  # the smoke against two real replicas (below)
 ```
+
+The smoke needs the end-to-end harness of [`e2e/`](../../e2e/README.md) running: start `flagnetic-e2e up` with
+`FLAGNETIC_E2E_SEED` naming a file, then run `uv run pytest e2e` with the same `FLAGNETIC_E2E_SEED` and, unless
+`flagnetic-e2e` is on the `PATH`, `FLAGNETIC_E2E_CMD` naming it. It ends by revoking the seed's server key, so bring
+the harness up again before running it a second time.
 
 The tests run the shared conformance suite in `conformance/` against the evaluator, play the protocol scenarios and degradation cases against a mock server through the public API, and measure that evaluating one flag of a 1,000-flag ruleset stays under a millisecond at the 99th percentile.

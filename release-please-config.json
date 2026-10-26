@@ -61,6 +61,15 @@
       "include-component-in-tag": true,
       "changelog-path": "CHANGELOG.md",
       "extra-files": ["src/version.ts"]
+    },
+    "sdks/python": {
+      "release-type": "python",
+      "initial-version": "0.1.0",
+      "package-name": "flagnetic",
+      "component": "sdks/python",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": ["src/flagnetic/_version.py"]
     }
   }
 }
