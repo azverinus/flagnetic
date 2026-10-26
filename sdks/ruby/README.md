@@ -1,6 +1,39 @@
 # Flagnetic SDK for Ruby
 
-The Ruby SDK for [Flagnetic](../../README.md), server mode: it evaluates flags inside a Ruby process from a ruleset held in memory. It needs Ruby 3.3 or newer and depends on nothing outside the standard library.
+The Ruby SDK for [Flagnetic](../../README.md), server mode: it evaluates flags inside a Ruby process from a ruleset held in memory. It depends on nothing outside the standard library.
+
+## Install
+
+```bash
+bundle add flagnetic
+```
+
+| Runtime | Supported |
+|---|---|
+| Ruby | 3.3 and later (CI: 3.3, 3.4, 4.0) |
+| Rails, for the integration | 8.0 and later (CI: 8.0, 8.1) |
+| Flagnetic server | 0.1.0 and later: the gem reads ruleset `schema_version` 1 over `/sdk/v1` ([compatibility](../../docs/sdks/compatibility.md)) |
+
+The oldest Ruby and Rails still supported upstream set the floor; one that reaches its end of life is dropped in a minor release.
+
+## Quick start
+
+```ruby
+require "flagnetic"
+
+client = Flagnetic::Client.new(ENV.fetch("FLAGNETIC_SDK_KEY"), base_url: "https://flags.example.com")
+client.ready(timeout: 5)
+
+if client.bool("new_checkout", default: false, context: { units: { user: "u-1001" } })
+  # the new checkout
+end
+```
+
+Under Rails no initializer is needed: set `FLAGNETIC_SDK_KEY` and `FLAGNETIC_BASE_URL` and use `Flagnetic.client` (see [Rails](#rails)). In tests, `Flagnetic::Testing` serves the values you set without a server (see [Testing](#testing)).
+
+## Propagation
+
+A change saved in Flagnetic, a kill switch included, reaches a client holding the change stream (the default) within **2 seconds at the 99th percentile**, whichever replica the change and the client each go through. With `stream: false`, or behind a proxy that blocks `text/event-stream`, it arrives at the next poll, within 30 seconds. Every pull request that changes this gem checks the 2 seconds against two real replicas.
 
 ## Client
 
@@ -176,6 +209,21 @@ with_ruleset(file: "test/fixtures/flags.json") do |client|
 end
 ```
 
+## OpenFeature
+
+[`flagnetic-openfeature`](../ruby-openfeature/README.md) is an OpenFeature provider over this gem, in a gem of its own so that `flagnetic` stays free of the dependency. It needs Ruby 3.4 or later and `openfeature-sdk` 0.6.1 or a later 0.x release; exposures and aliases go through `track`.
+
+```bash
+bundle add flagnetic-openfeature
+```
+
+```ruby
+require "flagnetic/openfeature"
+
+provider = Flagnetic::OpenFeature::Provider.new(ENV.fetch("FLAGNETIC_SDK_KEY"), base_url: "https://flags.example.com")
+OpenFeature::SDK.configure { |config| config.set_provider_and_wait(provider) }
+```
+
 ## Evaluator
 
 `Flagnetic::Eval` evaluates any ruleset document exactly as the reference evaluator in [`eval/`](../../eval) does, which every fixture of the [conformance suite](../../conformance) proves with no case skipped.
@@ -224,3 +272,5 @@ bundle exec rake test   # unit tests, every conformance fixture, the protocol sc
 bundle exec rubocop
 (cd rails && bundle install && bundle exec rake test)  # the Rails integration; RAILS_VERSION=8.0 for the older major
 ```
+
+`bundle exec rake e2e` runs the smoke against two real replicas brought up by `flagnetic-e2e up`; [docs/sdks/ruby.md](../../docs/sdks/ruby.md#how-it-is-tested) shows how.
