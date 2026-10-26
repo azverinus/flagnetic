@@ -39,11 +39,11 @@ A write that changes no ruleset pays nothing. A write that changes a ruleset pay
 
 A change to a protected environment goes through a [change request](change-requests.md):
 
-1. A developer proposes the configuration as a change request (`change_request.propose`) and opens it for review. The change request shows the diff from what the environment serves now.
+1. A developer proposes the configuration as a change request (`change_request.propose`) and opens it for review; a flag's variations and automatic exposure, or a segment's conditions and private switch, are proposed as one change request covering every environment. The change request shows the diff from what the environment serves now.
 2. A maintainer or owner who is not the author approves it (`change_request.approve`), or rejects it with a comment. Approval always takes a second person: the author is refused (`author_cannot_approve`).
 3. The author, the approver or any member holding `change_request.approve` applies it. The application writes the configuration into the protected environment, past protection for that environment alone, and its audit entries carry the change request's identifier.
 
-A change request is based on the configuration as it was proposed. If anything writes the configuration before the change request is applied, or archives or deletes its flag or deletes its environment, it is [superseded](change-requests.md#superseded) by that write at once, since what was reviewed is no longer what would be written; copy it to propose it again. A change request may be proposed for any environment, protected or not.
+A change request is based on the configuration, flag or segment as it was proposed. If anything writes it before the change request is applied, or archives or deletes its flag, deletes its segment or deletes its environment, it is [superseded](change-requests.md#superseded) by that write at once, since what was reviewed is no longer what would be written; copy it to propose it again. A change request may be proposed for any environment, protected or not.
 
 ## Pipelines and change requests
 
