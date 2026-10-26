@@ -168,7 +168,7 @@ function EnvironmentExposures({
       timeline={timeline.data}
       conflicts={conflicts.data}
       variations={experiment.variations.map(({ variation }) => variation)}
-      stopped={experiment.status === "stopped" || experiment.status === "archived"}
+      stoppedAt={experiment.stopped_at}
       refreshing={reads.some((read) => read.isFetching)}
       onRefresh={refresh}
     />
@@ -181,8 +181,11 @@ export type ExposuresViewProps = {
   conflicts: ExposureConflicts;
   /** The experiment's variations in its order, which the timeline's columns follow. */
   variations: readonly string[];
-  /** Whether the experiment was stopped, so its sample-ratio check is the stop's, never run again. */
-  stopped?: boolean;
+  /**
+   * When the experiment stopped, if it did: no sample-ratio check runs
+   * after, and the one taken at that instant is the stop's final check.
+   */
+  stoppedAt?: string | null;
   refreshing?: boolean;
   onRefresh?: () => void;
 };
@@ -193,7 +196,7 @@ export function ExposuresView({
   timeline,
   conflicts,
   variations,
-  stopped = false,
+  stoppedAt = null,
   refreshing = false,
   onRefresh,
 }: ExposuresViewProps) {
@@ -236,7 +239,7 @@ export function ExposuresView({
       </div>
       <VariationTable rows={summary.variations} />
       <Refusals rejections={summary.rejections} />
-      <SampleRatioResult check={summary.sample_ratio} stopped={stopped} />
+      <SampleRatioResult check={summary.sample_ratio} stoppedAt={stoppedAt} />
       <div className="flex flex-col gap-2">
         <h3 className="font-medium">
           <Trans>Per day</Trans>
@@ -331,20 +334,34 @@ function VariationTable({ rows }: { rows: readonly VariationExposures[] }) {
  * chi-square, or why the check computed nothing. An `srm` alert stays
  * active between a p-value of 0.001 and 0.01 once raised, so whether one
  * is active, not the p-value alone, says which way the check came out.
+ * A stop takes the final check only in the environments holding the rule
+ * at that moment, so one that stopped holding it earlier keeps the last
+ * check taken while the experiment ran, or none.
  */
 function SampleRatioResult({
   check,
-  stopped,
+  stoppedAt,
 }: {
   check: SampleRatioCheck | null;
-  stopped: boolean;
+  stoppedAt: string | null;
 }) {
   const { i18n, t } = useLingui();
   const heading = useId();
   const n = check ? formatNumber(i18n, check.n) : "";
 
+  const stopped = stoppedAt !== null;
+  const takenAtStop =
+    stopped && check !== null && Date.parse(check.checked_at) === Date.parse(stoppedAt);
+
   let verdict: ReactNode;
-  if (check === null) {
+  if (check === null && stopped) {
+    verdict = (
+      <Trans>
+        Not checked: the experiment stopped before a check ran in this environment, and none runs
+        after a stop.
+      </Trans>
+    );
+  } else if (check === null) {
     verdict = (
       <Trans>
         Not checked yet: a running experiment is checked every 10 minutes in each environment
@@ -405,10 +422,15 @@ function SampleRatioResult({
         ) : null}
         {check === null ? null : (
           <p className="text-muted-foreground">
-            {stopped ? (
+            {takenAtStop ? (
               <Trans>
                 Final check, taken at the stop on <Moment value={check.checked_at} />; it is never
                 run again.
+              </Trans>
+            ) : stopped ? (
+              <Trans>
+                Last checked <Moment value={check.checked_at} />, while the experiment ran; the stop
+                took no check here, as the environment no longer held its rule.
               </Trans>
             ) : (
               <Trans>

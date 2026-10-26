@@ -2664,6 +2664,10 @@ msgstr "Kind"
 msgid "Language"
 msgstr "Language"
 
+#: src/components/experiment-exposures.tsx
+msgid "Last checked <0/>, while the experiment ran; the stop took no check here, as the environment no longer held its rule."
+msgstr "Last checked <0/>, while the experiment ran; the stop took no check here, as the environment no longer held its rule."
+
 #: src/components/sdk-inventory.tsx
 msgid "Last ruleset version"
 msgstr "Last ruleset version"
@@ -3221,6 +3225,10 @@ msgstr "None, end the old key now"
 #: src/components/experiment-exposures.tsx
 msgid "Not checked yet: a running experiment is checked every 10 minutes in each environment holding its rule, and once more at its stop."
 msgstr "Not checked yet: a running experiment is checked every 10 minutes in each environment holding its rule, and once more at its stop."
+
+#: src/components/experiment-exposures.tsx
+msgid "Not checked: the experiment stopped before a check ran in this environment, and none runs after a stop."
+msgstr "Not checked: the experiment stopped before a check ran in this environment, and none runs after a stop."
 
 #: src/components/experiment-exposures.tsx
 msgid "Not counted yet: the exposures are first counted within seconds of arriving."

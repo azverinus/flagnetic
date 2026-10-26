@@ -53,7 +53,7 @@ function show(
   over: Partial<{
     summary: ExperimentExposures;
     conflicts: ExposureConflicts;
-    stopped: boolean;
+    stoppedAt: string;
   }> = {},
 ) {
   renderWithProviders(
@@ -62,7 +62,7 @@ function show(
       timeline={timeline}
       conflicts={over.conflicts ?? none}
       variations={["control", "treatment"]}
-      stopped={over.stopped}
+      stoppedAt={over.stoppedAt}
     />,
   );
 }
@@ -264,7 +264,27 @@ describe("an environment's exposures", () => {
   });
 
   it("says a stopped experiment keeps the check its stop took", () => {
-    show({ summary: checked({ active: false, p_value: 0.5, chi_square: 0.45 }), stopped: true });
+    show({
+      summary: checked({ active: false, p_value: 0.5, chi_square: 0.45 }),
+      stoppedAt: "2026-10-21T09:40:00.000Z",
+    });
     expect(within(sampleRatio()).getByText(/^Final check, taken at the stop/)).toBeVisible();
+  });
+
+  it("does not call a check from before the stop its final one", () => {
+    show({
+      summary: checked({ active: false, p_value: 0.5, chi_square: 0.45 }),
+      stoppedAt: "2026-10-22T12:00:00Z",
+    });
+    const region = sampleRatio();
+    expect(within(region).queryByText(/^Final check/)).toBeNull();
+    expect(within(region).getByText(/^Last checked .*, while the experiment ran/)).toBeVisible();
+  });
+
+  it("says a stopped experiment never checked in the environment will not be", () => {
+    show({ stoppedAt: "2026-10-22T12:00:00Z" });
+    expect(
+      within(sampleRatio()).getByText(/^Not checked: the experiment stopped before a check ran/),
+    ).toBeVisible();
   });
 });
