@@ -106,6 +106,9 @@ type Subject struct {
 	Environment *EnvironmentRef
 	// Segment names the segment of a segment's definition.
 	Segment *SegmentRef
+	// Experiment names the experiment whose transition is proposed; Flag
+	// then names the experiment's flag.
+	Experiment *ExperimentRef
 	// Base is the document of the entity as the change request was based
 	// on it, and BaseVersion that document's version.
 	Base        Document
@@ -116,6 +119,12 @@ type Subject struct {
 	// what the definition was reviewed with, even a write that stops naming
 	// the segment.
 	BaseReferrers []flags.FlagID
+	// BaseHolders are, for an experiment's transition, the environments
+	// whose configuration of the experiment's flag held a rule serving it
+	// when the change request was based on it: the environments whose
+	// rulesets the transition was reviewed as changing. A write to the
+	// flag's configuration in one of them moves what was reviewed.
+	BaseHolders []workspace.EnvironmentID
 }
 
 // FlagRef names a flag by identifier, and by the key it had when read.
@@ -281,7 +290,7 @@ func NewChangeRequest(in NewChangeRequestInput) (ChangeRequest, error) {
 	if err != nil {
 		return ChangeRequest{}, err
 	}
-	diff := Diff(in.Subject.Base, in.Proposed)
+	diff := diffOf(in.Subject.Kind, in.Subject.Base, in.Proposed)
 	state := StateDraft
 	if in.Open {
 		state = StateOpen
@@ -528,7 +537,7 @@ func (cr ChangeRequest) Edit(by Taker, e Edit, now time.Time) (ChangeRequest, bo
 		return cr, false, err
 	}
 	out.Title, out.Description, out.Proposed = title, description, p.Proposed
-	out.Diff = Diff(cr.Base, p.Proposed)
+	out.Diff = diffOf(cr.Kind, cr.Base, p.Proposed)
 	return cr.changedTo(out, now)
 }
 
@@ -541,8 +550,9 @@ func (cr ChangeRequest) Rebase(by Taker, current Subject, now time.Time) (Change
 		return cr, false, err
 	}
 	out := cr
-	out.Base, out.BaseVersion, out.BaseReferrers = current.Base, current.BaseVersion, current.BaseReferrers
-	out.Diff = Diff(current.Base, cr.Proposed)
+	out.Base, out.BaseVersion = current.Base, current.BaseVersion
+	out.BaseReferrers, out.BaseHolders = current.BaseReferrers, current.BaseHolders
+	out.Diff = diffOf(cr.Kind, current.Base, cr.Proposed)
 	return cr.changedTo(out, now)
 }
 
@@ -568,21 +578,30 @@ var errRevertProposed = apperrors.Invalid("invalid_change_request", "the change 
 	Pointer: "/proposed", Code: "not_allowed", Detail: "a revert proposes the version it returns to, which nobody edits",
 })
 
-// Open returns cr opened for review by by at now. currentVersion is the
-// version of the entity now: when it is not the one cr was based on, the
-// diff no longer shows what applying it would do, and opening is refused as
-// base_moved until the author rebases it.
-func (cr ChangeRequest) Open(by Taker, currentVersion int64, now time.Time) (ChangeRequest, error) {
+// Open returns cr opened for review by by at now. current is its entity
+// now: when its version is not the one cr was based on, or, for an
+// experiment, other environments hold its rule, the diff no longer shows
+// what applying it would do, and opening is refused as base_moved until the
+// author rebases it.
+func (cr ChangeRequest) Open(by Taker, current Current, now time.Time) (ChangeRequest, error) {
 	state, err := cr.Next(TransitionOpen, by)
 	if err != nil {
 		return cr, err
 	}
-	if currentVersion != cr.BaseVersion {
+	if current.Version != cr.BaseVersion || !cr.sameHolders(current) {
 		return cr, apperrors.Conflict("base_moved",
 			"what the change request is based on has changed since; rebase it, then open it").
-			WithExtension("base_version", cr.BaseVersion).WithExtension("current_version", currentVersion)
+			WithExtension("base_version", cr.BaseVersion).WithExtension("current_version", current.Version)
 	}
 	return cr.moved(state, now), nil
+}
+
+// sameHolders reports whether the environments holding cr's experiment's
+// rule now are those it was based on; always for any other kind. A write
+// that starts holding the rule in another environment moves no change
+// request, so the holders are compared again at every step.
+func (cr ChangeRequest) sameHolders(current Current) bool {
+	return cr.Kind != KindExperiment || sameEnvironments(cr.BaseHolders, current.Holders)
 }
 
 // Cancel returns cr cancelled by by at now.
@@ -597,12 +616,14 @@ func (cr ChangeRequest) Cancel(by Taker, now time.Time) (ChangeRequest, error) {
 	return out, nil
 }
 
-// Current is what a change request is judged against when it is approved
-// or applied: the version of its entity now, and the environments of its
-// project protected now.
+// Current is what a change request is judged against when it is opened,
+// approved or applied: the version of its entity now, the environments of
+// its project protected now, and, for an experiment, the environments
+// holding its rule now.
 type Current struct {
 	Version   int64
 	Protected []workspace.EnvironmentID
+	Holders   []workspace.EnvironmentID
 }
 
 // Approve returns cr approved by by at now with comment, which is optional;
@@ -620,7 +641,7 @@ func (cr ChangeRequest) Approve(by Taker, comment string, current Current, now t
 	if err != nil {
 		return cr, err
 	}
-	if current.Version != cr.BaseVersion {
+	if current.Version != cr.BaseVersion || !cr.sameHolders(current) {
 		return cr.moved(StateSuperseded, now), baseMoved(cr.BaseVersion, current.Version)
 	}
 	out := cr.moved(state, now)
@@ -660,7 +681,7 @@ func (cr ChangeRequest) Apply(by Taker, current Current, now time.Time) (ChangeR
 	if cr.ApplyAt != nil && !by.System {
 		return cr, errScheduled
 	}
-	if current.Version != cr.BaseVersion {
+	if current.Version != cr.BaseVersion || !cr.sameHolders(current) {
 		return cr.moved(StateSuperseded, now), baseMoved(cr.BaseVersion, current.Version)
 	}
 	if cr.Kind != KindFlagConfiguration {
@@ -758,7 +779,7 @@ func (cr ChangeRequest) changedTo(out ChangeRequest, now time.Time) (ChangeReque
 	sameSchedule := (out.ApplyAt == nil) == (cr.ApplyAt == nil) && (out.ApplyAt == nil || out.ApplyAt.Equal(*cr.ApplyAt))
 	if sameSchedule && out.Title == cr.Title && out.Description == cr.Description && out.BaseVersion == cr.BaseVersion &&
 		reflect.DeepEqual(out.Proposed, cr.Proposed) && reflect.DeepEqual(out.Base, cr.Base) &&
-		slices.Equal(out.BaseReferrers, cr.BaseReferrers) {
+		slices.Equal(out.BaseReferrers, cr.BaseReferrers) && slices.Equal(out.BaseHolders, cr.BaseHolders) {
 		return cr, false, nil
 	}
 	out.UpdatedAt, out.Version = now, cr.Version+1

@@ -74,6 +74,10 @@ A stopped experiment keeps its name, hypothesis (never emptied), owner and tags 
 
 The flag of a stopped experiment can be archived again, but a variation the experiment compared still cannot be removed from it: the decision and the exposures counted keep naming it.
 
+## In a protected environment
+
+A start, a stop and a traffic allocation growth change what every environment holding the experiment's rule serves, so when one of them is [protected](governance.md#protected-environments) they are refused `403 change_request_required` and proposed as a [change request](change-requests.md#experiments) instead, which shows each rule the transition rewrites. The experiment's other writes change no ruleset and stay direct.
+
 ## Archiving
 
 `POST /projects/{project}/experiments/{experiment}/archive` (`experiment.edit`, with `If-Match`) archives a draft or a stopped experiment, recorded as `experiment.archived`; no ruleset moves. A running experiment is stopped with a decision first (`409 running`). An archived experiment is left out of the list unless asked for, and every write of it, archiving it again included, is refused `409 archived`; it can still be [cloned](#cloning).

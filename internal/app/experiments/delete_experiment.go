@@ -39,7 +39,8 @@ type DeleteExperiment struct{ d DeleteExperimentDeps }
 func NewDeleteExperiment(d DeleteExperimentDeps) *DeleteExperiment { return &DeleteExperiment{d: d} }
 
 // Handle deletes the experiment, recording it as it was. A draft is in no
-// ruleset, so no ruleset moves.
+// ruleset, so no ruleset moves; the change requests proposing to start it
+// are superseded by the deletion.
 func (h *DeleteExperiment) Handle(ctx context.Context, cmd ExperimentCommand) error {
 	now := h.d.Recorder.now()
 	return h.d.Tx.Within(ctx, func(ctx context.Context) error {
@@ -56,11 +57,14 @@ func (h *DeleteExperiment) Handle(ctx context.Context, cmd ExperimentCommand) er
 		if err = e.CanDelete(); err != nil {
 			return err
 		}
-		if err = h.d.Store.DeleteExperiment(ctx, e.ID); err != nil {
+		// The entry is recorded before the row goes, so the change requests
+		// proposing a transition of the experiment are found and superseded
+		// by it before the deletion cascades to them.
+		if err = h.d.Recorder.record(ctx, now, cmd.Request, governance.Record{
+			Project: cmd.Project, Action: "experiment.deleted", Entity: experimentEntity(e), Before: experimentValues(e),
+		}); err != nil {
 			return err
 		}
-		return h.d.Recorder.record(ctx, now, cmd.Request, governance.Record{
-			Project: cmd.Project, Action: "experiment.deleted", Entity: experimentEntity(e), Before: experimentValues(e),
-		})
+		return h.d.Store.DeleteExperiment(ctx, e.ID)
 	})
 }

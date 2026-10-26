@@ -11,8 +11,9 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
 
-// CreateChangeRequest proposes a flag's configuration in one environment,
-// or a flag's or a segment's definition in every environment.
+// CreateChangeRequest proposes a flag's configuration in one environment, a
+// flag's or a segment's definition in every environment, or a transition of
+// an experiment in every environment holding its rule.
 type CreateChangeRequest struct{ d ChangeRequestDeps }
 
 // NewCreateChangeRequest returns the handler.
@@ -228,7 +229,8 @@ type OpenChangeRequest struct{ d ChangeRequestDeps }
 func NewOpenChangeRequest(d ChangeRequestDeps) *OpenChangeRequest { return &OpenChangeRequest{d: d} }
 
 // Handle opens the change request and returns it, or refuses it as
-// base_moved when its entity was written since it was based on it.
+// base_moved when its entity was written since it was based on it, or, for
+// an experiment, when other environments hold its rule now.
 func (h *OpenChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand) (governance.ChangeRequest, error) {
 	return transition(ctx, h.d, cmd, "change_request.opened",
 		func(ctx context.Context, cr governance.ChangeRequest, now time.Time) (governance.ChangeRequest, bool, error) {
@@ -239,7 +241,7 @@ func (h *OpenChangeRequest) Handle(ctx context.Context, cmd ChangeRequestCommand
 			if err != nil {
 				return cr, false, err
 			}
-			opened, err := cr.Open(cmd.By, subject.BaseVersion, now)
+			opened, err := cr.Open(cmd.By, governance.Current{Version: subject.BaseVersion, Holders: subject.BaseHolders}, now)
 			return opened, err == nil, err
 		})
 }
@@ -366,8 +368,11 @@ type ChangeRequestFilter struct {
 	Flag        string
 	Environment string
 	Segment     string
-	Kind        governance.ChangeRequestKind
-	State       governance.ChangeRequestState
+	// Experiment selects by the key of the experiment a change request
+	// proposes a transition of.
+	Experiment string
+	Kind       governance.ChangeRequestKind
+	State      governance.ChangeRequestState
 	// Author selects the change requests of a member or a project token,
 	// by its identifier.
 	Author string

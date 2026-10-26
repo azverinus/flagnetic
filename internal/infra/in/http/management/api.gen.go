@@ -118,6 +118,7 @@ func (e ChangeRequestAuthorKind) Valid() bool {
 // Defines values for ChangeRequestCreateKind.
 const (
 	ChangeRequestCreateKindDefinition        ChangeRequestCreateKind = "definition"
+	ChangeRequestCreateKindExperiment        ChangeRequestCreateKind = "experiment"
 	ChangeRequestCreateKindFlagConfiguration ChangeRequestCreateKind = "flag_configuration"
 )
 
@@ -125,6 +126,8 @@ const (
 func (e ChangeRequestCreateKind) Valid() bool {
 	switch e {
 	case ChangeRequestCreateKindDefinition:
+		return true
+	case ChangeRequestCreateKindExperiment:
 		return true
 	case ChangeRequestCreateKindFlagConfiguration:
 		return true
@@ -304,6 +307,27 @@ func (e ExperimentStatus) Valid() bool {
 	case ExperimentStatusRunning:
 		return true
 	case ExperimentStatusStopped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExperimentTransitionAction.
+const (
+	ExperimentTransitionActionSetTrafficAllocation ExperimentTransitionAction = "set_traffic_allocation"
+	ExperimentTransitionActionStart                ExperimentTransitionAction = "start"
+	ExperimentTransitionActionStop                 ExperimentTransitionAction = "stop"
+)
+
+// Valid indicates whether the value is a known member of the ExperimentTransitionAction enum.
+func (e ExperimentTransitionAction) Valid() bool {
+	switch e {
+	case ExperimentTransitionActionSetTrafficAllocation:
+		return true
+	case ExperimentTransitionActionStart:
+		return true
+	case ExperimentTransitionActionStop:
 		return true
 	default:
 		return false
@@ -933,32 +957,43 @@ type ChangeRequest struct {
 	// Author The member or the project token that proposed the change request.
 	Author ChangeRequestAuthor `json:"author"`
 
-	// BaseVersion The version of the configuration, the flag or the segment the change request is based on.
+	// BaseVersion The version of the configuration, the flag, the segment or the experiment the change request is based on.
 	BaseVersion int64     `json:"base_version"`
 	CreatedAt   time.Time `json:"created_at"`
 	Description string    `json:"description"`
 
-	// Diff The RFC 6902 patch from the entity as the change request is based on it to `proposed`.
+	// Diff The RFC 6902 patch from the entity as the change request is
+	// based on it to `proposed`. For an `experiment` change request,
+	// from the experiment (`status`, `traffic_allocation`,
+	// `decision`) and the rules serving it in each environment holding
+	// one (`rules`, by environment key) to what the transition leaves
+	// of them, so a stop shows each rule it rewrites or removes.
 	Diff []PatchOperation `json:"diff"`
 
 	// Environment The key of the environment of a `flag_configuration` change request.
 	Environment *string `json:"environment,omitempty"`
 
-	// Flag The key of the flag proposed for.
+	// Experiment The key of the experiment of an `experiment` change request.
+	Experiment *string `json:"experiment,omitempty"`
+
+	// Flag The key of the flag proposed for; for an `experiment` change request, the experiment's flag.
 	Flag *string            `json:"flag,omitempty"`
 	Id   openapi_types.UUID `json:"id"`
 
 	// Kind What a change request proposes: `flag_configuration`, a flag's
 	// configuration in one environment; `definition`, a flag's variations
 	// and automatic exposure, or a segment's conditions and private
-	// switch, in every environment. `experiment` is to come. A client
-	// reads `proposed` by the kind and the entity named.
+	// switch, in every environment; `experiment`, an experiment's start,
+	// stop with a decision or traffic allocation growth, in every
+	// environment holding its rule. A client reads `proposed` by the kind
+	// and the entity named.
 	Kind ChangeRequestKind `json:"kind"`
 
 	// Proposed What the change request proposes, by its kind and the entity it
 	// names: a `ProposedConfiguration` for `flag_configuration`, a
 	// `ProposedFlagDefinition` for a flag's `definition`, a
-	// `ProposedSegmentDefinition` for a segment's.
+	// `ProposedSegmentDefinition` for a segment's, a
+	// `ProposedExperimentTransition` for `experiment`.
 	Proposed ChangeRequest_Proposed `json:"proposed"`
 
 	// Rejection Who rejected the change request, when and why; null unless it was rejected.
@@ -978,7 +1013,7 @@ type ChangeRequest struct {
 	// it was based on moved). The last four are final.
 	State ChangeRequestState `json:"state"`
 
-	// SupersededBy The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment. Null unless a write superseded it; a change request found superseded only when it was approved or applied names none.
+	// SupersededBy The audit entry of the write that superseded the change request by changing what it was based on: a direct write, an override, the kill switch, a copy, a revert, another change request's application, archiving or deleting its flag, deleting its environment; for a definition, any write to its flag or segment, and a write to the configuration of its flag or of a flag naming its segment, in any environment; for an experiment, any write to the experiment, its deletion included, and a write to its flag's configuration in an environment that held its rule when the change request was based on it. Null unless a write superseded it; a change request found superseded only when it was opened, approved or applied names none, as when another environment has started holding the experiment's rule since.
 	SupersededBy *openapi_types.UUID `json:"superseded_by"`
 	Title        string              `json:"title"`
 	UpdatedAt    time.Time           `json:"updated_at"`
@@ -990,7 +1025,8 @@ type ChangeRequest struct {
 // ChangeRequest_Proposed What the change request proposes, by its kind and the entity it
 // names: a `ProposedConfiguration` for `flag_configuration`, a
 // `ProposedFlagDefinition` for a flag's `definition`, a
-// `ProposedSegmentDefinition` for a segment's.
+// `ProposedSegmentDefinition` for a segment's, a
+// `ProposedExperimentTransition` for `experiment`.
 type ChangeRequest_Proposed struct {
 	union json.RawMessage
 }
@@ -1035,6 +1071,9 @@ type ChangeRequestCreate struct {
 	// Environment The key of the environment, for a configuration only.
 	Environment *string `json:"environment,omitempty"`
 
+	// Experiment The key of the experiment, for an `experiment` change request only, which names no flag.
+	Experiment *string `json:"experiment,omitempty"`
+
 	// Flag The key of the flag, for a configuration or a flag's definition.
 	Flag *string                 `json:"flag,omitempty"`
 	Kind ChangeRequestCreateKind `json:"kind"`
@@ -1046,7 +1085,8 @@ type ChangeRequestCreate struct {
 	// read by the change request's kind and the entity it names: a
 	// `FlagConfigurationPut` for `flag_configuration`, a
 	// `FlagDefinitionPut` for a flag's `definition`, a
-	// `SegmentDefinitionPut` for a segment's.
+	// `SegmentDefinitionPut` for a segment's, an `ExperimentTransition`
+	// for `experiment`.
 	Proposed *ProposedInput `json:"proposed,omitempty"`
 
 	// RevertTo Propose reverting a `flag_configuration` to this version of it instead of giving `proposed`, which the server fills.
@@ -1072,8 +1112,10 @@ type ChangeRequestDecision struct {
 // ChangeRequestKind What a change request proposes: `flag_configuration`, a flag's
 // configuration in one environment; `definition`, a flag's variations
 // and automatic exposure, or a segment's conditions and private
-// switch, in every environment. `experiment` is to come. A client
-// reads `proposed` by the kind and the entity named.
+// switch, in every environment; `experiment`, an experiment's start,
+// stop with a decision or traffic allocation growth, in every
+// environment holding its rule. A client reads `proposed` by the kind
+// and the entity named.
 type ChangeRequestKind string
 
 // ChangeRequestList defines model for ChangeRequestList.
@@ -1102,7 +1144,8 @@ type ChangeRequestPatch struct {
 	// read by the change request's kind and the entity it names: a
 	// `FlagConfigurationPut` for `flag_configuration`, a
 	// `FlagDefinitionPut` for a flag's `definition`, a
-	// `SegmentDefinitionPut` for a segment's.
+	// `SegmentDefinitionPut` for a segment's, an `ExperimentTransition`
+	// for `experiment`.
 	Proposed *ProposedInput `json:"proposed,omitempty"`
 	Title    *string        `json:"title,omitempty"`
 }
@@ -1658,6 +1701,24 @@ type ExperimentStop struct {
 	// WinnerVariation The variation that won, one the experiment compares; required for `winner`, absent for `removed`.
 	WinnerVariation *string `json:"winner_variation,omitempty"`
 }
+
+// ExperimentTransition The transition an `experiment` change request proposes: `start` of
+// a draft; `stop` of a running experiment with `decision`, the body a
+// direct stop sends; or `set_traffic_allocation`, growing a running
+// experiment's traffic allocation to `traffic_allocation`, never
+// below the current value. It is checked when it is proposed as the
+// transition itself is, and applying it runs the transition exactly
+// as a direct call does.
+type ExperimentTransition struct {
+	Action   ExperimentTransitionAction `json:"action"`
+	Decision *ExperimentStop            `json:"decision,omitempty"`
+
+	// TrafficAllocation The traffic allocation to grow to, in basis points; for `set_traffic_allocation` only.
+	TrafficAllocation *int `json:"traffic_allocation,omitempty"`
+}
+
+// ExperimentTransitionAction defines model for ExperimentTransitionAction.
+type ExperimentTransitionAction string
 
 // ExperimentWeight The share of the allocated traffic one variation of the experiment's
 // flag gets. The order of an experiment's weights fixes the cumulative
@@ -2492,6 +2553,17 @@ type ProposedConfiguration struct {
 	Rules         []Rule             `json:"rules"`
 }
 
+// ProposedExperimentTransition The transition of an experiment a change request proposes.
+type ProposedExperimentTransition struct {
+	Action ExperimentTransitionAction `json:"action"`
+
+	// Decision A stop's decision; absent for any other transition.
+	Decision *ExperimentDecision `json:"decision,omitempty"`
+
+	// TrafficAllocation The traffic allocation a growth grows to; absent for any other transition.
+	TrafficAllocation *int `json:"traffic_allocation,omitempty"`
+}
+
 // ProposedFlagDefinition A flag's definition as a change request proposes it.
 type ProposedFlagDefinition struct {
 	AutomaticExposure bool        `json:"automatic_exposure"`
@@ -2502,7 +2574,8 @@ type ProposedFlagDefinition struct {
 // read by the change request's kind and the entity it names: a
 // `FlagConfigurationPut` for `flag_configuration`, a
 // `FlagDefinitionPut` for a flag's `definition`, a
-// `SegmentDefinitionPut` for a segment's.
+// `SegmentDefinitionPut` for a segment's, an `ExperimentTransition`
+// for `experiment`.
 type ProposedInput struct {
 	union json.RawMessage
 }
@@ -3565,9 +3638,12 @@ type ListChangeRequestsParams struct {
 	Environment *string `form:"environment,omitempty" json:"environment,omitempty"`
 
 	// Segment Only those naming the segment with this key.
-	Segment *string             `form:"segment,omitempty" json:"segment,omitempty"`
-	Kind    *ChangeRequestKind  `form:"kind,omitempty" json:"kind,omitempty"`
-	State   *ChangeRequestState `form:"state,omitempty" json:"state,omitempty"`
+	Segment *string `form:"segment,omitempty" json:"segment,omitempty"`
+
+	// Experiment Only those proposing a transition of the experiment with this key.
+	Experiment *string             `form:"experiment,omitempty" json:"experiment,omitempty"`
+	Kind       *ChangeRequestKind  `form:"kind,omitempty" json:"kind,omitempty"`
+	State      *ChangeRequestState `form:"state,omitempty" json:"state,omitempty"`
 
 	// Author Only those authored by the member or the project token with this identifier.
 	Author *openapi_types.UUID `form:"author,omitempty" json:"author,omitempty"`
@@ -4281,6 +4357,32 @@ func (t *ChangeRequest_Proposed) MergeProposedSegmentDefinition(v ProposedSegmen
 	return err
 }
 
+// AsProposedExperimentTransition returns the union data inside the ChangeRequest_Proposed as a ProposedExperimentTransition
+func (t ChangeRequest_Proposed) AsProposedExperimentTransition() (ProposedExperimentTransition, error) {
+	var body ProposedExperimentTransition
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromProposedExperimentTransition overwrites any union data inside the ChangeRequest_Proposed as the provided ProposedExperimentTransition
+func (t *ChangeRequest_Proposed) FromProposedExperimentTransition(v ProposedExperimentTransition) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeProposedExperimentTransition performs a merge with any union data inside the ChangeRequest_Proposed, using the provided ProposedExperimentTransition
+func (t *ChangeRequest_Proposed) MergeProposedExperimentTransition(v ProposedExperimentTransition) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
 func (t ChangeRequest_Proposed) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
 	return b, err
@@ -4359,6 +4461,32 @@ func (t *ProposedInput) FromSegmentDefinitionPut(v SegmentDefinitionPut) error {
 
 // MergeSegmentDefinitionPut performs a merge with any union data inside the ProposedInput, using the provided SegmentDefinitionPut
 func (t *ProposedInput) MergeSegmentDefinitionPut(v SegmentDefinitionPut) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsExperimentTransition returns the union data inside the ProposedInput as a ExperimentTransition
+func (t ProposedInput) AsExperimentTransition() (ExperimentTransition, error) {
+	var body ExperimentTransition
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromExperimentTransition overwrites any union data inside the ProposedInput as the provided ExperimentTransition
+func (t *ProposedInput) FromExperimentTransition(v ExperimentTransition) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeExperimentTransition performs a merge with any union data inside the ProposedInput, using the provided ExperimentTransition
+func (t *ProposedInput) MergeExperimentTransition(v ExperimentTransition) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -13137,6 +13265,18 @@ func NewListChangeRequestsRequest(server string, project ProjectKey, params *Lis
 		if params.Segment != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "segment", *params.Segment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Experiment != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "experiment", *params.Experiment, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -48409,6 +48549,19 @@ func (siw *ServerInterfaceWrapper) ListChangeRequests(w http.ResponseWriter, r *
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "segment"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "segment", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "experiment" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "experiment", r.URL.Query(), &params.Experiment, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "experiment"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "experiment", Err: err})
 		}
 		return
 	}

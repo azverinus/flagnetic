@@ -1171,8 +1171,10 @@ export const zFlagConfigurationRevert = z.object({
  * What a change request proposes: `flag_configuration`, a flag's
  * configuration in one environment; `definition`, a flag's variations
  * and automatic exposure, or a segment's conditions and private
- * switch, in every environment. `experiment` is to come. A client
- * reads `proposed` by the kind and the entity named.
+ * switch, in every environment; `experiment`, an experiment's start,
+ * stop with a decision or traffic allocation growth, in every
+ * environment holding its rule. A client reads `proposed` by the kind
+ * and the entity named.
  *
  */
 export const zChangeRequestKind = z.enum(["flag_configuration", "definition", "experiment"]);
@@ -1261,6 +1263,33 @@ export const zProposedOverride = z.object({
   unit_id: z.string(),
   variation: z.string(),
   note: z.string().nullable(),
+});
+
+export const zExperimentTransitionAction = z.enum(["start", "stop", "set_traffic_allocation"]);
+
+/**
+ * The transition an `experiment` change request proposes: `start` of
+ * a draft; `stop` of a running experiment with `decision`, the body a
+ * direct stop sends; or `set_traffic_allocation`, growing a running
+ * experiment's traffic allocation to `traffic_allocation`, never
+ * below the current value. It is checked when it is proposed as the
+ * transition itself is, and applying it runs the transition exactly
+ * as a direct call does.
+ *
+ */
+export const zExperimentTransition = z.object({
+  action: zExperimentTransitionAction,
+  decision: zExperimentStop.optional(),
+  traffic_allocation: z.int().gte(0).lte(10000).optional(),
+});
+
+/**
+ * The transition of an experiment a change request proposes.
+ */
+export const zProposedExperimentTransition = z.object({
+  action: zExperimentTransitionAction,
+  decision: zExperimentDecision.optional(),
+  traffic_allocation: z.int().optional(),
 });
 
 /**
@@ -1570,20 +1599,23 @@ export const zSegmentDefinitionPut = z.object({
  * read by the change request's kind and the entity it names: a
  * `FlagConfigurationPut` for `flag_configuration`, a
  * `FlagDefinitionPut` for a flag's `definition`, a
- * `SegmentDefinitionPut` for a segment's.
+ * `SegmentDefinitionPut` for a segment's, an `ExperimentTransition`
+ * for `experiment`.
  *
  */
 export const zProposedInput = z.union([
   zFlagConfigurationPut,
   zFlagDefinitionPut,
   zSegmentDefinitionPut,
+  zExperimentTransition,
 ]);
 
 export const zChangeRequestCreate = z.object({
-  kind: z.enum(["flag_configuration", "definition"]),
+  kind: z.enum(["flag_configuration", "definition", "experiment"]),
   flag: z.string().optional(),
   environment: z.string().optional(),
   segment: z.string().optional(),
+  experiment: z.string().optional(),
   title: z.string(),
   description: z.string().optional(),
   proposed: zProposedInput.optional(),
@@ -1619,6 +1651,7 @@ export const zChangeRequest = z.object({
   flag: z.string().optional(),
   environment: z.string().optional(),
   segment: z.string().optional(),
+  experiment: z.string().optional(),
   state: zChangeRequestState,
   title: z.string(),
   description: z.string(),
@@ -1639,7 +1672,12 @@ export const zChangeRequest = z.object({
       error: "Invalid value: Expected int64 to be <= 9223372036854775807",
     })
     .nullable(),
-  proposed: z.union([zProposedConfiguration, zProposedFlagDefinition, zProposedSegmentDefinition]),
+  proposed: z.union([
+    zProposedConfiguration,
+    zProposedFlagDefinition,
+    zProposedSegmentDefinition,
+    zProposedExperimentTransition,
+  ]),
   diff: z.array(zPatchOperation),
   author: zChangeRequestAuthor,
   approval: zChangeRequestDecision.nullable(),
@@ -3102,6 +3140,7 @@ export const zListChangeRequestsQuery = z.object({
   flag: z.string().optional(),
   environment: z.string().optional(),
   segment: z.string().optional(),
+  experiment: z.string().optional(),
   kind: zChangeRequestKind.optional(),
   state: zChangeRequestState.optional(),
   author: z.uuid().optional(),

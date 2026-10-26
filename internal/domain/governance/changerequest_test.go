@@ -261,16 +261,16 @@ func TestOpeningIsRefusedOnAMovedBase(t *testing.T) {
 	cr := newChangeRequest(t, proposal(t))
 	later := now.Add(time.Minute)
 
-	_, err := cr.Open(byAda, 4, later)
+	_, err := cr.Open(byAda, governance.Current{Version: 4}, later)
 	if e, ok := apperrors.From(err); !ok || e.Code != "base_moved" || e.Kind != apperrors.KindConflict {
 		t.Errorf("open on a moved base = %v, want base_moved", err)
 	}
-	opened, err := cr.Open(byAda, 3, later)
+	opened, err := cr.Open(byAda, governance.Current{Version: 3}, later)
 	if err != nil || opened.State != governance.StateOpen || opened.Version != 2 || !opened.UpdatedAt.Equal(later) {
 		t.Errorf("opened = %+v, %v", opened, err)
 	}
 	// Who may open is answered before the base.
-	if _, err := cr.Open(byBob, 4, later); codeOf(err) != "not_author" {
+	if _, err := cr.Open(byBob, governance.Current{Version: 4}, later); codeOf(err) != "not_author" {
 		t.Errorf("open by another on a moved base = %v, want not_author", err)
 	}
 }

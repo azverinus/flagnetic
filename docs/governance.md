@@ -12,7 +12,7 @@ SDKs read the protection from their ruleset and evaluate answers (`environment.p
 
 ### What protection refuses
 
-A write that would change what a protected environment's SDKs receive is refused `403 change_request_required`, whatever it touches and whichever endpoint it goes through: a flag's configuration there (replacing it, an override, a rollout's salt, a revert, a copy into it), a flag's variations or automatic exposure, a segment's conditions or private switch when a flag uses the segment there, archiving a flag switched on there or restoring one that was. The refusal's `detail` names the protected environments the write would change. Nothing of the write is kept: a write that would change a protected environment and others too, such as editing a segment that staging and production both use, changes none of them.
+A write that would change what a protected environment's SDKs receive is refused `403 change_request_required`, whatever it touches and whichever endpoint it goes through: a flag's configuration there (replacing it, an override, a rollout's salt, a revert, a copy into it), a flag's variations or automatic exposure, a segment's conditions or private switch when a flag uses the segment there, archiving a flag switched on there or restoring one that was, and an experiment's start, stop or traffic allocation growth when the environment holds a rule serving it. The refusal's `detail` names the protected environments the write would change. Nothing of the write is kept: a write that would change a protected environment and others too, such as editing a segment that staging and production both use, changes none of them.
 
 Protection judges the result, not the endpoint. When a write is about to commit, the server builds each protected environment's ruleset as the write would leave it and compares it with the ruleset that environment serves now. It leaves out what no evaluation depends on, so these writes stay direct in a protected environment:
 
@@ -39,13 +39,13 @@ A write that changes no ruleset pays nothing. A write that changes a ruleset pay
 
 A change to a protected environment goes through a [change request](change-requests.md):
 
-1. A developer proposes the configuration as a change request (`change_request.propose`) and opens it for review; a flag's variations and automatic exposure, or a segment's conditions and private switch, are proposed as one change request covering every environment. The change request shows the diff from what the environment serves now.
+1. A developer proposes the configuration as a change request (`change_request.propose`) and opens it for review; a flag's variations and automatic exposure, or a segment's conditions and private switch, are proposed as one change request covering every environment, and an experiment's start, stop or traffic allocation growth as one covering every environment holding its rule. The change request shows the diff from what the environment serves now.
 2. A maintainer or owner who is not the author approves it (`change_request.approve`), or rejects it with a comment. Approval always takes a second person: the author is refused (`author_cannot_approve`).
 3. The author, the approver or any member holding `change_request.approve` applies it. The application writes the configuration into the protected environment, past protection for that environment alone, and its audit entries carry the change request's identifier.
 
 A change request may instead name an apply time, `apply_at`, when it is proposed: once approved, the system applies it then, late rather than skipped when no replica was running, and once however many replicas run. A scheduled application that fails records why on the change request and is tried again, until the scheduler stops after five failures in a row. See [Scheduled changes](change-requests.md#scheduled-changes).
 
-A change request is based on the configuration, flag or segment as it was proposed. If anything writes it before the change request is applied, or archives or deletes its flag, deletes its segment or deletes its environment, it is [superseded](change-requests.md#superseded) by that write at once, since what was reviewed is no longer what would be written; copy it to propose it again. A change request may be proposed for any environment, protected or not.
+A change request is based on the configuration, flag, segment or experiment as it was proposed. If anything writes it before the change request is applied, or archives or deletes its flag, deletes its segment, experiment or environment, it is [superseded](change-requests.md#superseded) by that write at once, since what was reviewed is no longer what would be written; copy it to propose it again. A change request may be proposed for any environment, protected or not.
 
 ## Reverting a protected environment
 

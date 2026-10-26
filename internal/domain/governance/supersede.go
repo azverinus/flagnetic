@@ -4,6 +4,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/azverinus/flagnetic/internal/domain/experiments"
 	"github.com/azverinus/flagnetic/internal/domain/flags"
 	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -24,6 +25,9 @@ type Moved struct {
 	Definition bool
 	// EnvironmentDeleted reports that Environment was deleted.
 	EnvironmentDeleted bool
+	// Experiment names the experiment a write changed, transitioned or
+	// deleted.
+	Experiment experiments.ExperimentID
 }
 
 // MovedBy returns what e moves, or false when e moves no change request.
@@ -38,7 +42,9 @@ type Moved struct {
 //     archiving or deleting it also ends what every one of its
 //     configurations can be changed to;
 //   - every entry of a segment records a write to its definition;
-//   - deleting an environment moves every change request naming it.
+//   - deleting an environment moves every change request naming it;
+//   - an entry of an experiment's transition, edit or deletion moves the
+//     change requests proposing a transition of it.
 //
 // Creating an entity moves nothing, since nothing can be proposed for it
 // before; every other entry moves no change request.
@@ -66,8 +72,22 @@ func MovedBy(e Entry) (Moved, bool) {
 		if e.Action == "environment.deleted" && !e.Environment.IsZero() {
 			return Moved{Environment: e.Environment, EnvironmentDeleted: true}, true
 		}
+	case "experiment":
+		experiment, err := id.Parse[experiments.Experiment](e.Entity.ID)
+		if err == nil && slices.Contains(experimentMovingActions, e.Action) {
+			return Moved{Experiment: experiment}, true
+		}
 	}
 	return Moved{}, false
+}
+
+// experimentMovingActions are the entries of an experiment that change what
+// its change requests were based on: every write of the experiment itself.
+// Its alerts and its acknowledgements are kept beside it and change none of
+// it, and a clone is a new experiment.
+var experimentMovingActions = []string{
+	"experiment.updated", "experiment.started", "experiment.stopped", "experiment.traffic_allocation_changed",
+	"experiment.salts_regenerated", "experiment.archived", "experiment.deleted",
 }
 
 // Referrers are the flags whose configurations name a segment now, in some
@@ -117,7 +137,11 @@ func Supersedes(e Entry, candidates []ChangeRequest, referrers Referrers) []Supe
 //   - a segment's definition, by a write to the segment, or to the
 //     configurations of a flag that named it when the change request was
 //     based on it or names it now: the configurations the definition was
-//     reviewed with, and those it would now change what they serve.
+//     reviewed with, and those it would now change what they serve;
+//   - an experiment's transition, by a write to the experiment, or to its
+//     flag's configuration in an environment that held its rule when the
+//     change request was based on it, whose ruleset the transition was
+//     reviewed as changing.
 func (m Moved) moves(cr ChangeRequest, referrers Referrers) bool {
 	switch {
 	case cr.Kind == KindFlagConfiguration && cr.Flag != nil && cr.Environment != nil:
@@ -133,6 +157,12 @@ func (m Moved) moves(cr ChangeRequest, referrers Referrers) bool {
 		}
 		return m.Configurations &&
 			(slices.Contains(cr.BaseReferrers, m.Flag) || slices.Contains(referrers[cr.Segment.ID], m.Flag))
+	case cr.Kind == KindExperiment && cr.Experiment != nil:
+		if !m.Experiment.IsZero() {
+			return cr.Experiment.ID == m.Experiment
+		}
+		return m.Configurations && cr.Flag != nil && cr.Flag.ID == m.Flag && !m.EnvironmentDeleted &&
+			(m.Environment.IsZero() || slices.Contains(cr.BaseHolders, m.Environment))
 	}
 	return false
 }
