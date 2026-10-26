@@ -40,6 +40,7 @@ import (
 	pgflags "github.com/azverinus/flagnetic/internal/infra/out/postgres/flags"
 	pggovernance "github.com/azverinus/flagnetic/internal/infra/out/postgres/governance"
 	pgworkspace "github.com/azverinus/flagnetic/internal/infra/out/postgres/workspace"
+	"github.com/azverinus/flagnetic/internal/infra/out/webhook"
 	"github.com/azverinus/flagnetic/internal/pkg/pglisten"
 	"github.com/azverinus/flagnetic/internal/shared/clock"
 	"github.com/azverinus/flagnetic/internal/shared/id"
@@ -86,6 +87,9 @@ type Options struct {
 	// WebhookTargets is what the operator allows a webhook subscription's
 	// target to be.
 	WebhookTargets governance.TargetPolicy
+	// WebhookTick is how often the replica fans the outbox out and sends the
+	// webhook deliveries that are due.
+	WebhookTick time.Duration
 	management.Options
 }
 
@@ -176,6 +180,9 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 	webhooks := appgovernance.WebhookDeps{
 		Tx: tx, Store: webhookStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
 		Sealer: o.Keyring, Resolver: net.DefaultResolver, Targets: o.WebhookTargets,
+	}
+	deliveryRequests := appgovernance.DeliveryRequestDeps{
+		Tx: tx, Webhooks: webhookStore, Deliveries: webhookStore, Queue: outbox, Clock: d.Clock, IDs: d.IDs,
 	}
 	sdkKeys := appdelivery.SDKKeyDeps{
 		Tx: tx, Store: deliveryStore, Audit: audit, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
@@ -427,6 +434,8 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 		DeleteWebhook:         appgovernance.NewDeleteWebhook(webhooks),
 		ListWebhookDeliveries: appgovernance.NewListDeliveries(webhookStore, webhookStore),
 		GetWebhookDelivery:    appgovernance.NewGetDelivery(webhookStore, webhookStore),
+		TestWebhook:           appgovernance.NewTestWebhook(deliveryRequests),
+		RedeliverWebhook:      appgovernance.NewRedeliver(deliveryRequests),
 
 		ListSegments: appflags.NewListSegments(tx, flagStore),
 		GetSegment:   appflags.NewGetSegment(flagStore),
@@ -488,7 +497,11 @@ func Management(edge *flaghttp.Server, d Deps, reg prometheus.Registerer, o Opti
 			worker.EventRetention(
 				appevents.NewRunRetention(tx, eventStore, d.Clock, d.IDs, o.EventsRetention, o.EventsPartitionsAhead),
 				appdelivery.NewPurgeSDKInventory(deliveryStore, d.Clock, o.SDKInventoryRetention), edge.Logger(), reg),
-			worker.WebhookFanOut(appgovernance.NewRunFanOut(tx, outbox, d.Clock, d.IDs), reg),
+			worker.WebhookFanOut(appgovernance.NewRunFanOut(tx, outbox, d.Clock, d.IDs), o.WebhookTick, reg),
+			worker.WebhookDelivery(appgovernance.NewDeliver(appgovernance.DeliverDeps{
+				Tx: tx, Store: pggovernance.NewDeliveries(d.Pool), Sender: webhook.NewSender(o.WebhookTargets),
+				Opener: o.Keyring, Clock: d.Clock, IDs: d.IDs, Random: rand.Reader,
+			}), o.WebhookTick, edge.Logger(), reg),
 			worker.ProjectPurge(appworkspace.NewPurgeDeletedProjects(tx, ws)),
 			worker.ExperimentChecks(appexperiments.CheckInterval, appexperiments.NewRunChecks(appexperiments.RunChecksDeps{
 				Tx: tx, Lock: experimentStore, Running: experimentStore, Projects: experimentStore, Store: experimentStore,

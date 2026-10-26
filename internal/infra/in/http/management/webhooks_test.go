@@ -243,6 +243,7 @@ func TestOnlyAMaintainerReadsAndManagesWebhookSubscriptions(t *testing.T) {
 	admin := testkit.Client(t, srv, testkit.InstanceAdminToken(t))
 	p := createProject(t, admin, projectKey())
 	created := createWebhook(t, admin, p.Key, siem())
+	sent := ping(t, admin, p.Key, created.Id)
 
 	operations := map[string]func(c *management.ClientWithResponses) (int, []byte){
 		"list": func(c *management.ClientWithResponses) (int, []byte) {
@@ -260,6 +261,14 @@ func TestOnlyAMaintainerReadsAndManagesWebhookSubscriptions(t *testing.T) {
 		"edit": func(c *management.ClientWithResponses) (int, []byte) {
 			res := do(c.UpdateWebhookWithResponse(t.Context(), p.Key, created.Id, &management.UpdateWebhookParams{IfMatch: ifMatch(1)},
 				management.WebhookPatch{}))
+			return res.StatusCode(), res.Body
+		},
+		"test": func(c *management.ClientWithResponses) (int, []byte) {
+			res := do(c.TestWebhookWithResponse(t.Context(), p.Key, created.Id))
+			return res.StatusCode(), res.Body
+		},
+		"redeliver": func(c *management.ClientWithResponses) (int, []byte) {
+			res := do(c.RedeliverWebhookDeliveryWithResponse(t.Context(), p.Key, created.Id, sent.Id))
 			return res.StatusCode(), res.Body
 		},
 		"delete": func(c *management.ClientWithResponses) (int, []byte) {

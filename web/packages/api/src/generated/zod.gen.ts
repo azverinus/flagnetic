@@ -3427,6 +3427,16 @@ export const zUpdateWebhookPath = z.object({
  */
 export const zUpdateWebhookResponse = zWebhook;
 
+export const zTestWebhookPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+});
+
+/**
+ * The ping's delivery, pending.
+ */
+export const zTestWebhookResponse = zWebhookDelivery;
+
 export const zListWebhookDeliveriesPath = z.object({
   project: z.string(),
   webhook: z.uuid(),
@@ -3456,3 +3466,14 @@ export const zGetWebhookDeliveryPath = z.object({
  * The delivery with every attempt.
  */
 export const zGetWebhookDeliveryResponse = zWebhookDelivery;
+
+export const zRedeliverWebhookDeliveryPath = z.object({
+  project: z.string(),
+  webhook: z.uuid(),
+  delivery: z.uuid(),
+});
+
+/**
+ * The new delivery, pending.
+ */
+export const zRedeliverWebhookDeliveryResponse = zWebhookDelivery;
