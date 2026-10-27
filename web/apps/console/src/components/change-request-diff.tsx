@@ -11,11 +11,7 @@ import type {
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { ReactNode } from "react";
 
-import {
-  ConfigurationDiff,
-  DefinitionDiff,
-  SegmentDiff,
-} from "@/components/structural-diff-view";
+import { ConfigurationDiff, DefinitionDiff, SegmentDiff } from "@/components/structural-diff-view";
 import { diffBasis, type PatchChange, patchChanges } from "@/lib/change-requests";
 import { diffConfigurations, diffDefinitions, diffSegments } from "@/lib/structural-diff";
 
@@ -78,9 +74,7 @@ function Changes({
     case "configuration": {
       const proposed = changeRequest.proposed as ProposedConfiguration;
       return (
-        <ConfigurationDiff
-          changes={diffConfigurations(current as FlagConfiguration, proposed)}
-        />
+        <ConfigurationDiff changes={diffConfigurations(current as FlagConfiguration, proposed)} />
       );
     }
     case "definition": {
@@ -132,10 +126,7 @@ export function PatchDiff({
     );
   }
   return (
-    <ul
-      aria-label={label}
-      className="flex list-disc flex-col gap-1.5 pl-5 text-sm"
-    >
+    <ul aria-label={label} className="flex list-disc flex-col gap-1.5 pl-5 text-sm">
       {changes.map((change, index) => (
         <PatchItem key={index} change={change} />
       ))}
@@ -183,9 +174,7 @@ function PatchItem({ change }: { change: PatchChange }) {
   if (typeof change.value === "boolean" && change.op === "replace") {
     switch (change.target.kind) {
       case "on":
-        return (
-          <li>{change.value ? <Trans>Switched on.</Trans> : <Trans>Switched off.</Trans>}</li>
-        );
+        return <li>{change.value ? <Trans>Switched on.</Trans> : <Trans>Switched off.</Trans>}</li>;
       case "automatic_exposure":
         return (
           <li>
@@ -198,9 +187,7 @@ function PatchItem({ change }: { change: PatchChange }) {
         );
       case "private":
         return (
-          <li>
-            {change.value ? <Trans>Made private.</Trans> : <Trans>No longer private.</Trans>}
-          </li>
+          <li>{change.value ? <Trans>Made private.</Trans> : <Trans>No longer private.</Trans>}</li>
         );
     }
   }

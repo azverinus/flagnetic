@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { ConflictBanner } from "@/components/conflict-banner";
+import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { DefinitionDiff } from "@/components/structural-diff-view";
 import { TagsInput } from "@/components/tags-input";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,13 @@ const fieldPointer =
 /** A conflict met on saving: the definition as it is now, and the entry that made it so. */
 type Conflict = { current: FlagDefinition; entry: AuditEntry | undefined };
 
+/**
+ * A save refused because an environment is protected, as a proposal: the
+ * variations and automatic exposure every environment's ruleset carries,
+ * and the rest of the edit, which needs no review and is saved first.
+ */
+type Proposing = { proposal: Proposal; metadata: FlagPatch; at: number };
+
 function DefinitionForm({
   project,
   flag,
@@ -157,6 +165,7 @@ function DefinitionForm({
   const [version, setVersion] = useState(flag.version);
   const [conflict, setConflict] = useState<Conflict>();
   const [unread, setUnread] = useState(false);
+  const [proposing, setProposing] = useState<Proposing>();
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: valuesOf(flag) });
 
   const patchOf = (values: Values): FlagPatch => {
@@ -205,7 +214,32 @@ function DefinitionForm({
       toast.success(t`The definition is saved.`);
       onDone();
     },
-    onError: async (error) => {
+    onError: async (error, { values, at }) => {
+      if (error instanceof ApiError && error.code === "change_request_required") {
+        const { automatic_exposure, variations, ...metadata } = patchOf(values);
+        setProposing({
+          proposal: {
+            kind: "definition",
+            flag: flag.key,
+            proposed: {
+              automatic_exposure: automatic_exposure ?? values.automatic_exposure,
+              // A boolean flag's variations are not edited here: they stay as they are.
+              variations:
+                variations ??
+                variationInputs(flag.type, values.variations) ??
+                base.variations.map(({ key, value, name, description }) => ({
+                  key,
+                  value,
+                  name,
+                  description,
+                })),
+            },
+          },
+          metadata,
+          at,
+        });
+        return;
+      }
       if (!(error instanceof ApiError) || error.code !== "version_mismatch") return;
       let current: Flag;
       try {
@@ -276,188 +310,223 @@ function DefinitionForm({
   });
 
   return (
-    <form noValidate onSubmit={submit} className="flex flex-col gap-5">
-      {conflict ? (
-        <ConflictBanner
-          subject="form"
-          entry={conflict.entry}
-          diff={
-            <DefinitionDiff changes={diffDefinitions(base, conflict.current)} nameOf={nameOf} />
-          }
-          actions={
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setBase(conflict.current);
-                  setVersion(conflict.current.version);
-                  form.reset(valuesOf(conflict.current));
-                  setConflict(undefined);
-                  save.reset();
-                }}
-              >
-                <Trans>Reload and lose my edits</Trans>
-              </Button>
-              <Button
-                type="button"
-                disabled={save.isPending}
-                onClick={() => {
-                  const at = conflict.current.version;
-                  void form.handleSubmit((values) => {
-                    setVersion(at);
-                    setConflict(undefined);
-                    save.mutate({ values, at });
-                  })();
-                }}
-              >
-                <Trans>Keep my edits</Trans>
-              </Button>
-            </>
-          }
-        />
-      ) : null}
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-muted-foreground">
-          <Trans>Key</Trans>
-        </dt>
-        <dd className="font-mono">{flag.key}</dd>
-        <dt className="text-muted-foreground">
-          <Trans>Type</Trans>
-        </dt>
-        <dd>{flagTypeName(i18n, flag.type)}</dd>
-      </dl>
-      <Field label={<Trans>Name</Trans>} error={errors.name?.message ?? at("/name")}>
-        <Input autoComplete="off" {...form.register("name")} />
-      </Field>
-      <Field
-        label={<Trans>Description</Trans>}
-        error={errors.description?.message ?? at("/description")}
-      >
-        <Textarea rows={3} {...form.register("description")} />
-      </Field>
-      <Controller
-        control={form.control}
-        name="owner"
-        render={({ field }) => (
-          <Field
-            label={<Trans>Owner</Trans>}
-            hint={<Trans>The member accountable for the flag.</Trans>}
-            error={at("/owner")}
-          >
-            <Select
-              ref={field.ref}
-              onBlur={field.onBlur}
-              value={field.value}
-              onValueChange={field.onChange}
-            >
-              {owners.map((owner) => (
-                <SelectItem key={owner.value} value={owner.value}>
-                  {owner.label}
-                </SelectItem>
-              ))}
-            </Select>
-          </Field>
-        )}
-      />
-      <Controller
-        control={form.control}
-        name="tags"
-        render={({ field }) => (
-          <Field
-            label={<Trans>Tags</Trans>}
-            hint={<Trans>Press Enter after each tag.</Trans>}
-            error={
-              errors.tags?.message ??
-              (tagsRefusal ? flagViolationMessage(i18n, tagsRefusal) : undefined)
+    <>
+      <form noValidate onSubmit={submit} className="flex flex-col gap-5">
+        {conflict ? (
+          <ConflictBanner
+            subject="form"
+            entry={conflict.entry}
+            diff={
+              <DefinitionDiff changes={diffDefinitions(base, conflict.current)} nameOf={nameOf} />
             }
-          >
-            <TagsInput
-              ref={field.ref}
-              onBlur={field.onBlur}
-              value={field.value}
-              onChange={field.onChange}
-            />
-          </Field>
-        )}
-      />
-      <Controller
-        control={form.control}
-        name="lifetime"
-        render={({ field }) => (
-          <Field label={<Trans>Lifetime</Trans>} error={at("/lifetime")}>
-            <Select
-              ref={field.ref}
-              onBlur={field.onBlur}
-              value={field.value}
-              onValueChange={field.onChange}
-            >
-              <SelectItem value="temporary">{t`Temporary`}</SelectItem>
-              <SelectItem value="permanent">{t`Permanent`}</SelectItem>
-            </Select>
-          </Field>
-        )}
-      />
-      {lifetime === "temporary" ? (
-        <Field
-          label={<Trans>Expected removal</Trans>}
-          hint={<Trans>Left empty, 90 days from today.</Trans>}
-          error={at("/expected_removal_at")}
-          className="w-56"
-        >
-          <Input type="date" {...form.register("expected_removal_at")} />
-        </Field>
-      ) : null}
-      <Controller
-        control={form.control}
-        name="automatic_exposure"
-        render={({ field }) => (
-          <div className="flex items-start gap-3">
-            <Switch
-              id={exposureId}
-              ref={field.ref}
-              checked={field.value}
-              onCheckedChange={field.onChange}
-              aria-describedby={`${exposureId}-hint`}
-            />
-            <div className="flex flex-col gap-1">
-              <Label htmlFor={exposureId}>
-                <Trans>Automatic exposure</Trans>
-              </Label>
-              <p id={`${exposureId}-hint`} className="text-sm text-muted-foreground">
-                <Trans>
-                  SDKs record an exposure after every evaluation whose result carries an experiment.
-                </Trans>
-              </p>
-            </div>
-          </div>
-        )}
-      />
-      <Controller
-        control={form.control}
-        name="variations"
-        render={({ field }) => (
-          <VariationsEditor
-            type={flag.type}
-            rows={field.value}
-            onChange={(next) => {
-              // A refusal points at rows by their places, which adding or
-              // removing a row moves; it is dropped rather than shown on a
-              // row it was not about.
-              if (next.length !== field.value.length) save.reset();
-              field.onChange(next);
-            }}
-            errors={variationErrors}
-            refusal={refusal}
+            actions={
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setBase(conflict.current);
+                    setVersion(conflict.current.version);
+                    form.reset(valuesOf(conflict.current));
+                    setConflict(undefined);
+                    save.reset();
+                  }}
+                >
+                  <Trans>Reload and lose my edits</Trans>
+                </Button>
+                <Button
+                  type="button"
+                  disabled={save.isPending}
+                  onClick={() => {
+                    const at = conflict.current.version;
+                    void form.handleSubmit((values) => {
+                      setVersion(at);
+                      setConflict(undefined);
+                      save.mutate({ values, at });
+                    })();
+                  }}
+                >
+                  <Trans>Keep my edits</Trans>
+                </Button>
+              </>
+            }
           />
-        )}
-      />
-      <FormRefusal refusal={shownAtFields ? undefined : refusal} />
-      <FormActions
-        submitLabel={<Trans>Save definition</Trans>}
-        onCancel={onDone}
-        pending={save.isPending}
-      />
-    </form>
+        ) : null}
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          <dt className="text-muted-foreground">
+            <Trans>Key</Trans>
+          </dt>
+          <dd className="font-mono">{flag.key}</dd>
+          <dt className="text-muted-foreground">
+            <Trans>Type</Trans>
+          </dt>
+          <dd>{flagTypeName(i18n, flag.type)}</dd>
+        </dl>
+        <Field label={<Trans>Name</Trans>} error={errors.name?.message ?? at("/name")}>
+          <Input autoComplete="off" {...form.register("name")} />
+        </Field>
+        <Field
+          label={<Trans>Description</Trans>}
+          error={errors.description?.message ?? at("/description")}
+        >
+          <Textarea rows={3} {...form.register("description")} />
+        </Field>
+        <Controller
+          control={form.control}
+          name="owner"
+          render={({ field }) => (
+            <Field
+              label={<Trans>Owner</Trans>}
+              hint={<Trans>The member accountable for the flag.</Trans>}
+              error={at("/owner")}
+            >
+              <Select
+                ref={field.ref}
+                onBlur={field.onBlur}
+                value={field.value}
+                onValueChange={field.onChange}
+              >
+                {owners.map((owner) => (
+                  <SelectItem key={owner.value} value={owner.value}>
+                    {owner.label}
+                  </SelectItem>
+                ))}
+              </Select>
+            </Field>
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="tags"
+          render={({ field }) => (
+            <Field
+              label={<Trans>Tags</Trans>}
+              hint={<Trans>Press Enter after each tag.</Trans>}
+              error={
+                errors.tags?.message ??
+                (tagsRefusal ? flagViolationMessage(i18n, tagsRefusal) : undefined)
+              }
+            >
+              <TagsInput
+                ref={field.ref}
+                onBlur={field.onBlur}
+                value={field.value}
+                onChange={field.onChange}
+              />
+            </Field>
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="lifetime"
+          render={({ field }) => (
+            <Field label={<Trans>Lifetime</Trans>} error={at("/lifetime")}>
+              <Select
+                ref={field.ref}
+                onBlur={field.onBlur}
+                value={field.value}
+                onValueChange={field.onChange}
+              >
+                <SelectItem value="temporary">{t`Temporary`}</SelectItem>
+                <SelectItem value="permanent">{t`Permanent`}</SelectItem>
+              </Select>
+            </Field>
+          )}
+        />
+        {lifetime === "temporary" ? (
+          <Field
+            label={<Trans>Expected removal</Trans>}
+            hint={<Trans>Left empty, 90 days from today.</Trans>}
+            error={at("/expected_removal_at")}
+            className="w-56"
+          >
+            <Input type="date" {...form.register("expected_removal_at")} />
+          </Field>
+        ) : null}
+        <Controller
+          control={form.control}
+          name="automatic_exposure"
+          render={({ field }) => (
+            <div className="flex items-start gap-3">
+              <Switch
+                id={exposureId}
+                ref={field.ref}
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                aria-describedby={`${exposureId}-hint`}
+              />
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={exposureId}>
+                  <Trans>Automatic exposure</Trans>
+                </Label>
+                <p id={`${exposureId}-hint`} className="text-sm text-muted-foreground">
+                  <Trans>
+                    SDKs record an exposure after every evaluation whose result carries an
+                    experiment.
+                  </Trans>
+                </p>
+              </div>
+            </div>
+          )}
+        />
+        <Controller
+          control={form.control}
+          name="variations"
+          render={({ field }) => (
+            <VariationsEditor
+              type={flag.type}
+              rows={field.value}
+              onChange={(next) => {
+                // A refusal points at rows by their places, which adding or
+                // removing a row moves; it is dropped rather than shown on a
+                // row it was not about.
+                if (next.length !== field.value.length) save.reset();
+                field.onChange(next);
+              }}
+              errors={variationErrors}
+              refusal={refusal}
+            />
+          )}
+        />
+        <FormRefusal refusal={shownAtFields ? undefined : refusal} />
+        <FormActions
+          submitLabel={<Trans>Save definition</Trans>}
+          onCancel={onDone}
+          pending={save.isPending}
+        />
+      </form>
+      {/* Beside the form, not in it: its own form's submit would bubble to this one through the portal. */}
+      <ProposeDialog
+        project={project}
+        proposal={proposing?.proposal}
+        onOpenChange={(open) => !open && setProposing(undefined)}
+        before={
+          proposing && Object.keys(proposing.metadata).length > 0
+            ? async () => {
+                const saved = await unwrap(
+                  updateFlag({
+                    path: { project, flag: flag.key },
+                    body: proposing.metadata,
+                    headers: ifMatch(proposing.at),
+                  }),
+                );
+                queryClient.setQueryData(flagQuery(project, flag.key).queryKey, saved);
+                void queryClient.invalidateQueries({
+                  queryKey: [...flagsQueryKey(project), "list"],
+                });
+              }
+            : undefined
+        }
+        onProposed={onDone}
+      >
+        <p className="text-sm">
+          <Trans>
+            An environment is protected, so the variations and automatic exposure are proposed for
+            review; they apply to every environment once approved. The other fields edited here are
+            saved at once.
+          </Trans>
+        </p>
+      </ProposeDialog>
+    </>
   );
 }

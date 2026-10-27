@@ -304,10 +304,7 @@ describe("how a configuration is edited", () => {
 
   it("proposes in a protected environment, for whoever may propose", () => {
     expect(
-      configurationEditing(
-        true,
-        holding("flag_configuration.update", "change_request.propose"),
-      ),
+      configurationEditing(true, holding("flag_configuration.update", "change_request.propose")),
     ).toEqual({ kind: "propose" });
     expect(configurationEditing(true, holding("project.read"))).toEqual({
       kind: "read",

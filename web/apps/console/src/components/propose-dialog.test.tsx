@@ -1,4 +1,4 @@
-import type { ChangeRequestCreate } from "@flagnetic/api";
+import type { ChangeRequestCreate, Violation } from "@flagnetic/api";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -19,18 +19,27 @@ const proposal: Proposal = {
 
 const created = { id: "0192a000-0000-7000-8000-0000000000aa", state: "open", version: 1 };
 
-async function renderPropose(over: { before?: () => Promise<unknown> } = {}) {
+async function renderPropose(
+  over: { before?: () => Promise<unknown>; onRefusedProposal?: (v: Violation[]) => void } = {},
+) {
   const onProposed = vi.fn();
+  const onOpenChange = vi.fn();
   const rendered = await renderWithRouter(() => (
     <ProposeDialog
       project="shop"
       proposal={proposal}
-      onOpenChange={() => {}}
+      onOpenChange={onOpenChange}
       onProposed={onProposed}
       before={over.before}
+      onRefusedProposal={over.onRefusedProposal}
     />
   ));
-  return { ...rendered, onProposed, dialog: screen.getByRole("dialog", { name: "Propose the change" }) };
+  return {
+    ...rendered,
+    onProposed,
+    onOpenChange,
+    dialog: screen.getByRole("dialog", { name: "Propose the change" }),
+  };
 }
 
 async function bodyOf(request: Request | undefined): Promise<ChangeRequestCreate> {
@@ -104,5 +113,23 @@ describe("the propose dialog", () => {
     expect(before).toHaveBeenCalledOnce();
     expect(requests).toHaveLength(2);
     expect((await bodyOf(requests[1])).apply_at).toBeUndefined();
+  });
+
+  it("hands refusals of what is proposed back to the editor, as a direct write's", async () => {
+    fakeServer({
+      "POST /projects/shop/change-requests": problem(422, "invalid_configuration", {
+        errors: [{ pointer: "/proposed/rules/0/conditions/0/values", code: "required" }],
+      }),
+    });
+    const refused: Violation[][] = [];
+    const { dialog, onOpenChange } = await renderPropose({
+      onRefusedProposal: (violations) => refused.push(violations),
+    });
+
+    await userEvent.type(within(dialog).getByLabelText("Title"), "Beta");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Propose" }));
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(refused).toEqual([[{ pointer: "/rules/0/conditions/0/values", code: "required" }]]);
   });
 });

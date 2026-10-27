@@ -1,4 +1,4 @@
-import { type ChangeRequestCreate, createChangeRequest } from "@flagnetic/api";
+import { type ChangeRequestCreate, createChangeRequest, type Violation } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -11,7 +11,7 @@ import { DialogForm } from "@/components/ui/dialog-form";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { unwrap } from "@/lib/errors";
+import { ApiError, unwrap } from "@/lib/errors";
 import { auditQueryKey, changeRequestQuery, changeRequestsQueryKey } from "@/lib/queries";
 
 /** The longest title and description the server takes. */
@@ -43,6 +43,12 @@ export type ProposeDialogProps = {
    * it: the editor discards its draft, which the change request now holds.
    */
   onProposed: () => void;
+  /**
+   * Shows refusals of what is proposed where the editor shows a direct
+   * write's, with their pointers as a direct write's: the dialog closes
+   * so the member corrects the draft. Without it, the dialog says them.
+   */
+  onRefusedProposal?: (violations: Violation[]) => void;
   /** What the change is, above the form. */
   children?: ReactNode;
 };
@@ -58,6 +64,7 @@ export function ProposeDialog({
   onOpenChange,
   before,
   onProposed,
+  onRefusedProposal,
   children,
 }: ProposeDialogProps) {
   const { t } = useLingui();
@@ -102,6 +109,21 @@ export function ProposeDialog({
         to: "/projects/$project/change-requests/$changeRequest",
         params: { project, changeRequest: created.id },
       });
+    },
+    onError: (error) => {
+      if (!(error instanceof ApiError) || onRefusedProposal === undefined) return;
+      const { violations } = error;
+      if (violations.length === 0 || !violations.every((v) => v.pointer.startsWith("/proposed/"))) {
+        return;
+      }
+      onRefusedProposal(
+        violations.map((violation) => ({
+          ...violation,
+          pointer: violation.pointer.slice("/proposed".length),
+        })),
+      );
+      propose.reset();
+      onOpenChange(false);
     },
   });
 

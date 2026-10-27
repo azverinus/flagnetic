@@ -153,8 +153,8 @@ function ChangeRequestPage({
           <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
           {state === "draft" ? (
             <Trans>
-              What this change request was based on changed after it was written. Rebase it onto
-              the current version before opening it.
+              What this change request was based on changed after it was written. Rebase it onto the
+              current version before opening it.
             </Trans>
           ) : (
             <Trans>
