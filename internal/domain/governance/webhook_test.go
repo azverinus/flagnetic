@@ -182,3 +182,30 @@ func TestAChangeAppliesOnlyWhatItNames(t *testing.T) {
 		t.Error("Same tells an unchanged input from a changed one wrongly")
 	}
 }
+
+func TestAnInstanceSubscriptionTakesAuditEntryAloneAndNoEnvironment(t *testing.T) {
+	in := governance.WebhookInput{Name: " Archive ", URL: "https://receiver.example/archive",
+		Events: []string{governance.EventAuditEntry, governance.EventAuditEntry}}
+	got, err := governance.CheckInstanceWebhook(in, governance.TargetPolicy{})
+	if err != nil || got.Name != "Archive" || !slices.Equal(got.Events, []string{governance.EventAuditEntry}) {
+		t.Fatalf("CheckInstanceWebhook = %+v, %v", got, err)
+	}
+
+	for name, events := range map[string][]string{
+		"a project event":   {"flag.created"},
+		"every event":       {governance.EventAll},
+		"audit.entry and *": {governance.EventAuditEntry, governance.EventAll},
+	} {
+		in.Events = events
+		_, err = governance.CheckInstanceWebhook(in, governance.TargetPolicy{})
+		if code, pointers := problemOf(t, err); code != "unknown_event_type" || len(pointers) != 1 {
+			t.Errorf("%s: %s at %v, want unknown_event_type", name, code, pointers)
+		}
+	}
+
+	in.Events, in.Environments = []string{governance.EventAuditEntry}, []string{"production"}
+	_, err = governance.CheckInstanceWebhook(in, governance.TargetPolicy{})
+	if code, pointers := problemOf(t, err); code != "invalid_webhook" || !slices.Equal(pointers, []string{"/environments/0"}) {
+		t.Errorf("an environment: %s at %v, want invalid_webhook at /environments/0", code, pointers)
+	}
+}

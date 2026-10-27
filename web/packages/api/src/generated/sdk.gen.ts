@@ -64,6 +64,9 @@ import type {
   CreateGrantData,
   CreateGrantErrors,
   CreateGrantResponses,
+  CreateInstanceWebhookData,
+  CreateInstanceWebhookErrors,
+  CreateInstanceWebhookResponses,
   CreateMyTokenData,
   CreateMyTokenErrors,
   CreateMyTokenResponses,
@@ -106,6 +109,9 @@ import type {
   DeleteGrantData,
   DeleteGrantErrors,
   DeleteGrantResponses,
+  DeleteInstanceWebhookData,
+  DeleteInstanceWebhookErrors,
+  DeleteInstanceWebhookResponses,
   DeleteOverrideData,
   DeleteOverrideErrors,
   DeleteOverrideResponses,
@@ -124,6 +130,9 @@ import type {
   DismissDiscoveredAttributeData,
   DismissDiscoveredAttributeErrors,
   DismissDiscoveredAttributeResponses,
+  EnableInstanceWebhookData,
+  EnableInstanceWebhookErrors,
+  EnableInstanceWebhookResponses,
   EnableWebhookData,
   EnableWebhookErrors,
   EnableWebhookResponses,
@@ -175,6 +184,12 @@ import type {
   GetFlagEvaluationsErrors,
   GetFlagEvaluationsResponses,
   GetFlagResponses,
+  GetInstanceWebhookData,
+  GetInstanceWebhookDeliveryData,
+  GetInstanceWebhookDeliveryErrors,
+  GetInstanceWebhookDeliveryResponses,
+  GetInstanceWebhookErrors,
+  GetInstanceWebhookResponses,
   GetInvitationData,
   GetInvitationErrors,
   GetInvitationResponses,
@@ -238,6 +253,12 @@ import type {
   ListGrantsData,
   ListGrantsErrors,
   ListGrantsResponses,
+  ListInstanceWebhookDeliveriesData,
+  ListInstanceWebhookDeliveriesErrors,
+  ListInstanceWebhookDeliveriesResponses,
+  ListInstanceWebhooksData,
+  ListInstanceWebhooksErrors,
+  ListInstanceWebhooksResponses,
   ListMembersData,
   ListMembersErrors,
   ListMemberSessionsData,
@@ -310,6 +331,9 @@ import type {
   RebaseChangeRequestData,
   RebaseChangeRequestErrors,
   RebaseChangeRequestResponses,
+  RedeliverInstanceWebhookDeliveryData,
+  RedeliverInstanceWebhookDeliveryErrors,
+  RedeliverInstanceWebhookDeliveryResponses,
   RedeliverWebhookDeliveryData,
   RedeliverWebhookDeliveryErrors,
   RedeliverWebhookDeliveryResponses,
@@ -352,6 +376,9 @@ import type {
   RevokeSdkKeyData,
   RevokeSdkKeyErrors,
   RevokeSdkKeyResponses,
+  RotateInstanceWebhookSecretData,
+  RotateInstanceWebhookSecretErrors,
+  RotateInstanceWebhookSecretResponses,
   RotateSdkKeyData,
   RotateSdkKeyErrors,
   RotateSdkKeyResponses,
@@ -380,6 +407,9 @@ import type {
   StreamProjectChangesErrors,
   StreamProjectChangesResponse,
   StreamProjectChangesResponses,
+  TestInstanceWebhookData,
+  TestInstanceWebhookErrors,
+  TestInstanceWebhookResponses,
   TestWebhookData,
   TestWebhookErrors,
   TestWebhookResponses,
@@ -401,6 +431,9 @@ import type {
   UpdateFlagData,
   UpdateFlagErrors,
   UpdateFlagResponses,
+  UpdateInstanceWebhookData,
+  UpdateInstanceWebhookErrors,
+  UpdateInstanceWebhookResponses,
   UpdateMeData,
   UpdateMeErrors,
   UpdateMemberData,
@@ -4404,5 +4437,321 @@ export const redeliverWebhookDelivery = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver",
+    ...options,
+  });
+
+/**
+ * The instance's webhook subscriptions
+ *
+ * The oldest first. An instance subscription is sent `audit.entry` for
+ * every audit entry that names no project: instance settings, members,
+ * sign-ins, project deletions. A secret is never listed; it is shown
+ * once, when it is issued.
+ *
+ */
+export const listInstanceWebhooks = <ThrowOnError extends boolean = false>(
+  options?: Options<ListInstanceWebhooksData, ThrowOnError>,
+): RequestResult<ListInstanceWebhooksResponses, ListInstanceWebhooksErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListInstanceWebhooksResponses,
+    ListInstanceWebhooksErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks",
+    ...options,
+  });
+
+/**
+ * Subscribe to the instance's audit entries
+ *
+ * Creates an instance subscription and answers it with its `secret`,
+ * shown this once, as a project's subscription is created. Its
+ * `events` are exactly `audit.entry`: any other type, `*` included,
+ * is `unknown_event_type`, and an instance has no environments to
+ * filter on, so `environments` must be empty or absent
+ * (`invalid_webhook`). The target is checked as a project
+ * subscription's is.
+ *
+ */
+export const createInstanceWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<CreateInstanceWebhookData, ThrowOnError>,
+): RequestResult<CreateInstanceWebhookResponses, CreateInstanceWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateInstanceWebhookResponses,
+    CreateInstanceWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete an instance subscription
+ *
+ * As a project subscription is deleted, without `If-Match`.
+ */
+export const deleteInstanceWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteInstanceWebhookData, ThrowOnError>,
+): RequestResult<DeleteInstanceWebhookResponses, DeleteInstanceWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteInstanceWebhookResponses,
+    DeleteInstanceWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks/{webhook}",
+    ...options,
+  });
+
+/**
+ * An instance subscription
+ */
+export const getInstanceWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<GetInstanceWebhookData, ThrowOnError>,
+): RequestResult<GetInstanceWebhookResponses, GetInstanceWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetInstanceWebhookResponses,
+    GetInstanceWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks/{webhook}",
+    ...options,
+  });
+
+/**
+ * Edit an instance subscription
+ *
+ * As a project subscription is edited, with the refusals of the
+ * instance subscription's creation.
+ *
+ */
+export const updateInstanceWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateInstanceWebhookData, ThrowOnError>,
+): RequestResult<UpdateInstanceWebhookResponses, UpdateInstanceWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateInstanceWebhookResponses,
+    UpdateInstanceWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks/{webhook}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Send an instance subscription a test ping
+ *
+ * As a project subscription's ping, naming no project. A disabled
+ * subscription is refused `409 webhook_disabled`.
+ *
+ */
+export const testInstanceWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<TestInstanceWebhookData, ThrowOnError>,
+): RequestResult<TestInstanceWebhookResponses, TestInstanceWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    TestInstanceWebhookResponses,
+    TestInstanceWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks/{webhook}/test",
+    ...options,
+  });
+
+/**
+ * Enable an instance subscription
+ *
+ * As a project subscription is enabled, without `If-Match`.
+ */
+export const enableInstanceWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<EnableInstanceWebhookData, ThrowOnError>,
+): RequestResult<EnableInstanceWebhookResponses, EnableInstanceWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    EnableInstanceWebhookResponses,
+    EnableInstanceWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks/{webhook}/enable",
+    ...options,
+  });
+
+/**
+ * Rotate an instance subscription's secret
+ *
+ * As a project subscription's secret is rotated: the new secret is
+ * answered this once, and the one it replaces signs beside it until
+ * `previous_secret_expires_at`.
+ *
+ */
+export const rotateInstanceWebhookSecret = <ThrowOnError extends boolean = false>(
+  options: Options<RotateInstanceWebhookSecretData, ThrowOnError>,
+): RequestResult<
+  RotateInstanceWebhookSecretResponses,
+  RotateInstanceWebhookSecretErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RotateInstanceWebhookSecretResponses,
+    RotateInstanceWebhookSecretErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks/{webhook}/rotate-secret",
+    ...options,
+  });
+
+/**
+ * An instance subscription's delivery log
+ *
+ * As a project subscription's delivery log is read.
+ */
+export const listInstanceWebhookDeliveries = <ThrowOnError extends boolean = false>(
+  options: Options<ListInstanceWebhookDeliveriesData, ThrowOnError>,
+): RequestResult<
+  ListInstanceWebhookDeliveriesResponses,
+  ListInstanceWebhookDeliveriesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListInstanceWebhookDeliveriesResponses,
+    ListInstanceWebhookDeliveriesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks/{webhook}/deliveries",
+    ...options,
+  });
+
+/**
+ * One delivery of an instance subscription
+ */
+export const getInstanceWebhookDelivery = <ThrowOnError extends boolean = false>(
+  options: Options<GetInstanceWebhookDeliveryData, ThrowOnError>,
+): RequestResult<
+  GetInstanceWebhookDeliveryResponses,
+  GetInstanceWebhookDeliveryErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetInstanceWebhookDeliveryResponses,
+    GetInstanceWebhookDeliveryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks/{webhook}/deliveries/{delivery}",
+    ...options,
+  });
+
+/**
+ * Send an instance delivery's event again
+ *
+ * As a project subscription's delivery is redelivered: the same event
+ * `id` and body under a new delivery, pending. A disabled subscription
+ * is refused `409 webhook_disabled`.
+ *
+ */
+export const redeliverInstanceWebhookDelivery = <ThrowOnError extends boolean = false>(
+  options: Options<RedeliverInstanceWebhookDeliveryData, ThrowOnError>,
+): RequestResult<
+  RedeliverInstanceWebhookDeliveryResponses,
+  RedeliverInstanceWebhookDeliveryErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RedeliverInstanceWebhookDeliveryResponses,
+    RedeliverInstanceWebhookDeliveryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "flagnetic_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/webhooks/{webhook}/deliveries/{delivery}/redeliver",
     ...options,
   });

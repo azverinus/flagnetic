@@ -107,7 +107,9 @@ var (
 
 // NewEntry returns the entry recording r, made at now in req. The handler
 // making the change passes the time it read once for the whole change, so the
-// entry and what it records carry the same instant.
+// entry and what it records carry the same instant. The instant is kept to
+// the microsecond the log stores, so the entry an `audit.entry` event carries
+// equals the entry as the log reads it back on every platform's clock.
 func NewEntry(entryID EntryID, now time.Time, req Request, r Record) (Entry, error) {
 	if req.Actor.Kind == "" {
 		return Entry{}, errNoActor
@@ -116,5 +118,5 @@ func NewEntry(entryID EntryID, now time.Time, req Request, r Record) (Entry, err
 	if entity == "" || verb == "" || r.Entity.Kind == "" || r.Entity.ID == "" {
 		return Entry{}, errMalformed
 	}
-	return Entry{ID: entryID, OccurredAt: now, Actor: req.Actor, RequestID: req.ID, Record: r}, nil
+	return Entry{ID: entryID, OccurredAt: now.UTC().Truncate(time.Microsecond), Actor: req.Actor, RequestID: req.ID, Record: r}, nil
 }

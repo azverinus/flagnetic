@@ -64,3 +64,15 @@ func TestAnEntryNeedsAnActionAndAnEntity(t *testing.T) {
 		}
 	}
 }
+
+func TestAnEntryKeepsItsInstantToTheMicrosecondTheLogStores(t *testing.T) {
+	at := time.Date(2026, time.March, 1, 12, 0, 0, 123456789, time.FixedZone("CET", 3600))
+	e, err := governance.NewEntry(entryID(), at, system, created)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := time.Date(2026, time.March, 1, 11, 0, 0, 123456000, time.UTC); !e.OccurredAt.Equal(want) ||
+		e.OccurredAt.Location() != time.UTC {
+		t.Errorf("occurred at %v, want %v", e.OccurredAt, want)
+	}
+}

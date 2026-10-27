@@ -37,6 +37,30 @@ func (s *Webhooks) LockProject(ctx context.Context, project workspace.ProjectID)
 	return s.projects.LockProject(ctx, project)
 }
 
+// instanceWebhooksLock is the advisory lock the instance's subscriptions are
+// written under, keyed by schema so instances sharing a database never wait
+// on one another.
+const instanceWebhooksLock = `SELECT pg_advisory_xact_lock(hashtext('flagnetic.governance.instance_webhooks@' || current_schema()))`
+
+// LockInstanceWebhooks takes, until the transaction ends, the lock the
+// instance's subscriptions are written under.
+func (s *Webhooks) LockInstanceWebhooks(ctx context.Context) error {
+	return lockInstanceWebhooks(ctx, s.db(ctx))
+}
+
+func lockInstanceWebhooks(ctx context.Context, db pgxtx.DB) error {
+	if _, err := db.Exec(ctx, instanceWebhooksLock); err != nil {
+		return fmt.Errorf("locking the instance's webhook subscriptions: %w", err)
+	}
+	return nil
+}
+
+// ofScope selects the subscriptions of the project $1, or the instance's
+// when $1 is null, their project read from column.
+func ofScope(column string) string {
+	return `(` + column + ` = $1 OR ($1::uuid IS NULL AND ` + column + ` IS NULL))`
+}
+
 // EnvironmentKeys returns the keys of project's environments.
 func (s *Webhooks) EnvironmentKeys(ctx context.Context, project workspace.ProjectID) ([]string, error) {
 	rows, err := s.db(ctx).Query(ctx, `SELECT key FROM environments WHERE project_id = $1`, project.Bytes())
@@ -105,10 +129,11 @@ func utc(t *time.Time) *time.Time {
 	return &u
 }
 
-// Webhooks returns project's subscriptions, the oldest first.
+// Webhooks returns project's subscriptions, the oldest first; the
+// instance's for a zero project.
 func (s *Webhooks) Webhooks(ctx context.Context, project workspace.ProjectID) ([]governance.Webhook, error) {
-	rows, err := s.db(ctx).Query(ctx, `SELECT `+webhookColumns+webhookFrom+` WHERE w.project_id = $1 ORDER BY w.id`,
-		project.Bytes())
+	rows, err := s.db(ctx).Query(ctx, `SELECT `+webhookColumns+webhookFrom+` WHERE `+ofScope("w.project_id")+` ORDER BY w.id`,
+		optional(project))
 	if err != nil {
 		return nil, fmt.Errorf("listing webhook subscriptions: %w", err)
 	}
@@ -124,12 +149,12 @@ func (s *Webhooks) Webhooks(ctx context.Context, project workspace.ProjectID) ([
 	return out, rows.Err()
 }
 
-// Webhook returns project's subscription with webhook, or
-// appgovernance.ErrNotFound.
+// Webhook returns project's subscription with webhook, the instance's for a
+// zero project, or appgovernance.ErrNotFound.
 func (s *Webhooks) Webhook(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID,
 ) (governance.Webhook, error) {
 	w, err := scanWebhook(s.db(ctx).QueryRow(ctx, `SELECT `+webhookColumns+webhookFrom+`
-		WHERE w.project_id = $1 AND w.id = $2`, project.Bytes(), webhook.Bytes()))
+		WHERE `+ofScope("w.project_id")+` AND w.id = $2`, optional(project), webhook.Bytes()))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return w, appgovernance.ErrNotFound
 	}
@@ -179,8 +204,8 @@ func (s *Webhooks) UpdateWebhook(ctx context.Context, w governance.Webhook) erro
 		UPDATE webhook_subscriptions
 		SET name = $3, url = $4, events = $5, environments = $6, enabled = $7, disabled_reason = $8, enabled_at = $9,
 		    updated_at = $10, version = $11
-		WHERE project_id = $1 AND id = $2`,
-		w.Project.Bytes(), w.ID.Bytes(), w.Name, w.URL, w.Events, w.Environments, w.Enabled, reasonOf(w), w.EnabledAt,
+		WHERE `+ofScope("project_id")+` AND id = $2`,
+		optional(w.Project), w.ID.Bytes(), w.Name, w.URL, w.Events, w.Environments, w.Enabled, reasonOf(w), w.EnabledAt,
 		w.UpdatedAt, w.Version)
 	if err != nil {
 		return fmt.Errorf("updating a webhook subscription: %w", err)
@@ -188,10 +213,11 @@ func (s *Webhooks) UpdateWebhook(ctx context.Context, w governance.Webhook) erro
 	return nil
 }
 
-// DeleteWebhook deletes project's subscription with webhook.
+// DeleteWebhook deletes project's subscription with webhook, the instance's
+// for a zero project.
 func (s *Webhooks) DeleteWebhook(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID) error {
-	_, err := s.db(ctx).Exec(ctx, `DELETE FROM webhook_subscriptions WHERE project_id = $1 AND id = $2`,
-		project.Bytes(), webhook.Bytes())
+	_, err := s.db(ctx).Exec(ctx, `DELETE FROM webhook_subscriptions WHERE `+ofScope("project_id")+` AND id = $2`,
+		optional(project), webhook.Bytes())
 	if err != nil {
 		return fmt.Errorf("deleting a webhook subscription: %w", err)
 	}
@@ -205,8 +231,8 @@ func (s *Webhooks) EnableWebhook(ctx context.Context, w governance.Webhook) erro
 	_, err := s.db(ctx).Exec(ctx, `
 		UPDATE webhook_subscriptions
 		SET enabled = $3, disabled_reason = $4, consecutive_failures = $5, enabled_at = $6, updated_at = $7, version = $8
-		WHERE project_id = $1 AND id = $2`,
-		w.Project.Bytes(), w.ID.Bytes(), w.Enabled, reasonOf(w), w.ConsecutiveFailures, w.EnabledAt, w.UpdatedAt, w.Version)
+		WHERE `+ofScope("project_id")+` AND id = $2`,
+		optional(w.Project), w.ID.Bytes(), w.Enabled, reasonOf(w), w.ConsecutiveFailures, w.EnabledAt, w.UpdatedAt, w.Version)
 	if err != nil {
 		return fmt.Errorf("enabling a webhook subscription: %w", err)
 	}
@@ -223,8 +249,8 @@ func (s *Webhooks) RotateWebhookSecret(ctx context.Context, w governance.Webhook
 	_, err := s.db(ctx).Exec(ctx, `
 		UPDATE webhook_subscriptions
 		SET secret_sealed = $3, previous_secret_sealed = $4, previous_secret_expires_at = $5, updated_at = $6, version = $7
-		WHERE project_id = $1 AND id = $2`,
-		w.Project.Bytes(), w.ID.Bytes(), w.SealedSecret, previous, w.PreviousSecretExpiresAt, w.UpdatedAt, w.Version)
+		WHERE `+ofScope("project_id")+` AND id = $2`,
+		optional(w.Project), w.ID.Bytes(), w.SealedSecret, previous, w.PreviousSecretExpiresAt, w.UpdatedAt, w.Version)
 	if err != nil {
 		return fmt.Errorf("rotating a webhook subscription's secret: %w", err)
 	}

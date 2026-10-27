@@ -230,11 +230,7 @@ func (d DeliveryRequestDeps) queue(ctx context.Context, project workspace.Projec
 	now := d.Clock.Now().UTC().Truncate(time.Microsecond)
 	var out governance.Delivery
 	err := d.Tx.Within(ctx, func(ctx context.Context) error {
-		err := d.Webhooks.LockProject(ctx, project)
-		if errors.Is(err, ErrNotFound) {
-			return errProjectNotFound
-		}
-		if err != nil {
+		if err := lockSubscriptions(ctx, d.Webhooks, project); err != nil {
 			return err
 		}
 		w, err := webhookOf(ctx, d.Webhooks, project, webhook)

@@ -3743,3 +3743,113 @@ export const zRedeliverWebhookDeliveryPath = z.object({
  * The new delivery, pending.
  */
 export const zRedeliverWebhookDeliveryResponse = zWebhookDelivery;
+
+/**
+ * The instance's webhook subscriptions.
+ */
+export const zListInstanceWebhooksResponse = zWebhookList;
+
+export const zCreateInstanceWebhookBody = zWebhookCreate;
+
+/**
+ * The new subscription with its secret, shown this once.
+ */
+export const zCreateInstanceWebhookResponse = zWebhookWithSecret;
+
+export const zDeleteInstanceWebhookPath = z.object({
+  webhook: z.uuid(),
+});
+
+/**
+ * Deleted.
+ */
+export const zDeleteInstanceWebhookResponse = z.void();
+
+export const zGetInstanceWebhookPath = z.object({
+  webhook: z.uuid(),
+});
+
+/**
+ * The subscription; its `ETag` is its version.
+ */
+export const zGetInstanceWebhookResponse = zWebhook;
+
+export const zUpdateInstanceWebhookBody = zWebhookPatch;
+
+export const zUpdateInstanceWebhookHeaders = z.object({
+  "If-Match": z.string().optional(),
+});
+
+export const zUpdateInstanceWebhookPath = z.object({
+  webhook: z.uuid(),
+});
+
+/**
+ * The subscription as it is now.
+ */
+export const zUpdateInstanceWebhookResponse = zWebhook;
+
+export const zTestInstanceWebhookPath = z.object({
+  webhook: z.uuid(),
+});
+
+/**
+ * The ping's delivery, pending.
+ */
+export const zTestInstanceWebhookResponse = zWebhookDelivery;
+
+export const zEnableInstanceWebhookPath = z.object({
+  webhook: z.uuid(),
+});
+
+/**
+ * The subscription, enabled.
+ */
+export const zEnableInstanceWebhookResponse = zWebhook;
+
+export const zRotateInstanceWebhookSecretPath = z.object({
+  webhook: z.uuid(),
+});
+
+/**
+ * The subscription with its new secret.
+ */
+export const zRotateInstanceWebhookSecretResponse = zWebhookWithSecret;
+
+export const zListInstanceWebhookDeliveriesPath = z.object({
+  webhook: z.uuid(),
+});
+
+export const zListInstanceWebhookDeliveriesQuery = z.object({
+  status: zWebhookDeliveryStatus.optional(),
+  event_type: z.string().optional(),
+  from: z.iso.datetime().optional(),
+  to: z.iso.datetime().optional(),
+  cursor: z.string().optional(),
+  limit: z.int().gte(1).lte(200).optional().default(50),
+});
+
+/**
+ * One page of deliveries, newest first.
+ */
+export const zListInstanceWebhookDeliveriesResponse = zWebhookDeliveryList;
+
+export const zGetInstanceWebhookDeliveryPath = z.object({
+  webhook: z.uuid(),
+  delivery: z.uuid(),
+});
+
+/**
+ * The delivery with every attempt.
+ */
+export const zGetInstanceWebhookDeliveryResponse = zWebhookDelivery;
+
+export const zRedeliverInstanceWebhookDeliveryPath = z.object({
+  webhook: z.uuid(),
+  delivery: z.uuid(),
+});
+
+/**
+ * The new delivery, pending.
+ */
+export const zRedeliverInstanceWebhookDeliveryResponse = zWebhookDelivery;

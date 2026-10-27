@@ -205,6 +205,18 @@ var (
 // it. environments are the keys of the project's environments. Where the
 // target's name resolves to is judged apart, by CheckTargetAddresses.
 func CheckWebhook(in WebhookInput, environments []string, policy TargetPolicy) (WebhookInput, error) {
+	return checkWebhook(in, environments, false, policy)
+}
+
+// CheckInstanceWebhook is CheckWebhook for a subscription of the instance.
+// The entries naming no project are its whole stream, so it takes
+// EventAuditEntry and no other type, and it has no environment to filter
+// on: an environment is a malformed field, another type unknown_event_type.
+func CheckInstanceWebhook(in WebhookInput, policy TargetPolicy) (WebhookInput, error) {
+	return checkWebhook(in, nil, true, policy)
+}
+
+func checkWebhook(in WebhookInput, environments []string, instance bool, policy TargetPolicy) (WebhookInput, error) {
 	var violations []apperrors.Violation
 	add := func(pointer, code, detail string, params map[string]any) {
 		violations = append(violations, apperrors.Violation{Pointer: pointer, Code: code, Detail: detail, Params: params})
@@ -228,6 +240,10 @@ func CheckWebhook(in WebhookInput, environments []string, policy TargetPolicy) (
 	// Pointers index the list as the request wrote it, so they are judged
 	// before repeats are dropped.
 	for i, e := range in.Environments {
+		if instance {
+			add(fmt.Sprintf("/environments/%d", i), "not_allowed", "an instance subscription has no environments", nil)
+			continue
+		}
 		if !slices.Contains(environments, e) && !slices.Contains(in.Environments[:i], e) {
 			add(fmt.Sprintf("/environments/%d", i), "not_found", "the project has no environment with this key", nil)
 		}
@@ -237,6 +253,13 @@ func CheckWebhook(in WebhookInput, environments []string, policy TargetPolicy) (
 		return in, apperrors.Invalid("invalid_webhook", "the webhook subscription is not valid", violations...)
 	}
 	for i, e := range in.Events {
+		if instance && e != EventAuditEntry {
+			return in, apperrors.Invalid("unknown_event_type", "an instance subscription takes audit.entry alone",
+				apperrors.Violation{
+					Pointer: fmt.Sprintf("/events/%d", i), Code: "unknown_event_type",
+					Detail: "an instance subscription is sent every audit entry naming no project, as audit.entry",
+				})
+		}
 		if e != EventAll && !knownEventType(e) {
 			return in, apperrors.Invalid("unknown_event_type", "an event type is not in the catalogue", apperrors.Violation{
 				Pointer: fmt.Sprintf("/events/%d", i), Code: "unknown_event_type",
