@@ -1,4 +1,11 @@
-import { type AuditEntry, deleteSegment, type Segment, updateSegment } from "@flagnetic/api";
+import {
+  type AuditEntry,
+  deleteSegment,
+  type Segment,
+  type SegmentPatch,
+  updateSegment,
+  type Violation,
+} from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -9,6 +16,7 @@ import { toast } from "sonner";
 
 import { Can } from "@/components/can";
 import { ConflictBanner } from "@/components/conflict-banner";
+import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { QueryError } from "@/components/query-error";
 import { SegmentFields } from "@/components/segment-fields";
 import { SegmentDiff } from "@/components/structural-diff-view";
@@ -116,6 +124,13 @@ type Conflict = { current: Segment; entry: AuditEntry | undefined };
 type Refusal = { at: Map<string, string>; rest: string[] };
 
 /**
+ * A save refused because an environment is protected, as a proposal: the
+ * conditions and the private switch every environment's ruleset carries,
+ * and the rest of the edit, which needs no review and is saved first.
+ */
+type Proposing = { proposal: Proposal; metadata: SegmentPatch; at: number };
+
+/**
  * One segment as a draft: its fields and conditions, saved together
  * under the version the draft was filled from. A save while flags' rules
  * use the segment names them first; a save that meets a newer version
@@ -155,6 +170,7 @@ function SegmentPage({
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [proposing, setProposing] = useState<Proposing>();
 
   const patch = segmentPatchOf(base, draft, types);
   const dirty = canEdit && !deleted && Object.keys(patch).length > 0;
@@ -173,6 +189,16 @@ function SegmentPage({
     setConflict(undefined);
   };
 
+  const placeViolations = (violations: readonly Violation[], sent: SegmentDraft) => {
+    const placed = placeSegmentRefusal(violations, sent);
+    setRefusal({
+      at: new Map(
+        [...placed.at].map(([at, violation]) => [at, segmentViolationMessage(i18n, violation)]),
+      ),
+      rest: placed.rest.map((violation) => segmentViolationMessage(i18n, violation)),
+    });
+  };
+
   const save = useMutation({
     mutationFn: ({ sent, at }: { sent: SegmentDraft; at: number }) =>
       unwrap(
@@ -189,8 +215,25 @@ function SegmentPage({
       restart(saved);
       toast.success(t`The segment is saved.`);
     },
-    onError: async (error, { sent }) => {
+    onError: async (error, { sent, at }) => {
       if (!(error instanceof ApiError)) return;
+      if (error.code === "change_request_required") {
+        const { conditions, private: hidden, ...metadata } = segmentPatchOf(base, sent, types);
+        setRefusal({ at: new Map(), rest: [problemMessage(i18n, error)] });
+        setProposing({
+          proposal: {
+            kind: "definition",
+            segment: segment.key,
+            proposed: {
+              conditions: conditions ?? base.conditions,
+              private: hidden ?? base.private,
+            },
+          },
+          metadata,
+          at,
+        });
+        return;
+      }
       if (error.code === "version_mismatch") {
         let current: Segment;
         try {
@@ -216,13 +259,7 @@ function SegmentPage({
         return;
       }
       if (error.violations.length > 0) {
-        const placed = placeSegmentRefusal(error.violations, sent);
-        setRefusal({
-          at: new Map(
-            [...placed.at].map(([at, violation]) => [at, segmentViolationMessage(i18n, violation)]),
-          ),
-          rest: placed.rest.map((violation) => segmentViolationMessage(i18n, violation)),
-        });
+        placeViolations(error.violations, sent);
         return;
       }
       setRefusal({ at: new Map(), rest: [problemMessage(i18n, error)] });
@@ -425,6 +462,44 @@ function SegmentPage({
           </>
         )}
       </ConfirmDialog>
+      <ProposeDialog
+        project={project}
+        proposal={proposing?.proposal}
+        onOpenChange={(open) => !open && setProposing(undefined)}
+        before={
+          proposing && Object.keys(proposing.metadata).length > 0
+            ? async () => {
+                const saved = await unwrap(
+                  updateSegment({
+                    path: { project, segment: segment.key },
+                    body: proposing.metadata,
+                    headers: ifMatch(proposing.at),
+                  }),
+                );
+                queryClient.setQueryData(detailKey, saved);
+                void queryClient.invalidateQueries({ queryKey: segmentsQuery(project).queryKey });
+                // The draft now compares with what was saved, so a later
+                // save or proposal neither meets its own write as a newer
+                // version nor loses edits made after it.
+                setBase(saved);
+                setVersion(saved.version);
+              }
+            : undefined
+        }
+        onRefusedProposal={(violations) => placeViolations(violations, draft)}
+        onProposed={() => {
+          setProposing(undefined);
+          restart(base);
+        }}
+      >
+        <p className="text-sm">
+          <Trans>
+            An environment is protected, so the conditions and whether the segment is private are
+            proposed for review; they apply to every environment once approved. Its name and
+            description, when edited, are saved at once.
+          </Trans>
+        </p>
+      </ProposeDialog>
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}

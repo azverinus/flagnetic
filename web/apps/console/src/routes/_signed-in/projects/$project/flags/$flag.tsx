@@ -12,7 +12,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArchiveIcon, FlaskConicalIcon, GitCompareArrowsIcon, OctagonXIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/can";
@@ -22,6 +22,7 @@ import { FlagDefinitionSheet } from "@/components/flag-definition-sheet";
 import { FlagHistory } from "@/components/flag-history";
 import { KillSwitchDialog } from "@/components/kill-switch-dialog";
 import { OverridesSection } from "@/components/overrides-section";
+import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { QueryError } from "@/components/query-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,8 @@ import {
 import { flagTypeName } from "@/lib/flags";
 import { ifMatch } from "@/lib/http";
 import { problemMessage } from "@/lib/problem-messages";
-import { useCan, useMissingPermissionReason } from "@/lib/access";
+import { AccessContext, missingPermissionReason } from "@/lib/access";
+import { configurationEditing } from "@/lib/change-requests";
 import {
   attributesQuery,
   environmentsQuery,
@@ -486,14 +488,21 @@ type PanelProps = {
  * rules and fallthrough.
  */
 function EnvironmentPanel(props: PanelProps) {
-  const { t } = useLingui();
+  const { i18n, t } = useLingui();
   const { project, flag, configuration, environment } = props;
+  const access = useContext(AccessContext);
   const archived = flag.archived_at !== null;
   const frozen = archived
     ? t`The flag is archived. Restore it to change its configurations.`
     : undefined;
-  const can = useCan("flag_configuration.update");
-  const missing = useMissingPermissionReason("flag_configuration.update");
+  // A protected environment's configuration is proposed for review, so it
+  // is edited by whoever may propose; until the environments are read it
+  // is taken as unprotected, which the server judges on saving anyway.
+  const editing = configurationEditing(environment?.protected ?? false, access.permissions);
+  const missing =
+    editing.kind === "read"
+      ? missingPermissionReason(i18n, editing.missing, access.roles)
+      : undefined;
   const attributes = useQuery(attributesQuery(project));
   const segments = useQuery(segmentsQuery(project));
   const flags = useQuery(flagChoicesQuery(project));
@@ -512,9 +521,16 @@ function EnvironmentPanel(props: PanelProps) {
         <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">
           {frozen}
         </p>
-      ) : !can ? (
+      ) : missing !== undefined ? (
         <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">
           {missing}
+        </p>
+      ) : editing.kind === "propose" ? (
+        <p role="status" className="rounded-md border bg-muted/40 p-3 text-sm">
+          <Trans>
+            The environment is protected: changes to its configuration are proposed as change
+            requests and go live once approved and applied.
+          </Trans>
         </p>
       ) : null}
       <OnOff {...props} frozen={frozen !== undefined} />
@@ -536,7 +552,8 @@ function EnvironmentPanel(props: PanelProps) {
             experiments: experiments.data,
           }}
           overrides={<OverridesSection {...props} frozen={frozen} />}
-          readOnly={frozen ?? (can ? undefined : missing)}
+          readOnly={frozen ?? missing}
+          proposes={editing.kind === "propose"}
           tester={props.tester}
         />
       ) : (
@@ -564,6 +581,7 @@ function OnOff({
   const queryClient = useQueryClient();
   const answered = useConfigurationAnswer(project, flag.key);
   const [killing, setKilling] = useState(false);
+  const [proposing, setProposing] = useState<Proposal>();
   const name = environment?.name ?? configuration.environment;
   const key = flag.key;
 
@@ -581,12 +599,23 @@ function OnOff({
       answered(next);
       toast.success(next.on ? t`${key} is on in ${name}.` : t`${key} is off in ${name}.`);
     },
-    onError: (error) => {
+    onError: (error, on) => {
       if (error instanceof ApiError && error.code === "version_mismatch") {
         void queryClient.invalidateQueries({ queryKey: flagQuery(project, flag.key).queryKey });
         toast.error(
           t`Someone changed this configuration a moment ago. It is read again: switch it once more if you still mean to.`,
         );
+        return;
+      }
+      // A protected environment is switched through review: the same
+      // switch is offered as a change request.
+      if (error instanceof ApiError && error.code === "change_request_required") {
+        setProposing({
+          kind: "flag_configuration",
+          flag: flag.key,
+          environment: configuration.environment,
+          proposed: { ...configurationPut(configuration), on },
+        });
         return;
       }
       toast.error(error instanceof ApiError ? problemMessage(i18n, error) : String(error));
@@ -635,6 +664,24 @@ function OnOff({
           ) : null}
         </>
       ) : null}
+      <ProposeDialog
+        project={project}
+        proposal={proposing}
+        onOpenChange={(open) => !open && setProposing(undefined)}
+        onProposed={() => setProposing(undefined)}
+      >
+        <p className="text-sm">
+          {configuration.on ? (
+            <Trans>
+              {name} is protected: switching {key} off there goes through a change request.
+            </Trans>
+          ) : (
+            <Trans>
+              {name} is protected: switching {key} on there goes through a change request.
+            </Trans>
+          )}
+        </p>
+      </ProposeDialog>
     </section>
   );
 }

@@ -19,6 +19,7 @@ import { useEnvironmentPlace } from "@/components/project-audit";
 import { QueryError } from "@/components/query-error";
 import { ConfigurationDiff, DefinitionDiff } from "@/components/structural-diff-view";
 import { Button } from "@/components/ui/button";
+import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ApiError, unwrap } from "@/lib/errors";
@@ -226,6 +227,7 @@ function RevertAction({
   const answered = useConfigurationAnswer(project, flag.key);
   // The version the member asked to revert to, while confirming.
   const [asking, setAsking] = useState<number>();
+  const [proposing, setProposing] = useState<Proposal>();
   const made = revertVersion(entry, current.version);
   const earlier = versionBefore(entry, current.version);
   const now = current.version;
@@ -247,9 +249,21 @@ function RevertAction({
       setAsking(undefined);
       toast.success(t`The configuration in ${name} is back to version ${to}.`);
     },
-    onError: (error) => {
+    onError: (error, to) => {
       if (error instanceof ApiError && error.code === "version_mismatch") {
         void queryClient.invalidateQueries({ queryKey: flagQuery(project, flag.key).queryKey });
+      }
+      // A protected environment is reverted through review: the same
+      // revert is offered as a change request, which the server fills
+      // with the version reverted to.
+      if (error instanceof ApiError && error.code === "change_request_required") {
+        setAsking(undefined);
+        setProposing({
+          kind: "flag_configuration",
+          flag: flag.key,
+          environment: environment.key,
+          revert_to: to,
+        });
       }
     },
   });
@@ -273,6 +287,7 @@ function RevertAction({
     setAsking(version);
   };
   const version = asking;
+  const proposedVersion = proposing?.revert_to;
   return (
     <>
       {atThisVersion}
@@ -309,6 +324,19 @@ function RevertAction({
           </Trans>
         </p>
       </ConfirmDialog>
+      <ProposeDialog
+        project={project}
+        proposal={proposing}
+        onOpenChange={(open) => !open && setProposing(undefined)}
+        onProposed={() => setProposing(undefined)}
+      >
+        <p className="text-sm">
+          <Trans>
+            {name} is protected, so reverting its configuration to version {proposedVersion} goes
+            through a change request. What it proposes is that version, as it was; nobody edits it.
+          </Trans>
+        </p>
+      </ProposeDialog>
     </>
   );
 }

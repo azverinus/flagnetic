@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useBlocker } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -11,6 +11,8 @@ export type UnsavedChangesBarProps = {
   onDiscard: () => void;
   /** Submits the form; omitted when the form's own button saves. */
   onSave?: () => void;
+  /** What the save button says; Save unless the form proposes its changes instead. */
+  saveLabel?: ReactNode;
   pending?: boolean;
   /**
    * Whether a navigation keeps the form on screen, as opening a panel
@@ -36,6 +38,7 @@ export function UnsavedChangesBar({
   dirty,
   onDiscard,
   onSave,
+  saveLabel,
   pending,
   keeps,
 }: UnsavedChangesBarProps) {
@@ -80,7 +83,7 @@ export function UnsavedChangesBar({
             </Button>
             {onSave ? (
               <Button type="button" onClick={onSave} disabled={pending}>
-                <Trans>Save</Trans>
+                {saveLabel ?? <Trans>Save</Trans>}
               </Button>
             ) : null}
           </div>

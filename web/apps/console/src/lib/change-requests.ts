@@ -191,11 +191,14 @@ export function diffBasis(
     : "patch";
 }
 
-/** The part of a configuration a patch operation touches. */
+/** A field of a configuration or a definition a patch operation replaces whole. */
+type PatchField = "on" | "off_variation" | "fallthrough" | "automatic_exposure" | "private";
+
+/** The part of a configuration or a definition a patch operation touches. */
 export type PatchTarget =
-  | { kind: "on" | "off_variation" | "fallthrough" }
+  | { kind: PatchField }
   | {
-      kind: "rule" | "override" | "prerequisite";
+      kind: "rule" | "override" | "prerequisite" | "variation" | "condition";
       /** 1-based, as the configuration stands when the operation applies. */
       position: number;
       /** The pointer within the item, empty for the whole item. */
@@ -211,7 +214,25 @@ export type PatchChange = {
   value: unknown;
 };
 
-const listKinds = { rules: "rule", overrides: "override", prerequisites: "prerequisite" } as const;
+const patchFields: ReadonlySet<string> = new Set<PatchField>([
+  "on",
+  "off_variation",
+  "fallthrough",
+  "automatic_exposure",
+  "private",
+]);
+
+function isPatchField(token: string | undefined): token is PatchField {
+  return token !== undefined && patchFields.has(token);
+}
+
+const listKinds = {
+  rules: "rule",
+  overrides: "override",
+  prerequisites: "prerequisite",
+  variations: "variation",
+  conditions: "condition",
+} as const;
 
 function unescape(token: string): string {
   return token.replaceAll("~1", "/").replaceAll("~0", "~");
@@ -220,12 +241,7 @@ function unescape(token: string): string {
 function targetOf(path: string): PatchTarget {
   const tokens = path.split("/").slice(1).map(unescape);
   const [head, index, ...rest] = tokens;
-  if (
-    tokens.length === 1 &&
-    (head === "on" || head === "off_variation" || head === "fallthrough")
-  ) {
-    return { kind: head };
-  }
+  if (tokens.length === 1 && isPatchField(head)) return { kind: head };
   if (head !== undefined && head in listKinds && index !== undefined && /^\d+$/.test(index)) {
     return {
       kind: listKinds[head as keyof typeof listKinds],
@@ -238,8 +254,8 @@ function targetOf(path: string): PatchTarget {
 
 /**
  * A change request's patch by what each operation touches, in its order:
- * what is read when the configuration it was based on is no longer there
- * to compare with.
+ * what is read when the configuration or definition it was based on is no
+ * longer there to compare with.
  */
 export function patchChanges(diff: readonly PatchOperation[]): PatchChange[] {
   return diff.map((operation) => ({
@@ -265,4 +281,23 @@ export function waitingByEnvironment(
     out.set(environment, waiting);
   }
   return out;
+}
+
+/**
+ * How a member edits a flag's configuration in one environment: saving
+ * it, or, where the environment is protected, proposing it for review,
+ * which needs the permission to propose alone, since an approved change
+ * request is what writes it; otherwise reading it, with the permission
+ * that is missing.
+ */
+export type ConfigurationEditing =
+  { kind: "save" } | { kind: "propose" } | { kind: "read"; missing: Permission };
+
+export function configurationEditing(
+  isProtected: boolean,
+  permissions: ReadonlySet<string>,
+): ConfigurationEditing {
+  const needed: Permission = isProtected ? "change_request.propose" : "flag_configuration.update";
+  if (!permissions.has(needed)) return { kind: "read", missing: needed };
+  return { kind: isProtected ? "propose" : "save" };
 }

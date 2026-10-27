@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ActionOffer,
   changeRequestOffers,
+  configurationEditing,
   diffBasis,
   listChangeRequestsQueryOf,
   patchChanges,
@@ -265,6 +266,54 @@ describe("a patch in words", () => {
       },
       { op: "add", target: { kind: "other", path: "something/else" }, value: 1 },
     ]);
+  });
+});
+
+describe("a definition's patch in words", () => {
+  it("names the field, variation or condition each operation touches", () => {
+    expect(
+      patchChanges([
+        { op: "replace", path: "/automatic_exposure", value: true },
+        { op: "replace", path: "/variations/1/value", value: "green" },
+        { op: "add", path: "/variations/2", value: { key: "c" } },
+        { op: "replace", path: "/private", value: true },
+        { op: "remove", path: "/conditions/0" },
+      ]),
+    ).toEqual([
+      { op: "replace", target: { kind: "automatic_exposure" }, value: true },
+      { op: "replace", target: { kind: "variation", position: 2, field: "value" }, value: "green" },
+      { op: "add", target: { kind: "variation", position: 3, field: "" }, value: { key: "c" } },
+      { op: "replace", target: { kind: "private" }, value: true },
+      { op: "remove", target: { kind: "condition", position: 1, field: "" }, value: undefined },
+    ]);
+  });
+});
+
+describe("how a configuration is edited", () => {
+  const holding = (...permissions: string[]) => new Set(permissions);
+
+  it("saves directly where the environment is not protected", () => {
+    expect(configurationEditing(false, holding("flag_configuration.update"))).toEqual({
+      kind: "save",
+    });
+    expect(configurationEditing(false, holding("change_request.propose"))).toEqual({
+      kind: "read",
+      missing: "flag_configuration.update",
+    });
+  });
+
+  it("proposes in a protected environment, for whoever may propose", () => {
+    expect(
+      configurationEditing(true, holding("flag_configuration.update", "change_request.propose")),
+    ).toEqual({ kind: "propose" });
+    expect(configurationEditing(true, holding("project.read"))).toEqual({
+      kind: "read",
+      missing: "change_request.propose",
+    });
+    expect(configurationEditing(true, holding("flag_configuration.update"))).toEqual({
+      kind: "read",
+      missing: "change_request.propose",
+    });
   });
 });
 
