@@ -34,8 +34,9 @@ export type ProposeDialogProps = {
   onOpenChange: (open: boolean) => void;
   /**
    * A write the proposal needs first, such as a definition's name or
-   * tags, which a change request does not carry. It is sent once, so
-   * proposing again after a refusal does not repeat it.
+   * tags, which a change request does not carry. It is sent once per
+   * proposal, so proposing it again after a refusal does not repeat it,
+   * while a new proposal from the editor sends its own.
    */
   before?: () => Promise<unknown>;
   /**
@@ -70,15 +71,16 @@ export function ProposeDialog({
   const { t } = useLingui();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  // Whether the write the proposal needs first is done: a refusal of the
-  // proposal does not take it back.
-  const prepared = useRef(false);
+  // The proposal whose first write is done: a refusal of the proposal
+  // does not take the write back, but an editor handing a new proposal
+  // has new edits for it to write.
+  const prepared = useRef<Proposal>(undefined);
 
   const propose = useMutation({
     mutationFn: async ({ sent, details }: { sent: Proposal; details: Details }) => {
-      if (before && !prepared.current) {
+      if (before && prepared.current !== sent) {
         await before();
-        prepared.current = true;
+        prepared.current = sent;
       }
       const description = details.description.trim();
       return unwrap(
@@ -104,7 +106,7 @@ export function ProposeDialog({
       toast.success(t`The change request is open for review.`);
       // The draft goes into the change request, so leaving does not ask about it.
       flushSync(() => onProposed());
-      prepared.current = false;
+      prepared.current = undefined;
       await navigate({
         to: "/projects/$project/change-requests/$changeRequest",
         params: { project, changeRequest: created.id },

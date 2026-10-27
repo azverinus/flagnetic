@@ -514,6 +514,11 @@ function DefinitionForm({
                 void queryClient.invalidateQueries({
                   queryKey: [...flagsQueryKey(project), "list"],
                 });
+                // The form now edits from what was saved, so a later save
+                // or proposal neither meets its own write as a newer
+                // version nor loses edits made after it.
+                setBase(saved);
+                setVersion(saved.version);
               }
             : undefined
         }

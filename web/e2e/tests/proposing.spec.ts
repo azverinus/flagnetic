@@ -128,7 +128,7 @@ test.describe("proposing from the editors", () => {
     );
   });
 
-  test("a definition edit refused for a protected environment becomes a proposal", async ({
+  test("a definition edit refused for a protected environment becomes a change request", async ({
     page,
   }) => {
     const project = await seedProject("proposing-definition");

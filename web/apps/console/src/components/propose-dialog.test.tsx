@@ -1,6 +1,7 @@
 import type { ChangeRequestCreate, Violation } from "@flagnetic/api";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { fakeServer, problem } from "@/test/fake-server";
@@ -113,6 +114,50 @@ describe("the propose dialog", () => {
     expect(before).toHaveBeenCalledOnce();
     expect(requests).toHaveLength(2);
     expect((await bodyOf(requests[1])).apply_at).toBeUndefined();
+  });
+
+  it("writes what a later proposal needs first, though an earlier one's write was done", async () => {
+    let answer = problem(422, "invalid_change_request", {
+      errors: [{ pointer: "/title", code: "required" }],
+    });
+    fakeServer({ "POST /projects/shop/change-requests": () => answer });
+    const first = vi.fn(() => Promise.resolve());
+    const second = vi.fn(() => Promise.resolve());
+    const onProposed = vi.fn();
+    function Editor() {
+      const [shown, setShown] = useState<{ proposal: Proposal; before: () => Promise<unknown> }>({
+        proposal,
+        before: first,
+      });
+      return (
+        <ProposeDialog
+          project="shop"
+          proposal={shown.proposal}
+          onOpenChange={() => setShown({ proposal: { ...proposal }, before: second })}
+          onProposed={onProposed}
+          before={shown.before}
+        />
+      );
+    }
+    await renderWithRouter(() => <Editor />);
+
+    let dialog = screen.getByRole("dialog", { name: "Propose the change" });
+    await userEvent.type(within(dialog).getByLabelText("Title"), "First");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Propose" }));
+    await waitFor(() =>
+      expect(within(dialog).getByLabelText("Title")).toHaveAttribute("aria-invalid", "true"),
+    );
+    expect(first).toHaveBeenCalledOnce();
+
+    // The member leaves the dialog, edits again and the editor proposes anew.
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    answer = { status: 201, body: created };
+    dialog = screen.getByRole("dialog", { name: "Propose the change" });
+    await userEvent.type(within(dialog).getByLabelText("Title"), "Second");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Propose" }));
+
+    await waitFor(() => expect(onProposed).toHaveBeenCalledOnce());
+    expect(second).toHaveBeenCalledOnce();
   });
 
   it("hands refusals of what is proposed back to the editor, as a direct write's", async () => {

@@ -478,6 +478,11 @@ function SegmentPage({
                 );
                 queryClient.setQueryData(detailKey, saved);
                 void queryClient.invalidateQueries({ queryKey: segmentsQuery(project).queryKey });
+                // The draft now compares with what was saved, so a later
+                // save or proposal neither meets its own write as a newer
+                // version nor loses edits made after it.
+                setBase(saved);
+                setVersion(saved.version);
               }
             : undefined
         }
