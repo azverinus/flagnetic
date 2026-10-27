@@ -20,7 +20,7 @@ module Flagnetic
         when Time then (value.to_r * 1_000_000_000).floor
         when true, false, nil then nil
         else
-          ms = Eval.number(value)
+          ms = Values.number(value)
           return nil unless ms && ms == ms.truncate && ms.abs <= MAX_EPOCH_MILLIS
 
           ms.to_i * 1_000_000
@@ -66,5 +66,6 @@ module Flagnetic
         (year % 4).zero? && (!(year % 100).zero? || (year % 400).zero?)
       end
     end
+    private_constant :Instant
   end
 end

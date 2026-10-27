@@ -25,4 +25,5 @@ module Flagnetic
       @attempts = 0
     end
   end
+  private_constant :Backoff
 end

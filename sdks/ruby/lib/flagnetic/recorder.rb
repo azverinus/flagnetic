@@ -127,5 +127,9 @@ module Flagnetic
     def aliases
       @mutex.synchronize { @aliases.dup }
     end
+
+    # The client hands the recorder what it counts and reports; a test only
+    # reads it.
+    private :count, :record, :record_event
   end
 end

@@ -90,4 +90,5 @@ module Flagnetic
       yield Event.new(type: type.empty? ? "message" : type, data: data.chomp, id: @id)
     end
   end
+  private_constant :SSEParser
 end

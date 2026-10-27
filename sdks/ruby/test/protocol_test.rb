@@ -62,7 +62,7 @@ class ProtocolTest < Minitest::Test
   end
 
   def build(factor, options, stored: nil, offline: nil)
-    timing = Flagnetic::Client::DEFAULT_TIMING.to_h.transform_values do |v|
+    timing = Flagnetic::Client.const_get(:DEFAULT_TIMING).to_h.transform_values do |v|
       v.is_a?(Array) ? v.map { |x| x / factor } : v / factor
     end
     poll = options["poll_interval_ms"] / 1000.0 / factor
@@ -418,7 +418,7 @@ class ProtocolTest < Minitest::Test
 
   def parse(text)
     frames = []
-    Flagnetic::SSEParser.new.feed(text) { |kind, value| frames << [kind, value] }
+    Flagnetic.const_get(:SSEParser).new.feed(text) { |kind, value| frames << [kind, value] }
     frames
   end
 end

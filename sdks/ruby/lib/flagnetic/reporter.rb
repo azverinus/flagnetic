@@ -90,4 +90,5 @@ module Flagnetic
       nil
     end
   end
+  private_constant :Reporter
 end

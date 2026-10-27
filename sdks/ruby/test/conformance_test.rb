@@ -53,12 +53,12 @@ class ConformanceTest < Minitest::Test
     vectors.each do |vec|
       assert_keys vec, %w[input hash bucket]
       input = vec.fetch("input")
-      assert_equal vec.fetch("hash"), Flagnetic::Eval::Murmur3.hash32(input), "hash32(#{input.inspect})"
+      assert_equal vec.fetch("hash"), Flagnetic::Eval.const_get(:Murmur3).hash32(input), "hash32(#{input.inspect})"
       assert_equal vec.fetch("bucket"), vec.fetch("hash") % Flagnetic::Eval::BUCKETS, "vector #{input.inspect}"
       next unless input.include?(".")
 
       salt, unit_id = input.split(".", 2)
-      assert_equal vec.fetch("bucket"), Flagnetic::Eval.bucket(salt, unit_id),
+      assert_equal vec.fetch("bucket"), Flagnetic::Eval.const_get(:Murmur3).bucket(salt, unit_id),
                    "bucket(#{salt.inspect}, #{unit_id.inspect})"
     end
   end

@@ -12,18 +12,15 @@ module Flagnetic
     # milliseconds or a Time.
     Context = Struct.new(:units, :attributes, keyword_init: true) do
       def initialize(units: nil, attributes: nil)
-        super(units: Context.stringify_keys(units), attributes: Context.stringify_keys(attributes))
+        super(units: (units || {}).transform_keys(&:to_s).freeze,
+              attributes: (attributes || {}).transform_keys(&:to_s).freeze)
         freeze
       end
 
       # unit returns the unit ID of a unit type, or nil when absent.
       def unit(unit_type)
         id = units[unit_type]
-        id.is_a?(String) && !id.empty? ? Eval.utf8(id) : nil
-      end
-
-      def self.stringify_keys(hash)
-        (hash || {}).transform_keys(&:to_s).freeze
+        id.is_a?(String) && !id.empty? ? Values.utf8(id) : nil
       end
 
       # coerce accepts a Context, a Hash with units and attributes, or nil.
@@ -32,11 +29,12 @@ module Flagnetic
         when Context then context
         when nil then self::EMPTY
         when Hash
-          c = stringify_keys(context)
+          c = context.transform_keys(&:to_s)
           new(units: c["units"], attributes: c["attributes"])
         else raise ArgumentError, "context must be a Flagnetic::Eval::Context or a Hash, got #{context.class}"
         end
       end
+      private_class_method :coerce
     end
     Context::EMPTY = Context.new
 
@@ -92,6 +90,7 @@ module Flagnetic
       def of_flag(flag)
         Result.new(**to_h, type: flag.type, automatic_exposure: flag.automatic_exposure)
       end
+      private :of_flag
 
       # as_json is the result's JSON form, keyed as the reference
       # evaluator encodes it: the flag's type and automatic exposure unless

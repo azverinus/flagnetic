@@ -5,15 +5,17 @@ require "test_helper"
 # The change stream's parser follows the WHATWG event-stream rules: any of
 # CRLF, LF or CR ends a line, even split across reads.
 class SSEParserTest < Minitest::Test
+  SSEParser = Flagnetic.const_get(:SSEParser)
+
   def parse(*chunks)
-    parser = Flagnetic::SSEParser.new
+    parser = SSEParser.new
     out = []
     chunks.each { |c| parser.feed(c) { |kind, value| out << [kind, value] } }
     out
   end
 
   def event(type, data, id = nil)
-    [:event, Flagnetic::SSEParser::Event.new(type: type, data: data, id: id)]
+    [:event, SSEParser::Event.new(type: type, data: data, id: id)]
   end
 
   def test_the_frames_the_server_writes
@@ -66,7 +68,7 @@ class SSEParserTest < Minitest::Test
   end
 
   def test_an_endless_line_is_refused
-    parser = Flagnetic::SSEParser.new(max_line: 16)
-    assert_raises(Flagnetic::SSEParser::Error) { parser.feed("x" * 17) { nil } }
+    parser = SSEParser.new(max_line: 16)
+    assert_raises(SSEParser::Error) { parser.feed("x" * 17) { nil } }
   end
 end

@@ -102,4 +102,5 @@ module Flagnetic
       { "Authorization" => "Bearer #{@sdk_key}", "User-Agent" => @user_agent }
     end
   end
+  private_constant :Transport
 end

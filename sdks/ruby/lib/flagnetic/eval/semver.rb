@@ -75,5 +75,6 @@ module Flagnetic
         left.b <=> right.b
       end
     end
+    private_constant :Semver
   end
 end

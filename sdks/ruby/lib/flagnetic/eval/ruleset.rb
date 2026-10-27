@@ -35,7 +35,7 @@ module Flagnetic
       def self.decode(json)
         raise DecodeError, "decode ruleset: want JSON text, got #{json.class}" unless json.is_a?(String)
 
-        doc = JSON.parse(Eval.utf8(json), freeze: true, max_nesting: 10_000)
+        doc = JSON.parse(Values.utf8(json), freeze: true, max_nesting: 10_000)
         new(**Document.ruleset(doc))
       rescue JSON::ParserError, EncodingError => e
         raise DecodeError, "decode ruleset: #{e.message}"
@@ -92,13 +92,13 @@ module Flagnetic
       # never records an exposure and never fails: problems are results with
       # reason error.
       def evaluate(flag_key, context = nil)
-        Evaluation.new(@index, Context.coerce(context)).flag(flag_key)
+        Evaluation.new(@index, Context.__send__(:coerce, context)).flag(flag_key)
       end
 
       # evaluate_all evaluates every flag of the ruleset for a context, keyed
       # by flag key. Prerequisite results are memoized within the call.
       def evaluate_all(context = nil)
-        e = Evaluation.new(@index, Context.coerce(context))
+        e = Evaluation.new(@index, Context.__send__(:coerce, context))
         flags.to_h { |f| [f.key, e.flag(f.key)] }.freeze
       end
     end

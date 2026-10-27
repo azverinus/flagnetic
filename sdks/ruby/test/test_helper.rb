@@ -107,7 +107,7 @@ module ClientHelpers
   # fallthrough of a flag with one variation.
   def document(version, values = {}, protected: false, **extra)
     flags = values.map do |key, value|
-      type = Flagnetic::Client.type_of(value)
+      type = Flagnetic::Client.__send__(:type_of, value)
       { "key" => key.to_s, "type" => type, "on" => true, "variations" => [{ "key" => "v", "value" => value }],
         "off_variation" => "v", "fallthrough" => "v" }
     end

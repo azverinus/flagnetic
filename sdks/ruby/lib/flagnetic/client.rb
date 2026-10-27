@@ -38,7 +38,7 @@ module Flagnetic
     ).freeze
     MIN_POLL_INTERVAL = 30
     TYPES = %w[boolean string number json].freeze
-    private_constant :TYPES
+    private_constant :Timing, :DEFAULT_TIMING, :TYPES
 
     # new constructs a client for a server key and the base URL of the
     # instance. It fails loudly (ArgumentError) only for a client key and
@@ -128,7 +128,7 @@ module Flagnetic
     # detail serves a flag with why it was served. default's class names the
     # flag type asked for: true or false is boolean, a String is string, a
     # Numeric is number, anything else JSON.
-    def detail(key, default:, context: nil) = serve(key, Client.type_of(default), default, context)
+    def detail(key, default:, context: nil) = serve(key, Client.__send__(:type_of, default), default, context)
 
     # stage returns the current stage of the fallback chain: :built_in,
     # :last_good or :fresh.
@@ -276,6 +276,7 @@ module Flagnetic
       else "json"
       end
     end
+    private_class_method :type_of
 
     private
 
@@ -436,7 +437,7 @@ module Flagnetic
     # the exposure at once for a flag with automatic exposure. A failure
     # here never changes what was served.
     def report(key, detail, automatic, context)
-      @recorder&.count(key, detail)
+      @recorder&.__send__(:count, key, detail)
       @summaries&.count(key, detail)
       @exposures&.evaluated(context, key, detail, automatic)
     rescue StandardError => e
@@ -540,8 +541,8 @@ module Flagnetic
                                     "#{loaded.ruleset.environment.key.inspect} is protected"
       end
       flag = loaded&.ruleset&.flag(key)
-      type = flag ? flag.type : Client.type_of(value)
-      normalized = LocalOverrides.normalize(type, value)
+      type = flag ? flag.type : Client.__send__(:type_of, value)
+      normalized = LocalOverrides.__send__(:normalize, type, value)
       @mutex.synchronize { @overrides = @overrides.merge(key => [type, normalized].freeze).freeze }
       log(:warn, :override_set, flag: key)
       fire_change([key])

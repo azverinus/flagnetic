@@ -55,5 +55,8 @@ module Flagnetic
     def format_line(event, fields)
       ([event.to_s] + fields.map { |k, v| "#{k}=#{v.is_a?(String) ? v.inspect : v}" }).join(" ")
     end
+
+    private_constant :SEVERITIES
+    private_class_method :standard, :format_line
   end
 end
