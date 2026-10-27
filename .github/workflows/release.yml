@@ -34,6 +34,10 @@ jobs:
       sdk_python_released: ${{ steps.release.outputs['sdks/python--release_created'] }}
       sdk_python_tag: ${{ steps.release.outputs['sdks/python--tag_name'] }}
       sdk_python_version: ${{ steps.release.outputs['sdks/python--version'] }}
+      sdk_dart_released: ${{ steps.release.outputs['sdks/dart--release_created'] }}
+      sdk_dart_tag: ${{ steps.release.outputs['sdks/dart--tag_name'] }}
+      sdk_flutter_released: ${{ steps.release.outputs['sdks/flutter--release_created'] }}
+      sdk_flutter_tag: ${{ steps.release.outputs['sdks/flutter--tag_name'] }}
     steps:
       # A GitHub App token makes the release pull request trigger CI; without
       # the app the built-in token still works, but CI must be run by hand.
@@ -254,3 +258,31 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           attestations: true
+
+  # pub.dev accepts a publish only from a run started by a tag push or by
+  # workflow_dispatch on the tag, and the tags release-please creates start
+  # no workflow, so this dispatches publish-dart.yml on each released pub
+  # package's tag. That workflow checks and publishes the package, or stops
+  # at a dry run before its first version (CONTRIBUTING.md).
+  sdk-dart-pub-dev:
+    name: pub.dev (dispatch)
+    needs: release-please
+    if: >-
+      needs.release-please.outputs.sdk_dart_released == 'true' ||
+      needs.release-please.outputs.sdk_flutter_released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch publish-dart.yml on flagnetic's tag
+        if: needs.release-please.outputs.sdk_dart_released == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.sdk_dart_tag }}
+        run: gh workflow run publish-dart.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
+      - name: Dispatch publish-dart.yml on flagnetic_flutter's tag
+        if: needs.release-please.outputs.sdk_flutter_released == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.sdk_flutter_tag }}
+        run: gh workflow run publish-dart.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"

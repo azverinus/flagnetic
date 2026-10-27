@@ -70,6 +70,23 @@
       "include-component-in-tag": true,
       "changelog-path": "CHANGELOG.md",
       "extra-files": ["src/flagnetic/_version.py"]
+    },
+    "sdks/dart": {
+      "release-type": "dart",
+      "initial-version": "0.1.0",
+      "package-name": "flagnetic",
+      "component": "sdks/dart",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": ["lib/src/client/options.dart"]
+    },
+    "sdks/flutter": {
+      "release-type": "dart",
+      "initial-version": "0.1.0",
+      "package-name": "flagnetic_flutter",
+      "component": "sdks/flutter",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md"
     }
   }
 }
