@@ -43,11 +43,7 @@ import {
   reapply,
 } from "@/lib/configuration-draft";
 import { ApiError, unwrap } from "@/lib/errors";
-import {
-  configurationViolationMessage,
-  entryOfVersion,
-  onlyTesterToggled,
-} from "@/lib/flag-detail";
+import { configurationViolationMessage, entryOfVersion, onlyViewChanged } from "@/lib/flag-detail";
 import { ifMatch } from "@/lib/http";
 import { problemMessage } from "@/lib/problem-messages";
 import { flagEntriesQuery } from "@/lib/queries";
@@ -468,7 +464,7 @@ export function ConfigurationEditor({
         onSave={submit}
         saveLabel={proposes ? <Trans>Propose</Trans> : undefined}
         pending={save.isPending}
-        keeps={onlyTesterToggled}
+        keeps={onlyViewChanged}
       />
       <ProposeDialog
         project={project}

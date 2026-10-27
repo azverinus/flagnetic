@@ -43,6 +43,12 @@ import {
   type SdkKey,
   listFlags,
   getFlag,
+  getFlagEvaluations,
+  listStaleFlags,
+  type FlagEvaluations,
+  type StaleFlagList,
+  getEventVolume,
+  type EventVolume,
   listExperiments,
   getExperiment,
   listExperimentAlerts,
@@ -82,6 +88,7 @@ import { type ChangeRequestsSearch, listChangeRequestsQueryOf } from "./change-r
 import { unwrap } from "./errors";
 import { type ExperimentsSearch, listExperimentsQueryOf } from "./experiments";
 import { type FlagsSearch, listFlagsQueryOf } from "./flags";
+import { listStaleFlagsQueryOf, type StaleFlagsSearch } from "./stale-flags";
 
 /** The caller: who is signed in, and with which credential. */
 export const meQuery = queryOptions<Me>({
@@ -216,6 +223,48 @@ export function flagQuery(project: string, flag: string) {
     queryKey: [...flagsQueryKey(project), "detail", flag],
     queryFn: () => unwrap(getFlag({ path: { project, flag } })),
     retry: false,
+  });
+}
+
+/**
+ * A flag's evaluations per UTC day in one environment over a range of
+ * days. Kept under the flags' key, so that a write to the flag reads them
+ * again with it; the range shown stays while another loads.
+ */
+export function flagEvaluationsQuery(
+  project: string,
+  flag: string,
+  environment: string,
+  range: { from: string; to: string },
+) {
+  return queryOptions<FlagEvaluations>({
+    queryKey: [...flagsQueryKey(project), "evaluations", flag, environment, range.from, range.to],
+    queryFn: () =>
+      unwrap(getFlagEvaluations({ path: { project, flag, environment }, query: range })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * One page of a project's stale flags for a search. Kept under the flags'
+ * key, since a write to a flag can make it stale or not; the page shown
+ * stays while the next one loads.
+ */
+export function staleFlagsQuery(project: string, search: StaleFlagsSearch) {
+  return queryOptions<StaleFlagList>({
+    queryKey: [...flagsQueryKey(project), "stale", search],
+    queryFn: () =>
+      unwrap(listStaleFlags({ path: { project }, query: listStaleFlagsQueryOf(search) })),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The events a project received per UTC day and type over a range of days, and the gaps in it. */
+export function eventVolumeQuery(project: string, range: { from: string; to: string }) {
+  return queryOptions<EventVolume>({
+    queryKey: ["projects", project, "events", "volume", range.from, range.to],
+    queryFn: () => unwrap(getEventVolume({ path: { project }, query: range })),
+    placeholderData: keepPreviousData,
   });
 }
 

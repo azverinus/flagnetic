@@ -4,7 +4,14 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FlagIcon, FlaskConicalIcon, ListChecksIcon, PercentIcon, PlusIcon } from "lucide-react";
+import {
+  FlagIcon,
+  FlaskConicalIcon,
+  HourglassIcon,
+  ListChecksIcon,
+  PercentIcon,
+  PlusIcon,
+} from "lucide-react";
 import { type ReactNode, useEffect, useId, useMemo, useState } from "react";
 
 import { Can } from "@/components/can";
@@ -129,7 +136,17 @@ function Flags() {
             its own configuration.
           </Trans>
         }
-        actions={newFlag}
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link to="/projects/$project/stale-flags" params={{ project }}>
+                <HourglassIcon aria-hidden />
+                <Trans>Stale flags</Trans>
+              </Link>
+            </Button>
+            {newFlag}
+          </>
+        }
       />
       {environments.isError ? (
         <QueryError error={environments.error} onRetry={() => void environments.refetch()} />

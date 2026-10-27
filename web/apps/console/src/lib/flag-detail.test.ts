@@ -8,7 +8,7 @@ import {
   entryOfVersion,
   killReasonReady,
   lastKillOf,
-  onlyTesterToggled,
+  onlyViewChanged,
   overrideIssues,
   validateFlagDetailSearch,
 } from "./flag-detail";
@@ -26,14 +26,29 @@ describe("the flag page's address", () => {
     expect(validateFlagDetailSearch({ entry: "e", tester: "yes" })).toEqual({});
   });
 
+  it("keeps the days the evaluations cover", () => {
+    expect(validateFlagDetailSearch({ environment: "qa", days: "7" })).toEqual({
+      environment: "qa",
+      days: 7,
+    });
+  });
+
   it("leaves the draft on screen when only the tester opens or closes", () => {
     const at = (search: object, pathname = "/projects/p/flags/f") => ({ pathname, search });
     expect(
-      onlyTesterToggled(at({ environment: "qa" }), at({ environment: "qa", tester: true })),
+      onlyViewChanged(at({ environment: "qa" }), at({ environment: "qa", tester: true })),
     ).toBe(true);
-    expect(onlyTesterToggled(at({ tester: true }), at({}))).toBe(true);
-    expect(onlyTesterToggled(at({}), at({ environment: "qa" }))).toBe(false);
-    expect(onlyTesterToggled(at({}), at({}, "/projects/p/flags"))).toBe(false);
+    expect(onlyViewChanged(at({ tester: true }), at({}))).toBe(true);
+    expect(onlyViewChanged(at({}), at({ environment: "qa" }))).toBe(false);
+    expect(onlyViewChanged(at({}), at({}, "/projects/p/flags"))).toBe(false);
+  });
+
+  it("leaves the draft on screen when only the evaluations' days change", () => {
+    const at = (search: object) => ({ pathname: "/projects/p/flags/f", search });
+    expect(onlyViewChanged(at({ environment: "qa" }), at({ environment: "qa", days: 90 }))).toBe(
+      true,
+    );
+    expect(onlyViewChanged(at({ days: 7 }), at({ days: 7, environment: "qa" }))).toBe(false);
   });
 });
 

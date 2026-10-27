@@ -27,6 +27,14 @@ export function formatDay(i18n: I18n, day: string): string {
   );
 }
 
+/** A calendar day (YYYY-MM-DD) by its month and date alone, as a chart's axis reads it. */
+export function formatShortDay(i18n: I18n, day: string): string {
+  const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+  return new Intl.DateTimeFormat(i18n.locale, { month: "short", day: "numeric" }).format(
+    new Date(year, month - 1, date),
+  );
+}
+
 export function formatNumber(i18n: I18n, value: number): string {
   return new Intl.NumberFormat(i18n.locale).format(value);
 }

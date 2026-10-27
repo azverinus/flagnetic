@@ -19,6 +19,7 @@ import { Can } from "@/components/can";
 import { CompareEnvironments } from "@/components/compare-environments";
 import { ConfigurationEditor } from "@/components/configuration-editor";
 import { FlagDefinitionSheet } from "@/components/flag-definition-sheet";
+import { FlagEvaluations } from "@/components/flag-evaluations";
 import { FlagHistory } from "@/components/flag-history";
 import { KillSwitchDialog } from "@/components/kill-switch-dialog";
 import { OverridesSection } from "@/components/overrides-section";
@@ -34,6 +35,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { WaitingChangeRequests } from "@/components/waiting-change-requests";
 import { formatDateTime } from "@/i18n/format";
 import { cn } from "@/lib/cn";
+import { type DayRange, dayRangeOf, daysSearchOf } from "@/lib/daily-counts";
 import { ApiError, unwrap } from "@/lib/errors";
 import {
   configurationPut,
@@ -187,6 +189,12 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
     ? formatDateTime(i18n, flag.expected_removal_at)
     : undefined;
 
+  const setDays = (days: DayRange) =>
+    void navigate({
+      search: (prev) => ({ ...prev, days: daysSearchOf(days) }),
+      replace: true,
+    });
+
   const tabs = [
     ...flag.environments.map((configuration) => {
       const known = environments.data?.find((env) => env.key === configuration.environment);
@@ -202,6 +210,7 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
             unitTypes={unitTypes.data ?? []}
             nameOf={nameOf}
             tester={testerOpen ? { onClose: closeTester } : undefined}
+            evaluations={{ days: dayRangeOf(search), onDays: setDays }}
           />
         ),
       };
@@ -331,7 +340,11 @@ function FlagPage({ project, flag }: { project: string; flag: Flag }) {
             search: (prev) =>
               next === historyTab
                 ? { ...prev, tab: "history" as const, tester: undefined }
-                : { environment: next === first ? undefined : next, tester: prev.tester },
+                : {
+                    environment: next === first ? undefined : next,
+                    tester: prev.tester,
+                    days: prev.days,
+                  },
             replace: true,
           });
         }}
@@ -480,12 +493,14 @@ type PanelProps = {
   nameOf: (member: string) => string;
   /** The tester beside the configuration, while it is open. */
   tester?: { onClose: () => void };
+  /** The days the flag's evaluations in the environment cover. */
+  evaluations: { days: DayRange; onDays: (days: DayRange) => void };
 };
 
 /**
  * What the flag serves in one environment, in the order evaluation reads
  * it: whether it is on, its off variation, overrides, prerequisites,
- * rules and fallthrough.
+ * rules and fallthrough; then whether SDKs still evaluate it there.
  */
 function EnvironmentPanel(props: PanelProps) {
   const { i18n, t } = useLingui();
@@ -562,6 +577,13 @@ function EnvironmentPanel(props: PanelProps) {
           <Skeleton className="h-32 w-full" />
         </div>
       )}
+      <FlagEvaluations
+        project={project}
+        flag={flag}
+        environment={configuration.environment}
+        days={props.evaluations.days}
+        onDays={props.evaluations.onDays}
+      />
     </div>
   );
 }
