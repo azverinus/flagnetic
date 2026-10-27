@@ -224,13 +224,33 @@ jobs:
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
+  # The Playwright version the console's lockfile resolves, for the image the
+  # console end to end runs in.
+  playwright:
+    name: playwright version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            .github/scripts
+            web/pnpm-lock.yaml
+          sparse-checkout-cone-mode: false
+      - id: version
+        run: echo "version=$(.github/scripts/playwright-version.sh web/pnpm-lock.yaml)" >> "$GITHUB_OUTPUT"
+
   # The console end to end: on a pull request that touches the console, on
   # release pull requests, on main and nightly. Playwright builds the binary
   # with the console embedded, runs it against PostgreSQL under the test
-  # clock, and drives it in Chromium.
+  # clock, and drives it in Chromium. The Playwright image carries Chromium
+  # and its system libraries, so nothing is downloaded or installed through
+  # apt.
   e2e:
     name: console end to end
-    needs: changes
+    needs: [changes, playwright]
     if: >-
       always() && (
         github.event_name != 'pull_request' ||
@@ -238,6 +258,10 @@ jobs:
         startsWith(github.head_ref, 'release-please--')
       )
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: mcr.microsoft.com/playwright:v${{ needs.playwright.outputs.version }}-noble
+      options: --ipc=host
     services:
       postgres:
         image: postgres:17-alpine
@@ -245,13 +269,12 @@ jobs:
           POSTGRES_DB: flagnetic
           POSTGRES_USER: flagnetic
           POSTGRES_PASSWORD: flagnetic
-        ports:
-          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U flagnetic -d flagnetic"
           --health-interval 2s --health-timeout 5s --health-retries 30
     env:
-      DATABASE_URL: postgres://flagnetic:flagnetic@localhost:5432/flagnetic?sslmode=disable
+      # The job runs in a container, where the service is reached by its name.
+      DATABASE_URL: postgres://flagnetic:flagnetic@postgres:5432/flagnetic?sslmode=disable
     defaults:
       run:
         working-directory: web
@@ -270,22 +293,11 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Playwright version
-        id: playwright
-        run: echo "version=$(pnpm --filter @flagnetic/e2e exec playwright --version)" >> "$GITHUB_OUTPUT"
-      - name: Cache Chromium
-        id: chromium
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: chromium-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-      - name: Install Chromium
-        if: steps.chromium.outputs.cache-hit != 'true'
-        run: pnpm e2e:install
-      # The browser comes from the cache; the system libraries it needs do not.
-      - name: Install Chromium system libraries
-        if: steps.chromium.outputs.cache-hit == 'true'
-        run: pnpm --filter @flagnetic/e2e exec playwright install-deps chromium
+      # The checkout belongs to the runner's user and the container runs as
+      # root, so git refuses the repository and go build cannot stamp the
+      # binary with its revision.
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Run the suite
         run: pnpm e2e
       - name: Keep the report
@@ -600,15 +612,19 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: sdks/js/pnpm-lock.yaml
-      - name: Install the JavaScript SDK and Chromium
+      - name: Install the JavaScript SDK
         if: env.SDK_JS == 'true'
         working-directory: sdks/js
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm exec playwright install --with-deps chromium
-      - name: Run the JavaScript SDK in Node and in Chromium against two replicas
+        run: pnpm install --frozen-lockfile
+      # The browser smoke runs in the Chrome the runner image already has:
+      # this job runs on the runner itself, beside the replicas, so it cannot
+      # take the Playwright image, and installing Playwright's Chromium pulls
+      # its system libraries through apt.
+      - name: Run the JavaScript SDK in Node and in Chrome against two replicas
         if: env.SDK_JS == 'true'
         working-directory: sdks/js
+        env:
+          FLAGNETIC_BROWSER_CHANNEL: chrome
         run: |
           set -o pipefail
           pnpm test:e2e | tee "$RUNNER_TEMP/smoke.log"
@@ -725,7 +741,7 @@ jobs:
   # fine; a failed or cancelled one is not.
   ci-ok:
     name: ci-ok
-    needs: [lint, test, vuln, npm-audit, tidy, console, changes, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, docker, modules, module, released, dart-changes, dart, flutter, sdk-js]
+    needs: [lint, test, vuln, npm-audit, tidy, console, changes, playwright, e2e, sdk-e2e, sdk-ruby, sdk-python, workflows, docker, modules, module, released, dart-changes, dart, flutter, sdk-js]
     if: always()
     runs-on: ubuntu-latest
     steps:
