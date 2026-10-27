@@ -353,14 +353,17 @@ jobs:
           retention-days: 30
 
   # The provider requires a released flagnetic, so when both are released in
-  # one run, flagnetic is published first; a failed flagnetic publish holds
-  # the provider back.
+  # one run, flagnetic is published first; a failed flagnetic build or
+  # publish holds the provider back. The build is checked as well as the
+  # publish because a failed build leaves the publish skipped, the result it
+  # also has when flagnetic is not released at all.
   sdk-ruby-openfeature-rubygems:
     name: RubyGems (flagnetic-openfeature)
-    needs: [release-please, sdk-ruby-openfeature-gem, sdk-ruby-rubygems]
+    needs: [release-please, sdk-ruby-openfeature-gem, sdk-ruby-gem, sdk-ruby-rubygems]
     if: >-
       always() &&
       needs.sdk-ruby-openfeature-gem.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs.sdk-ruby-gem.result) &&
       contains(fromJSON('["success", "skipped"]'), needs.sdk-ruby-rubygems.result)
     runs-on: ubuntu-latest
     environment: rubygems
