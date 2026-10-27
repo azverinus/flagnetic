@@ -197,7 +197,7 @@ func TestAnInstanceSubscriptionTakesAuditEntryAloneAndNoEnvironment(t *testing.T
 		"audit.entry and *": {governance.EventAuditEntry, governance.EventAll},
 	} {
 		in.Events = events
-		_, err := governance.CheckInstanceWebhook(in, governance.TargetPolicy{})
+		_, err = governance.CheckInstanceWebhook(in, governance.TargetPolicy{})
 		if code, pointers := problemOf(t, err); code != "unknown_event_type" || len(pointers) != 1 {
 			t.Errorf("%s: %s at %v, want unknown_event_type", name, code, pointers)
 		}
