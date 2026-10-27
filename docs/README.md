@@ -17,6 +17,7 @@
 - [Go SDK](../sdks/go/README.md), its [OpenFeature provider](../sdks/go-openfeature/README.md), and the [evaluator](../eval/README.md) every Go program shares.
 - [Ruby SDK](sdks/ruby.md): the `flagnetic` gem with its Rails integration and test helper, and the `flagnetic-openfeature` provider.
 - [Python SDK](sdks/python.md): the PyPI package `flagnetic`, its test helper and OpenFeature provider, and how it runs under pre-forking servers and asyncio.
+- [Dart and Flutter SDK](sdks/dart.md): the pub.dev packages `flagnetic` and `flagnetic_flutter`, the client mode on devices and the web, the Flutter widgets, and how soon each app serves a change.
 - [JavaScript SDK](sdks/javascript.md): the npm package `flagnetic`, its server mode, browser client, React bindings and OpenFeature providers, and how soon each serves a change.
 - [SDK keys](sdks/keys.md): server and client keys, rotation with an overlap, revocation, allowed origins, calls from browsers, and which SDKs use an environment.
 - [Downloading the ruleset](sdks/ruleset.md): the server SDK's ruleset, its versions, conditional requests, compression and schema versions.
