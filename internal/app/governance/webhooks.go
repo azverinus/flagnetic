@@ -16,12 +16,18 @@ import (
 	"github.com/azverinus/flagnetic/internal/shared/secret"
 )
 
-// WebhookStore keeps webhook subscriptions.
+// WebhookStore keeps webhook subscriptions: a project's, and with a zero
+// project, the instance's.
 type WebhookStore interface {
 	ProjectLocker
+	// LockInstanceWebhooks takes, for the unit of work ctx carries, the lock
+	// the instance's subscriptions are written under, the instance having no
+	// row of its own to lock.
+	LockInstanceWebhooks(ctx context.Context) error
 	// EnvironmentKeys returns the keys of project's environments.
 	EnvironmentKeys(ctx context.Context, project workspace.ProjectID) ([]string, error)
-	// Webhooks returns project's subscriptions, the oldest first.
+	// Webhooks returns project's subscriptions, the oldest first; the
+	// instance's for a zero project.
 	Webhooks(ctx context.Context, project workspace.ProjectID) ([]governance.Webhook, error)
 	// Webhook returns project's subscription with webhook, or ErrNotFound.
 	Webhook(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID) (governance.Webhook, error)
@@ -76,8 +82,13 @@ func (d WebhookDeps) now() time.Time { return d.Clock.Now().UTC().Truncate(time.
 // environments as the store reads them, plus kept: the keys a subscription
 // already holds and the edit leaves alone. An environment deleted after the
 // subscription named it would otherwise refuse every later edit, a rename
-// or a disable included, until the caller rewrote the environments too.
+// or a disable included, until the caller rewrote the environments too. A
+// zero project's subscription is the instance's, checked by
+// CheckInstanceWebhook.
 func (d WebhookDeps) check(ctx context.Context, project workspace.ProjectID, in governance.WebhookInput, kept ...string) (governance.WebhookInput, error) {
+	if project.IsZero() {
+		return governance.CheckInstanceWebhook(in, d.Targets)
+	}
 	environments, err := d.Store.EnvironmentKeys(ctx, project)
 	if err != nil {
 		return in, err
@@ -115,7 +126,17 @@ func (d WebhookDeps) checkTarget(ctx context.Context, url string) error {
 // lockProject takes project's row lock, answering a project deleted since
 // the request found it as unknown.
 func (d WebhookDeps) lockProject(ctx context.Context, project workspace.ProjectID) error {
-	err := d.Store.LockProject(ctx, project)
+	return lockSubscriptions(ctx, d.Store, project)
+}
+
+// lockSubscriptions takes the lock project's subscriptions are written
+// under: its row's, answering a project deleted since the request found it
+// as unknown, or for a zero project the instance's.
+func lockSubscriptions(ctx context.Context, store WebhookStore, project workspace.ProjectID) error {
+	if project.IsZero() {
+		return store.LockInstanceWebhooks(ctx)
+	}
+	err := store.LockProject(ctx, project)
 	if errors.Is(err, ErrNotFound) {
 		return errProjectNotFound
 	}
@@ -163,13 +184,22 @@ func webhookValues(w governance.Webhook) map[string]any {
 	}
 }
 
-// ErrWebhookNotFound answers a subscription the project does not have.
-var ErrWebhookNotFound = apperrors.NotFound("not_found", "the project has no webhook subscription with this identifier")
+var (
+	// ErrWebhookNotFound answers a subscription the project does not have.
+	ErrWebhookNotFound = apperrors.NotFound("not_found", "the project has no webhook subscription with this identifier")
+	// ErrInstanceWebhookNotFound answers a subscription the instance does
+	// not have, a project's included.
+	ErrInstanceWebhookNotFound = apperrors.NotFound("not_found",
+		"the instance has no webhook subscription with this identifier")
+)
 
 func webhookOf(ctx context.Context, store WebhookStore, project workspace.ProjectID, webhook governance.WebhookID,
 ) (governance.Webhook, error) {
 	w, err := store.Webhook(ctx, project, webhook)
-	if errors.Is(err, ErrNotFound) {
+	switch {
+	case errors.Is(err, ErrNotFound) && project.IsZero():
+		return w, ErrInstanceWebhookNotFound
+	case errors.Is(err, ErrNotFound):
 		return w, ErrWebhookNotFound
 	}
 	return w, err

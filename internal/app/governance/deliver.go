@@ -61,6 +61,9 @@ type DeliveryStore interface {
 	// failures, a failure adds one.
 	CountAttempt(ctx context.Context, webhook governance.WebhookID, succeeded bool, at time.Time) error
 	ProjectLocker
+	// LockInstanceWebhooks takes the lock the instance's subscriptions are
+	// written under, as WebhookStore does.
+	LockInstanceWebhooks(ctx context.Context) error
 	// SubscriptionOf returns the subscription with webhook, of whichever
 	// project, or ErrNotFound.
 	SubscriptionOf(ctx context.Context, webhook governance.WebhookID) (governance.Webhook, error)
@@ -278,7 +281,12 @@ func (h *Deliver) disableIfFailing(ctx context.Context, webhook governance.Webho
 func (h *Deliver) disableLocked(ctx context.Context, project workspace.ProjectID, webhook governance.WebhookID,
 	a governance.DeliveryAttempt, now time.Time,
 ) (bool, error) {
-	if !project.IsZero() {
+	if project.IsZero() {
+		// The instance's subscriptions are edited under a lock of their own.
+		if err := h.d.Store.LockInstanceWebhooks(ctx); err != nil {
+			return false, err
+		}
+	} else {
 		// A project deleted meanwhile took the subscription with it.
 		err := h.d.Store.LockProject(ctx, project)
 		if errors.Is(err, ErrNotFound) {

@@ -9,6 +9,7 @@ import (
 
 	appgovernance "github.com/azverinus/flagnetic/internal/app/governance"
 	"github.com/azverinus/flagnetic/internal/domain/governance"
+	"github.com/azverinus/flagnetic/internal/domain/workspace"
 	flaghttp "github.com/azverinus/flagnetic/internal/infra/in/http"
 	"github.com/azverinus/flagnetic/internal/shared/id"
 )
@@ -30,21 +31,26 @@ func (a *api) ListWebhooks(ctx context.Context, _ ListWebhooksRequestObject) (Li
 	return ListWebhooks200JSONResponse{Items: each(list, webhookOut)}, nil
 }
 
-// CreateWebhook creates a webhook subscription and answers its secret, this
-// once.
-func (a *api) CreateWebhook(ctx context.Context, req CreateWebhookRequestObject) (CreateWebhookResponseObject, error) {
-	b := req.Body
+// createWebhook creates a subscription of project, the instance's for a
+// zero project, from the body asked for.
+func (a *api) createWebhook(ctx context.Context, project workspace.ProjectID, b WebhookCreate) (appgovernance.CreatedWebhook, error) {
 	var creator *governance.Author
 	if author := authorOf(ctx); author.Member != nil || author.Token != nil {
 		creator = &author
 	}
-	created, err := a.h.CreateWebhook.Handle(ctx, appgovernance.CreateWebhookCommand{
-		Project: projectID(ctx), CreatedBy: creator, Request: requestOf(ctx),
+	return a.h.CreateWebhook.Handle(ctx, appgovernance.CreateWebhookCommand{
+		Project: project, CreatedBy: creator, Request: requestOf(ctx),
 		Input: governance.WebhookInput{
 			Name: b.Name, URL: b.Url, Events: b.Events, Environments: valueOr(b.Environments, nil),
 			Enabled: valueOr(b.Enabled, true),
 		},
 	})
+}
+
+// CreateWebhook creates a webhook subscription and answers its secret, this
+// once.
+func (a *api) CreateWebhook(ctx context.Context, req CreateWebhookRequestObject) (CreateWebhookResponseObject, error) {
+	created, err := a.createWebhook(ctx, projectID(ctx), *req.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -100,22 +106,29 @@ func (a *api) GetWebhook(ctx context.Context, req GetWebhookRequestObject) (GetW
 
 // UpdateWebhook edits a webhook subscription.
 func (a *api) UpdateWebhook(ctx context.Context, req UpdateWebhookRequestObject) (UpdateWebhookResponseObject, error) {
-	expected, err := ifMatch(req.Params.IfMatch)
+	w, err := a.updateWebhook(ctx, projectID(ctx), req.Webhook, req.Params.IfMatch, *req.Body)
 	if err != nil {
 		return nil, err
 	}
-	b := req.Body
-	w, err := a.h.UpdateWebhook.Handle(ctx, appgovernance.UpdateWebhookCommand{
-		Project: projectID(ctx), Webhook: id.FromBytes[governance.Webhook](req.Webhook), Expected: expected,
+	return UpdateWebhook200JSONResponse{Body: webhookOut(w), Headers: UpdateWebhook200ResponseHeaders{ETag: etag(w.Version)}}, nil
+}
+
+// updateWebhook edits project's subscription webhook, the instance's for a
+// zero project, based on the version ifMatchHeader names.
+func (a *api) updateWebhook(ctx context.Context, project workspace.ProjectID, webhook WebhookID, ifMatchHeader *IfMatch,
+	b WebhookPatch,
+) (governance.Webhook, error) {
+	expected, err := ifMatch(ifMatchHeader)
+	if err != nil {
+		return governance.Webhook{}, err
+	}
+	return a.h.UpdateWebhook.Handle(ctx, appgovernance.UpdateWebhookCommand{
+		Project: project, Webhook: id.FromBytes[governance.Webhook](webhook), Expected: expected,
 		Request: requestOf(ctx),
 		Change: governance.WebhookChange{
 			Name: b.Name, URL: b.Url, Events: b.Events, Environments: b.Environments, Enabled: b.Enabled,
 		},
 	})
-	if err != nil {
-		return nil, err
-	}
-	return UpdateWebhook200JSONResponse{Body: webhookOut(w), Headers: UpdateWebhook200ResponseHeaders{ETag: etag(w.Version)}}, nil
 }
 
 // DeleteWebhook deletes a webhook subscription.
@@ -153,12 +166,23 @@ func webhookOut(w governance.Webhook) Webhook {
 
 // ListWebhookDeliveries answers a page of a subscription's delivery log.
 func (a *api) ListWebhookDeliveries(ctx context.Context, req ListWebhookDeliveriesRequestObject) (ListWebhookDeliveriesResponseObject, error) {
-	q := req.Params
+	list, next, err := a.listDeliveries(ctx, projectID(ctx), req.Webhook, req.Params)
+	if err != nil {
+		return nil, err
+	}
+	return ListWebhookDeliveries200JSONResponse(deliveryList(list, next)), nil
+}
+
+// listDeliveries answers the page q asks for of the delivery log of
+// project's subscription webhook, the instance's for a zero project.
+func (a *api) listDeliveries(ctx context.Context, project workspace.ProjectID, webhook WebhookID,
+	q ListWebhookDeliveriesParams,
+) ([]governance.Delivery, governance.DeliveryID, error) {
 	f := appgovernance.DeliveryFilter{Type: valueOf(q.EventType)}
 	if q.Status != nil {
 		f.Status = governance.DeliveryStatus(*q.Status)
 		if !slices.Contains(governance.DeliveryStatuses, f.Status) {
-			return nil, flaghttp.InvalidRequest("status is not a delivery status")
+			return nil, governance.DeliveryID{}, flaghttp.InvalidRequest("status is not a delivery status")
 		}
 	}
 	if q.From != nil {
@@ -170,27 +194,29 @@ func (a *api) ListWebhookDeliveries(ctx context.Context, req ListWebhookDeliveri
 	page := appgovernance.DeliveryPage{Limit: defaultAuditLimit}
 	if q.Limit != nil {
 		if *q.Limit < 1 || *q.Limit > maxAuditLimit {
-			return nil, flaghttp.InvalidRequest(fmt.Sprintf("limit must be between 1 and %d", maxAuditLimit))
+			return nil, governance.DeliveryID{}, flaghttp.InvalidRequest(fmt.Sprintf("limit must be between 1 and %d", maxAuditLimit))
 		}
 		page.Limit = *q.Limit
 	}
 	if q.Cursor != nil {
 		after, err := id.Parse[governance.Delivery](*q.Cursor)
 		if err != nil {
-			return nil, flaghttp.InvalidRequest("cursor is not a next_cursor this API returned")
+			return nil, governance.DeliveryID{}, flaghttp.InvalidRequest("cursor is not a next_cursor this API returned")
 		}
 		page.After = after
 	}
-	list, next, err := a.h.ListWebhookDeliveries.Handle(ctx, projectID(ctx), id.FromBytes[governance.Webhook](req.Webhook), f, page)
-	if err != nil {
-		return nil, err
-	}
+	return a.h.ListWebhookDeliveries.Handle(ctx, project, id.FromBytes[governance.Webhook](webhook), f, page)
+}
+
+// deliveryList answers a page of deliveries, with the cursor of the next
+// when next is not zero.
+func deliveryList(list []governance.Delivery, next governance.DeliveryID) WebhookDeliveryList {
 	out := WebhookDeliveryList{Items: each(list, deliveryOut)}
 	if !next.IsZero() {
 		cursor := next.String()
 		out.NextCursor = &cursor
 	}
-	return ListWebhookDeliveries200JSONResponse(out), nil
+	return out
 }
 
 // GetWebhookDelivery answers one delivery of a subscription with its

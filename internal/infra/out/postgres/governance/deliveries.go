@@ -195,6 +195,12 @@ func (s *Deliveries) LockProject(ctx context.Context, project workspace.ProjectI
 	return s.projects.LockProject(ctx, project)
 }
 
+// LockInstanceWebhooks takes, until the transaction ends, the lock the
+// instance's subscriptions are written under.
+func (s *Deliveries) LockInstanceWebhooks(ctx context.Context) error {
+	return lockInstanceWebhooks(ctx, s.db(ctx))
+}
+
 // SubscriptionOf returns the subscription with webhook, of whichever
 // project, or appgovernance.ErrNotFound.
 func (s *Deliveries) SubscriptionOf(ctx context.Context, webhook governance.WebhookID) (governance.Webhook, error) {

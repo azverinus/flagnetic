@@ -4144,6 +4144,36 @@ type ListWebhookDeliveriesParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// UpdateInstanceWebhookParams defines parameters for UpdateInstanceWebhook.
+type UpdateInstanceWebhookParams struct {
+	// IfMatch The version of the entity this write is based on, as its `ETag`
+	// answered it (`"7"`, or `7`). Required: without it the write is
+	// refused `428 precondition_required`, and with any other version than
+	// the current one `412 version_mismatch`, both judged after the request
+	// is validated.
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
+// ListInstanceWebhookDeliveriesParams defines parameters for ListInstanceWebhookDeliveries.
+type ListInstanceWebhookDeliveriesParams struct {
+	Status *WebhookDeliveryStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// EventType An event type, such as `audit.entry`.
+	EventType *string `form:"event_type,omitempty" json:"event_type,omitempty"`
+
+	// From The earliest time a delivery was made, included.
+	From *time.Time `form:"from,omitempty" json:"from,omitempty"`
+
+	// To The latest time a delivery was made, included.
+	To *time.Time `form:"to,omitempty" json:"to,omitempty"`
+
+	// Cursor The `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit How many entries a page holds at most.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // AcceptInvitationJSONRequestBody defines body for AcceptInvitation for application/json ContentType.
 type AcceptInvitationJSONRequestBody = InvitationAcceptance
 
@@ -4278,6 +4308,12 @@ type CreateWebhookJSONRequestBody = WebhookCreate
 
 // UpdateWebhookJSONRequestBody defines body for UpdateWebhook for application/json ContentType.
 type UpdateWebhookJSONRequestBody = WebhookPatch
+
+// CreateInstanceWebhookJSONRequestBody defines body for CreateInstanceWebhook for application/json ContentType.
+type CreateInstanceWebhookJSONRequestBody = WebhookCreate
+
+// UpdateInstanceWebhookJSONRequestBody defines body for UpdateInstanceWebhook for application/json ContentType.
+type UpdateInstanceWebhookJSONRequestBody = WebhookPatch
 
 // AsProposedConfiguration returns the union data inside the ChangeRequest_Proposed as a ProposedConfiguration
 func (t ChangeRequest_Proposed) AsProposedConfiguration() (ProposedConfiguration, error) {
@@ -6960,6 +6996,123 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /webhook-event-types (the `ListWebhookEventTypes` operationId).
 	ListWebhookEventTypes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListInstanceWebhooks The instance's webhook subscriptions
+	//
+	// The oldest first. An instance subscription is sent `audit.entry` for
+	// every audit entry that names no project: instance settings, members,
+	// sign-ins, project deletions. A secret is never listed; it is shown
+	// once, when it is issued.
+	//
+	// Corresponds with GET /webhooks (the `ListInstanceWebhooks` operationId).
+	ListInstanceWebhooks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateInstanceWebhookWithBody Subscribe to the instance's audit entries
+	//
+	// Creates an instance subscription and answers it with its `secret`,
+	// shown this once, as a project's subscription is created. Its
+	// `events` are exactly `audit.entry`: any other type, `*` included,
+	// is `unknown_event_type`, and an instance has no environments to
+	// filter on, so `environments` must be empty or absent
+	// (`invalid_webhook`). The target is checked as a project
+	// subscription's is.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /webhooks (the `CreateInstanceWebhook` operationId).
+	CreateInstanceWebhookWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateInstanceWebhook Subscribe to the instance's audit entries
+	//
+	// Creates an instance subscription and answers it with its `secret`,
+	// shown this once, as a project's subscription is created. Its
+	// `events` are exactly `audit.entry`: any other type, `*` included,
+	// is `unknown_event_type`, and an instance has no environments to
+	// filter on, so `environments` must be empty or absent
+	// (`invalid_webhook`). The target is checked as a project
+	// subscription's is.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /webhooks (the `CreateInstanceWebhook` operationId).
+	CreateInstanceWebhook(ctx context.Context, body CreateInstanceWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteInstanceWebhook Delete an instance subscription
+	//
+	// As a project subscription is deleted, without `If-Match`.
+	//
+	// Corresponds with DELETE /webhooks/{webhook} (the `DeleteInstanceWebhook` operationId).
+	DeleteInstanceWebhook(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetInstanceWebhook An instance subscription
+	//
+	// Corresponds with GET /webhooks/{webhook} (the `GetInstanceWebhook` operationId).
+	GetInstanceWebhook(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateInstanceWebhookWithBody Edit an instance subscription
+	//
+	// As a project subscription is edited, with the refusals of the
+	// instance subscription's creation.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /webhooks/{webhook} (the `UpdateInstanceWebhook` operationId).
+	UpdateInstanceWebhookWithBody(ctx context.Context, webhook WebhookID, params *UpdateInstanceWebhookParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateInstanceWebhook Edit an instance subscription
+	//
+	// As a project subscription is edited, with the refusals of the
+	// instance subscription's creation.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /webhooks/{webhook} (the `UpdateInstanceWebhook` operationId).
+	UpdateInstanceWebhook(ctx context.Context, webhook WebhookID, params *UpdateInstanceWebhookParams, body UpdateInstanceWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListInstanceWebhookDeliveries An instance subscription's delivery log
+	//
+	// As a project subscription's delivery log is read.
+	//
+	// Corresponds with GET /webhooks/{webhook}/deliveries (the `ListInstanceWebhookDeliveries` operationId).
+	ListInstanceWebhookDeliveries(ctx context.Context, webhook WebhookID, params *ListInstanceWebhookDeliveriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetInstanceWebhookDelivery One delivery of an instance subscription
+	//
+	// Corresponds with GET /webhooks/{webhook}/deliveries/{delivery} (the `GetInstanceWebhookDelivery` operationId).
+	GetInstanceWebhookDelivery(ctx context.Context, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RedeliverInstanceWebhookDelivery Send an instance delivery's event again
+	//
+	// As a project subscription's delivery is redelivered: the same event
+	// `id` and body under a new delivery, pending. A disabled subscription
+	// is refused `409 webhook_disabled`.
+	//
+	// Corresponds with POST /webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverInstanceWebhookDelivery` operationId).
+	RedeliverInstanceWebhookDelivery(ctx context.Context, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EnableInstanceWebhook Enable an instance subscription
+	//
+	// As a project subscription is enabled, without `If-Match`.
+	//
+	// Corresponds with POST /webhooks/{webhook}/enable (the `EnableInstanceWebhook` operationId).
+	EnableInstanceWebhook(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateInstanceWebhookSecret Rotate an instance subscription's secret
+	//
+	// As a project subscription's secret is rotated: the new secret is
+	// answered this once, and the one it replaces signs beside it until
+	// `previous_secret_expires_at`.
+	//
+	// Corresponds with POST /webhooks/{webhook}/rotate-secret (the `RotateInstanceWebhookSecret` operationId).
+	RotateInstanceWebhookSecret(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TestInstanceWebhook Send an instance subscription a test ping
+	//
+	// As a project subscription's ping, naming no project. A disabled
+	// subscription is refused `409 webhook_disabled`.
+	//
+	// Corresponds with POST /webhooks/{webhook}/test (the `TestInstanceWebhook` operationId).
+	TestInstanceWebhook(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // ListAuditEntries The instance's audit log
@@ -11152,6 +11305,253 @@ func (c *Client) ListRoles(ctx context.Context, reqEditors ...RequestEditorFn) (
 // Corresponds with GET /webhook-event-types (the `ListWebhookEventTypes` operationId).
 func (c *Client) ListWebhookEventTypes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListWebhookEventTypesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListInstanceWebhooks The instance's webhook subscriptions
+//
+// The oldest first. An instance subscription is sent `audit.entry` for
+// every audit entry that names no project: instance settings, members,
+// sign-ins, project deletions. A secret is never listed; it is shown
+// once, when it is issued.
+//
+// Corresponds with GET /webhooks (the `ListInstanceWebhooks` operationId).
+func (c *Client) ListInstanceWebhooks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListInstanceWebhooksRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateInstanceWebhookWithBody Subscribe to the instance's audit entries
+//
+// Creates an instance subscription and answers it with its `secret`,
+// shown this once, as a project's subscription is created. Its
+// `events` are exactly `audit.entry`: any other type, `*` included,
+// is `unknown_event_type`, and an instance has no environments to
+// filter on, so `environments` must be empty or absent
+// (`invalid_webhook`). The target is checked as a project
+// subscription's is.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /webhooks (the `CreateInstanceWebhook` operationId).
+func (c *Client) CreateInstanceWebhookWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInstanceWebhookRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateInstanceWebhook Subscribe to the instance's audit entries
+//
+// Creates an instance subscription and answers it with its `secret`,
+// shown this once, as a project's subscription is created. Its
+// `events` are exactly `audit.entry`: any other type, `*` included,
+// is `unknown_event_type`, and an instance has no environments to
+// filter on, so `environments` must be empty or absent
+// (`invalid_webhook`). The target is checked as a project
+// subscription's is.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /webhooks (the `CreateInstanceWebhook` operationId).
+func (c *Client) CreateInstanceWebhook(ctx context.Context, body CreateInstanceWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInstanceWebhookRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteInstanceWebhook Delete an instance subscription
+//
+// As a project subscription is deleted, without `If-Match`.
+//
+// Corresponds with DELETE /webhooks/{webhook} (the `DeleteInstanceWebhook` operationId).
+func (c *Client) DeleteInstanceWebhook(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteInstanceWebhookRequest(c.Server, webhook)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetInstanceWebhook An instance subscription
+//
+// Corresponds with GET /webhooks/{webhook} (the `GetInstanceWebhook` operationId).
+func (c *Client) GetInstanceWebhook(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetInstanceWebhookRequest(c.Server, webhook)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateInstanceWebhookWithBody Edit an instance subscription
+//
+// As a project subscription is edited, with the refusals of the
+// instance subscription's creation.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /webhooks/{webhook} (the `UpdateInstanceWebhook` operationId).
+func (c *Client) UpdateInstanceWebhookWithBody(ctx context.Context, webhook WebhookID, params *UpdateInstanceWebhookParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateInstanceWebhookRequestWithBody(c.Server, webhook, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateInstanceWebhook Edit an instance subscription
+//
+// As a project subscription is edited, with the refusals of the
+// instance subscription's creation.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /webhooks/{webhook} (the `UpdateInstanceWebhook` operationId).
+func (c *Client) UpdateInstanceWebhook(ctx context.Context, webhook WebhookID, params *UpdateInstanceWebhookParams, body UpdateInstanceWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateInstanceWebhookRequest(c.Server, webhook, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListInstanceWebhookDeliveries An instance subscription's delivery log
+//
+// As a project subscription's delivery log is read.
+//
+// Corresponds with GET /webhooks/{webhook}/deliveries (the `ListInstanceWebhookDeliveries` operationId).
+func (c *Client) ListInstanceWebhookDeliveries(ctx context.Context, webhook WebhookID, params *ListInstanceWebhookDeliveriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListInstanceWebhookDeliveriesRequest(c.Server, webhook, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetInstanceWebhookDelivery One delivery of an instance subscription
+//
+// Corresponds with GET /webhooks/{webhook}/deliveries/{delivery} (the `GetInstanceWebhookDelivery` operationId).
+func (c *Client) GetInstanceWebhookDelivery(ctx context.Context, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetInstanceWebhookDeliveryRequest(c.Server, webhook, delivery)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RedeliverInstanceWebhookDelivery Send an instance delivery's event again
+//
+// As a project subscription's delivery is redelivered: the same event
+// `id` and body under a new delivery, pending. A disabled subscription
+// is refused `409 webhook_disabled`.
+//
+// Corresponds with POST /webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverInstanceWebhookDelivery` operationId).
+func (c *Client) RedeliverInstanceWebhookDelivery(ctx context.Context, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRedeliverInstanceWebhookDeliveryRequest(c.Server, webhook, delivery)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EnableInstanceWebhook Enable an instance subscription
+//
+// As a project subscription is enabled, without `If-Match`.
+//
+// Corresponds with POST /webhooks/{webhook}/enable (the `EnableInstanceWebhook` operationId).
+func (c *Client) EnableInstanceWebhook(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEnableInstanceWebhookRequest(c.Server, webhook)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RotateInstanceWebhookSecret Rotate an instance subscription's secret
+//
+// As a project subscription's secret is rotated: the new secret is
+// answered this once, and the one it replaces signs beside it until
+// `previous_secret_expires_at`.
+//
+// Corresponds with POST /webhooks/{webhook}/rotate-secret (the `RotateInstanceWebhookSecret` operationId).
+func (c *Client) RotateInstanceWebhookSecret(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateInstanceWebhookSecretRequest(c.Server, webhook)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TestInstanceWebhook Send an instance subscription a test ping
+//
+// As a project subscription's ping, naming no project. A disabled
+// subscription is refused `409 webhook_disabled`.
+//
+// Corresponds with POST /webhooks/{webhook}/test (the `TestInstanceWebhook` operationId).
+func (c *Client) TestInstanceWebhook(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTestInstanceWebhookRequest(c.Server, webhook)
 	if err != nil {
 		return nil, err
 	}
@@ -18658,6 +19058,508 @@ func NewListWebhookEventTypesRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListInstanceWebhooksRequest constructs an http.Request for the ListInstanceWebhooks method
+func NewListInstanceWebhooksRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateInstanceWebhookRequest calls the generic CreateInstanceWebhook builder with application/json body
+func NewCreateInstanceWebhookRequest(server string, body CreateInstanceWebhookJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateInstanceWebhookRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateInstanceWebhookRequestWithBody constructs an http.Request for the CreateInstanceWebhook method, with any body, and a specified content type
+func NewCreateInstanceWebhookRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteInstanceWebhookRequest constructs an http.Request for the DeleteInstanceWebhook method
+func NewDeleteInstanceWebhookRequest(server string, webhook WebhookID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetInstanceWebhookRequest constructs an http.Request for the GetInstanceWebhook method
+func NewGetInstanceWebhookRequest(server string, webhook WebhookID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateInstanceWebhookRequest calls the generic UpdateInstanceWebhook builder with application/json body
+func NewUpdateInstanceWebhookRequest(server string, webhook WebhookID, params *UpdateInstanceWebhookParams, body UpdateInstanceWebhookJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateInstanceWebhookRequestWithBody(server, webhook, params, "application/json", bodyReader)
+}
+
+// NewUpdateInstanceWebhookRequestWithBody constructs an http.Request for the UpdateInstanceWebhook method, with any body, and a specified content type
+func NewUpdateInstanceWebhookRequestWithBody(server string, webhook WebhookID, params *UpdateInstanceWebhookParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewListInstanceWebhookDeliveriesRequest constructs an http.Request for the ListInstanceWebhookDeliveries method
+func NewListInstanceWebhookDeliveriesRequest(server string, webhook WebhookID, params *ListInstanceWebhookDeliveriesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks/%s/deliveries", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.EventType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "event_type", *params.EventType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.From != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", *params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.To != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", *params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetInstanceWebhookDeliveryRequest constructs an http.Request for the GetInstanceWebhookDelivery method
+func NewGetInstanceWebhookDeliveryRequest(server string, webhook WebhookID, delivery openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "delivery", delivery, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks/%s/deliveries/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRedeliverInstanceWebhookDeliveryRequest constructs an http.Request for the RedeliverInstanceWebhookDelivery method
+func NewRedeliverInstanceWebhookDeliveryRequest(server string, webhook WebhookID, delivery openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "delivery", delivery, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks/%s/deliveries/%s/redeliver", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEnableInstanceWebhookRequest constructs an http.Request for the EnableInstanceWebhook method
+func NewEnableInstanceWebhookRequest(server string, webhook WebhookID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks/%s/enable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRotateInstanceWebhookSecretRequest constructs an http.Request for the RotateInstanceWebhookSecret method
+func NewRotateInstanceWebhookSecretRequest(server string, webhook WebhookID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks/%s/rotate-secret", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewTestInstanceWebhookRequest constructs an http.Request for the TestInstanceWebhook method
+func NewTestInstanceWebhookRequest(server string, webhook WebhookID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "webhook", webhook, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/webhooks/%s/test", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -21273,6 +22175,141 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /webhook-event-types (the `ListWebhookEventTypes` operationId).
 	ListWebhookEventTypesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListWebhookEventTypesResponse, error)
+
+	// ListInstanceWebhooksWithResponse The instance's webhook subscriptions
+	//
+	// The oldest first. An instance subscription is sent `audit.entry` for
+	// every audit entry that names no project: instance settings, members,
+	// sign-ins, project deletions. A secret is never listed; it is shown
+	// once, when it is issued.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /webhooks (the `ListInstanceWebhooks` operationId).
+	ListInstanceWebhooksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInstanceWebhooksResponse, error)
+
+	// CreateInstanceWebhookWithBodyWithResponse Subscribe to the instance's audit entries
+	//
+	// Creates an instance subscription and answers it with its `secret`,
+	// shown this once, as a project's subscription is created. Its
+	// `events` are exactly `audit.entry`: any other type, `*` included,
+	// is `unknown_event_type`, and an instance has no environments to
+	// filter on, so `environments` must be empty or absent
+	// (`invalid_webhook`). The target is checked as a project
+	// subscription's is.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /webhooks (the `CreateInstanceWebhook` operationId).
+	CreateInstanceWebhookWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateInstanceWebhookResponse, error)
+
+	// CreateInstanceWebhookWithResponse Subscribe to the instance's audit entries
+	//
+	// Creates an instance subscription and answers it with its `secret`,
+	// shown this once, as a project's subscription is created. Its
+	// `events` are exactly `audit.entry`: any other type, `*` included,
+	// is `unknown_event_type`, and an instance has no environments to
+	// filter on, so `environments` must be empty or absent
+	// (`invalid_webhook`). The target is checked as a project
+	// subscription's is.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /webhooks (the `CreateInstanceWebhook` operationId).
+	CreateInstanceWebhookWithResponse(ctx context.Context, body CreateInstanceWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInstanceWebhookResponse, error)
+
+	// DeleteInstanceWebhookWithResponse Delete an instance subscription
+	//
+	// As a project subscription is deleted, without `If-Match`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /webhooks/{webhook} (the `DeleteInstanceWebhook` operationId).
+	DeleteInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*DeleteInstanceWebhookResponse, error)
+
+	// GetInstanceWebhookWithResponse An instance subscription
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /webhooks/{webhook} (the `GetInstanceWebhook` operationId).
+	GetInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*GetInstanceWebhookResponse, error)
+
+	// UpdateInstanceWebhookWithBodyWithResponse Edit an instance subscription
+	//
+	// As a project subscription is edited, with the refusals of the
+	// instance subscription's creation.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /webhooks/{webhook} (the `UpdateInstanceWebhook` operationId).
+	UpdateInstanceWebhookWithBodyWithResponse(ctx context.Context, webhook WebhookID, params *UpdateInstanceWebhookParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateInstanceWebhookResponse, error)
+
+	// UpdateInstanceWebhookWithResponse Edit an instance subscription
+	//
+	// As a project subscription is edited, with the refusals of the
+	// instance subscription's creation.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /webhooks/{webhook} (the `UpdateInstanceWebhook` operationId).
+	UpdateInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, params *UpdateInstanceWebhookParams, body UpdateInstanceWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateInstanceWebhookResponse, error)
+
+	// ListInstanceWebhookDeliveriesWithResponse An instance subscription's delivery log
+	//
+	// As a project subscription's delivery log is read.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /webhooks/{webhook}/deliveries (the `ListInstanceWebhookDeliveries` operationId).
+	ListInstanceWebhookDeliveriesWithResponse(ctx context.Context, webhook WebhookID, params *ListInstanceWebhookDeliveriesParams, reqEditors ...RequestEditorFn) (*ListInstanceWebhookDeliveriesResponse, error)
+
+	// GetInstanceWebhookDeliveryWithResponse One delivery of an instance subscription
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /webhooks/{webhook}/deliveries/{delivery} (the `GetInstanceWebhookDelivery` operationId).
+	GetInstanceWebhookDeliveryWithResponse(ctx context.Context, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetInstanceWebhookDeliveryResponse, error)
+
+	// RedeliverInstanceWebhookDeliveryWithResponse Send an instance delivery's event again
+	//
+	// As a project subscription's delivery is redelivered: the same event
+	// `id` and body under a new delivery, pending. A disabled subscription
+	// is refused `409 webhook_disabled`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverInstanceWebhookDelivery` operationId).
+	RedeliverInstanceWebhookDeliveryWithResponse(ctx context.Context, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*RedeliverInstanceWebhookDeliveryResponse, error)
+
+	// EnableInstanceWebhookWithResponse Enable an instance subscription
+	//
+	// As a project subscription is enabled, without `If-Match`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /webhooks/{webhook}/enable (the `EnableInstanceWebhook` operationId).
+	EnableInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*EnableInstanceWebhookResponse, error)
+
+	// RotateInstanceWebhookSecretWithResponse Rotate an instance subscription's secret
+	//
+	// As a project subscription's secret is rotated: the new secret is
+	// answered this once, and the one it replaces signs beside it until
+	// `previous_secret_expires_at`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /webhooks/{webhook}/rotate-secret (the `RotateInstanceWebhookSecret` operationId).
+	RotateInstanceWebhookSecretWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*RotateInstanceWebhookSecretResponse, error)
+
+	// TestInstanceWebhookWithResponse Send an instance subscription a test ping
+	//
+	// As a project subscription's ping, naming no project. A disabled
+	// subscription is refused `409 webhook_disabled`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /webhooks/{webhook}/test (the `TestInstanceWebhook` operationId).
+	TestInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*TestInstanceWebhookResponse, error)
 }
 
 // ListAuditEntriesResponse401Headers the declared response headers of an HTTP 401 response for ListAuditEntries
@@ -32584,6 +33621,849 @@ func (r ListWebhookEventTypesResponse) ContentType() string {
 	return ""
 }
 
+// ListInstanceWebhooksResponse401Headers the declared response headers of an HTTP 401 response for ListInstanceWebhooks
+type ListInstanceWebhooksResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListInstanceWebhooksResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WebhookList
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListInstanceWebhooksResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListInstanceWebhooksResponse) GetJSON200() *WebhookList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListInstanceWebhooksResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListInstanceWebhooksResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ListInstanceWebhooksResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListInstanceWebhooksResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListInstanceWebhooksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListInstanceWebhooksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// CreateInstanceWebhookResponse201Headers the declared response headers of an HTTP 201 response for CreateInstanceWebhook
+type CreateInstanceWebhookResponse201Headers struct {
+	ETag *string
+}
+
+// CreateInstanceWebhookResponse401Headers the declared response headers of an HTTP 401 response for CreateInstanceWebhook
+type CreateInstanceWebhookResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type CreateInstanceWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *WebhookWithSecret
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// Headers201 the parsed response headers for an HTTP 201 response
+	Headers201 *CreateInstanceWebhookResponse201Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *CreateInstanceWebhookResponse401Headers
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateInstanceWebhookResponse) GetJSON201() *WebhookWithSecret {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreateInstanceWebhookResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreateInstanceWebhookResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreateInstanceWebhookResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreateInstanceWebhookResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateInstanceWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateInstanceWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateInstanceWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateInstanceWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DeleteInstanceWebhookResponse401Headers the declared response headers of an HTTP 401 response for DeleteInstanceWebhook
+type DeleteInstanceWebhookResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type DeleteInstanceWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *DeleteInstanceWebhookResponse401Headers
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteInstanceWebhookResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteInstanceWebhookResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteInstanceWebhookResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteInstanceWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteInstanceWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteInstanceWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteInstanceWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetInstanceWebhookResponse200Headers the declared response headers of an HTTP 200 response for GetInstanceWebhook
+type GetInstanceWebhookResponse200Headers struct {
+	ETag *string
+}
+
+// GetInstanceWebhookResponse401Headers the declared response headers of an HTTP 401 response for GetInstanceWebhook
+type GetInstanceWebhookResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetInstanceWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Webhook
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetInstanceWebhookResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetInstanceWebhookResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetInstanceWebhookResponse) GetJSON200() *Webhook {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetInstanceWebhookResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetInstanceWebhookResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetInstanceWebhookResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetInstanceWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetInstanceWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetInstanceWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetInstanceWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UpdateInstanceWebhookResponse200Headers the declared response headers of an HTTP 200 response for UpdateInstanceWebhook
+type UpdateInstanceWebhookResponse200Headers struct {
+	ETag *string
+}
+
+// UpdateInstanceWebhookResponse401Headers the declared response headers of an HTTP 401 response for UpdateInstanceWebhook
+type UpdateInstanceWebhookResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type UpdateInstanceWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Webhook
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// ApplicationproblemJSON412 the response for an HTTP 412 `application/problem+json` response
+	ApplicationproblemJSON412 *VersionMismatch
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Invalid
+	// ApplicationproblemJSON428 the response for an HTTP 428 `application/problem+json` response
+	ApplicationproblemJSON428 *PreconditionRequired
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UpdateInstanceWebhookResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *UpdateInstanceWebhookResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateInstanceWebhookResponse) GetJSON200() *Webhook {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateInstanceWebhookResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdateInstanceWebhookResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdateInstanceWebhookResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdateInstanceWebhookResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r UpdateInstanceWebhookResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON412 returns the response for an HTTP 412 `application/problem+json` response
+func (r UpdateInstanceWebhookResponse) GetApplicationproblemJSON412() *VersionMismatch {
+	return r.ApplicationproblemJSON412
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdateInstanceWebhookResponse) GetApplicationproblemJSON422() *Invalid {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON428 returns the response for an HTTP 428 `application/problem+json` response
+func (r UpdateInstanceWebhookResponse) GetApplicationproblemJSON428() *PreconditionRequired {
+	return r.ApplicationproblemJSON428
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateInstanceWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateInstanceWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateInstanceWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateInstanceWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListInstanceWebhookDeliveriesResponse401Headers the declared response headers of an HTTP 401 response for ListInstanceWebhookDeliveries
+type ListInstanceWebhookDeliveriesResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type ListInstanceWebhookDeliveriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WebhookDeliveryList
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *BadRequest
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *ListInstanceWebhookDeliveriesResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListInstanceWebhookDeliveriesResponse) GetJSON200() *WebhookDeliveryList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListInstanceWebhookDeliveriesResponse) GetApplicationproblemJSON400() *BadRequest {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListInstanceWebhookDeliveriesResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListInstanceWebhookDeliveriesResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListInstanceWebhookDeliveriesResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListInstanceWebhookDeliveriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListInstanceWebhookDeliveriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListInstanceWebhookDeliveriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListInstanceWebhookDeliveriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetInstanceWebhookDeliveryResponse401Headers the declared response headers of an HTTP 401 response for GetInstanceWebhookDelivery
+type GetInstanceWebhookDeliveryResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type GetInstanceWebhookDeliveryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WebhookDelivery
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *GetInstanceWebhookDeliveryResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetInstanceWebhookDeliveryResponse) GetJSON200() *WebhookDelivery {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetInstanceWebhookDeliveryResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetInstanceWebhookDeliveryResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetInstanceWebhookDeliveryResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetInstanceWebhookDeliveryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetInstanceWebhookDeliveryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetInstanceWebhookDeliveryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetInstanceWebhookDeliveryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RedeliverInstanceWebhookDeliveryResponse401Headers the declared response headers of an HTTP 401 response for RedeliverInstanceWebhookDelivery
+type RedeliverInstanceWebhookDeliveryResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RedeliverInstanceWebhookDeliveryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *WebhookDelivery
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RedeliverInstanceWebhookDeliveryResponse401Headers
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r RedeliverInstanceWebhookDeliveryResponse) GetJSON202() *WebhookDelivery {
+	return r.JSON202
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RedeliverInstanceWebhookDeliveryResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RedeliverInstanceWebhookDeliveryResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RedeliverInstanceWebhookDeliveryResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RedeliverInstanceWebhookDeliveryResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r RedeliverInstanceWebhookDeliveryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RedeliverInstanceWebhookDeliveryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RedeliverInstanceWebhookDeliveryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RedeliverInstanceWebhookDeliveryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// EnableInstanceWebhookResponse200Headers the declared response headers of an HTTP 200 response for EnableInstanceWebhook
+type EnableInstanceWebhookResponse200Headers struct {
+	ETag *string
+}
+
+// EnableInstanceWebhookResponse401Headers the declared response headers of an HTTP 401 response for EnableInstanceWebhook
+type EnableInstanceWebhookResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type EnableInstanceWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Webhook
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *EnableInstanceWebhookResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *EnableInstanceWebhookResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r EnableInstanceWebhookResponse) GetJSON200() *Webhook {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r EnableInstanceWebhookResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r EnableInstanceWebhookResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r EnableInstanceWebhookResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r EnableInstanceWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EnableInstanceWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EnableInstanceWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EnableInstanceWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// RotateInstanceWebhookSecretResponse200Headers the declared response headers of an HTTP 200 response for RotateInstanceWebhookSecret
+type RotateInstanceWebhookSecretResponse200Headers struct {
+	ETag *string
+}
+
+// RotateInstanceWebhookSecretResponse401Headers the declared response headers of an HTTP 401 response for RotateInstanceWebhookSecret
+type RotateInstanceWebhookSecretResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type RotateInstanceWebhookSecretResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WebhookWithSecret
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RotateInstanceWebhookSecretResponse200Headers
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *RotateInstanceWebhookSecretResponse401Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RotateInstanceWebhookSecretResponse) GetJSON200() *WebhookWithSecret {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RotateInstanceWebhookSecretResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RotateInstanceWebhookSecretResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RotateInstanceWebhookSecretResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RotateInstanceWebhookSecretResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateInstanceWebhookSecretResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateInstanceWebhookSecretResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RotateInstanceWebhookSecretResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// TestInstanceWebhookResponse401Headers the declared response headers of an HTTP 401 response for TestInstanceWebhook
+type TestInstanceWebhookResponse401Headers struct {
+	WWWAuthenticate *string
+}
+
+type TestInstanceWebhookResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *WebhookDelivery
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Unauthenticated
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Forbidden
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *NotFound
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Conflict
+	// Headers401 the parsed response headers for an HTTP 401 response
+	Headers401 *TestInstanceWebhookResponse401Headers
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r TestInstanceWebhookResponse) GetJSON202() *WebhookDelivery {
+	return r.JSON202
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r TestInstanceWebhookResponse) GetApplicationproblemJSON401() *Unauthenticated {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r TestInstanceWebhookResponse) GetApplicationproblemJSON403() *Forbidden {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r TestInstanceWebhookResponse) GetApplicationproblemJSON404() *NotFound {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r TestInstanceWebhookResponse) GetApplicationproblemJSON409() *Conflict {
+	return r.ApplicationproblemJSON409
+}
+
+// GetBody returns the raw response body bytes
+func (r TestInstanceWebhookResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TestInstanceWebhookResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TestInstanceWebhookResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TestInstanceWebhookResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListAuditEntriesWithResponse The instance's audit log
 //
 // Every entry of the instance, of every project and of none (members,
@@ -36246,6 +38126,219 @@ func (c *ClientWithResponses) ListWebhookEventTypesWithResponse(ctx context.Cont
 		return nil, err
 	}
 	return ParseListWebhookEventTypesResponse(rsp)
+}
+
+// ListInstanceWebhooksWithResponse The instance's webhook subscriptions
+//
+// The oldest first. An instance subscription is sent `audit.entry` for
+// every audit entry that names no project: instance settings, members,
+// sign-ins, project deletions. A secret is never listed; it is shown
+// once, when it is issued.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /webhooks (the `ListInstanceWebhooks` operationId).
+func (c *ClientWithResponses) ListInstanceWebhooksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInstanceWebhooksResponse, error) {
+	rsp, err := c.ListInstanceWebhooks(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListInstanceWebhooksResponse(rsp)
+}
+
+// CreateInstanceWebhookWithBodyWithResponse Subscribe to the instance's audit entries
+//
+// Creates an instance subscription and answers it with its `secret`,
+// shown this once, as a project's subscription is created. Its
+// `events` are exactly `audit.entry`: any other type, `*` included,
+// is `unknown_event_type`, and an instance has no environments to
+// filter on, so `environments` must be empty or absent
+// (`invalid_webhook`). The target is checked as a project
+// subscription's is.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /webhooks (the `CreateInstanceWebhook` operationId).
+func (c *ClientWithResponses) CreateInstanceWebhookWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateInstanceWebhookResponse, error) {
+	rsp, err := c.CreateInstanceWebhookWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateInstanceWebhookResponse(rsp)
+}
+
+// CreateInstanceWebhookWithResponse Subscribe to the instance's audit entries
+//
+// Creates an instance subscription and answers it with its `secret`,
+// shown this once, as a project's subscription is created. Its
+// `events` are exactly `audit.entry`: any other type, `*` included,
+// is `unknown_event_type`, and an instance has no environments to
+// filter on, so `environments` must be empty or absent
+// (`invalid_webhook`). The target is checked as a project
+// subscription's is.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /webhooks (the `CreateInstanceWebhook` operationId).
+func (c *ClientWithResponses) CreateInstanceWebhookWithResponse(ctx context.Context, body CreateInstanceWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInstanceWebhookResponse, error) {
+	rsp, err := c.CreateInstanceWebhook(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateInstanceWebhookResponse(rsp)
+}
+
+// DeleteInstanceWebhookWithResponse Delete an instance subscription
+//
+// As a project subscription is deleted, without `If-Match`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /webhooks/{webhook} (the `DeleteInstanceWebhook` operationId).
+func (c *ClientWithResponses) DeleteInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*DeleteInstanceWebhookResponse, error) {
+	rsp, err := c.DeleteInstanceWebhook(ctx, webhook, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteInstanceWebhookResponse(rsp)
+}
+
+// GetInstanceWebhookWithResponse An instance subscription
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /webhooks/{webhook} (the `GetInstanceWebhook` operationId).
+func (c *ClientWithResponses) GetInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*GetInstanceWebhookResponse, error) {
+	rsp, err := c.GetInstanceWebhook(ctx, webhook, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetInstanceWebhookResponse(rsp)
+}
+
+// UpdateInstanceWebhookWithBodyWithResponse Edit an instance subscription
+//
+// As a project subscription is edited, with the refusals of the
+// instance subscription's creation.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /webhooks/{webhook} (the `UpdateInstanceWebhook` operationId).
+func (c *ClientWithResponses) UpdateInstanceWebhookWithBodyWithResponse(ctx context.Context, webhook WebhookID, params *UpdateInstanceWebhookParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateInstanceWebhookResponse, error) {
+	rsp, err := c.UpdateInstanceWebhookWithBody(ctx, webhook, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateInstanceWebhookResponse(rsp)
+}
+
+// UpdateInstanceWebhookWithResponse Edit an instance subscription
+//
+// As a project subscription is edited, with the refusals of the
+// instance subscription's creation.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /webhooks/{webhook} (the `UpdateInstanceWebhook` operationId).
+func (c *ClientWithResponses) UpdateInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, params *UpdateInstanceWebhookParams, body UpdateInstanceWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateInstanceWebhookResponse, error) {
+	rsp, err := c.UpdateInstanceWebhook(ctx, webhook, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateInstanceWebhookResponse(rsp)
+}
+
+// ListInstanceWebhookDeliveriesWithResponse An instance subscription's delivery log
+//
+// As a project subscription's delivery log is read.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /webhooks/{webhook}/deliveries (the `ListInstanceWebhookDeliveries` operationId).
+func (c *ClientWithResponses) ListInstanceWebhookDeliveriesWithResponse(ctx context.Context, webhook WebhookID, params *ListInstanceWebhookDeliveriesParams, reqEditors ...RequestEditorFn) (*ListInstanceWebhookDeliveriesResponse, error) {
+	rsp, err := c.ListInstanceWebhookDeliveries(ctx, webhook, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListInstanceWebhookDeliveriesResponse(rsp)
+}
+
+// GetInstanceWebhookDeliveryWithResponse One delivery of an instance subscription
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /webhooks/{webhook}/deliveries/{delivery} (the `GetInstanceWebhookDelivery` operationId).
+func (c *ClientWithResponses) GetInstanceWebhookDeliveryWithResponse(ctx context.Context, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetInstanceWebhookDeliveryResponse, error) {
+	rsp, err := c.GetInstanceWebhookDelivery(ctx, webhook, delivery, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetInstanceWebhookDeliveryResponse(rsp)
+}
+
+// RedeliverInstanceWebhookDeliveryWithResponse Send an instance delivery's event again
+//
+// As a project subscription's delivery is redelivered: the same event
+// `id` and body under a new delivery, pending. A disabled subscription
+// is refused `409 webhook_disabled`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /webhooks/{webhook}/deliveries/{delivery}/redeliver (the `RedeliverInstanceWebhookDelivery` operationId).
+func (c *ClientWithResponses) RedeliverInstanceWebhookDeliveryWithResponse(ctx context.Context, webhook WebhookID, delivery openapi_types.UUID, reqEditors ...RequestEditorFn) (*RedeliverInstanceWebhookDeliveryResponse, error) {
+	rsp, err := c.RedeliverInstanceWebhookDelivery(ctx, webhook, delivery, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRedeliverInstanceWebhookDeliveryResponse(rsp)
+}
+
+// EnableInstanceWebhookWithResponse Enable an instance subscription
+//
+// As a project subscription is enabled, without `If-Match`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /webhooks/{webhook}/enable (the `EnableInstanceWebhook` operationId).
+func (c *ClientWithResponses) EnableInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*EnableInstanceWebhookResponse, error) {
+	rsp, err := c.EnableInstanceWebhook(ctx, webhook, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEnableInstanceWebhookResponse(rsp)
+}
+
+// RotateInstanceWebhookSecretWithResponse Rotate an instance subscription's secret
+//
+// As a project subscription's secret is rotated: the new secret is
+// answered this once, and the one it replaces signs beside it until
+// `previous_secret_expires_at`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /webhooks/{webhook}/rotate-secret (the `RotateInstanceWebhookSecret` operationId).
+func (c *ClientWithResponses) RotateInstanceWebhookSecretWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*RotateInstanceWebhookSecretResponse, error) {
+	rsp, err := c.RotateInstanceWebhookSecret(ctx, webhook, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateInstanceWebhookSecretResponse(rsp)
+}
+
+// TestInstanceWebhookWithResponse Send an instance subscription a test ping
+//
+// As a project subscription's ping, naming no project. A disabled
+// subscription is refused `409 webhook_disabled`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /webhooks/{webhook}/test (the `TestInstanceWebhook` operationId).
+func (c *ClientWithResponses) TestInstanceWebhookWithResponse(ctx context.Context, webhook WebhookID, reqEditors ...RequestEditorFn) (*TestInstanceWebhookResponse, error) {
+	rsp, err := c.TestInstanceWebhook(ctx, webhook, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTestInstanceWebhookResponse(rsp)
 }
 
 // ParseListAuditEntriesResponse parses an HTTP response from a ListAuditEntriesWithResponse call
@@ -46588,6 +48681,768 @@ func ParseListWebhookEventTypesResponse(rsp *http.Response) (*ListWebhookEventTy
 	return response, nil
 }
 
+// ParseListInstanceWebhooksResponse parses an HTTP response from a ListInstanceWebhooksWithResponse call
+func ParseListInstanceWebhooksResponse(rsp *http.Response) (*ListInstanceWebhooksResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListInstanceWebhooksResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WebhookList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListInstanceWebhooksResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateInstanceWebhookResponse parses an HTTP response from a CreateInstanceWebhookWithResponse call
+func ParseCreateInstanceWebhookResponse(rsp *http.Response) (*CreateInstanceWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateInstanceWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest WebhookWithSecret
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 201:
+		var headers CreateInstanceWebhookResponse201Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers201 = &headers
+	case rsp.StatusCode == 401:
+		var headers CreateInstanceWebhookResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseDeleteInstanceWebhookResponse parses an HTTP response from a DeleteInstanceWebhookWithResponse call
+func ParseDeleteInstanceWebhookResponse(rsp *http.Response) (*DeleteInstanceWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteInstanceWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers DeleteInstanceWebhookResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetInstanceWebhookResponse parses an HTTP response from a GetInstanceWebhookWithResponse call
+func ParseGetInstanceWebhookResponse(rsp *http.Response) (*GetInstanceWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetInstanceWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Webhook
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetInstanceWebhookResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers GetInstanceWebhookResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUpdateInstanceWebhookResponse parses an HTTP response from a UpdateInstanceWebhookWithResponse call
+func ParseUpdateInstanceWebhookResponse(rsp *http.Response) (*UpdateInstanceWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateInstanceWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Webhook
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 412:
+		var dest VersionMismatch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON412 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Invalid
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 428:
+		var dest PreconditionRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON428 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UpdateInstanceWebhookResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers UpdateInstanceWebhookResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListInstanceWebhookDeliveriesResponse parses an HTTP response from a ListInstanceWebhookDeliveriesWithResponse call
+func ParseListInstanceWebhookDeliveriesResponse(rsp *http.Response) (*ListInstanceWebhookDeliveriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListInstanceWebhookDeliveriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WebhookDeliveryList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers ListInstanceWebhookDeliveriesResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseGetInstanceWebhookDeliveryResponse parses an HTTP response from a GetInstanceWebhookDeliveryWithResponse call
+func ParseGetInstanceWebhookDeliveryResponse(rsp *http.Response) (*GetInstanceWebhookDeliveryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetInstanceWebhookDeliveryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WebhookDelivery
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers GetInstanceWebhookDeliveryResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRedeliverInstanceWebhookDeliveryResponse parses an HTTP response from a RedeliverInstanceWebhookDeliveryWithResponse call
+func ParseRedeliverInstanceWebhookDeliveryResponse(rsp *http.Response) (*RedeliverInstanceWebhookDeliveryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RedeliverInstanceWebhookDeliveryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest WebhookDelivery
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers RedeliverInstanceWebhookDeliveryResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseEnableInstanceWebhookResponse parses an HTTP response from a EnableInstanceWebhookWithResponse call
+func ParseEnableInstanceWebhookResponse(rsp *http.Response) (*EnableInstanceWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EnableInstanceWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Webhook
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers EnableInstanceWebhookResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers EnableInstanceWebhookResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseRotateInstanceWebhookSecretResponse parses an HTTP response from a RotateInstanceWebhookSecretWithResponse call
+func ParseRotateInstanceWebhookSecretResponse(rsp *http.Response) (*RotateInstanceWebhookSecretResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateInstanceWebhookSecretResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WebhookWithSecret
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RotateInstanceWebhookSecretResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	case rsp.StatusCode == 401:
+		var headers RotateInstanceWebhookSecretResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseTestInstanceWebhookResponse parses an HTTP response from a TestInstanceWebhookWithResponse call
+func ParseTestInstanceWebhookResponse(rsp *http.Response) (*TestInstanceWebhookResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TestInstanceWebhookResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest WebhookDelivery
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthenticated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Forbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 401:
+		var headers TestInstanceWebhookResponse401Headers
+		if values := rsp.Header.Values("WWW-Authenticate"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "WWW-Authenticate", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.WWWAuthenticate = &value
+		}
+		response.Headers401 = &headers
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// ListAuditEntries The instance's audit log
@@ -47001,6 +49856,39 @@ type ServerInterface interface {
 	// ListWebhookEventTypes The event catalogue
 	// (GET /webhook-event-types)
 	ListWebhookEventTypes(w http.ResponseWriter, r *http.Request)
+	// ListInstanceWebhooks The instance's webhook subscriptions
+	// (GET /webhooks)
+	ListInstanceWebhooks(w http.ResponseWriter, r *http.Request)
+	// CreateInstanceWebhook Subscribe to the instance's audit entries
+	// (POST /webhooks)
+	CreateInstanceWebhook(w http.ResponseWriter, r *http.Request)
+	// DeleteInstanceWebhook Delete an instance subscription
+	// (DELETE /webhooks/{webhook})
+	DeleteInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID)
+	// GetInstanceWebhook An instance subscription
+	// (GET /webhooks/{webhook})
+	GetInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID)
+	// UpdateInstanceWebhook Edit an instance subscription
+	// (PATCH /webhooks/{webhook})
+	UpdateInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID, params UpdateInstanceWebhookParams)
+	// ListInstanceWebhookDeliveries An instance subscription's delivery log
+	// (GET /webhooks/{webhook}/deliveries)
+	ListInstanceWebhookDeliveries(w http.ResponseWriter, r *http.Request, webhook WebhookID, params ListInstanceWebhookDeliveriesParams)
+	// GetInstanceWebhookDelivery One delivery of an instance subscription
+	// (GET /webhooks/{webhook}/deliveries/{delivery})
+	GetInstanceWebhookDelivery(w http.ResponseWriter, r *http.Request, webhook WebhookID, delivery openapi_types.UUID)
+	// RedeliverInstanceWebhookDelivery Send an instance delivery's event again
+	// (POST /webhooks/{webhook}/deliveries/{delivery}/redeliver)
+	RedeliverInstanceWebhookDelivery(w http.ResponseWriter, r *http.Request, webhook WebhookID, delivery openapi_types.UUID)
+	// EnableInstanceWebhook Enable an instance subscription
+	// (POST /webhooks/{webhook}/enable)
+	EnableInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID)
+	// RotateInstanceWebhookSecret Rotate an instance subscription's secret
+	// (POST /webhooks/{webhook}/rotate-secret)
+	RotateInstanceWebhookSecret(w http.ResponseWriter, r *http.Request, webhook WebhookID)
+	// TestInstanceWebhook Send an instance subscription a test ping
+	// (POST /webhooks/{webhook}/test)
+	TestInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -53151,6 +56039,391 @@ func (siw *ServerInterfaceWrapper) ListWebhookEventTypes(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// ListInstanceWebhooks operation middleware
+func (siw *ServerInterfaceWrapper) ListInstanceWebhooks(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListInstanceWebhooks(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateInstanceWebhook operation middleware
+func (siw *ServerInterfaceWrapper) CreateInstanceWebhook(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateInstanceWebhook(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteInstanceWebhook operation middleware
+func (siw *ServerInterfaceWrapper) DeleteInstanceWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteInstanceWebhook(w, r, webhook)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetInstanceWebhook operation middleware
+func (siw *ServerInterfaceWrapper) GetInstanceWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInstanceWebhook(w, r, webhook)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateInstanceWebhook operation middleware
+func (siw *ServerInterfaceWrapper) UpdateInstanceWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateInstanceWebhookParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateInstanceWebhook(w, r, webhook, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListInstanceWebhookDeliveries operation middleware
+func (siw *ServerInterfaceWrapper) ListInstanceWebhookDeliveries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListInstanceWebhookDeliveriesParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "event_type" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "event_type", r.URL.Query(), &params.EventType, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "event_type"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "event_type", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListInstanceWebhookDeliveries(w, r, webhook, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetInstanceWebhookDelivery operation middleware
+func (siw *ServerInterfaceWrapper) GetInstanceWebhookDelivery(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "delivery" -------------
+	var delivery openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "delivery", r.PathValue("delivery"), &delivery, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "delivery", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInstanceWebhookDelivery(w, r, webhook, delivery)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RedeliverInstanceWebhookDelivery operation middleware
+func (siw *ServerInterfaceWrapper) RedeliverInstanceWebhookDelivery(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "delivery" -------------
+	var delivery openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "delivery", r.PathValue("delivery"), &delivery, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "delivery", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RedeliverInstanceWebhookDelivery(w, r, webhook, delivery)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableInstanceWebhook operation middleware
+func (siw *ServerInterfaceWrapper) EnableInstanceWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableInstanceWebhook(w, r, webhook)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RotateInstanceWebhookSecret operation middleware
+func (siw *ServerInterfaceWrapper) RotateInstanceWebhookSecret(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateInstanceWebhookSecret(w, r, webhook)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// TestInstanceWebhook operation middleware
+func (siw *ServerInterfaceWrapper) TestInstanceWebhook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "webhook" -------------
+	var webhook WebhookID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "webhook", r.PathValue("webhook"), &webhook, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "webhook", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.TestInstanceWebhook(w, r, webhook)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -53408,6 +56681,17 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries", wrapper.ListWebhookDeliveries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}", wrapper.GetWebhookDelivery)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/projects/{project}/webhooks/{webhook}/deliveries/{delivery}/redeliver", wrapper.RedeliverWebhookDelivery)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks", wrapper.ListInstanceWebhooks)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks", wrapper.CreateInstanceWebhook)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/webhooks/{webhook}", wrapper.DeleteInstanceWebhook)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks/{webhook}", wrapper.GetInstanceWebhook)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/webhooks/{webhook}", wrapper.UpdateInstanceWebhook)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks/{webhook}/test", wrapper.TestInstanceWebhook)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks/{webhook}/enable", wrapper.EnableInstanceWebhook)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks/{webhook}/rotate-secret", wrapper.RotateInstanceWebhookSecret)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks/{webhook}/deliveries", wrapper.ListInstanceWebhookDeliveries)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/webhooks/{webhook}/deliveries/{delivery}", wrapper.GetInstanceWebhookDelivery)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/webhooks/{webhook}/deliveries/{delivery}/redeliver", wrapper.RedeliverInstanceWebhookDelivery)
 
 	return m
 }
@@ -67609,6 +70893,985 @@ func (response ListWebhookEventTypes403ApplicationProblemPlusJSONResponse) Visit
 	return err
 }
 
+type ListInstanceWebhooksRequestObject struct {
+}
+
+type ListInstanceWebhooksResponseObject interface {
+	VisitListInstanceWebhooksResponse(w http.ResponseWriter) error
+}
+
+type ListInstanceWebhooks200JSONResponse WebhookList
+
+func (response ListInstanceWebhooks200JSONResponse) VisitListInstanceWebhooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceWebhooks401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListInstanceWebhooks401ApplicationProblemPlusJSONResponse) VisitListInstanceWebhooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceWebhooks403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListInstanceWebhooks403ApplicationProblemPlusJSONResponse) VisitListInstanceWebhooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateInstanceWebhookRequestObject struct {
+	Body *CreateInstanceWebhookJSONRequestBody
+}
+
+type CreateInstanceWebhookResponseObject interface {
+	VisitCreateInstanceWebhookResponse(w http.ResponseWriter) error
+}
+
+type CreateInstanceWebhook201ResponseHeaders struct {
+	ETag *string
+}
+
+type CreateInstanceWebhook201JSONResponse struct {
+	Body    WebhookWithSecret
+	Headers CreateInstanceWebhook201ResponseHeaders
+}
+
+func (response CreateInstanceWebhook201JSONResponse) VisitCreateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateInstanceWebhook400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateInstanceWebhook400ApplicationProblemPlusJSONResponse) VisitCreateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateInstanceWebhook401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateInstanceWebhook401ApplicationProblemPlusJSONResponse) VisitCreateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateInstanceWebhook403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateInstanceWebhook403ApplicationProblemPlusJSONResponse) VisitCreateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateInstanceWebhook422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response CreateInstanceWebhook422ApplicationProblemPlusJSONResponse) VisitCreateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteInstanceWebhookRequestObject struct {
+	Webhook WebhookID `json:"webhook"`
+}
+
+type DeleteInstanceWebhookResponseObject interface {
+	VisitDeleteInstanceWebhookResponse(w http.ResponseWriter) error
+}
+
+type DeleteInstanceWebhook204Response struct {
+}
+
+func (response DeleteInstanceWebhook204Response) VisitDeleteInstanceWebhookResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteInstanceWebhook401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteInstanceWebhook401ApplicationProblemPlusJSONResponse) VisitDeleteInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteInstanceWebhook403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteInstanceWebhook403ApplicationProblemPlusJSONResponse) VisitDeleteInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteInstanceWebhook404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteInstanceWebhook404ApplicationProblemPlusJSONResponse) VisitDeleteInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstanceWebhookRequestObject struct {
+	Webhook WebhookID `json:"webhook"`
+}
+
+type GetInstanceWebhookResponseObject interface {
+	VisitGetInstanceWebhookResponse(w http.ResponseWriter) error
+}
+
+type GetInstanceWebhook200ResponseHeaders struct {
+	ETag *string
+}
+
+type GetInstanceWebhook200JSONResponse struct {
+	Body    Webhook
+	Headers GetInstanceWebhook200ResponseHeaders
+}
+
+func (response GetInstanceWebhook200JSONResponse) VisitGetInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstanceWebhook401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetInstanceWebhook401ApplicationProblemPlusJSONResponse) VisitGetInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstanceWebhook403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetInstanceWebhook403ApplicationProblemPlusJSONResponse) VisitGetInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstanceWebhook404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetInstanceWebhook404ApplicationProblemPlusJSONResponse) VisitGetInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateInstanceWebhookRequestObject struct {
+	Webhook WebhookID `json:"webhook"`
+	Params  UpdateInstanceWebhookParams
+	Body    *UpdateInstanceWebhookJSONRequestBody
+}
+
+type UpdateInstanceWebhookResponseObject interface {
+	VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error
+}
+
+type UpdateInstanceWebhook200ResponseHeaders struct {
+	ETag *string
+}
+
+type UpdateInstanceWebhook200JSONResponse struct {
+	Body    Webhook
+	Headers UpdateInstanceWebhook200ResponseHeaders
+}
+
+func (response UpdateInstanceWebhook200JSONResponse) VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateInstanceWebhook400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateInstanceWebhook400ApplicationProblemPlusJSONResponse) VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateInstanceWebhook401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateInstanceWebhook401ApplicationProblemPlusJSONResponse) VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateInstanceWebhook403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateInstanceWebhook403ApplicationProblemPlusJSONResponse) VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateInstanceWebhook404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateInstanceWebhook404ApplicationProblemPlusJSONResponse) VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateInstanceWebhook409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateInstanceWebhook409ApplicationProblemPlusJSONResponse) VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateInstanceWebhook412ApplicationProblemPlusJSONResponse struct {
+	VersionMismatchApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateInstanceWebhook412ApplicationProblemPlusJSONResponse) VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateInstanceWebhook422ApplicationProblemPlusJSONResponse struct {
+	InvalidApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateInstanceWebhook422ApplicationProblemPlusJSONResponse) VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateInstanceWebhook428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateInstanceWebhook428ApplicationProblemPlusJSONResponse) VisitUpdateInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceWebhookDeliveriesRequestObject struct {
+	Webhook WebhookID `json:"webhook"`
+	Params  ListInstanceWebhookDeliveriesParams
+}
+
+type ListInstanceWebhookDeliveriesResponseObject interface {
+	VisitListInstanceWebhookDeliveriesResponse(w http.ResponseWriter) error
+}
+
+type ListInstanceWebhookDeliveries200JSONResponse WebhookDeliveryList
+
+func (response ListInstanceWebhookDeliveries200JSONResponse) VisitListInstanceWebhookDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceWebhookDeliveries400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response ListInstanceWebhookDeliveries400ApplicationProblemPlusJSONResponse) VisitListInstanceWebhookDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceWebhookDeliveries401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response ListInstanceWebhookDeliveries401ApplicationProblemPlusJSONResponse) VisitListInstanceWebhookDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceWebhookDeliveries403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListInstanceWebhookDeliveries403ApplicationProblemPlusJSONResponse) VisitListInstanceWebhookDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceWebhookDeliveries404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response ListInstanceWebhookDeliveries404ApplicationProblemPlusJSONResponse) VisitListInstanceWebhookDeliveriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstanceWebhookDeliveryRequestObject struct {
+	Webhook  WebhookID          `json:"webhook"`
+	Delivery openapi_types.UUID `json:"delivery"`
+}
+
+type GetInstanceWebhookDeliveryResponseObject interface {
+	VisitGetInstanceWebhookDeliveryResponse(w http.ResponseWriter) error
+}
+
+type GetInstanceWebhookDelivery200JSONResponse WebhookDelivery
+
+func (response GetInstanceWebhookDelivery200JSONResponse) VisitGetInstanceWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstanceWebhookDelivery401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response GetInstanceWebhookDelivery401ApplicationProblemPlusJSONResponse) VisitGetInstanceWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstanceWebhookDelivery403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetInstanceWebhookDelivery403ApplicationProblemPlusJSONResponse) VisitGetInstanceWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstanceWebhookDelivery404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetInstanceWebhookDelivery404ApplicationProblemPlusJSONResponse) VisitGetInstanceWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverInstanceWebhookDeliveryRequestObject struct {
+	Webhook  WebhookID          `json:"webhook"`
+	Delivery openapi_types.UUID `json:"delivery"`
+}
+
+type RedeliverInstanceWebhookDeliveryResponseObject interface {
+	VisitRedeliverInstanceWebhookDeliveryResponse(w http.ResponseWriter) error
+}
+
+type RedeliverInstanceWebhookDelivery202JSONResponse WebhookDelivery
+
+func (response RedeliverInstanceWebhookDelivery202JSONResponse) VisitRedeliverInstanceWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverInstanceWebhookDelivery401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverInstanceWebhookDelivery401ApplicationProblemPlusJSONResponse) VisitRedeliverInstanceWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverInstanceWebhookDelivery403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverInstanceWebhookDelivery403ApplicationProblemPlusJSONResponse) VisitRedeliverInstanceWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverInstanceWebhookDelivery404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverInstanceWebhookDelivery404ApplicationProblemPlusJSONResponse) VisitRedeliverInstanceWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RedeliverInstanceWebhookDelivery409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response RedeliverInstanceWebhookDelivery409ApplicationProblemPlusJSONResponse) VisitRedeliverInstanceWebhookDeliveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableInstanceWebhookRequestObject struct {
+	Webhook WebhookID `json:"webhook"`
+}
+
+type EnableInstanceWebhookResponseObject interface {
+	VisitEnableInstanceWebhookResponse(w http.ResponseWriter) error
+}
+
+type EnableInstanceWebhook200ResponseHeaders struct {
+	ETag *string
+}
+
+type EnableInstanceWebhook200JSONResponse struct {
+	Body    Webhook
+	Headers EnableInstanceWebhook200ResponseHeaders
+}
+
+func (response EnableInstanceWebhook200JSONResponse) VisitEnableInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableInstanceWebhook401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response EnableInstanceWebhook401ApplicationProblemPlusJSONResponse) VisitEnableInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableInstanceWebhook403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response EnableInstanceWebhook403ApplicationProblemPlusJSONResponse) VisitEnableInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EnableInstanceWebhook404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response EnableInstanceWebhook404ApplicationProblemPlusJSONResponse) VisitEnableInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateInstanceWebhookSecretRequestObject struct {
+	Webhook WebhookID `json:"webhook"`
+}
+
+type RotateInstanceWebhookSecretResponseObject interface {
+	VisitRotateInstanceWebhookSecretResponse(w http.ResponseWriter) error
+}
+
+type RotateInstanceWebhookSecret200ResponseHeaders struct {
+	ETag *string
+}
+
+type RotateInstanceWebhookSecret200JSONResponse struct {
+	Body    WebhookWithSecret
+	Headers RotateInstanceWebhookSecret200ResponseHeaders
+}
+
+func (response RotateInstanceWebhookSecret200JSONResponse) VisitRotateInstanceWebhookSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateInstanceWebhookSecret401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response RotateInstanceWebhookSecret401ApplicationProblemPlusJSONResponse) VisitRotateInstanceWebhookSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateInstanceWebhookSecret403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response RotateInstanceWebhookSecret403ApplicationProblemPlusJSONResponse) VisitRotateInstanceWebhookSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateInstanceWebhookSecret404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response RotateInstanceWebhookSecret404ApplicationProblemPlusJSONResponse) VisitRotateInstanceWebhookSecretResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestInstanceWebhookRequestObject struct {
+	Webhook WebhookID `json:"webhook"`
+}
+
+type TestInstanceWebhookResponseObject interface {
+	VisitTestInstanceWebhookResponse(w http.ResponseWriter) error
+}
+
+type TestInstanceWebhook202JSONResponse WebhookDelivery
+
+func (response TestInstanceWebhook202JSONResponse) VisitTestInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestInstanceWebhook401ApplicationProblemPlusJSONResponse struct {
+	UnauthenticatedApplicationProblemPlusJSONResponse
+}
+
+func (response TestInstanceWebhook401ApplicationProblemPlusJSONResponse) VisitTestInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestInstanceWebhook403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response TestInstanceWebhook403ApplicationProblemPlusJSONResponse) VisitTestInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestInstanceWebhook404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response TestInstanceWebhook404ApplicationProblemPlusJSONResponse) VisitTestInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type TestInstanceWebhook409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response TestInstanceWebhook409ApplicationProblemPlusJSONResponse) VisitTestInstanceWebhookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ListAuditEntries The instance's audit log
@@ -68022,6 +72285,39 @@ type StrictServerInterface interface {
 	// ListWebhookEventTypes The event catalogue
 	// (GET /webhook-event-types)
 	ListWebhookEventTypes(ctx context.Context, request ListWebhookEventTypesRequestObject) (ListWebhookEventTypesResponseObject, error)
+	// ListInstanceWebhooks The instance's webhook subscriptions
+	// (GET /webhooks)
+	ListInstanceWebhooks(ctx context.Context, request ListInstanceWebhooksRequestObject) (ListInstanceWebhooksResponseObject, error)
+	// CreateInstanceWebhook Subscribe to the instance's audit entries
+	// (POST /webhooks)
+	CreateInstanceWebhook(ctx context.Context, request CreateInstanceWebhookRequestObject) (CreateInstanceWebhookResponseObject, error)
+	// DeleteInstanceWebhook Delete an instance subscription
+	// (DELETE /webhooks/{webhook})
+	DeleteInstanceWebhook(ctx context.Context, request DeleteInstanceWebhookRequestObject) (DeleteInstanceWebhookResponseObject, error)
+	// GetInstanceWebhook An instance subscription
+	// (GET /webhooks/{webhook})
+	GetInstanceWebhook(ctx context.Context, request GetInstanceWebhookRequestObject) (GetInstanceWebhookResponseObject, error)
+	// UpdateInstanceWebhook Edit an instance subscription
+	// (PATCH /webhooks/{webhook})
+	UpdateInstanceWebhook(ctx context.Context, request UpdateInstanceWebhookRequestObject) (UpdateInstanceWebhookResponseObject, error)
+	// ListInstanceWebhookDeliveries An instance subscription's delivery log
+	// (GET /webhooks/{webhook}/deliveries)
+	ListInstanceWebhookDeliveries(ctx context.Context, request ListInstanceWebhookDeliveriesRequestObject) (ListInstanceWebhookDeliveriesResponseObject, error)
+	// GetInstanceWebhookDelivery One delivery of an instance subscription
+	// (GET /webhooks/{webhook}/deliveries/{delivery})
+	GetInstanceWebhookDelivery(ctx context.Context, request GetInstanceWebhookDeliveryRequestObject) (GetInstanceWebhookDeliveryResponseObject, error)
+	// RedeliverInstanceWebhookDelivery Send an instance delivery's event again
+	// (POST /webhooks/{webhook}/deliveries/{delivery}/redeliver)
+	RedeliverInstanceWebhookDelivery(ctx context.Context, request RedeliverInstanceWebhookDeliveryRequestObject) (RedeliverInstanceWebhookDeliveryResponseObject, error)
+	// EnableInstanceWebhook Enable an instance subscription
+	// (POST /webhooks/{webhook}/enable)
+	EnableInstanceWebhook(ctx context.Context, request EnableInstanceWebhookRequestObject) (EnableInstanceWebhookResponseObject, error)
+	// RotateInstanceWebhookSecret Rotate an instance subscription's secret
+	// (POST /webhooks/{webhook}/rotate-secret)
+	RotateInstanceWebhookSecret(ctx context.Context, request RotateInstanceWebhookSecretRequestObject) (RotateInstanceWebhookSecretResponseObject, error)
+	// TestInstanceWebhook Send an instance subscription a test ping
+	// (POST /webhooks/{webhook}/test)
+	TestInstanceWebhook(ctx context.Context, request TestInstanceWebhookRequestObject) (TestInstanceWebhookResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -72050,6 +76346,306 @@ func (sh *strictHandler) ListWebhookEventTypes(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListWebhookEventTypesResponseObject); ok {
 		if err := validResponse.VisitListWebhookEventTypesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListInstanceWebhooks operation middleware
+func (sh *strictHandler) ListInstanceWebhooks(w http.ResponseWriter, r *http.Request) {
+	var request ListInstanceWebhooksRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListInstanceWebhooks(ctx, request.(ListInstanceWebhooksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListInstanceWebhooks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListInstanceWebhooksResponseObject); ok {
+		if err := validResponse.VisitListInstanceWebhooksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateInstanceWebhook operation middleware
+func (sh *strictHandler) CreateInstanceWebhook(w http.ResponseWriter, r *http.Request) {
+	var request CreateInstanceWebhookRequestObject
+
+	var body CreateInstanceWebhookJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateInstanceWebhook(ctx, request.(CreateInstanceWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateInstanceWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateInstanceWebhookResponseObject); ok {
+		if err := validResponse.VisitCreateInstanceWebhookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteInstanceWebhook operation middleware
+func (sh *strictHandler) DeleteInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID) {
+	var request DeleteInstanceWebhookRequestObject
+
+	request.Webhook = webhook
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteInstanceWebhook(ctx, request.(DeleteInstanceWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteInstanceWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteInstanceWebhookResponseObject); ok {
+		if err := validResponse.VisitDeleteInstanceWebhookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetInstanceWebhook operation middleware
+func (sh *strictHandler) GetInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID) {
+	var request GetInstanceWebhookRequestObject
+
+	request.Webhook = webhook
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInstanceWebhook(ctx, request.(GetInstanceWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInstanceWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInstanceWebhookResponseObject); ok {
+		if err := validResponse.VisitGetInstanceWebhookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateInstanceWebhook operation middleware
+func (sh *strictHandler) UpdateInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID, params UpdateInstanceWebhookParams) {
+	var request UpdateInstanceWebhookRequestObject
+
+	request.Webhook = webhook
+	request.Params = params
+
+	var body UpdateInstanceWebhookJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateInstanceWebhook(ctx, request.(UpdateInstanceWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateInstanceWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateInstanceWebhookResponseObject); ok {
+		if err := validResponse.VisitUpdateInstanceWebhookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListInstanceWebhookDeliveries operation middleware
+func (sh *strictHandler) ListInstanceWebhookDeliveries(w http.ResponseWriter, r *http.Request, webhook WebhookID, params ListInstanceWebhookDeliveriesParams) {
+	var request ListInstanceWebhookDeliveriesRequestObject
+
+	request.Webhook = webhook
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListInstanceWebhookDeliveries(ctx, request.(ListInstanceWebhookDeliveriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListInstanceWebhookDeliveries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListInstanceWebhookDeliveriesResponseObject); ok {
+		if err := validResponse.VisitListInstanceWebhookDeliveriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetInstanceWebhookDelivery operation middleware
+func (sh *strictHandler) GetInstanceWebhookDelivery(w http.ResponseWriter, r *http.Request, webhook WebhookID, delivery openapi_types.UUID) {
+	var request GetInstanceWebhookDeliveryRequestObject
+
+	request.Webhook = webhook
+	request.Delivery = delivery
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInstanceWebhookDelivery(ctx, request.(GetInstanceWebhookDeliveryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInstanceWebhookDelivery")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInstanceWebhookDeliveryResponseObject); ok {
+		if err := validResponse.VisitGetInstanceWebhookDeliveryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RedeliverInstanceWebhookDelivery operation middleware
+func (sh *strictHandler) RedeliverInstanceWebhookDelivery(w http.ResponseWriter, r *http.Request, webhook WebhookID, delivery openapi_types.UUID) {
+	var request RedeliverInstanceWebhookDeliveryRequestObject
+
+	request.Webhook = webhook
+	request.Delivery = delivery
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RedeliverInstanceWebhookDelivery(ctx, request.(RedeliverInstanceWebhookDeliveryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RedeliverInstanceWebhookDelivery")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RedeliverInstanceWebhookDeliveryResponseObject); ok {
+		if err := validResponse.VisitRedeliverInstanceWebhookDeliveryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnableInstanceWebhook operation middleware
+func (sh *strictHandler) EnableInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID) {
+	var request EnableInstanceWebhookRequestObject
+
+	request.Webhook = webhook
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EnableInstanceWebhook(ctx, request.(EnableInstanceWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EnableInstanceWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EnableInstanceWebhookResponseObject); ok {
+		if err := validResponse.VisitEnableInstanceWebhookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RotateInstanceWebhookSecret operation middleware
+func (sh *strictHandler) RotateInstanceWebhookSecret(w http.ResponseWriter, r *http.Request, webhook WebhookID) {
+	var request RotateInstanceWebhookSecretRequestObject
+
+	request.Webhook = webhook
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RotateInstanceWebhookSecret(ctx, request.(RotateInstanceWebhookSecretRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RotateInstanceWebhookSecret")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RotateInstanceWebhookSecretResponseObject); ok {
+		if err := validResponse.VisitRotateInstanceWebhookSecretResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// TestInstanceWebhook operation middleware
+func (sh *strictHandler) TestInstanceWebhook(w http.ResponseWriter, r *http.Request, webhook WebhookID) {
+	var request TestInstanceWebhookRequestObject
+
+	request.Webhook = webhook
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.TestInstanceWebhook(ctx, request.(TestInstanceWebhookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "TestInstanceWebhook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(TestInstanceWebhookResponseObject); ok {
+		if err := validResponse.VisitTestInstanceWebhookResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
