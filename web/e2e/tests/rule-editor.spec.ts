@@ -87,6 +87,10 @@ async function pickByKeyboard(page: Page, within: Locator, field: string, option
   await expect(page.getByRole("option", { name: option, exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(within.getByRole("combobox", { name: field, exact: true })).toHaveText(option);
+  // The list gives the focus back to its select once it has closed; the
+  // next step waits for that, or the focus would come back after it.
+  await expect(page.getByRole("listbox")).toBeHidden();
+  await expect(select).toBeFocused();
 }
 
 /**
@@ -117,6 +121,10 @@ test.describe("the rule editor", () => {
     test(`adds three rules, reorders with the keyboard and saves (${mode})`, async ({ page }) => {
       const project = await seedRuleProject(`rules-${mode === "keyboard only" ? "keys" : "mixed"}`);
       await openRules(page, project);
+      // Signing in left the pointer over the page, where an open list may
+      // come to lie under it and take the option it rests on: a keyboard
+      // alone leaves the pointer out of the way.
+      if (mode === "keyboard only") await page.mouse.move(0, 0);
       const choose = mode === "keyboard only" ? pickByKeyboard : pick;
       const click =
         mode === "keyboard only"
