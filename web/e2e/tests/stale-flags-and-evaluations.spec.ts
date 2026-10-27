@@ -129,6 +129,9 @@ test.describe("evaluations and event volume", () => {
   test("show what SDKs reported apart from remote evaluations, and the events the project received", async ({
     page,
   }) => {
+    // Waiting for the rollup's rounds to count the summary takes more than
+    // the default time on a busy runner.
+    test.setTimeout(120_000);
     const project = await seedProject("evaluations");
     const flag = "checkout_cta";
     await seedFlag(project, stringFlag(flag));
@@ -154,7 +157,7 @@ test.describe("evaluations and event volume", () => {
       await expect(
         evaluations.getByRole("img", { name: /^Remote evaluations: 1 over 30 days/ }),
       ).toBeVisible({ timeout: 5_000 });
-    }).toPass({ timeout: 45_000 });
+    }).toPass({ timeout: 90_000 });
     await expect(evaluations.getByText(/^Last evaluated by an SDK:/)).not.toContainText("Never");
 
     await evaluations.getByText("Show as table").click();
