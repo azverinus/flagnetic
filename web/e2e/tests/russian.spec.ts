@@ -12,7 +12,7 @@ import {
   type SignInWords,
   submitSignIn,
 } from "../support/console";
-import { seedFlag, stringFlag, writeConfiguration } from "../support/flags";
+import { choose, seedFlag, stringFlag, writeConfiguration } from "../support/flags";
 import { sdkRequest, seedSdkKey } from "../support/sdk";
 
 /**
@@ -291,5 +291,20 @@ test.describe("the console in Russian", () => {
     await page.getByRole("button", { name: "Отклонить", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Отклонить запрос на изменение" })).toBeVisible();
     await expectNoSeriousViolations(page, "the reject dialog in Russian");
+  });
+
+  test("proposes a change to a protected environment in Russian", async ({ page }) => {
+    await seedFlag(project, stringFlag("checkout_promo"));
+    await signIn(page, anna, russian);
+    await page.goto(`/projects/${project}/flags/checkout_promo?environment=production`);
+    await expect(page.getByText(/Окружение защищено: изменения его конфигурации/)).toBeVisible();
+
+    await choose(page, "Вариант без совпадений", "treatment");
+    await page.getByRole("button", { name: "Предложить", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Предложить изменение" });
+    await expect(dialog.getByLabel("Применить в")).toBeVisible();
+    await expectNoSeriousViolations(page, "the propose dialog in Russian");
+    await dialog.getByRole("button", { name: "Предложить", exact: true }).click();
+    await expect(dialog.getByText("Введите заголовок.")).toBeVisible();
   });
 });
