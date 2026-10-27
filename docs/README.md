@@ -4,7 +4,8 @@
 - [Glossary](glossary.md): the vocabulary the code, the API, the docs and the console use.
 - [Access](access.md): permissions, roles, grants, scopes and API tokens.
 - [Flags](flags.md): flag definitions, configurations per environment, rules, rollouts, overrides, prerequisites, the kill switch, revert, copy and compare.
-- [Experiments](experiments.md): creating an experiment on a flag, its salts and weights.
+- [Experiments](experiments.md): an experiment's lifecycle, the rules serving it, salts and assignment, exposures, aliases across sign-up, alerts, and what a client key learns.
+- [The sample-ratio check](sample-ratio-check.md): the statistic, when it is skipped, its two thresholds, a worked example and the warehouse SQL reproducing it.
 - [Governance](governance.md): protected environments, which writes they refuse, and the kill switch exception.
 - [Change requests](change-requests.md): proposing a flag's configuration for review, its diff and its states.
 - [Webhooks](webhooks.md): subscribing a receiver to a project's events, its secret, the targets the platform calls, and the event catalogue.

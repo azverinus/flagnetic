@@ -242,6 +242,26 @@ A rollup far enough behind, held back by a long transaction for longer than the 
 
 Every 10 seconds, rollups read the raw events committed since their last round and keep what the API reads: first exposures, exposure counts per day and conflicts of each experiment, evaluations per day of each flag and when SDKs last evaluated it, and events received per day, aliases included. A rollup reads only the rows of transactions that have ended, along transaction IDs, so a row committing late is never skipped; one replica at a time moves each rollup, so nothing is counted twice. Any transaction left open in the database, by Flagnetic or anything else connected to it, holds every rollup back until it ends: `flagnetic_rollup_lag_seconds` shows it.
 
+### A long transaction holds the rollups back
+
+A rollup reads a row only once every transaction that could still commit a row before it has ended, so that a batch committing late is never skipped. It therefore stops at the oldest transaction still open that holds a transaction ID, one that has written anything (or locked a row) and not yet committed or rolled back, whatever it does and whichever database of the PostgreSQL server it runs in; a prepared transaction counts too, until it is committed or rolled back. Ingest goes on meanwhile: events are stored and answered `202` as usual, only the counts stop moving. When the transaction ends, the rollups catch up in bounded batches, each committed with its cursor, and nothing is lost or counted twice.
+
+While it lasts, `flagnetic_rollup_lag_seconds` grows in step for every stream, exposure counts and first exposures stay where they were (`as_of` on an experiment's exposures does not move), `last_evaluated_at` and evaluations per day stop moving, and the event volume trails. The sample-ratio check and the other checks judge the counts they find. To find the transaction, ask PostgreSQL for the oldest ones holding a transaction ID:
+
+```sql
+SELECT pid, datname, usename, application_name, state, now() - xact_start AS open_for, left(query, 100) AS query
+FROM pg_stat_activity
+WHERE backend_xid IS NOT NULL
+ORDER BY age(backend_xid) DESC
+LIMIT 5;
+
+SELECT gid, database, owner, prepared FROM pg_prepared_xacts ORDER BY prepared;
+```
+
+End it with `SELECT pg_terminate_backend(<pid>)`, or `COMMIT PREPARED` or `ROLLBACK PREPARED` with its `gid`, once you know what it was doing. A session `idle in transaction` is the usual culprit, a console or migration tool left open; `idle_in_transaction_session_timeout` on the roles that connect by hand ends those by itself.
+
+A transaction held open for longer than the retention turns the lag into a [gap](#raw-events): retention drops partitions holding rows the rollups have not read yet, records a gap for them, and they are never counted. The rollup's cursor still never passes the oldest transaction open, so whatever that transaction commits is read once it ends.
+
 ## Deleting a project
 
 An owner of a project, or an instance admin, deletes it with `DELETE /api/v1/projects/{project}` under `If-Match` on the project's version, from a signed-in session: every API token is refused `403 session_required`, and a project token never holds `project.delete`. There is no restore, so download what you want to keep first (the console offers the audit log's download before asking you to type the project's key).
@@ -280,7 +300,7 @@ Prometheus metrics are served on `/metrics` of a listener of their own, `FLAGNET
 | `flagnetic_ruleset_propagation_seconds` | `environment` (its identifier) | Time from a change to an environment's ruleset to this replica's first answer carrying it (histogram, 0.01 s to 60 s). A version nobody asks for is not observed. The series of a deleted environment is dropped. |
 | `flagnetic_protection_guard_seconds` | | Time [protection](governance.md#protected-environments) took to judge a write that reached a protected environment, refused or not (histogram, 1 ms to 2.5 s): one build of each such environment's ruleset inside the write. A write reaching no protected environment is not observed. |
 | `flagnetic_sdk_rate_limited_total` | `endpoint`, `kind` | SDK API requests refused `429 rate_limited`, by endpoint (`ruleset`, `evaluate`, `events`, `stream`) and key kind (`server`, `client`, or `none` for a client IP refused for its failed authentications before its key is known). See [Rate limits on the SDK API](#rate-limits-on-the-sdk-api). |
-| `flagnetic_events_ingested_total` | `kind` | [Events](sdks/events.md) SDKs posted that were stored, by kind (`evaluation_summary`, `alias`). |
+| `flagnetic_events_ingested_total` | `kind` | [Events](sdks/events.md) SDKs posted that were stored, by kind (`evaluation_summary`, `alias`, `exposure`). |
 | `flagnetic_events_dropped_total` | `reason` | Events SDKs posted that were not stored, by reason: a rejection code, `duplicate` for an event received before, or `unknown_flag` for a summary row naming a flag the project does not have. |
 | `flagnetic_rollup_lag_seconds` | `stream` | Age of the oldest committed raw event a rollup has not read yet (`exposures`, `evaluation_summaries`, `aliases`), 0 when it has read them all. It grows while a long transaction anywhere in the database holds the rollups back. |
 | `flagnetic_event_gap_rows_total` | `stream` | Raw events retention dropped before the rollup reading them had read them (`exposures`, `evaluation_summaries`, `aliases`): rows the rollup's aggregates will never count. See [Raw events](#raw-events). |

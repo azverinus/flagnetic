@@ -270,7 +270,7 @@ The earliest recorded exposure of a unit in an experiment. Sample-ratio checks a
 _Avoid_: enrolment, entry
 
 **Sample-ratio check**:
-A chi-square test, every 10 minutes and once at stop, of each running experiment's first exposures per variation against its weights, in each environment holding its rule. Below 1000 first exposures, or when a variation expects fewer than 5, it is skipped. It raises an alert at p below 0.001 and clears it at p above 0.01. The statistic is documented so an analyst can reproduce it.
+A chi-square test, every 10 minutes and once at stop, of each running experiment's first exposures per variation against its weights, in each environment holding its rule. Below 1000 first exposures, or when a variation expects fewer than 5, it is skipped. It raises an alert at p below 0.001 and clears it at p above 0.01. The statistic is documented on [The sample-ratio check](sample-ratio-check.md) so an analyst can reproduce it.
 _Avoid_: SRM test, balance check (`srm` names only the alert kind and its events)
 
 **Alert**:
@@ -297,7 +297,7 @@ What a stop records: outcome winner (with the winner variation, which replaces t
 _Avoid_: resolution, verdict, outcome (reserved for the field naming winner or removed)
 
 **Layer**:
-A group of experiments whose audiences never overlap: a unit is in at most one experiment of a layer.
+A group of experiments whose audiences never overlap: a unit is in at most one experiment of a layer. Not built before 1.0.
 _Avoid_: namespace, mutex group, exclusion group
 
 ## Delivery
@@ -392,7 +392,7 @@ A sink one of whose streams has an undelivered row within the loss warning (`FLA
 _Avoid_: critical, overdue, warning (the word is reserved for a sink warning)
 
 **Gap**:
-The explicit record of rows a stream lost because retention dropped their partition while its cursor still pointed before them: the cursor range lost and when it was dropped. The cursor moves to just before the first row still stored and delivery continues; a member dismisses the gap once seen, and it stays listed.
+The explicit record of rows a stream (a sink's delivery or a rollup) lost because retention dropped their partition while its cursor still pointed before them: the cursor range lost and when it was dropped. The cursor moves to just before the first row still stored and the stream continues; a member dismisses the gap once seen, and it stays listed.
 _Avoid_: hole, data loss event, missing range
 
 ## Governance

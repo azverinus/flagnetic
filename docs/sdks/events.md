@@ -47,6 +47,17 @@ Otherwise each event is judged on its own and a refused one is listed in `reject
 | `unit_type_mismatch` | An exposure's `unit_type` is not the unit type its experiment assigns. |
 | `unknown_variation` | An exposure names a variation its experiment does not weigh. An exposure with `override` true is not checked against the weights, since an override decides the variation whatever they are. |
 
+An exposure carries what the evaluation that assigned the unit answered, so the server can check it against the experiment:
+
+```json
+{"type": "exposure", "event_id": "01a0b91b-c500-7000-8000-000000000011", "occurred_at": "2026-09-19T10:00:00Z",
+ "experiment_key": "banner_test", "flag_key": "banner_text", "variation_key": "long",
+ "unit_type": "user", "unit_id": "u-1001", "evaluation_reason": "experiment", "override": false,
+ "ruleset_version": 1, "platform": "linux", "app_version": "1.18.0"}
+```
+
+An exposure of an experiment the project has is accepted whatever the experiment's status, a draft or a stopped one too, and counted toward its [exposures](../experiments.md#exposures).
+
 An exposure is judged against its experiment in this order, and refused with the first check it fails: the experiment exists, the unit type is its own, the variation is one it weighs, then `flag_key` must be the experiment's flag and `evaluation_reason` `experiment` or `override` (both `event_invalid`). The codes are the same for every key; the `detail` of a refusal is specific for a server key and, for a client key, names no unit type, flag, variation or status of the experiment: a key that ships inside an app learns nothing of an experiment from it. Exposures refused for an experiment that exists are counted per experiment, environment and reason, and the counts go with the experiment; an exposure naming an experiment that does not exist is counted nowhere.
 
 An accepted alias links its pair of unit IDs in the environment of the key, once: the pair sent again under another `event_id`, as an app signing the same user in again does, is stored as an event but adds no link, and the link keeps the alias that occurred earliest. Links are kept for as long as the environment exists, after retention drops the raw aliases, so an anonymous ID can always be joined to the ID known after sign-up.
