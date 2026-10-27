@@ -8,6 +8,8 @@ require "test_helper"
 # vector is an input and the instant Go reads, in Unix nanoseconds, or nil
 # when Go refuses it.
 class InstantTest < Minitest::Test
+  Instant = Flagnetic::Eval.const_get(:Instant)
+
   VECTORS = [
     ["2026-09-19T12:00:00Z", 1_789_819_200_000_000_000],
     ["2026-09-19t12:00:00z", nil],
@@ -43,20 +45,20 @@ class InstantTest < Minitest::Test
 
   def test_rfc3339_reads_like_go
     VECTORS.each do |input, want|
-      got = Flagnetic::Eval::Instant.parse_rfc3339(input)
+      got = Instant.parse_rfc3339(input)
       want.nil? ? assert_nil(got, input) : assert_equal(want, got, input)
     end
   end
 
   def test_context_values
     noon = 1_789_819_200_000_000_000
-    assert_equal noon, Flagnetic::Eval::Instant.from_context(Time.utc(2026, 9, 19, 12))
-    assert_equal noon + 1, Flagnetic::Eval::Instant.from_context(Time.at(1_789_819_200, 1, :nsec))
-    assert_equal noon, Flagnetic::Eval::Instant.from_context(1_789_819_200_000)
-    assert_equal noon, Flagnetic::Eval::Instant.from_context(1_789_819_200_000.0)
-    assert_nil Flagnetic::Eval::Instant.from_context(1.5)
-    assert_nil Flagnetic::Eval::Instant.from_context(2**54) # beyond 2^53 milliseconds
-    assert_nil Flagnetic::Eval::Instant.from_context(true)
-    assert_nil Flagnetic::Eval::Instant.from_context("1789819200000")
+    assert_equal noon, Instant.from_context(Time.utc(2026, 9, 19, 12))
+    assert_equal noon + 1, Instant.from_context(Time.at(1_789_819_200, 1, :nsec))
+    assert_equal noon, Instant.from_context(1_789_819_200_000)
+    assert_equal noon, Instant.from_context(1_789_819_200_000.0)
+    assert_nil Instant.from_context(1.5)
+    assert_nil Instant.from_context(2**54) # beyond 2^53 milliseconds
+    assert_nil Instant.from_context(true)
+    assert_nil Instant.from_context("1789819200000")
   end
 end

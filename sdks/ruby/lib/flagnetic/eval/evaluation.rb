@@ -205,10 +205,10 @@ module Flagnetic
 
         f = @index.flags[key]
         return error(:flag_not_found) unless f
-        return error(:prerequisite_cycle).of_flag(f.flag) if @visiting.key?(key)
+        return error(:prerequisite_cycle).__send__(:of_flag, f.flag) if @visiting.key?(key)
 
         @visiting[key] = true
-        result = compute(f).of_flag(f.flag)
+        result = compute(f).__send__(:of_flag, f.flag)
         @visiting.delete(key)
         @memo[key] = result
       end
@@ -274,7 +274,7 @@ module Flagnetic
           serve(cf, s.variation, reason: :rule, rule_id: rule.id, override_influenced: influenced)
         when "rollout"
           id = @context.unit(s.unit_type)
-          bucket = id && Eval.bucket(s.salt, id)
+          bucket = id && Murmur3.bucket(s.salt, id)
           return nil unless bucket && bucket < s.percentage
 
           serve(cf, s.variation, reason: :rollout, rule_id: rule.id, bucket: bucket, override_influenced: influenced)
@@ -290,10 +290,10 @@ module Flagnetic
         id = @context.unit(s.unit_type)
         return nil unless id
 
-        inclusion = Eval.bucket(s.inclusion_salt, id)
+        inclusion = Murmur3.bucket(s.inclusion_salt, id)
         return nil unless inclusion < s.traffic_allocation
 
-        variation_bucket = Eval.bucket(s.variation_salt, id)
+        variation_bucket = Murmur3.bucket(s.variation_salt, id)
         assigned = assign(s.weights, variation_bucket)
         return error(:inconsistent_ruleset, influenced) unless assigned
 

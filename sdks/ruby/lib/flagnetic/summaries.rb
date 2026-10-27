@@ -253,4 +253,5 @@ module Flagnetic
                                  rejected: result.rejected.map { |r| r["code"] })
     end
   end
+  private_constant :Summaries
 end

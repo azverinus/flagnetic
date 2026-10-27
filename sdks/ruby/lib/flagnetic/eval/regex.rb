@@ -3,6 +3,7 @@
 require_relative "unicode_tables"
 
 module Flagnetic
+  # Eval is the evaluator; see flagnetic/eval.rb.
   module Eval
     # Regex compiles the pattern of a matches condition. Patterns are RE2
     # syntax, as the reference evaluator (Go's regexp) reads them. Ruby's
@@ -641,5 +642,6 @@ module Flagnetic
       end
       private_constant :Translator, :Sets
     end
+    private_constant :Regex, :UnicodeTables
   end
 end

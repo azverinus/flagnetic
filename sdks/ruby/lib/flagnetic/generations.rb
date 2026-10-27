@@ -46,4 +46,5 @@ module Flagnetic
       @current = {}
     end
   end
+  private_constant :Generations
 end

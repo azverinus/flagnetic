@@ -21,6 +21,6 @@ Gem::Specification.new do |spec|
   spec.files = Dir["lib/**/*.rb", "README.md", "LICENSE"]
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "flagnetic", "~> 0.1"
+  spec.add_dependency "flagnetic", "~> 0.1.0"
   spec.add_dependency "openfeature-sdk", "~> 0.6", ">= 0.6.1"
 end

@@ -115,4 +115,5 @@ module Flagnetic
       seconds && !seconds.negative? ? seconds : nil
     end
   end
+  private_constant :EventBatch
 end

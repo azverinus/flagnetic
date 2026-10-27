@@ -137,7 +137,7 @@ class RulesetTest < Minitest::Test
     assert_empty rs.unsupported_rules
   end
 
-  def test_check_operator_follows_the_operator_table
+  def test_the_operator_check_follows_the_operator_table
     [
       ["string", "matches", "^a", true],
       ["string", "matches", "(?=a)", false],
@@ -157,8 +157,8 @@ class RulesetTest < Minitest::Test
       ["string", "exists", nil, true],
       ["object", "exists", nil, false]
     ].each do |type, op, value, ok|
-      problem = Eval.check_operator(type, op, value)
-      assert_equal ok, problem.nil?, "check_operator(#{type}, #{op}, #{value.inspect}) = #{problem.inspect}"
+      problem = Eval.const_get(:Operators).check(type, op, value)
+      assert_equal ok, problem.nil?, "check(#{type}, #{op}, #{value.inspect}) = #{problem.inspect}"
     end
   end
 end

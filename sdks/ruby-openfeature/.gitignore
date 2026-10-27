@@ -2,3 +2,4 @@
 /.bundle/
 /vendor/
 *.gem
+/tree.gemfile.lock

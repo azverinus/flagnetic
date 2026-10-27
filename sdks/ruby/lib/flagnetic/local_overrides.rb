@@ -60,5 +60,6 @@ module Flagnetic
     rescue JSON::GeneratorError, JSON::ParserError => e
       raise ArgumentError, "a #{value.class} is not a JSON value: #{e.message}"
     end
+    private_class_method :normalize
   end
 end

@@ -34,6 +34,12 @@ jobs:
       sdk_python_released: ${{ steps.release.outputs['sdks/python--release_created'] }}
       sdk_python_tag: ${{ steps.release.outputs['sdks/python--tag_name'] }}
       sdk_python_version: ${{ steps.release.outputs['sdks/python--version'] }}
+      sdk_ruby_released: ${{ steps.release.outputs['sdks/ruby--release_created'] }}
+      sdk_ruby_tag: ${{ steps.release.outputs['sdks/ruby--tag_name'] }}
+      sdk_ruby_version: ${{ steps.release.outputs['sdks/ruby--version'] }}
+      sdk_ruby_openfeature_released: ${{ steps.release.outputs['sdks/ruby-openfeature--release_created'] }}
+      sdk_ruby_openfeature_tag: ${{ steps.release.outputs['sdks/ruby-openfeature--tag_name'] }}
+      sdk_ruby_openfeature_version: ${{ steps.release.outputs['sdks/ruby-openfeature--version'] }}
       sdk_dart_released: ${{ steps.release.outputs['sdks/dart--release_created'] }}
       sdk_dart_tag: ${{ steps.release.outputs['sdks/dart--tag_name'] }}
       sdk_flutter_released: ${{ steps.release.outputs['sdks/flutter--release_created'] }}
@@ -258,6 +264,128 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           attestations: true
+
+  # The Ruby gems, each built from its tag and checked like every pull
+  # request checks it, after its tests prove the version is the tag's.
+  # Building apart from the publishing job keeps the build's tools away from
+  # the job that can publish.
+  sdk-ruby-gem:
+    name: ruby gem (flagnetic)
+    needs: release-please
+    if: needs.release-please.outputs.sdk_ruby_released == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/ruby
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.sdk_ruby_tag }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+          bundler-cache: true
+          working-directory: sdks/ruby
+      - name: Version equals the tag
+        env:
+          FLAGNETIC_RELEASE_VERSION: ${{ needs.release-please.outputs.sdk_ruby_version }}
+        run: bundle exec ruby -Ilib -Itest test/version_test.rb
+      - name: Build and check the gem
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/check-gem.sh" . flagnetic.gemspec "$RUNNER_TEMP/gem"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flagnetic-ruby-${{ needs.release-please.outputs.sdk_ruby_version }}
+          path: ${{ runner.temp }}/gem/
+          retention-days: 30
+
+  # RubyGems trusts this workflow, in the rubygems environment, by its OIDC
+  # token (trusted publishing), so no RubyGems key is stored anywhere. The
+  # pending publisher is configured before the first release
+  # (CONTRIBUTING.md), so the first version is published here too.
+  sdk-ruby-rubygems:
+    name: RubyGems (flagnetic)
+    needs: [release-please, sdk-ruby-gem]
+    runs-on: ubuntu-latest
+    environment: rubygems
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: flagnetic-ruby-${{ needs.release-please.outputs.sdk_ruby_version }}
+          path: gem/
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+      - uses: rubygems/configure-rubygems-credentials@v2.1.0
+      - name: Publish
+        env:
+          VERSION: ${{ needs.release-please.outputs.sdk_ruby_version }}
+        run: gem push "gem/flagnetic-$VERSION.gem"
+
+  sdk-ruby-openfeature-gem:
+    name: ruby gem (flagnetic-openfeature)
+    needs: release-please
+    if: needs.release-please.outputs.sdk_ruby_openfeature_released == 'true'
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/sdks/ruby-openfeature/tree.gemfile
+    defaults:
+      run:
+        working-directory: sdks/ruby-openfeature
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.sdk_ruby_openfeature_tag }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+          bundler-cache: true
+          working-directory: sdks/ruby-openfeature
+      - name: Version equals the tag
+        env:
+          FLAGNETIC_RELEASE_VERSION: ${{ needs.release-please.outputs.sdk_ruby_openfeature_version }}
+        run: bundle exec ruby -Ilib -Itest test/version_test.rb
+      - name: Build and check the gem
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/check-gem.sh" . flagnetic-openfeature.gemspec "$RUNNER_TEMP/gem"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: flagnetic-openfeature-ruby-${{ needs.release-please.outputs.sdk_ruby_openfeature_version }}
+          path: ${{ runner.temp }}/gem/
+          retention-days: 30
+
+  # The provider requires a released flagnetic, so when both are released in
+  # one run, flagnetic is published first; a failed flagnetic build or
+  # publish holds the provider back. The build is checked as well as the
+  # publish because a failed build leaves the publish skipped, the result it
+  # also has when flagnetic is not released at all.
+  sdk-ruby-openfeature-rubygems:
+    name: RubyGems (flagnetic-openfeature)
+    needs: [release-please, sdk-ruby-openfeature-gem, sdk-ruby-gem, sdk-ruby-rubygems]
+    if: >-
+      always() &&
+      needs.sdk-ruby-openfeature-gem.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs.sdk-ruby-gem.result) &&
+      contains(fromJSON('["success", "skipped"]'), needs.sdk-ruby-rubygems.result)
+    runs-on: ubuntu-latest
+    environment: rubygems
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: flagnetic-openfeature-ruby-${{ needs.release-please.outputs.sdk_ruby_openfeature_version }}
+          path: gem/
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+      - uses: rubygems/configure-rubygems-credentials@v2.1.0
+      - name: Publish
+        env:
+          VERSION: ${{ needs.release-please.outputs.sdk_ruby_openfeature_version }}
+        run: gem push "gem/flagnetic-openfeature-$VERSION.gem"
 
   # pub.dev accepts a publish only from a run started by a tag push or by
   # workflow_dispatch on the tag, and the tags release-please creates start

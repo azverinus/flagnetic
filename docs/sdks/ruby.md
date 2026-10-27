@@ -5,7 +5,7 @@ Two gems, released on their own tags:
 | Gem | Directory | What it is | Needs |
 |---|---|---|---|
 | `flagnetic` | [`sdks/ruby`](../../sdks/ruby/README.md) | The SDK: server mode, a Rails integration loaded only under Rails, and `Flagnetic::Testing` | Ruby ≥ 3.3; Rails ≥ 8.0 for the integration; nothing outside the standard library |
-| `flagnetic-openfeature` | [`sdks/ruby-openfeature`](../../sdks/ruby-openfeature/README.md) | An [OpenFeature](https://openfeature.dev) provider over `flagnetic` | Ruby ≥ 3.4, `openfeature-sdk` ≥ 0.6.1 within 0.x |
+| `flagnetic-openfeature` | [`sdks/ruby-openfeature`](../../sdks/ruby-openfeature/README.md) | An [OpenFeature](https://openfeature.dev) provider over `flagnetic` | Ruby ≥ 3.4, `openfeature-sdk` ≥ 0.6.1 within 0.x, `flagnetic` within one minor (0.1.x) |
 
 ```bash
 bundle add flagnetic
@@ -37,12 +37,13 @@ While the stream is connected the client also polls every 5 minutes (`poll_inter
 
 ## Compatibility
 
-`flagnetic` 0.x reads ruleset `schema_version` 1, speaks `/sdk/v1` and works with every Flagnetic server from 0.1.0 on; see the [compatibility table](compatibility.md). `flagnetic-openfeature` makes no request of its own and follows the `flagnetic` it runs with.
+`flagnetic` 0.x reads ruleset `schema_version` 1, speaks `/sdk/v1` and works with every Flagnetic server from 0.1.0 on; see the [compatibility table](compatibility.md). `flagnetic-openfeature` makes no request of its own and follows the `flagnetic` it runs with. Before 1.0 a new minor of `flagnetic` may break the provider, so the provider requires one minor of it; a provider release that admits the next minor follows each `flagnetic` minor release.
 
 ## How it is tested
 
 - **Evaluation**: every fixture of the [conformance suite](conformance.md), the RE2 vectors and MurmurHash3 vectors, with no case skipped, and a 1,000-flag ruleset evaluated under 1 ms at the 99th percentile.
 - **Delivery and events**: every server-mode protocol scenario against a mock server; the [behaviour matrix](behaviour-matrix.md) shows which passed.
+- **Packages**: on every pull request that changes either gem, `gem build --strict` and a comparison of the files each gem packs with the files the repository tracks for it; the provider runs its tests against both the `flagnetic` of the working tree and the one released on RubyGems.
 - **End to end**: on every pull request that changes either gem, against two replicas on one PostgreSQL brought up by [`flagnetic-e2e up`](../../e2e/README.md): the client reaches `fresh`, serves every seeded case with its true reason, decides the private segment, sees a kill switch saved through one replica within 2 seconds while streaming from the other, appears in the SDK inventory as `flagnetic-ruby` and is refused once its key is revoked.
 
 To run the smoke yourself, with Docker running:

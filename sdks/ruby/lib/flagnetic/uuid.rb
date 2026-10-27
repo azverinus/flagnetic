@@ -21,4 +21,5 @@ module Flagnetic
       "#{hex[0, 8]}-#{hex[8, 4]}-#{hex[12, 4]}-#{hex[16, 4]}-#{hex[20, 12]}"
     end
   end
+  private_constant :UUID
 end

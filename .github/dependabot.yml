@@ -80,6 +80,19 @@ updates:
       # The types follow the oldest Node the package supports.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+  # The OpenFeature gem's requirement on the flagnetic gem. It admits one
+  # minor of flagnetic, so a flagnetic release of the next minor falls
+  # outside it and is proposed here; the bump is a commit to the provider,
+  # which then releases next. Daily, so the provider does not wait a week.
+  # Only flagnetic: the bundle's tools are not what this entry is for.
+  - package-ecosystem: bundler
+    directory: /sdks/ruby-openfeature
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: "deps(sdk-ruby-openfeature)"
+    allow:
+      - dependency-name: flagnetic
   - package-ecosystem: github-actions
     directory: /
     schedule:

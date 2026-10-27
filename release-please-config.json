@@ -62,6 +62,24 @@
       "changelog-path": "CHANGELOG.md",
       "extra-files": ["src/version.ts"]
     },
+    "sdks/ruby": {
+      "release-type": "ruby",
+      "initial-version": "0.1.0",
+      "package-name": "flagnetic",
+      "component": "sdks/ruby",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "version-file": "lib/flagnetic/version.rb"
+    },
+    "sdks/ruby-openfeature": {
+      "release-type": "ruby",
+      "initial-version": "0.1.0",
+      "package-name": "flagnetic-openfeature",
+      "component": "sdks/ruby-openfeature",
+      "include-component-in-tag": true,
+      "changelog-path": "CHANGELOG.md",
+      "version-file": "lib/flagnetic/openfeature/version.rb"
+    },
     "sdks/python": {
       "release-type": "python",
       "initial-version": "0.1.0",

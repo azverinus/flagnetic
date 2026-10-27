@@ -30,4 +30,5 @@ module Flagnetic
 
     def to_s = @path
   end
+  private_constant :FileStore
 end

@@ -20,6 +20,7 @@ module Flagnetic
   module Testing
     # VARIATION names the one variation set and values: give a flag.
     VARIATION = "value"
+    private_constant :VARIATION
 
     # offline builds an OfflineClient from a ruleset document (JSON text or
     # a Hash, exactly as the ruleset endpoint serves it), from file:, or
@@ -52,7 +53,7 @@ module Flagnetic
     def self.set_flag(doc, key, value)
       flags = (doc["flags"] ||= [])
       at = flags.index { |f| f.is_a?(Hash) && f["key"] == key }
-      type = Client.type_of(value)
+      type = Client.__send__(:type_of, value)
       if at && (existing = flags[at]["type"]) != "json" && existing != type
         raise ArgumentError, "flag #{key.inspect} is #{existing}, a #{value.class} is #{type}"
       end
@@ -100,7 +101,7 @@ module Flagnetic
         client.close(timeout: 0)
       end
     end
-    private_class_method :swap
+    private_class_method :document_from, :set_flag, :swap
 
     # Helpers is with_flags and with_ruleset for test classes:
     #
@@ -141,7 +142,7 @@ module Flagnetic
       def set(key, value)
         @document_mutex.synchronize do
           doc = JSON.parse(@document)
-          Testing.set_flag(doc, key.to_s, value)
+          Testing.__send__(:set_flag, doc, key.to_s, value)
           @document = JSON.generate(doc)
         end
         reload_document

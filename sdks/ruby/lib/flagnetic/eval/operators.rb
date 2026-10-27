@@ -3,40 +3,35 @@
 module Flagnetic
   # Eval is the evaluator; see flagnetic/eval.rb.
   module Eval
-    # number reads a context or condition value as a number: an Integer,
-    # Float, Rational or other real Numeric, never a String ("5" is
-    # wrong-typed). NaN and the infinities are not numbers.
-    def self.number(value)
-      return nil unless value.is_a?(Numeric) && value.real?
+    # Values reads context and condition values as the evaluator compares
+    # them.
+    module Values
+      module_function
 
-      f = value.to_f
-      f.nan? || f.infinite? ? nil : f
+      # number reads a context or condition value as a number: an Integer,
+      # Float, Rational or other real Numeric, never a String ("5" is
+      # wrong-typed). NaN and the infinities are not numbers.
+      def number(value)
+        return nil unless value.is_a?(Numeric) && value.real?
+
+        f = value.to_f
+        f.nan? || f.infinite? ? nil : f
+      end
+
+      # utf8 returns a string whose bytes compare as UTF-8, whatever encoding
+      # the caller's string carries. Strings compare byte-wise.
+      def utf8(str)
+        str.encoding == Encoding::UTF_8 ? str : str.dup.force_encoding(Encoding::UTF_8)
+      end
+
+      # strings reads a list whose every element is a string.
+      def strings(value)
+        return nil unless value.is_a?(Array) && value.all?(String)
+
+        value.map { |s| utf8(s) }
+      end
     end
-
-    # utf8 returns a string whose bytes compare as UTF-8, whatever encoding
-    # the caller's string carries. Strings compare byte-wise.
-    def self.utf8(str)
-      str.encoding == Encoding::UTF_8 ? str : str.dup.force_encoding(Encoding::UTF_8)
-    end
-
-    # strings reads a list whose every element is a string.
-    def self.strings(value)
-      return nil unless value.is_a?(Array) && value.all?(String)
-
-      value.map { |s| utf8(s) }
-    end
-
-    # check_operator returns why this evaluator cannot apply op with value
-    # to an attribute of type, or nil when it can: op must be defined for
-    # type and value must have the JSON type op needs. It does not reject
-    # what the evaluator treats as a false condition, such as an
-    # unparseable semantic version or date in the value.
-    def self.check_operator(type, op, value)
-      Operators.compile(type, op, value)
-      nil
-    rescue Operators::Error => e
-      e.message
-    end
+    private_constant :Values
 
     # Operators compiles an attribute condition into a matcher of a context
     # value. The matcher receives nil for an absent attribute. An absent,
@@ -48,12 +43,12 @@ module Flagnetic
       class Error < StandardError; end
 
       EXTRACT = {
-        "string" => ->(v) { Eval.utf8(v) if v.is_a?(String) },
-        "number" => ->(v) { Eval.number(v) },
+        "string" => ->(v) { Values.utf8(v) if v.is_a?(String) },
+        "number" => ->(v) { Values.number(v) },
         "boolean" => ->(v) { v if [true, false].include?(v) },
         "semver" => ->(v) { Semver.parse(v) if v.is_a?(String) },
         "date" => ->(v) { Instant.from_context(v) },
-        "list" => ->(v) { Eval.strings(v) }
+        "list" => ->(v) { Values.strings(v) }
       }.freeze
       COMPARISONS = %w[eq neq lt lte gt gte].freeze
 
@@ -66,6 +61,18 @@ module Flagnetic
       private_constant :EXTRACT, :COMPARISONS
 
       module_function
+
+      # check returns why this evaluator cannot apply op with value to an
+      # attribute of type, or nil when it can: op must be defined for type
+      # and value must have the JSON type op needs. It does not reject what
+      # the evaluator treats as a false condition, such as an unparseable
+      # semantic version or date in the value.
+      def check(type, op, value)
+        compile(type, op, value)
+        nil
+      rescue Error => e
+        e.message
+      end
 
       def compile(type, op, value)
         extract = EXTRACT[type]
@@ -177,17 +184,17 @@ module Flagnetic
       # json_number reads a condition value as a number: only what JSON
       # decodes to one.
       def json_number(value)
-        Eval.number(value) if value.is_a?(Integer) || value.is_a?(Float)
+        Values.number(value) if value.is_a?(Integer) || value.is_a?(Float)
       end
 
       def string_value(op, value)
         raise Error, "operator #{op.inspect} needs a string value" unless value.is_a?(String)
 
-        Eval.utf8(value)
+        Values.utf8(value)
       end
 
       def strings_value(op, value)
-        Eval.strings(value) or raise Error, "operator #{op.inspect} needs a list of strings"
+        Values.strings(value) or raise Error, "operator #{op.inspect} needs a list of strings"
       end
 
       def regex(pattern)
@@ -213,5 +220,6 @@ module Flagnetic
         end
       end
     end
+    private_constant :Operators
   end
 end

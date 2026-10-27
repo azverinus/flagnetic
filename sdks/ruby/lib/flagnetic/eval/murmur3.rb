@@ -7,17 +7,6 @@ module Flagnetic
     # basis points (0 to 10000) is compared against a bucket directly.
     BUCKETS = 10_000
 
-    # bucket computes the bucket of a unit for a salt:
-    #
-    #   murmur3_32(utf8("{salt}.{unit_id}"), seed 0) mod 10000
-    #
-    # on the unsigned hash, giving 0 to 9999. A unit is inside
-    # percentage p when its bucket is below p. It equals ClickHouse
-    # murmurHash3_32(concat(salt, '.', unit_id)) % 10000.
-    def self.bucket(salt, unit_id)
-      Murmur3.hash32("#{salt.b}.#{unit_id.b}") % BUCKETS
-    end
-
     # Murmur3 is MurmurHash3 x86 32-bit with seed 0 over the bytes of a
     # string, read as an unsigned integer. Hashing UTF-16 or reading the
     # result as signed gives different buckets and fails the murmur3 vectors.
@@ -27,6 +16,17 @@ module Flagnetic
       MASK = 0xffffffff
 
       module_function
+
+      # bucket computes the bucket of a unit for a salt:
+      #
+      #   murmur3_32(utf8("{salt}.{unit_id}"), seed 0) mod 10000
+      #
+      # on the unsigned hash, giving 0 to 9999. A unit is inside
+      # percentage p when its bucket is below p. It equals ClickHouse
+      # murmurHash3_32(concat(salt, '.', unit_id)) % 10000.
+      def bucket(salt, unit_id)
+        hash32("#{salt.b}.#{unit_id.b}") % BUCKETS
+      end
 
       def hash32(data)
         bytes = data.b
@@ -65,5 +65,6 @@ module Flagnetic
       end
       private_class_method :mix, :fmix, :rotl
     end
+    private_constant :Murmur3
   end
 end

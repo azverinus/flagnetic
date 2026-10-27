@@ -170,7 +170,7 @@ module Flagnetic
       end
       t = Time.now
       coerced = begin
-        Eval::Context.coerce(context)
+        Eval::Context.__send__(:coerce, context)
       rescue StandardError
         Eval::Context::EMPTY
       end
@@ -232,7 +232,7 @@ module Flagnetic
     # evaluated for. It never leaves the process and needs no cross-language
     # stability.
     def fingerprint(context)
-      c = Eval::Context.coerce(context)
+      c = Eval::Context.__send__(:coerce, context)
       units = c.units.sort.flatten
       attributes = c.attributes.sort.map { |k, v| [k, attribute_token(v)] }.flatten
       (units + [""] + attributes).join(" ")
@@ -338,4 +338,5 @@ module Flagnetic
                                  rejected: result.rejected.map { |r| r["code"] })
     end
   end
+  private_constant :Exposures
 end
