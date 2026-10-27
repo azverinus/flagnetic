@@ -160,7 +160,7 @@ SDKs report how often they evaluated each flag in [evaluation summaries](sdks/ev
 
 `last_evaluated_at`, on the flag's `last_evaluated` and on each flag state of the list, is when an SDK last evaluated the flag in the environment: the end of the latest interval an evaluation summary covered, or the latest exposure recorded, never later than the server received them; null when no SDK ever did. Remote evaluations never move it, so a flag sent to client SDKs in every answer, yet read by no application, still shows as never evaluated.
 
-Both lag the SDKs by the rollup's round of 10 seconds, and by as long as a transaction left open in the database holds the rollups back ([Operations](operations.md#raw-events)). A summary row naming a flag deleted since counts in no flag's evaluations.
+Both lag the SDKs by the rollup's round of 10 seconds, and by as long as a transaction left open in the database holds the rollups back ([Operations](operations.md#a-long-transaction-holds-the-rollups-back)). A summary row naming a flag deleted since counts in no flag's evaluations.
 
 ## Stale flags
 

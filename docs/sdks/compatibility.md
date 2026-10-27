@@ -14,6 +14,10 @@ Flagnetic 0.1.0 is the first release, a developer preview. From it on:
 
 What 0.1 does not have yet: experiments (every exposure an SDK posts is rejected `unknown_experiment` until they exist), governance beyond roles and the audit log: protected environments, change requests, scheduled changes and webhooks (`environment.protected` is `false` everywhere, so local overrides work in every environment), single sign-on, and SDKs other than Go and its OpenFeature provider. It needs PostgreSQL 16 or later.
 
+### Experiments
+
+0.1 rejects every exposure `unknown_experiment`, since it has no experiments. A server with experiments accepts an exposure of an experiment the project has, in any status, and rejects the others per event with `unknown_experiment`, `unit_type_mismatch`, `unknown_variation` or `event_invalid` (see [Events](events.md#the-batch-and-each-event)); the batch is answered `202` either way, so an SDK built against 0.1 sends exposures unchanged and needs no upgrade. Its ruleset carries a running experiment's rules, which the SDKs already evaluate: the experiment scenarios of the [behaviour matrix](behaviour-matrix.md) prove it for each.
+
 ### Protected environments
 
 0.1 serves `environment.protected` as `false` in every ruleset and evaluate answer, so local overrides work everywhere. A server with protected environments serves the real value: an environment an owner protects, and the production environment of every project created on that server, answer `true`, and a server SDK ignores local overrides there, as it always promised. Environments that existed before the upgrade stay unprotected until an owner protects them, so an upgrade alone changes nothing an SDK does. Protecting or unprotecting an environment moves its ruleset version, so SDKs pick the change up like any other. A test that sets local overrides against a protected environment should use an unprotected one, such as development, or the SDK's test client.

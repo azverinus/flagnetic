@@ -2,6 +2,19 @@
 
 An experiment compares two or more variations of one [flag](flags.md) on units of a declared unit type, to learn which does better. It has a hypothesis written before it runs, an owner, the weights that split the traffic, a traffic allocation and two salts. Creating one only describes the comparison: it starts as a draft, which changes nothing any SDK receives.
 
+## Lifecycle
+
+An experiment moves one way through four statuses: `draft`, `running` (by [start](#starting-an-experiment)), `stopped` (by [stop](#stopping-with-a-decision), with a decision) and `archived` (by [archive](#archiving), from a draft or a stopped experiment). There is no pause, since the flag's kill switch already is one, and no restart, since a rerun is a [clone](#cloning) with new salts that never reuses an assignment.
+
+| Status | Rules serving it in SDKs' rulesets | What can change |
+|---|---|---|
+| `draft` | Left out. | Everything but the key; salts can be regenerated; it can be deleted. |
+| `running` | Assign units by its weights. | Name, hypothesis, owner, tags, expected end date; the traffic allocation, only up. |
+| `stopped` | Rewritten by the decision: serving the winner, or deleted. | Name, hypothesis, owner, tags, the decision's note. |
+| `archived` | Left out. | Nothing. |
+
+Exposures are accepted in every status, so an app flushing its queue days late is still counted, and every experiment can be cloned.
+
 ## Creating an experiment
 
 `POST /projects/{project}/experiments` needs the `experiment.edit` permission (token scope `experiments:write`) and takes:
@@ -22,6 +35,12 @@ An experiment compares two or more variations of one [flag](flags.md) on units o
 A request breaking several rules is refused `422 invalid_experiment` with one violation per field to fix, each naming its JSON Pointer, such as `/variations/1/variation` `unknown_variation`.
 
 The answer is the experiment at `status` `draft` and `version` 1, which is also its `ETag`. `GET /projects/{project}/experiments/{experiment}` reads it again.
+
+## Serving it from a rule
+
+An experiment decides nothing by itself: a rule of its flag serves it, `{"kind": "experiment", "experiment": "checkout_title_test"}`, written through the flag's ordinary configuration write in each environment where it should run (see [Rules](flags.md#rules)). The rule's conditions choose who enters the experiment, the experiment's traffic allocation how many of them, and its weights which variation each gets. A unit the allocation leaves out, or a context without the experiment's unit type, goes on to the next rule. Several rules, in one environment or in several, may serve the same experiment; an environment with no such rule never runs it.
+
+While the experiment is a draft its rules stay out of the ruleset, so the rule can be prepared and reviewed without changing what anyone is served. Starting, growing the allocation and stopping move the ruleset of exactly the environments holding such a rule.
 
 ## Listing experiments
 
@@ -142,13 +161,32 @@ SDKs report an exposure each time a unit is assigned a variation of an experimen
 
 A unit's first exposure is its exposure with the earliest `occurred_at`, ties broken by the smaller `event_id`, so an exposure arriving late from a phone that was offline replaces it when it occurred earlier. Each other exposure of the unit naming another variation is a conflict, and a unit's conflicting variation is the other one it was last exposed to by `occurred_at`. Override exposures are counted as overridden and never make, replace or conflict with a first exposure: an override decides the variation whatever the assignment. Exposures and overridden exposures count on the day they were received, first exposures on the day they occurred, so a replacement moves a first exposure to its own day. Whatever order the exposures arrive in, and however SDKs batch them, the counts come out the same.
 
+An exposure is accepted for an experiment of the project in any status, a draft or a stopped one too, and refused per event when it names no such experiment, another unit type, a variation the experiment does not weigh (unless it is an override exposure) or another flag (see [Events](sdks/events.md#the-batch-and-each-event)). The refusals of an experiment that exists are counted per reason beside its exposures, so an SDK sending the wrong unit type shows on the experiment's page.
+
+Rollups lag the SDKs by their round of 10 seconds, and by as long as a transaction left open in the database holds them back (see [Operations](operations.md#a-long-transaction-holds-the-rollups-back)); `as_of` tells how current the counts are.
+
+## Across sign-up: aliases
+
+An experiment assigns units of one unit type, and a unit keeps its variation only as long as the contexts it is evaluated with carry the same unit ID of that type. Choose the unit type by where the comparison starts:
+
+- An experiment on what visitors see before they sign up, such as onboarding, assigns an anonymous unit type, such as `device`: the SDK's context carries the device's ID before sign-up and after it, so the visitor keeps the variation across sign-up. An experiment on the `user` unit type would not reach them before: a context without the experiment's unit type goes on to the next rule.
+- An experiment on signed-in users assigns `user`, so a member keeps the variation on every device.
+
+What an experiment on an anonymous unit type is judged by often happens after sign-up, recorded under the user ID: a purchase, a retained account. To join the two, the SDK sends an **alias** when the visitor signs in, linking the anonymous unit to the known one: in the Go SDK, `client.Alias(ctx, "device", "d-8f1c", "user", "u-1001")`, and an `alias` call in every other SDK. The server checks that both unit types are declared (`undeclared_unit_type`) and differ (`event_invalid`), and links the pair once per environment, keeping the alias that occurred earliest however often the visitor signs in again (see [Events](sdks/events.md#the-batch-and-each-event)). The links are kept for as long as the environment exists, after retention drops the raw aliases, so an anonymous ID can always be joined to the ID known after sign-up. In a warehouse holding the aliases your SDKs recorded, join a user's outcomes to the device's first exposure through the pair.
+
+An alias never changes an assignment: the unit keeps the variation its own ID was assigned, and the experiment counts its first exposure under that ID.
+
+## What a client key learns
+
+A client key ships inside apps and browsers, where anyone can read it, so it learns of an experiment only what an exposure needs. For a context a running experiment includes, a remote evaluation answers reason `experiment` and the experiment block: the experiment's key, the variation assigned, the unit type and unit ID, both salts and both buckets. It never learns the experiment's weights, traffic allocation, hypothesis, status or the other variations, nor the rule or segment that led to it: a unit the allocation leaves out is answered with the next rule's value, as targeting decided it (`targeting_match`). A draft, stopped or archived experiment assigns nobody, so it never shows.
+
+An exposure posted with a client key is judged like one posted with a server key and refused with the same codes, but the refusal's `detail` names no unit type, flag, variation or status of the experiment, so an app learns nothing of an experiment from a refusal either. Only whether an experiment key exists can be told, by `unknown_experiment`: do not put anything secret in an experiment's key. See [What a client key still learns](operations.md#what-a-client-key-still-learns) for the rest of what any client key exposes.
+
 ## The sample-ratio check
 
-Every 10 minutes the server checks each running experiment in each environment whose configuration holds its rule, and once more when it stops, in the environments that held its rule until the stop rewrote them. It compares the first exposures of the variations the experiment weighs with what the weights ask for: with `N` the first exposures, `O` a variation's and `E = N × weight / 10000` its expected count, `X² = Σ (O − E)² / E` with one degree of freedom fewer than there are variations, and the p-value is the upper tail of the chi-square distribution. Weights 5,000/5,000 and first exposures 5,200 and 4,800 give `X²` 16 and a p-value of about 0.000063.
+Every 10 minutes the server checks each running experiment in each environment whose configuration holds its rule, and once more when it stops, in the environments that held its rule until the stop rewrote them. It compares the first exposures of the variations the experiment weighs with what the weights ask for by Pearson's chi-square test: weights 5,000/5,000 and first exposures 5,200 and 4,800 give `X²` 16 and a p-value of about 0.000063. The check is skipped below 1,000 first exposures (`below_minimum_sample`) or when a variation expects fewer than 5 (`expected_below_5`). Below a p-value of 0.001 it raises an `srm` alert in the environment; above 0.01 it clears it; between the two the alert stays as it is.
 
-The check is skipped below 1,000 first exposures (`below_minimum_sample`) or when a variation expects fewer than 5 (`expected_below_5`), and then leaves any alert as it is. A variation weighed 0 expects no unit at all, so an experiment with one is never judged. Below a p-value of 0.001 it raises an `srm` alert in the environment; above 0.01 it clears it; between the two the alert stays as it is, so it does not flap while the p-value hovers around a threshold. Growing the traffic allocation never moves an included unit, so it raises nothing.
-
-`GET …/exposures?environment=` answers the latest check in `sample_ratio` (`n`, `chi_square`, `p_value`, `skipped_reason`, `active`, `checked_at`), null before the first. A stopped experiment keeps the check its stop took and is never checked again, though its late exposures are still counted.
+`GET …/exposures?environment=` answers the latest check in `sample_ratio` (`n`, `chi_square`, `p_value`, `skipped_reason`, `active`, `checked_at`), null before the first. A stopped experiment keeps the check its stop took and is never checked again, though its late exposures are still counted. [The sample-ratio check](sample-ratio-check.md) has the statistic, the skip rules, the thresholds, a worked example and the SQL to reproduce it in a warehouse.
 
 ## Alerts
 
