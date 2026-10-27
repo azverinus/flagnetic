@@ -58,9 +58,11 @@ jobs:
         if: steps.tag.outputs.dir == 'sdks/flutter'
         with:
           channel: stable
+      # Removed from the index too: a tracked file missing from the working
+      # tree is a warning in the dry run below.
       - name: Use the released flagnetic
         if: steps.tag.outputs.dir == 'sdks/flutter'
-        run: rm sdks/flutter/pubspec_overrides.yaml
+        run: git rm -q sdks/flutter/pubspec_overrides.yaml
       - name: Version equals the tag
         working-directory: ${{ steps.tag.outputs.dir }}
         env:

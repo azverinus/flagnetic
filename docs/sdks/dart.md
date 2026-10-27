@@ -54,7 +54,7 @@ A client key's limits count per key and client address on each replica (see [cli
 
 - **Delivery and events**: every client-mode protocol scenario and degradation case against a mock server, on the VM for the device scenarios (foreground, background, the stream's jitter) and in Chrome for the page scenarios (visibility, the beacon on hide), the requests crossing origins; the [behaviour matrix](behaviour-matrix.md) shows which passed.
 - **Flutter**: widget tests of the scope, the builder, the lifecycle observer, the store and the Dev Tools screen in debug and release builds, on the VM and in Chrome; and the package against the `flagnetic` released on pub.dev as well as the working tree.
-- **Packages**: `dart pub publish --dry-run` and [pana](https://pub.dev/packages/pana) at full score on every pull request.
+- **Packages**: `dart pub publish --dry-run` without a warning and [pana](https://pub.dev/packages/pana) at full score on every pull request that changes the package; `flagnetic_flutter` is checked against the `flagnetic` released on pub.dev, so once `flagnetic` is on pub.dev.
 - **End to end**: on every pull request that changes `flagnetic`, against two replicas on one PostgreSQL brought up by [`flagnetic-e2e up`](../../e2e/README.md): the client reaches `fresh` and serves every seeded case with its client reason; a kill switch saved through one replica reaches four apps streaming from the other, twelve times over, within 5 seconds at the 99th percentile; the evaluates one change causes across twelve apps behind one address are recorded; the SDK appears in the inventory as `flagnetic-dart`; and it is refused once its key is revoked.
 
 To run the smoke yourself, with Docker running:

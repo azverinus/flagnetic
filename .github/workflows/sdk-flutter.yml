@@ -74,8 +74,10 @@ jobs:
           channel: stable
       - name: Resolve flagnetic from pub.dev
         if: steps.core.outputs.released == 'true'
+        # Removed from the index too: a tracked file missing from the
+        # working tree is a warning in the dry run below.
         run: |
-          rm pubspec_overrides.yaml
+          git rm -q pubspec_overrides.yaml
           flutter pub get
           flutter pub deps --style=compact | grep -E '^- flagnetic '
       - name: Analyze
