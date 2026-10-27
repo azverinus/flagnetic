@@ -30,7 +30,7 @@ The check computes nothing, and leaves any alert as it is, when:
 - `N` is below 1,000 (`below_minimum_sample`): a smaller sample is too noisy to judge a split;
 - some `Eᵢ` is below 5 (`expected_below_5`): the chi-square distribution no longer approximates `X²` well there.
 
-A variation weighed 0 expects no unit at all, so an experiment weighing one is always skipped as `expected_below_5`.
+A variation weighed 0 expects no unit at all, so an experiment weighing one is always skipped: as `below_minimum_sample` below 1,000 first exposures, as `expected_below_5` from then on.
 
 ## Alerts and hysteresis
 

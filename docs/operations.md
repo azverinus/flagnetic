@@ -260,7 +260,7 @@ SELECT gid, database, owner, prepared FROM pg_prepared_xacts ORDER BY prepared;
 
 End it with `SELECT pg_terminate_backend(<pid>)`, or `COMMIT PREPARED` or `ROLLBACK PREPARED` with its `gid`, once you know what it was doing. A session `idle in transaction` is the usual culprit, a console or migration tool left open; `idle_in_transaction_session_timeout` on the roles that connect by hand ends those by itself.
 
-A transaction held open for longer than the retention, while partitions it has not read are dropped, turns the lag into a [gap](#raw-events): the rollup's cursor is moved past the rows dropped and they are never counted.
+A transaction held open for longer than the retention turns the lag into a [gap](#raw-events): retention drops partitions holding rows the rollups have not read yet, records a gap for them, and they are never counted. The rollup's cursor still never passes the oldest transaction open, so whatever that transaction commits is read once it ends.
 
 ## Deleting a project
 
