@@ -215,9 +215,11 @@ export function ConfigurationEditor({
 
   /**
    * Reads the newer version a write met, and who saved it, for the banner;
-   * a failure to read it is explained where a refusal of Save is.
+   * a failure to read it is explained where a refusal of Save is. Before
+   * a proposal, which meets no version on its own, it reads whether there
+   * is a newer one, and goes on with onCurrent when there is none.
    */
-  const meetConflict = async (from: FlagConfiguration) => {
+  const meetConflict = async (from: FlagConfiguration, onCurrent?: () => void) => {
     let fresh: FlagConfiguration;
     try {
       fresh = await unwrap(
@@ -231,6 +233,10 @@ export function ConfigurationEditor({
           ? problemMessage(i18n, error)
           : i18n._(msg`The request was refused.`);
       setRefusal({ at: new Map(), rest: [message] });
+      return;
+    }
+    if (onCurrent && fresh.version === from.version) {
+      onCurrent();
       return;
     }
     const entries = await queryClient
@@ -286,7 +292,10 @@ export function ConfigurationEditor({
     setRefusal(undefined);
     if (issues.size > 0) return;
     setConflict(undefined);
-    if (proposes) setProposing(proposalOf(state));
+    // A change request names no version, so a draft is proposed only
+    // while it is based on the configuration as it is now: otherwise the
+    // proposal would quietly undo what someone saved meanwhile.
+    if (proposes) void meetConflict(state.base, () => setProposing(proposalOf(state)));
     else save.mutate({ sent: state });
   };
 

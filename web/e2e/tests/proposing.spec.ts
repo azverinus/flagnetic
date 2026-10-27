@@ -88,6 +88,16 @@ test.describe("proposing from the editors", () => {
     await choose(dmitri, "Fallthrough variation", "treatment");
     const bar = dmitri.getByRole("region", { name: "Unsaved changes" });
     await expect(bar.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
+
+    // A draft based on a version someone moved on from is not proposed
+    // over their change: the editor shows it first, as a save would.
+    await unprotectProduction(project);
+    await writeConfiguration(project, "checkout_copy", "production", () => ({
+      off_variation: "treatment",
+    }));
+    await protectProduction(project);
+    await bar.getByRole("button", { name: "Propose", exact: true }).click();
+    await dmitri.getByRole("button", { name: "Reload and reapply my draft" }).click();
     await bar.getByRole("button", { name: "Propose", exact: true }).click();
     await expect(dmitri.getByRole("dialog", { name: "Propose the change" })).toBeVisible();
     await expectNoSeriousViolations(dmitri, "the propose dialog");
@@ -179,12 +189,12 @@ test.describe("proposing from the editors", () => {
     await expect(page.getByRole("dialog", { name: "Propose the change" })).toContainText(
       "reverting its configuration to version 2 goes through a change request",
     );
+    await expectNoSeriousViolations(page, "the propose dialog of a revert");
     await propose(page, "Back to control");
     await expect(page.getByText("Reverts the configuration to version 2.")).toBeVisible();
     await expect(
       page.getByRole("list", { name: "Changes to the configuration" }).getByRole("listitem"),
     ).toHaveText(["Fallthrough variation changed from treatment to control."]);
-    await expectNoSeriousViolations(page, "a revert's change request");
     expect((await readConfiguration(project, "banner", "production")).fallthrough).toBe(
       "treatment",
     );
