@@ -1,0 +1,145 @@
+name: publish-dart
+
+# Publishes a released pub package from its tag: `flagnetic` from
+# sdks/dart/vX.Y.Z, `flagnetic_flutter` from sdks/flutter/vX.Y.Z. pub.dev
+# trusts this workflow, in the pub.dev environment, by its OIDC token, so no
+# pub.dev credential is stored anywhere. pub.dev accepts that token only from
+# a run started by a tag push or by workflow_dispatch on the tag, and tags
+# that release.yml creates start no workflow, so release.yml dispatches this
+# one on the tag it created. Run it by hand on a tag to publish again.
+#
+# pub.dev lets a package trust a workflow only once the package exists, so
+# while it is not on pub.dev the run stops at the dry run and keeps the
+# package's files as an artifact the maintainer publishes from by hand
+# (CONTRIBUTING.md).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-dart-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: check the package
+    runs-on: ubuntu-latest
+    outputs:
+      dir: ${{ steps.tag.outputs.dir }}
+      package: ${{ steps.tag.outputs.package }}
+      version: ${{ steps.tag.outputs.version }}
+      exists: ${{ steps.pub.outputs.exists }}
+    steps:
+      - name: The tag names the package and its version
+        id: tag
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          case "$REF" in
+            refs/tags/sdks/dart/v*) dir=sdks/dart package=flagnetic ;;
+            refs/tags/sdks/flutter/v*) dir=sdks/flutter package=flagnetic_flutter ;;
+            *) echo "run this workflow on a tag sdks/dart/vX.Y.Z or sdks/flutter/vX.Y.Z, not $REF" >&2; exit 1 ;;
+          esac
+          {
+            echo "dir=$dir"
+            echo "package=$package"
+            echo "version=${REF#refs/tags/"$dir"/v}"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+      - uses: dart-lang/setup-dart@v1
+        if: steps.tag.outputs.dir == 'sdks/dart'
+        with:
+          sdk: stable
+      # A Flutter package resolves and is scored with the Flutter SDK; the
+      # flagnetic it requires is on pub.dev before it is released.
+      - uses: subosito/flutter-action@v2
+        if: steps.tag.outputs.dir == 'sdks/flutter'
+        with:
+          channel: stable
+      # Removed from the index too: a tracked file missing from the working
+      # tree is a warning in the dry run below.
+      - name: Use the released flagnetic
+        if: steps.tag.outputs.dir == 'sdks/flutter'
+        run: git rm -q sdks/flutter/pubspec_overrides.yaml
+      - name: Version equals the tag
+        working-directory: ${{ steps.tag.outputs.dir }}
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          [[ "$(sed -n 's/^version: *//p' pubspec.yaml)" == "$VERSION" ]] || { echo "pubspec.yaml is not at $VERSION" >&2; exit 1; }
+          if [[ -f lib/src/client/options.dart ]]; then
+            dart pub get
+            FLAGNETIC_RELEASE_VERSION="$VERSION" dart test test/version_test.dart
+          fi
+      - name: Dry run and pana
+        run: .github/scripts/check-pub-package.sh --keep-changelog "${{ steps.tag.outputs.dir }}"
+      - name: Is the package on pub.dev
+        id: pub
+        env:
+          PACKAGE: ${{ steps.tag.outputs.package }}
+        run: |
+          status="$(curl -sS -o /dev/null -w '%{http_code}' "https://pub.dev/api/packages/$PACKAGE")"
+          case "$status" in
+            200) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
+            404) echo "exists=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "pub.dev answered $status" >&2; exit 1 ;;
+          esac
+      # The files `dart pub publish` sends, from a clean checkout of the tag.
+      - name: Package files
+        if: steps.pub.outputs.exists == 'false'
+        env:
+          DIR: ${{ steps.tag.outputs.dir }}
+          PACKAGE: ${{ steps.tag.outputs.package }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          git archive --format=tar.gz --prefix="$PACKAGE-$VERSION/" -o "$RUNNER_TEMP/$PACKAGE-$VERSION.tar.gz" \
+            "$GITHUB_REF:$DIR" ':(exclude)pubspec_overrides.yaml'
+      - uses: actions/upload-artifact@v7
+        if: steps.pub.outputs.exists == 'false'
+        with:
+          name: ${{ steps.tag.outputs.package }}-${{ steps.tag.outputs.version }}
+          path: ${{ runner.temp }}/${{ steps.tag.outputs.package }}-${{ steps.tag.outputs.version }}.tar.gz
+          retention-days: 30
+      - name: Hand-publish steps
+        if: steps.pub.outputs.exists == 'false'
+        env:
+          PACKAGE: ${{ steps.tag.outputs.package }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          {
+            echo "$PACKAGE is not on pub.dev yet, so nothing was published."
+            echo "Publish the artifact $PACKAGE-$VERSION by hand, then enable automated publishing (CONTRIBUTING.md)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: pub.dev (${{ needs.check.outputs.package }})
+    needs: check
+    if: needs.check.outputs.exists == 'true'
+    runs-on: ubuntu-latest
+    environment: pub.dev
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: ${{ needs.check.outputs.dir }}
+    steps:
+      - uses: actions/checkout@v7
+      # setup-dart exchanges the job's OIDC token for a pub.dev credential.
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - uses: subosito/flutter-action@v2
+        if: needs.check.outputs.dir == 'sdks/flutter'
+        with:
+          channel: stable
+      - name: Publish
+        env:
+          PACKAGE: ${{ needs.check.outputs.package }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          rm -f pubspec_overrides.yaml
+          dart pub publish --force
+          echo "Published $PACKAGE $VERSION to pub.dev." >> "$GITHUB_STEP_SUMMARY"

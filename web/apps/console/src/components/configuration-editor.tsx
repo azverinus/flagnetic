@@ -10,6 +10,7 @@ import {
   regenerateRolloutSalt,
   type Segment,
   type UnitType,
+  type Violation,
 } from "@flagnetic/api";
 import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -20,6 +21,7 @@ import { toast } from "sonner";
 
 import { ConflictBanner } from "@/components/conflict-banner";
 import { PrerequisitesSection } from "@/components/prerequisites-section";
+import { type Proposal, ProposeDialog } from "@/components/propose-dialog";
 import { RuleEditor } from "@/components/rule-editor";
 import { TesterPanel } from "@/components/tester-panel";
 import { ConfigurationDiff } from "@/components/structural-diff-view";
@@ -75,6 +77,11 @@ export type ConfigurationEditorProps = {
   overrides: ReactNode;
   /** Why the configuration cannot be edited here, when it cannot. */
   readOnly?: string;
+  /**
+   * Whether the draft is proposed as a change request instead of saved,
+   * as it is in a protected environment.
+   */
+  proposes?: boolean;
   /** The tester beside the editor, while it is open. */
   tester?: { onClose: () => void };
 };
@@ -95,7 +102,9 @@ type Refusal = { at: Map<string, string>; rest: string[] };
  * prerequisites, the rules and the fallthrough. The draft remembers the
  * version it is based on; Save replaces the configuration under that
  * version, and a save that meets a newer one shows who saved it and what
- * they changed, and reapplies the draft onto it or discards it.
+ * they changed, and reapplies the draft onto it or discards it. In a
+ * protected environment the draft is proposed for review instead, and a
+ * save refused because the environment became protected offers the same.
  */
 export function ConfigurationEditor({
   project,
@@ -105,6 +114,7 @@ export function ConfigurationEditor({
   declarations,
   overrides,
   readOnly,
+  proposes = false,
   tester,
 }: ConfigurationEditorProps) {
   const { i18n, t } = useLingui();
@@ -149,6 +159,7 @@ export function ConfigurationEditor({
   const [refusal, setRefusal] = useState<Refusal>();
   const [conflict, setConflict] = useState<Conflict>();
   const [salting, setSalting] = useState<RuleDraft>();
+  const [proposing, setProposing] = useState<Proposal>();
   // The card of the rule that served the tester's last result, marked
   // only while the tester is open.
   const [matched, setMatched] = useState<string>();
@@ -183,12 +194,32 @@ export function ConfigurationEditor({
   ]);
 
   const answered = useConfigurationAnswer(project, flag.key);
+  const placeViolations = (violations: readonly Violation[], sent: ConfigurationDraft) => {
+    const placed = placeRefusal(violations, sent);
+    setRefusal({
+      at: new Map(
+        [...placed.at].map(([key, violation]) => [
+          key,
+          configurationViolationMessage(i18n, violation),
+        ]),
+      ),
+      rest: placed.rest.map((violation) => configurationViolationMessage(i18n, violation)),
+    });
+  };
+  const proposalOf = (sent: EditorState): Proposal => ({
+    kind: "flag_configuration",
+    flag: flag.key,
+    environment: configuration.environment,
+    proposed: configurationPutOf(sent, types),
+  });
 
   /**
    * Reads the newer version a write met, and who saved it, for the banner;
-   * a failure to read it is explained where a refusal of Save is.
+   * a failure to read it is explained where a refusal of Save is. Before
+   * a proposal, which meets no version on its own, it reads whether there
+   * is a newer one, and goes on with onCurrent when there is none.
    */
-  const meetConflict = async (from: FlagConfiguration) => {
+  const meetConflict = async (from: FlagConfiguration, onCurrent?: () => void) => {
     let fresh: FlagConfiguration;
     try {
       fresh = await unwrap(
@@ -202,6 +233,10 @@ export function ConfigurationEditor({
           ? problemMessage(i18n, error)
           : i18n._(msg`The request was refused.`);
       setRefusal({ at: new Map(), rest: [message] });
+      return;
+    }
+    if (onCurrent && fresh.version === from.version) {
+      onCurrent();
       return;
     }
     const entries = await queryClient
@@ -237,17 +272,15 @@ export function ConfigurationEditor({
         await meetConflict(sent.base);
         return;
       }
+      // The environment was protected since the page was read: the same
+      // draft can go for review instead.
+      if (error.code === "change_request_required") {
+        setRefusal({ at: new Map(), rest: [problemMessage(i18n, error)] });
+        setProposing(proposalOf(sent));
+        return;
+      }
       if (error.violations.length > 0) {
-        const placed = placeRefusal(error.violations, sent.draft);
-        setRefusal({
-          at: new Map(
-            [...placed.at].map(([key, violation]) => [
-              key,
-              configurationViolationMessage(i18n, violation),
-            ]),
-          ),
-          rest: placed.rest.map((violation) => configurationViolationMessage(i18n, violation)),
-        });
+        placeViolations(error.violations, sent.draft);
         return;
       }
       setRefusal({ at: new Map(), rest: [problemMessage(i18n, error)] });
@@ -259,7 +292,11 @@ export function ConfigurationEditor({
     setRefusal(undefined);
     if (issues.size > 0) return;
     setConflict(undefined);
-    save.mutate({ sent: state });
+    // A change request names no version, so a draft is proposed only
+    // while it is based on the configuration as it is now: otherwise the
+    // proposal would quietly undo what someone saved meanwhile.
+    if (proposes) void meetConflict(state.base, () => setProposing(proposalOf(state)));
+    else save.mutate({ sent: state });
   };
 
   const regenerate = useMutation({
@@ -403,7 +440,11 @@ export function ConfigurationEditor({
       {checked && issues.size > 0 ? (
         <p role="alert" className="flex items-start gap-2 text-sm">
           <CircleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
-          <Trans>Fix what is marked above before saving.</Trans>
+          {proposes ? (
+            <Trans>Fix what is marked above before proposing.</Trans>
+          ) : (
+            <Trans>Fix what is marked above before saving.</Trans>
+          )}
         </p>
       ) : null}
       {refusal && refusal.rest.length > 0 ? (
@@ -425,9 +466,26 @@ export function ConfigurationEditor({
           setChecked(false);
         }}
         onSave={submit}
+        saveLabel={proposes ? <Trans>Propose</Trans> : undefined}
         pending={save.isPending}
         keeps={onlyTesterToggled}
       />
+      <ProposeDialog
+        project={project}
+        proposal={proposing}
+        onOpenChange={(open) => !open && setProposing(undefined)}
+        onRefusedProposal={(violations) => placeViolations(violations, draft)}
+        onProposed={() => {
+          setProposing(undefined);
+          setState({ base: configuration, draft: configurationDraft(configuration, types) });
+          setRefusal(undefined);
+          setChecked(false);
+        }}
+      >
+        <p className="text-sm">
+          <Trans>The configuration in {name}, as drafted here, is proposed whole.</Trans>
+        </p>
+      </ProposeDialog>
       {tester ? (
         <TesterPanel
           project={project}

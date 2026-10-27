@@ -128,6 +128,20 @@ RubyGems accepts a publisher for a gem that does not exist yet, so the first ver
 3. Merge the release pull request. The first push creates the gem and turns the pending publisher into its trusted publisher.
 4. Once it has, check the gem's trusted publishers on rubygems.org and that no API key with push rights is scoped to it; both gemspecs require multi-factor authentication for any push made by hand.
 
+### The Dart and Flutter SDK
+
+The pub.dev packages `flagnetic` in `sdks/dart` and `flagnetic_flutter` in `sdks/flutter` are release-please components of their own, tagged `sdks/dart/vX.Y.Z` and `sdks/flutter/vX.Y.Z`; use the scopes `sdk-dart` and `sdk-flutter`. release-please keeps `version` in `pubspec.yaml` and, for `flagnetic`, `sdkVersion` in `lib/src/client/options.dart` at the release's version. `flagnetic_flutter` requires the released `flagnetic` by version and resolves the working tree only through `pubspec_overrides.yaml`, which is never published, so release `flagnetic` first, let Dependabot raise the requirement, then release `flagnetic_flutter`.
+
+pub.dev accepts a publish from GitHub Actions only for a run started by a tag push or by `workflow_dispatch` on the tag, and the tags release-please creates start no workflow. So when a release pull request is merged, the `pub.dev (dispatch)` job of `release.yml` dispatches `publish-dart.yml` on the tag. That workflow checks that the version is the tag's, runs `dart pub publish --dry-run` and pana at full score, and publishes through [automated publishing](https://dart.dev/tools/pub/automated-publishing): pub.dev accepts the job's OIDC token, so no pub.dev credential is stored. The publishing job runs in the GitHub environment `pub.dev`; give it the protection rules a publish should have. To publish a tag again, run `publish-dart.yml` by hand on that tag.
+
+pub.dev lets a package be published automatically only once it exists, so the first version of each package is published by hand:
+
+1. Merge the first release pull request of `sdks/dart`. While `flagnetic` is not on pub.dev, `publish-dart.yml` stops after its checks, says so in its summary and keeps the package's files as the artifact `flagnetic-<version>` for 30 days.
+2. Download the artifact, unpack it (`tar xzf flagnetic-<version>.tar.gz`) and check its contents.
+3. In the unpacked directory, from a Google account with two-factor authentication, run `dart pub publish`.
+4. On pub.dev, in the package's Admin tab, enable automated publishing from GitHub Actions: repository `azverinus/flagnetic`, tag pattern `sdks/dart/v{{version}}`, publishing from `workflow_dispatch` events enabled, environment `pub.dev` required. Move the package to a verified publisher if you have one.
+5. Once Dependabot has raised `flagnetic_flutter`'s requirement and `flagnetic_flutter`'s first release pull request is merged, do the same for `flagnetic_flutter` (artifact `flagnetic_flutter-<version>`, tag pattern `sdks/flutter/v{{version}}`), publishing with `flutter pub publish`.
+
 ## Licensing
 
 Flagnetic is licensed under [Apache-2.0](LICENSE). Contributions are accepted under the same license (inbound = outbound), certified by the sign-off above. There is no CLA.

@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/i18n/format";
 import { changeRequestKindName, diffBasis } from "@/lib/change-requests";
 import { ApiError } from "@/lib/errors";
-import { changeRequestQuery, environmentsQuery, flagQuery } from "@/lib/queries";
+import { changeRequestQuery, environmentsQuery, flagQuery, segmentQuery } from "@/lib/queries";
 
 export const Route = createFileRoute(
   "/_signed-in/projects/$project/change-requests/$changeRequest",
@@ -106,12 +106,25 @@ function ChangeRequestPage({
     ...flagQuery(project, changeRequest.flag ?? ""),
     enabled: changeRequest.flag !== undefined,
   });
+  const segment = useQuery({
+    ...segmentQuery(project, changeRequest.segment ?? ""),
+    enabled: changeRequest.segment !== undefined,
+  });
   const environments = useQuery(environmentsQuery(project));
   const environmentName = (key: string) =>
     environments.data?.find((environment) => environment.key === key)?.name ?? key;
-  const current = flag.data?.environments.find(
-    (configuration) => configuration.environment === changeRequest.environment,
-  );
+  // What the change request would change as it is now: the segment of a
+  // segment's definition, the flag of a flag's, otherwise the
+  // environment's configuration.
+  const subject = changeRequest.segment !== undefined ? segment : flag;
+  const current =
+    changeRequest.segment !== undefined
+      ? segment.data
+      : changeRequest.kind === "definition"
+        ? flag.data
+        : flag.data?.environments.find(
+            (configuration) => configuration.environment === changeRequest.environment,
+          );
   const { state, author, approval, rejection, applied_at, applied_by } = changeRequest;
   const waiting = state === "draft" || state === "open" || state === "approved";
   const baseMoved =
@@ -140,12 +153,12 @@ function ChangeRequestPage({
           <TriangleAlertIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
           {state === "draft" ? (
             <Trans>
-              The configuration changed after this change request was based on it. Rebase it onto
-              the current configuration before opening it.
+              What this change request was based on changed after it was written. Rebase it onto the
+              current version before opening it.
             </Trans>
           ) : (
             <Trans>
-              The configuration changed after this change request was based on it; it can no longer
+              What this change request was based on changed after it was written; it can no longer
               be approved or applied. Copy it to propose it again.
             </Trans>
           )}
@@ -169,6 +182,17 @@ function ChangeRequestPage({
               className="font-mono text-xs hover:underline"
             >
               {changeRequest.flag}
+            </Link>
+          </Fact>
+        ) : null}
+        {changeRequest.segment ? (
+          <Fact term={<Trans>Segment</Trans>}>
+            <Link
+              to="/projects/$project/segments/$segment"
+              params={{ project, segment: changeRequest.segment }}
+              className="font-mono text-xs hover:underline"
+            >
+              {changeRequest.segment}
             </Link>
           </Fact>
         ) : null}
@@ -227,9 +251,9 @@ function ChangeRequestPage({
         <h2 id="changes" className="text-base font-semibold">
           <Trans>Changes</Trans>
         </h2>
-        {flag.isError ? (
-          <QueryError error={flag.error} onRetry={() => void flag.refetch()} />
-        ) : flag.isPending && changeRequest.flag !== undefined ? (
+        {subject.isError ? (
+          <QueryError error={subject.error} onRetry={() => void subject.refetch()} />
+        ) : subject.isPending && subject.fetchStatus !== "idle" ? (
           <Skeleton className="h-16 w-full" />
         ) : (
           <ChangeRequestDiff changeRequest={changeRequest} current={current} />

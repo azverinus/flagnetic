@@ -1,6 +1,7 @@
 // The VM side of a browser test: mock servers that a page of another
 // origin calls, driven over the test's channel, plus the protocol fixtures
-// a browser cannot read from the checkout. remote_server.dart is the
+// a browser cannot read from the checkout, and the scenario report it
+// cannot write. remote_server.dart is the
 // browser side.
 import 'dart:async';
 import 'dart:convert';
@@ -9,6 +10,7 @@ import 'dart:io';
 import 'package:stream_channel/stream_channel.dart';
 
 import 'mock_server.dart';
+import 'scenario_report.dart';
 
 /// Sends every protocol fixture, then answers each command with
 /// `{id, result}` or `{id, error}`.
@@ -92,6 +94,8 @@ Future<void> hybridMain(StreamChannel<Object?> channel, Object? message) async {
         );
       case 'close':
         await servers.remove(command['server'])!.close();
+      case 'report':
+        reportPassed((command['passed']! as List<Object?>).cast());
     }
     return null;
   }

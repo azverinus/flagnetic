@@ -1,40 +1,95 @@
 import type {
   ChangeRequest,
+  Flag,
   FlagConfiguration,
   PatchOperation,
   ProposedConfiguration,
+  ProposedFlagDefinition,
+  ProposedSegmentDefinition,
+  Segment,
 } from "@flagnetic/api";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { ReactNode } from "react";
 
-import { ConfigurationDiff } from "@/components/structural-diff-view";
+import { ConfigurationDiff, DefinitionDiff, SegmentDiff } from "@/components/structural-diff-view";
 import { diffBasis, type PatchChange, patchChanges } from "@/lib/change-requests";
-import { diffConfigurations } from "@/lib/structural-diff";
+import { diffConfigurations, diffDefinitions, diffSegments } from "@/lib/structural-diff";
+
+/** What a change request proposes for: a configuration, a flag's definition or a segment's. */
+type Subject = "configuration" | "definition" | "segment";
+
+function subjectOf(changeRequest: ChangeRequest): Subject {
+  if (changeRequest.kind !== "definition") return "configuration";
+  return changeRequest.segment === undefined ? "definition" : "segment";
+}
 
 /**
  * What a change request would change. While it waits on the version of
- * the configuration it was based on, that configuration is compared with
- * what it proposes, item by item; otherwise only its patch is left, each
- * operation said by what it touches and what it writes.
+ * the configuration, the flag or the segment it was based on, that is
+ * compared with what it proposes, item by item; otherwise only its patch
+ * is left, each operation said by what it touches and what it writes. A
+ * revert names the version it returns to first.
  */
 export function ChangeRequestDiff({
   changeRequest,
   current,
 }: {
   changeRequest: ChangeRequest;
-  /** The environment's configuration as it is now, once read. */
-  current: FlagConfiguration | undefined;
+  /**
+   * What it would change as it is now, once read: the environment's
+   * configuration, the flag of a flag's definition, or the segment.
+   */
+  current: FlagConfiguration | Flag | Segment | undefined;
 }) {
-  if (
-    changeRequest.kind === "flag_configuration" &&
-    current !== undefined &&
-    diffBasis(changeRequest, current) === "current"
-  ) {
-    // A configuration's change request proposes a configuration.
-    const proposed = changeRequest.proposed as ProposedConfiguration;
-    return <ConfigurationDiff changes={diffConfigurations(current, proposed)} />;
+  const revertTo = changeRequest.revert_to;
+  return (
+    <div className="flex flex-col gap-3">
+      {revertTo !== null ? (
+        <p className="text-sm">
+          <Trans>Reverts the configuration to version {revertTo}.</Trans>
+        </p>
+      ) : null}
+      <Changes changeRequest={changeRequest} current={current} />
+    </div>
+  );
+}
+
+/** A member's identifier stands for them where no name is at hand; a proposal never changes the owner. */
+const asIs = (member: string) => member;
+
+function Changes({
+  changeRequest,
+  current,
+}: {
+  changeRequest: ChangeRequest;
+  current: FlagConfiguration | Flag | Segment | undefined;
+}) {
+  const subject = subjectOf(changeRequest);
+  if (current === undefined || diffBasis(changeRequest, current) !== "current") {
+    return <PatchDiff diff={changeRequest.diff} subject={subject} />;
   }
-  return <PatchDiff diff={changeRequest.diff} />;
+  // What a change request proposes follows its kind and the entity it
+  // names, and so does what it is compared with.
+  switch (subject) {
+    case "configuration": {
+      const proposed = changeRequest.proposed as ProposedConfiguration;
+      return (
+        <ConfigurationDiff changes={diffConfigurations(current as FlagConfiguration, proposed)} />
+      );
+    }
+    case "definition": {
+      const flag = current as Flag;
+      const proposed = changeRequest.proposed as ProposedFlagDefinition;
+      return (
+        <DefinitionDiff changes={diffDefinitions(flag, { ...flag, ...proposed })} nameOf={asIs} />
+      );
+    }
+    case "segment": {
+      const segment = current as Segment;
+      const proposed = changeRequest.proposed as ProposedSegmentDefinition;
+      return <SegmentDiff changes={diffSegments(segment, { ...segment, ...proposed })} />;
+    }
+  }
 }
 
 function Value({ children }: { children: ReactNode }) {
@@ -49,8 +104,19 @@ function json(value: unknown): string {
 }
 
 /** A change request's patch, one sentence per operation. */
-export function PatchDiff({ diff }: { diff: readonly PatchOperation[] }) {
+export function PatchDiff({
+  diff,
+  subject = "configuration",
+}: {
+  diff: readonly PatchOperation[];
+  subject?: Subject;
+}) {
   const { t } = useLingui();
+  const label = {
+    configuration: t`Changes to the configuration`,
+    definition: t`Changes to the definition`,
+    segment: t`Changes to the segment`,
+  }[subject];
   const changes = patchChanges(diff);
   if (changes.length === 0) {
     return (
@@ -60,10 +126,7 @@ export function PatchDiff({ diff }: { diff: readonly PatchOperation[] }) {
     );
   }
   return (
-    <ul
-      aria-label={t`Changes to the configuration`}
-      className="flex list-disc flex-col gap-1.5 pl-5 text-sm"
-    >
+    <ul aria-label={label} className="flex list-disc flex-col gap-1.5 pl-5 text-sm">
       {changes.map((change, index) => (
         <PatchItem key={index} change={change} />
       ))}
@@ -82,16 +145,21 @@ function useWhere(change: PatchChange): ReactNode {
       return t`Off variation`;
     case "fallthrough":
       return t`Fallthrough variation`;
+    case "automatic_exposure":
+      return t`Automatic exposure`;
+    case "private":
+      return t`Private`;
     case "other":
       return <Value>{target.path}</Value>;
   }
   const { position, field } = target;
-  const item =
-    target.kind === "rule"
-      ? t`Rule ${position}`
-      : target.kind === "override"
-        ? t`Override ${position}`
-        : t`Prerequisite ${position}`;
+  const item = {
+    rule: t`Rule ${position}`,
+    override: t`Override ${position}`,
+    prerequisite: t`Prerequisite ${position}`,
+    variation: t`Variation ${position}`,
+    condition: t`Condition ${position}`,
+  }[target.kind];
   return field === "" ? (
     item
   ) : (
@@ -103,8 +171,25 @@ function useWhere(change: PatchChange): ReactNode {
 
 function PatchItem({ change }: { change: PatchChange }) {
   const where = useWhere(change);
-  if (change.target.kind === "on" && typeof change.value === "boolean") {
-    return <li>{change.value ? <Trans>Switched on.</Trans> : <Trans>Switched off.</Trans>}</li>;
+  if (typeof change.value === "boolean" && change.op === "replace") {
+    switch (change.target.kind) {
+      case "on":
+        return <li>{change.value ? <Trans>Switched on.</Trans> : <Trans>Switched off.</Trans>}</li>;
+      case "automatic_exposure":
+        return (
+          <li>
+            {change.value ? (
+              <Trans>Automatic exposure switched on.</Trans>
+            ) : (
+              <Trans>Automatic exposure switched off.</Trans>
+            )}
+          </li>
+        );
+      case "private":
+        return (
+          <li>{change.value ? <Trans>Made private.</Trans> : <Trans>No longer private.</Trans>}</li>
+        );
+    }
   }
   const value = <Value>{json(change.value)}</Value>;
   switch (change.op) {

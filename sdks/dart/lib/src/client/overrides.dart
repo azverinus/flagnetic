@@ -32,8 +32,7 @@ abstract interface class OverrideHost {
 /// option and are refused in a protected environment. Obtain this through
 /// the client's `overrides`.
 final class LocalOverrides {
-  /// The local overrides of [host]; a client hands these out.
-  LocalOverrides.of(this._host);
+  LocalOverrides._(this._host);
 
   final OverrideHost _host;
 
@@ -99,6 +98,11 @@ final class LocalOverrides {
       key: value.value,
   };
 }
+
+/// The local overrides of [host]; a client hands these out. A function
+/// rather than a constructor, so that the package exports the class without
+/// a way to build one around a host of the caller's.
+LocalOverrides localOverridesOf(OverrideHost host) => LocalOverrides._(host);
 
 /// Drops every local override of [host] when [protectedEnvironment] holds,
 /// logging `override_refused` for each, and returns the dropped keys

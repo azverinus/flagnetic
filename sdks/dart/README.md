@@ -2,6 +2,13 @@
 
 Feature flags and experiments for Dart and Flutter apps, served by a self-hosted [Flagnetic](https://github.com/azverinus/flagnetic) instance. This package is the client mode: it runs on the Dart VM and has no dependency, Flutter included. A Flutter app adds [`flagnetic_flutter`](https://pub.dev/packages/flagnetic_flutter) for widgets that rebuild when a flag changes, the app lifecycle, a store on every platform and a Dev Tools screen.
 
+```bash
+dart pub add flagnetic            # Dart without Flutter
+flutter pub add flagnetic_flutter # a Flutter app: it brings this package
+```
+
+Requires Dart 3.9 or newer, on iOS, Android, desktop and the web, with no dependency. Supported versions follow Flutter's stable releases of about the last twelve months and the Dart each ships; a version that leaves upstream support is dropped in a minor release. There is no OpenFeature provider for Dart yet.
+
 A client posts its context to remote evaluation with a **client key** and serves every flag from memory, so getters are synchronous and never throw. The values it last received are kept in a store on the device, so a cold start without a network serves them. A server key cannot build a client: it must never ship in an app.
 
 ```dart
@@ -50,6 +57,13 @@ Exposures and aliases are queued in the store, sent in batches and flushed every
 ## Staying fresh
 
 On iOS, Android and desktop the client holds the ruleset stream while the app is in the foreground and closes it in the background. When a change is announced it waits a random 0–3 seconds before evaluating, so the apps open at a kill switch do not all ask at once. A kill switch therefore reaches an open app within 5 seconds at the 99th percentile, and a backgrounded app at its next `foreground()`, which refetches unless the last attempt was less than 10 seconds ago. Pass `ClientOptions(sse: false)` to hold no connection: values then stay fresh within the 5 minute poll and at every `foreground()`. On the web the stream is opt-in (`sse: true`).
+
+| The app | A change reaches it |
+|---|---|
+| in the foreground, holding the stream (the default on iOS, Android and desktop) | within 5 seconds at the 99th percentile |
+| in the background | at its next `foreground()` |
+| with `sse: false` | within 5 minutes, and at every `foreground()` |
+| on the web without the stream | within 5 minutes, and when the page is shown again or its network comes back |
 
 ## On the web
 

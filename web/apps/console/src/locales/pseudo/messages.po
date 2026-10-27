@@ -188,6 +188,18 @@ msgstr ""
 msgid "{name} is not signed in anywhere."
 msgstr ""
 
+#: src/components/flag-history.tsx
+msgid "{name} is protected, so reverting its configuration to version {proposedVersion} goes through a change request. What it proposes is that version, as it was; nobody edits it."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "{name} is protected: switching {key} off there goes through a change request."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "{name} is protected: switching {key} on there goes through a change request."
+msgstr ""
+
 #: src/components/member-actions.tsx
 msgid "{name} is reactivated."
 msgstr ""
@@ -635,6 +647,14 @@ msgstr ""
 msgid "An attribute's type is fixed once it is declared."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/segments/$segment.tsx
+msgid "An environment is protected, so the conditions and whether the segment is private are proposed for review; they apply to every environment once approved. Its name and description, when edited, are saved at once."
+msgstr ""
+
+#: src/components/flag-definition-sheet.tsx
+msgid "An environment is protected, so the variations and automatic exposure are proposed for review; they apply to every environment once approved. The other fields edited here are saved at once."
+msgstr ""
+
 #: src/lib/experiments.ts
 msgid "An experiment has at most 50 tags."
 msgstr ""
@@ -762,6 +782,10 @@ msgstr ""
 
 #: src/components/change-request-actions.tsx
 msgid "Apply"
+msgstr ""
+
+#: src/components/propose-dialog.tsx
+msgid "Apply at"
 msgstr ""
 
 #: src/components/audit-log.tsx
@@ -942,14 +966,17 @@ msgstr ""
 msgid "Author"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/flag-definition-sheet.tsx
 msgid "Automatic exposure"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "Automatic exposure switched off."
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "Automatic exposure switched on."
 msgstr ""
@@ -1090,6 +1117,7 @@ msgstr ""
 msgid "Changes to the configuration"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "Changes to the definition"
 msgstr ""
@@ -1098,6 +1126,7 @@ msgstr ""
 msgid "Changes to the experiment"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "Changes to the segment"
 msgstr ""
@@ -1134,6 +1163,10 @@ msgstr ""
 msgid "Choose a key no other experiment has."
 msgstr ""
 
+#: src/lib/problem-messages.ts
+msgid "Choose a later time: the server needs some lead to apply it."
+msgstr ""
+
 #: src/components/grant-form.tsx
 msgid "Choose a member"
 msgstr ""
@@ -1165,6 +1198,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Choose a stronger password."
+msgstr ""
+
+#: src/lib/problem-messages.ts
+msgid "Choose a time at most a year ahead."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -1336,6 +1373,7 @@ msgstr ""
 msgid "Compare environments"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/condition-row.tsx
 msgid "Condition {position}"
 msgstr ""
@@ -1619,6 +1657,7 @@ msgstr ""
 
 #: src/components/change-request-actions.tsx
 #: src/components/flag-definition-sheet.tsx
+#: src/components/propose-dialog.tsx
 #: src/components/segment-fields.tsx
 #: src/components/variations-editor.tsx
 #: src/routes/_signed-in/admin/projects.tsx
@@ -1850,6 +1889,7 @@ msgid "Enter a scheme, a host and an optional port, such as https://app.example.
 msgstr ""
 
 #: src/components/change-request-actions.tsx
+#: src/components/propose-dialog.tsx
 msgid "Enter a title."
 msgstr ""
 
@@ -2202,6 +2242,10 @@ msgstr ""
 #: src/components/discovered-attributes.tsx
 #: src/components/sdk-inventory.tsx
 msgid "First seen"
+msgstr ""
+
+#: src/components/configuration-editor.tsx
+msgid "Fix what is marked above before proposing."
 msgstr ""
 
 #: src/components/configuration-editor.tsx
@@ -2576,6 +2620,10 @@ msgstr ""
 msgid "It has no hypothesis."
 msgstr ""
 
+#: src/components/propose-dialog.tsx
+msgid "It is opened for review at once. Once a member who may approve change requests approves it, it is applied by hand or at the time given."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "It is still in use by {references}."
 msgstr ""
@@ -2771,6 +2819,7 @@ msgstr ""
 msgid "Made an instance admin"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "Made private."
 msgstr ""
@@ -3105,6 +3154,7 @@ msgstr ""
 msgid "No longer an instance admin"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/structural-diff-view.tsx
 msgid "No longer private."
 msgstr ""
@@ -3405,6 +3455,10 @@ msgstr ""
 msgid "Operator (condition {position})"
 msgstr ""
 
+#: src/components/propose-dialog.tsx
+msgid "Optional, in your time zone: once approved, it is applied then. Left empty, it is applied by hand."
+msgstr ""
+
 #: src/components/change-request-actions.tsx
 msgid "Optional; the author and the audit log see it."
 msgstr ""
@@ -3611,6 +3665,7 @@ msgstr ""
 msgid "Previous"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
 #: src/components/segment-fields.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Private"
@@ -3668,8 +3723,17 @@ msgstr ""
 msgid "Projects"
 msgstr ""
 
+#: src/components/configuration-editor.tsx
+#: src/components/propose-dialog.tsx
+msgid "Propose"
+msgstr ""
+
 #: src/lib/access-names.ts
 msgid "propose changes as change requests"
+msgstr ""
+
+#: src/components/propose-dialog.tsx
+msgid "Propose the change"
 msgstr ""
 
 #: src/lib/access-names.ts
@@ -3920,6 +3984,10 @@ msgstr ""
 
 #: src/components/flag-history.tsx
 msgid "Revert to version {version}"
+msgstr ""
+
+#: src/components/change-request-diff.tsx
+msgid "Reverts the configuration to version {revertTo}."
 msgstr ""
 
 #: src/components/token-list.tsx
@@ -4179,6 +4247,7 @@ msgstr ""
 
 #. A kind of entity in the audit log.
 #: src/lib/audit.ts
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
 msgid "Segment"
 msgstr ""
@@ -4629,6 +4698,7 @@ msgid "The change request is cancelled."
 msgstr ""
 
 #: src/components/change-request-actions.tsx
+#: src/components/propose-dialog.tsx
 msgid "The change request is open for review."
 msgstr ""
 
@@ -4646,14 +4716,6 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "The change request's state no longer allows this."
-msgstr ""
-
-#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
-msgid "The configuration changed after this change request was based on it; it can no longer be approved or applied. Copy it to propose it again."
-msgstr ""
-
-#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
-msgid "The configuration changed after this change request was based on it. Rebase it onto the current configuration before opening it."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -4674,6 +4736,10 @@ msgstr ""
 
 #: src/components/configuration-editor.tsx
 msgid "The configuration in {name} is saved."
+msgstr ""
+
+#: src/components/configuration-editor.tsx
+msgid "The configuration in {name}, as drafted here, is proposed whole."
 msgstr ""
 
 #: src/components/flag-history.tsx
@@ -4742,6 +4808,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "The environment already has 10 active keys of this kind. Revoke one, or wait for a rotated one to end, first."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+msgid "The environment is protected: changes to its configuration are proposed as change requests and go live once approved and applied."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -5381,6 +5451,7 @@ msgid "Times seen"
 msgstr ""
 
 #: src/components/change-request-actions.tsx
+#: src/components/propose-dialog.tsx
 msgid "Title"
 msgstr ""
 
@@ -5626,6 +5697,10 @@ msgstr ""
 msgid "Variation {n}"
 msgstr ""
 
+#: src/components/change-request-diff.tsx
+msgid "Variation {position}"
+msgstr ""
+
 #: src/components/structural-diff-view.tsx
 msgid "Variation <0>{key}</0> added, serving <1/>."
 msgstr ""
@@ -5748,6 +5823,14 @@ msgstr ""
 msgid "What the project is called and what it is for."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "What this change request was based on changed after it was written; it can no longer be approved or applied. Copy it to propose it again."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
+msgid "What this change request was based on changed after it was written. Rebase it onto the current version before opening it."
+msgstr ""
+
 #: src/components/sdk-keys.tsx
 msgid "What uses the key, to tell it apart later."
 msgstr ""
@@ -5789,6 +5872,7 @@ msgid "Whose units are split: users, accounts, devices."
 msgstr ""
 
 #: src/components/change-request-actions.tsx
+#: src/components/propose-dialog.tsx
 msgid "Why the change is needed, for whoever reviews it. Optional."
 msgstr ""
 

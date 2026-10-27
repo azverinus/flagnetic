@@ -519,7 +519,7 @@ jobs:
   # every run that is not a pull request.
   sdk-e2e:
     name: SDK end to end
-    needs: changes
+    needs: [changes, dart-changes]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -541,6 +541,7 @@ jobs:
       RUBY_SMOKE: ${{ github.event_name != 'pull_request' || needs.changes.outputs.ruby == 'true' || startsWith(github.head_ref, 'release-please--') }}
       SDK_JS: ${{ github.event_name != 'pull_request' || needs.changes.outputs.sdk-js == 'true' || startsWith(github.head_ref, 'release-please--') }}
       SDK_PYTHON: ${{ github.event_name != 'pull_request' || needs.changes.outputs.python == 'true' || startsWith(github.head_ref, 'release-please--') }}
+      SDK_DART: ${{ github.event_name != 'pull_request' || needs.dart-changes.outputs.dart == 'true' }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -661,8 +662,34 @@ jobs:
           cd sdks/python
           uv sync --locked --python "$(command -v python)"
           uv run pytest e2e || { cat "$RUNNER_TEMP/up-python.log"; exit 1; }
+      - uses: dart-lang/setup-dart@v1
+        if: env.SDK_DART == 'true'
+        with:
+          sdk: stable
+      # Its own `up`, seeded again with new keys: the smokes before it end
+      # by revoking theirs. The smoke writes its kill-switch percentile and
+      # the evaluate burst of one change to the job summary itself.
+      - name: Dart SDK smoke against two replicas
+        if: env.SDK_DART == 'true'
+        run: |
+          go build -o "$RUNNER_TEMP/flagnetic-e2e" ./e2e/cmd/flagnetic-e2e
+          export FLAGNETIC_E2E_SEED="$RUNNER_TEMP/seed-dart.json" FLAGNETIC_E2E_CMD="$RUNNER_TEMP/flagnetic-e2e"
+          export FLAGNETIC_E2E_LOGS="$RUNNER_TEMP/replicas-dart.log"
+          "$FLAGNETIC_E2E_CMD" up > "$RUNNER_TEMP/up-dart.log" 2>&1 &
+          up=$!
+          trap 'kill "$up"; wait "$up" || true' EXIT
+          for _ in $(seq 180); do
+            [[ -s "$FLAGNETIC_E2E_SEED" ]] && break
+            kill -0 "$up" 2>/dev/null || { cat "$RUNNER_TEMP/up-dart.log"; exit 1; }
+            sleep 1
+          done
+          [[ -s "$FLAGNETIC_E2E_SEED" ]] || { echo "no seed after 180 s"; cat "$RUNNER_TEMP/up-dart.log"; exit 1; }
+          cd sdks/dart
+          dart pub get
+          echo "Kill-switch propagation of the Dart client mode (target 5000 ms at the 99th percentile) and the evaluates of one change:" >> "$GITHUB_STEP_SUMMARY"
+          dart test -r expanded test/e2e_test.dart || { cat "$RUNNER_TEMP/up-dart.log"; exit 1; }
       - name: Keep the replicas' log
-        if: failure() && (env.SDK_JS == 'true' || env.SDK_PYTHON == 'true')
+        if: failure() && (env.SDK_JS == 'true' || env.SDK_PYTHON == 'true' || env.SDK_DART == 'true')
         uses: actions/upload-artifact@v7
         with:
           name: sdk-e2e-replicas
@@ -689,7 +716,7 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/dart/|conformance/|api/sdk\.yaml$|\.github/workflows/(sdk-dart|ci)\.yml$)'; then
+            grep -qE '^(sdks/dart/|conformance/|api/sdk\.yaml$|docs/sdks/(behaviour-matrix|compatibility)\.md$|\.github/scripts/(behaviour-matrix|check-pub-package)\.sh$|\.github/workflows/(sdk-dart|ci)\.yml$)'; then
             echo "dart=true" >> "$GITHUB_OUTPUT"
           else
             echo "dart=false" >> "$GITHUB_OUTPUT"
@@ -697,7 +724,7 @@ jobs:
           # The Flutter package resolves the Dart SDK from the working tree,
           # so a change to either one tests it.
           if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/dart/|sdks/flutter/|\.github/workflows/(sdk-flutter|ci)\.yml$)'; then
+            grep -qE '^(sdks/dart/|sdks/flutter/|\.github/scripts/check-pub-package\.sh$|\.github/workflows/(sdk-flutter|ci)\.yml$)'; then
             echo "flutter=true" >> "$GITHUB_OUTPUT"
           else
             echo "flutter=false" >> "$GITHUB_OUTPUT"

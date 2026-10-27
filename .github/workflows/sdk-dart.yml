@@ -2,7 +2,9 @@ name: sdk-dart
 
 # The Dart SDK: format, static analysis with infos fatal, and the unit and
 # protocol tests on the VM and on Chrome, on the oldest Dart that Flutter's
-# supported stable ships and on the current stable. Called from ci.yml.
+# supported stable ships and on the current stable; the protocol runner's
+# report compared with the Dart column of the behaviour matrix; and the
+# package checked as pub.dev will score it. Called from ci.yml.
 on:
   workflow_call:
 
@@ -33,11 +35,36 @@ jobs:
       - name: Analyze
         run: dart analyze --fatal-infos
       - name: Test
+        env:
+          FLAGNETIC_SCENARIO_REPORT: ${{ runner.temp }}/scenarios.json
         run: dart test
       # The same package compiled for the web: the browser transport and the
-      # client protocol runner against a mock server on another origin.
+      # client protocol runner against a mock server on another origin. Its
+      # page scenarios join the report of the run above.
       - name: Test on Chrome
+        env:
+          FLAGNETIC_SCENARIO_REPORT: ${{ runner.temp }}/scenarios.json
         run: dart test -p chrome
+      - name: Behaviour matrix
+        # The Dart column of docs/sdks/behaviour-matrix.md is what the
+        # protocol runner reports as passed on the VM and on Chrome.
+        if: matrix.sdk == 'stable'
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/behaviour-matrix.sh" Dart "$RUNNER_TEMP/scenarios.json"
+          git diff --exit-code -- "$GITHUB_WORKSPACE/docs/sdks/behaviour-matrix.md"
       - name: Test on Chrome as WebAssembly
         if: matrix.sdk == 'stable'
         run: dart test -p chrome -c dart2wasm
+
+  # What pub.dev will make of the package: `dart pub publish --dry-run`
+  # without a warning and pana at full score.
+  package:
+    name: dart package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Dry run and pana
+        run: .github/scripts/check-pub-package.sh sdks/dart

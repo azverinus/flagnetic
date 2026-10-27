@@ -46,6 +46,10 @@ final class OfflineSource {
 /// Whether the code was compiled for the web, where the stream is opt-in.
 const bool _isWeb = bool.fromEnvironment('dart.library.js_interop');
 
+/// [ClientOptions.sse] resolved: the explicit choice, else the platform's
+/// default. A function rather than a getter, so that only the client reads it.
+bool streamEnabled(ClientOptions options) => options.sse ?? !_isWeb;
+
 /// How a client behaves. Every duration is configurable so that a test can
 /// run a whole scenario in milliseconds.
 final class ClientOptions {
@@ -206,9 +210,6 @@ final class ClientOptions {
   /// The time the minimum refetch gap is measured against; `DateTime.now`
   /// when null.
   final DateTime Function()? clock;
-
-  /// [sse] resolved: the explicit choice, else the platform's default.
-  bool get streamEnabled => sse ?? !_isWeb;
 
   /// The first reconnect bound after a stream error; each further failure
   /// doubles it up to [streamBackoffCap], and the attempt waits a random
