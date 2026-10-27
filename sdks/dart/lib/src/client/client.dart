@@ -227,7 +227,7 @@ final class FlagneticClient {
       visible: foreground,
       online: foreground,
     );
-    if (!_options.streamEnabled) {
+    if (!streamEnabled(_options)) {
       _trigger(_Trigger.start);
       return;
     }
@@ -318,7 +318,7 @@ final class FlagneticClient {
         'ClientOptions(allowOverrides: true)',
       );
     }
-    return LocalOverrides.of(_ClientOverrides(this));
+    return localOverridesOf(_ClientOverrides(this));
   }
 
   /// Every flag the held values carry, local overrides applied, for a Dev
