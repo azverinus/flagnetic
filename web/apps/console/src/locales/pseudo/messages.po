@@ -111,7 +111,7 @@ msgstr ""
 msgid "{flag} serves {variation}"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "{from} to {to}"
 msgstr ""
 
@@ -1583,9 +1583,9 @@ msgstr ""
 msgid "Date"
 msgstr ""
 
+#: src/components/event-volume.tsx
 #: src/components/experiment-exposures.tsx
 #: src/components/flag-evaluations.tsx
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Day (UTC)"
 msgstr ""
 
@@ -1800,7 +1800,7 @@ msgstr ""
 msgid "Drag rule {position}"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Dropped"
 msgstr ""
 
@@ -2106,19 +2106,20 @@ msgstr ""
 msgid "Event volume"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Events"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Events lost"
 msgstr ""
 
+#: src/components/event-volume.tsx
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Events per day"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Events retention dropped before a rollup had read them: they are missing from the counts above and from everything read from them, such as evaluations and exposures. A rollup reads every project's events, so a gap counts the events of every project of the instance."
 msgstr ""
 
@@ -2451,11 +2452,11 @@ msgstr ""
 msgid "From"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Gap"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Gaps"
 msgstr ""
 
@@ -3258,7 +3259,7 @@ msgstr ""
 msgid "No evaluation in these days."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "No event was lost in these days."
 msgstr ""
 
@@ -3984,7 +3985,7 @@ msgstr ""
 msgid "Rebase the change request"
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Received"
 msgstr ""
 
@@ -5735,7 +5736,7 @@ msgstr ""
 msgid "Too many."
 msgstr ""
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Total"
 msgstr ""
 

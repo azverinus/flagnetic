@@ -111,7 +111,7 @@ msgstr "{firstExposed}; подсчитано до <0/>."
 msgid "{flag} serves {variation}"
 msgstr "{flag} отдаёт {variation}"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "{from} to {to}"
 msgstr "с {from} по {to}"
 
@@ -1583,9 +1583,9 @@ msgstr "Тёмная"
 msgid "Date"
 msgstr "Дата"
 
+#: src/components/event-volume.tsx
 #: src/components/experiment-exposures.tsx
 #: src/components/flag-evaluations.tsx
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Day (UTC)"
 msgstr "День (UTC)"
 
@@ -1800,7 +1800,7 @@ msgstr "Черновик"
 msgid "Drag rule {position}"
 msgstr "Перетащить правило {position}"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Dropped"
 msgstr "Удалены"
 
@@ -2106,19 +2106,20 @@ msgstr "Вычисления по дням"
 msgid "Event volume"
 msgstr "Объём событий"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Events"
 msgstr "События"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Events lost"
 msgstr "Потеряно событий"
 
+#: src/components/event-volume.tsx
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Events per day"
 msgstr "События по дням"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Events retention dropped before a rollup had read them: they are missing from the counts above and from everything read from them, such as evaluations and exposures. A rollup reads every project's events, so a gap counts the events of every project of the instance."
 msgstr "События, которые хранение удалило раньше, чем их прочитал агрегатор: их нет в подсчётах выше и во всём, что из них считается, например в вычислениях и экспозициях. Агрегатор читает события всех проектов, поэтому пропуск считает события всех проектов инстанса."
 
@@ -2451,11 +2452,11 @@ msgstr "Найдено"
 msgid "From"
 msgstr "С"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Gap"
 msgstr "Пропуск"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Gaps"
 msgstr "Пропуски"
 
@@ -3258,7 +3259,7 @@ msgstr "Нет записей, подходящих под эти фильтры
 msgid "No evaluation in these days."
 msgstr "За эти дни вычислений нет."
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "No event was lost in these days."
 msgstr "За эти дни ни одно событие не потеряно."
 
@@ -3984,7 +3985,7 @@ msgstr "Перебазировать"
 msgid "Rebase the change request"
 msgstr "Перебазировать запрос на изменение"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Received"
 msgstr "Получены"
 
@@ -5735,7 +5736,7 @@ msgstr "Слишком много попыток входа из вашей се
 msgid "Too many."
 msgstr "Слишком много."
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Total"
 msgstr "Всего"
 

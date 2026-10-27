@@ -363,7 +363,7 @@ test.describe("the environment search parameter", () => {
   }) => {
     await openProject(page, seededProject);
 
-    await projectNavigation(page).getByRole("link", { name: "Flags" }).click();
+    await projectNavigation(page).getByRole("link", { name: "Flags", exact: true }).click();
 
     await expect(page).toHaveURL(/\/flags\?environment=development$/);
   });

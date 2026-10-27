@@ -111,7 +111,7 @@ msgstr "{firstExposed}, counted up to <0/>."
 msgid "{flag} serves {variation}"
 msgstr "{flag} serves {variation}"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "{from} to {to}"
 msgstr "{from} to {to}"
 
@@ -1583,9 +1583,9 @@ msgstr "Dark"
 msgid "Date"
 msgstr "Date"
 
+#: src/components/event-volume.tsx
 #: src/components/experiment-exposures.tsx
 #: src/components/flag-evaluations.tsx
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Day (UTC)"
 msgstr "Day (UTC)"
 
@@ -1800,7 +1800,7 @@ msgstr "Draft"
 msgid "Drag rule {position}"
 msgstr "Drag rule {position}"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Dropped"
 msgstr "Dropped"
 
@@ -2106,19 +2106,20 @@ msgstr "Evaluations per day"
 msgid "Event volume"
 msgstr "Event volume"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Events"
 msgstr "Events"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Events lost"
 msgstr "Events lost"
 
+#: src/components/event-volume.tsx
 #: src/routes/_signed-in/projects/$project/event-volume.tsx
 msgid "Events per day"
 msgstr "Events per day"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Events retention dropped before a rollup had read them: they are missing from the counts above and from everything read from them, such as evaluations and exposures. A rollup reads every project's events, so a gap counts the events of every project of the instance."
 msgstr "Events retention dropped before a rollup had read them: they are missing from the counts above and from everything read from them, such as evaluations and exposures. A rollup reads every project's events, so a gap counts the events of every project of the instance."
 
@@ -2451,11 +2452,11 @@ msgstr "Found"
 msgid "From"
 msgstr "From"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Gap"
 msgstr "Gap"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Gaps"
 msgstr "Gaps"
 
@@ -3258,7 +3259,7 @@ msgstr "No entry matches these filters."
 msgid "No evaluation in these days."
 msgstr "No evaluation in these days."
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "No event was lost in these days."
 msgstr "No event was lost in these days."
 
@@ -3984,7 +3985,7 @@ msgstr "Rebase"
 msgid "Rebase the change request"
 msgstr "Rebase the change request"
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Received"
 msgstr "Received"
 
@@ -5735,7 +5736,7 @@ msgstr "Too many sign-in attempts from your network. Try again later."
 msgid "Too many."
 msgstr "Too many."
 
-#: src/routes/_signed-in/projects/$project/event-volume.tsx
+#: src/components/event-volume.tsx
 msgid "Total"
 msgstr "Total"
 
