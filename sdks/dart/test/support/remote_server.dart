@@ -58,6 +58,10 @@ final class Remote {
     return waiter.future;
   }
 
+  /// Adds the scenarios that passed to the report the isolate writes.
+  Future<void> reportPassed(List<String> passed) =>
+      _call('report', {'passed': passed});
+
   /// Starts a mock server in the isolate.
   Future<ScriptedServer> startServer() async {
     final started = (await _call('start'))! as Map;

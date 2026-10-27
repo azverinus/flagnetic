@@ -7,6 +7,7 @@ import 'package:test/test.dart';
 
 import 'support/mock_server.dart';
 import 'support/protocol_runner.dart';
+import 'support/scenario_report.dart';
 
 void main() {
   final harness = Harness(
@@ -37,14 +38,15 @@ void main() {
   });
 
   final scenarios = suite.clientScenarios;
+  final passed = <String>[];
   group('client scenarios', () {
     for (final s in scenarios) {
-      test(
-        s['name'],
-        () => runScenario(harness, s, suite.doc),
-        timeout: const Timeout.factor(4),
-      );
+      test(s['name'], () async {
+        await runScenario(harness, s, suite.doc);
+        passed.add(s['name']! as String);
+      }, timeout: const Timeout.factor(4));
     }
+    tearDownAll(() => reportPassed(passed));
   });
   test('every scenario is a client or a server scenario, once', () {
     expect(scenarios, isNotEmpty);

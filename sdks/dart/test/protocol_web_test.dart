@@ -44,27 +44,32 @@ void main() {
     'every client scenario',
     timeout: const Timeout(Duration(minutes: 5)),
     () async {
-      await playAll(
+      final passed = await playAll(
         suite.clientScenarios,
         (s) => runScenario(harness, s, suite.doc),
       );
+      await remote.reportPassed(passed);
     },
   );
 }
 
-/// Plays every entry of [entries], then fails naming each one that failed.
-Future<void> playAll(
+/// Plays every entry of [entries], then fails naming each one that failed;
+/// returns the names of those that passed.
+Future<List<String>> playAll(
   List<Map<String, Object?>> entries,
   Future<void> Function(Map<String, Object?> entry) play,
 ) async {
   expect(entries, isNotEmpty);
   final failed = <String>[];
+  final passed = <String>[];
   for (final entry in entries) {
     try {
       await play(entry);
+      passed.add(entry['name']! as String);
     } on Object catch (e) {
       failed.add('${entry['name']}: $e');
     }
   }
   if (failed.isNotEmpty) fail(failed.join('\n\n'));
+  return passed;
 }
