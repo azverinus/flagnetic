@@ -1,6 +1,6 @@
 # Webhooks
 
-A webhook subscription is a project's standing request to be sent chosen events over signed HTTP, so that chat channels, audit archives and deployment tooling learn of changes without polling. Managing a project's subscriptions, reading them included, needs the `webhook.manage` permission, which maintainers and owners hold (see [Access](access.md)).
+A webhook subscription is a project's standing request to be sent chosen events over signed HTTP (or an instance's, for its own audit entries: see [Instance subscriptions](#instance-subscriptions)), so that chat channels, audit archives and deployment tooling learn of changes without polling. Managing a project's subscriptions, reading them included, needs the `webhook.manage` permission, which maintainers and owners hold (see [Access](access.md)).
 
 ## Subscriptions
 
@@ -47,6 +47,20 @@ A subscription is refused with 422 and one of these codes:
 | `private_network_target` | a target whose name resolves to a loopback, private, link-local, unspecified or multicast address, unless the operator set `FLAGNETIC_WEBHOOK_ALLOW_PRIVATE_NETWORKS` |
 
 A name that does not resolve when the subscription is written is accepted: the receiver may not be up yet.
+
+## Instance subscriptions
+
+An instance admin subscribes an archive to every audit entry that names no project: instance settings, members, sign-ins and project deletions (`project.deleted`, naming the project's id, key and name). `/api/v1/webhooks` and its children work as a project's `/api/v1/projects/{project}/webhooks` do, from creating, editing, enabling and deleting to rotating the secret, testing, reading the delivery log and redelivering, and need `instance_admin`:
+
+```json
+{
+  "name": "Audit archive",
+  "url": "https://archive.example.com/flagnetic",
+  "events": ["audit.entry"]
+}
+```
+
+`events` is exactly `audit.entry`: any other type, `*` included, is refused `unknown_event_type`. An instance has no environments to filter on, so `environments` must be empty or absent, else `invalid_webhook`. Each event's `project` is null, and `data` carries the entry as `GET /api/v1/audit` lists it. A project's entries never reach an instance subscription; a project's own subscriptions receive them. The writes to an instance subscription are audited as entries of the instance, so the subscription receives them too, its own creation first.
 
 ## The event catalogue
 
