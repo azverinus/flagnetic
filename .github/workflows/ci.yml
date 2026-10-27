@@ -168,8 +168,8 @@ jobs:
   # the generated client left out, as it changes with every edit of the
   # management API; server changes behind it are covered by the runs on main,
   # on release pull requests and nightly. For the Ruby gems: their
-  # directories, the conformance suite, the SDK contract, the behaviour
-  # matrix their runner fills in and their workflow.
+  # directories, the conformance suite, the SDK contract, the pages their
+  # tests compare with, the scripts they run and their workflow.
   changes:
     name: what changed
     runs-on: ubuntu-latest
@@ -195,7 +195,7 @@ jobs:
             echo "e2e=false" >> "$GITHUB_OUTPUT"
           fi
           if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/ruby/|sdks/ruby-openfeature/|conformance/|api/sdk\.yaml$|go\.mod$|docs/sdks/behaviour-matrix\.md$|\.github/scripts/behaviour-matrix\.sh$|\.github/workflows/(ci|sdk-ruby)\.yml$)'; then
+            grep -qE '^(sdks/ruby/|sdks/ruby-openfeature/|conformance/|api/sdk\.yaml$|go\.mod$|docs/sdks/(behaviour-matrix|compatibility)\.md$|\.github/scripts/(behaviour-matrix|check-gem)\.sh$|\.github/workflows/(ci|sdk-ruby)\.yml$)'; then
             echo "ruby=true" >> "$GITHUB_OUTPUT"
           else
             echo "ruby=false" >> "$GITHUB_OUTPUT"

@@ -73,3 +73,16 @@ client.track("alias", tracking_event_details: OpenFeature::SDK::TrackingEventDet
 ```
 
 `exposure` records the exposure of the most recent evaluation of that flag for that context, as the client's `exposure` does, and `alias` links two unit IDs, as `alias` does. Any other event name, or one missing an attribute, does nothing. An evaluation alone never records an exposure, unless the flag asks for automatic exposure.
+
+## Development
+
+The provider is developed against the `flagnetic` gem in `../ruby`, whatever its version, through `tree.gemfile`; the plain `Gemfile` resolves `flagnetic` from RubyGems, as a consumer's bundle does.
+
+```bash
+export BUNDLE_GEMFILE=tree.gemfile
+bundle install
+bundle exec rake test   # every conformance case through the provider, the shared OpenFeature reasons, events and track
+bundle exec rubocop
+```
+
+`OPENFEATURE_SDK_VERSION=0.6.1` pins `openfeature-sdk` to the oldest release the gem supports, in either bundle.

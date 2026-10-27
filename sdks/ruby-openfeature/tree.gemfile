@@ -1,0 +1,26 @@
+# frozen_string_literal: true
+
+# The bundle the provider is developed and tested with:
+# BUNDLE_GEMFILE=tree.gemfile. flagnetic comes from the working tree in
+# ../ruby whatever its version, since between a flagnetic release and the
+# bump of the gemspec's requirement the two disagree, and testing both
+# trees together must not wait for the bump. The gemspec's other
+# requirements hold as in Gemfile; it is not loaded with `gemspec`, which
+# would require flagnetic from RubyGems. Dependabot does not read this file:
+# a path source hides a gem's versions from it.
+
+source "https://rubygems.org"
+
+openfeature_sdk = ENV.fetch("OPENFEATURE_SDK_VERSION", "")
+
+Bundler.load_gemspec(File.expand_path("flagnetic-openfeature.gemspec", __dir__)).runtime_dependencies.each do |dep|
+  next if dep.name == "flagnetic"
+
+  pin = dep.name == "openfeature-sdk" && !openfeature_sdk.empty? ? [openfeature_sdk] : []
+  gem dep.name, *dep.requirement.as_list, *pin
+end
+
+gem "flagnetic", path: "../ruby"
+gem "minitest", "~> 5.25"
+gem "rake", "~> 13.0"
+gem "rubocop", "~> 1.71.0", require: false

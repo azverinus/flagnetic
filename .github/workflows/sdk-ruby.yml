@@ -58,8 +58,9 @@ jobs:
         run: |
           "$GITHUB_WORKSPACE/.github/scripts/behaviour-matrix.sh" Ruby "$RUNNER_TEMP/scenarios.json"
           git diff --exit-code -- "$GITHUB_WORKSPACE/docs/sdks/behaviour-matrix.md"
-      - name: Gem builds
-        run: gem build --strict flagnetic.gemspec
+      - name: Gem builds with the tracked files
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/check-gem.sh" . flagnetic.gemspec
 
   # The Rails integration against a minimal Rails application booted
   # in-process, as console, runner and rake, and as a two-worker Puma, on
@@ -93,7 +94,8 @@ jobs:
         run: bundle exec rake test
 
   # The OpenFeature provider on the Ruby versions it supports (3.4 and the
-  # newest) against the core gem of the working tree, and on the oldest
+  # newest) against the core gem of the working tree (tree.gemfile, which
+  # takes it from ../ruby whatever its version), and on the oldest
   # openfeature-sdk it supports, the first release with track. It runs the
   # shared OpenFeature reasons and every conformance case first.
   openfeature:
@@ -109,6 +111,7 @@ jobs:
             openfeature: "0.6.1"
     env:
       OPENFEATURE_SDK_VERSION: ${{ matrix.openfeature }}
+      BUNDLE_GEMFILE: ${{ github.workspace }}/sdks/ruby-openfeature/tree.gemfile
     defaults:
       run:
         working-directory: sdks/ruby-openfeature
@@ -123,17 +126,17 @@ jobs:
         run: bundle exec rubocop
       - name: Test
         run: bundle exec rake test
-      - name: Gem builds
-        run: gem build --strict flagnetic-openfeature.gemspec
+      - name: Gem builds with the tracked files
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/check-gem.sh" . flagnetic-openfeature.gemspec
 
   # What bundle add gives a consumer: the provider against the flagnetic gem
-  # published on RubyGems rather than the working tree. Skipped while
+  # published on RubyGems, at the newest version the gemspec admits, rather
+  # than the working tree; the plain Gemfile resolves it so. Skipped while
   # flagnetic has no release.
   openfeature-released:
     name: ruby-openfeature against the released flagnetic
     runs-on: ubuntu-latest
-    env:
-      FLAGNETIC_GEM: released
     defaults:
       run:
         working-directory: sdks/ruby-openfeature

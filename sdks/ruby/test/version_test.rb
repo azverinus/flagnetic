@@ -36,6 +36,14 @@ class VersionTest < Minitest::Test
     end
   end
 
+  # The release job sets FLAGNETIC_RELEASE_VERSION to the version of the
+  # tag it publishes, so a gem whose version is not the tag's is never
+  # pushed; the gemspec takes its version from VERSION.
+  def test_the_version_is_the_release_tags
+    skip "not a release run" unless ENV.key?("FLAGNETIC_RELEASE_VERSION")
+    assert_equal ENV.fetch("FLAGNETIC_RELEASE_VERSION"), Flagnetic::VERSION
+  end
+
   def test_a_row_covers_the_versions_it_names
     rows = [row("0.x"), row("≥ 0.3.0")]
     assert_equal "0.x", covering(rows, "0.1.0")[:version]

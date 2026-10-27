@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
-# FLAGNETIC_GEM=released resolves flagnetic from RubyGems, as a consumer's
-# bundle does, instead of the working tree; OPENFEATURE_SDK_VERSION pins
-# openfeature-sdk (empty leaves it unpinned), for the run on the oldest
-# release the gem supports.
+# What a consumer's bundle resolves: flagnetic from RubyGems, at the version
+# the gemspec requires. Dependabot reads this file, and bumps the gemspec's
+# requirement after a flagnetic release outside it. The tests run with it
+# against the released flagnetic; against the working tree they run with
+# tree.gemfile. OPENFEATURE_SDK_VERSION pins openfeature-sdk (empty leaves
+# it unpinned), for the run on the oldest release the gem supports.
 
 source "https://rubygems.org"
 
@@ -11,7 +13,6 @@ gemspec
 
 openfeature_sdk = ENV.fetch("OPENFEATURE_SDK_VERSION", "")
 
-gem "flagnetic", path: "../ruby" unless ENV["FLAGNETIC_GEM"] == "released"
 gem "minitest", "~> 5.25"
 gem "openfeature-sdk", openfeature_sdk unless openfeature_sdk.empty?
 gem "rake", "~> 13.0"

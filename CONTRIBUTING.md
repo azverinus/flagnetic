@@ -58,7 +58,7 @@ A test package that needs PostgreSQL calls `testkit.Main` from its `TestMain`: i
 
 ## Commits
 
-- **Conventional Commits.** `type(scope): summary` in the imperative, under 72 characters. Types: `feat`, `fix`, `perf`, `deps`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`. Scopes are the contexts (`flags`, `experiments`, `delivery`, `events`, `governance`, `access`, `workspace`, `integrations`), the SDKs (`sdk-go`, `sdk-go-openfeature`, `sdk-js`, `sdk-dart`, `sdk-flutter`, `sdk-ruby`, `sdk-python`), and `api`, `eval`, `conformance`, `console`, `platform`, `release`, `ci`, `docs`.
+- **Conventional Commits.** `type(scope): summary` in the imperative, under 72 characters. Types: `feat`, `fix`, `perf`, `deps`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`. Scopes are the contexts (`flags`, `experiments`, `delivery`, `events`, `governance`, `access`, `workspace`, `integrations`), the SDKs (`sdk-go`, `sdk-go-openfeature`, `sdk-js`, `sdk-dart`, `sdk-flutter`, `sdk-ruby`, `sdk-ruby-openfeature`, `sdk-python`), and `api`, `eval`, `conformance`, `console`, `platform`, `release`, `ci`, `docs`.
 - **Sign-off (DCO).** Every commit carries a `Signed-off-by:` line matching its author: `git commit -s`. By signing off you certify the [Developer Certificate of Origin](https://developercertificate.org/): that you wrote the change or otherwise have the right to submit it under the project's license. CI rejects commits without it.
 - Explain *why* in the body when the subject cannot. Keep commits self-contained; each one should build and pass tests.
 
@@ -110,6 +110,23 @@ PyPI accepts a publisher for a project that does not exist yet, so the first ver
 2. On pypi.org, from an account with two-factor authentication, add a pending publisher (Your account → Publishing): PyPI project name `flagnetic`, owner `azverinus`, repository `flagnetic`, workflow name `release.yml`, environment name `pypi`. A pending publisher does not reserve the name: whoever uploads `flagnetic` first owns it, so merge the release pull request soon after.
 3. Merge the release pull request. The first upload creates the project and turns the pending publisher into its trusted publisher.
 4. Once it has, check the project's publishers on pypi.org and that no API token is scoped to it.
+
+### The Ruby SDK
+
+The gems `flagnetic` in `sdks/ruby` and `flagnetic-openfeature` in `sdks/ruby-openfeature` are release-please components of their own, tagged `sdks/ruby/vX.Y.Z` and `sdks/ruby-openfeature/vX.Y.Z`; use the scopes `sdk-ruby` and `sdk-ruby-openfeature`. release-please keeps `VERSION` in `lib/flagnetic/version.rb` and `lib/flagnetic/openfeature/version.rb` at the release's version, and each gemspec reads its version from there. When a release pull request is merged, the `ruby gem` job of `release.yml` checks out the tag, checks that the version is the tag's, builds the gem with `gem build --strict`, compares the files it packs with the files the repository tracks and keeps it as the artifact `flagnetic-ruby-<version>` or `flagnetic-openfeature-ruby-<version>` for 30 days; the `RubyGems` job then pushes it through [trusted publishing](https://guides.rubygems.org/trusted-publishing/): RubyGems accepts the workflow's OIDC token, so no RubyGems key is stored. Both jobs run in the GitHub environment `rubygems`; give it the protection rules a publish should have.
+
+The provider requires one minor of `flagnetic` (`~> 0.1.0`) and is tested against the released one as well as the working tree, so a change across both gems releases in order:
+
+1. The release pull request of `sdks/ruby` is merged and `flagnetic` is published.
+2. When that release is a new minor, Dependabot proposes the bump of the provider's requirement in `flagnetic-openfeature.gemspec`; merging it is a commit to the provider, which updates the provider's release pull request.
+3. The release pull request of `sdks/ruby-openfeature` is merged. When both are merged at once, the workflow publishes `flagnetic` first and holds the provider back if that fails.
+
+RubyGems accepts a publisher for a gem that does not exist yet, so the first versions are published by the workflow too. Before merging the first release pull request of each gem:
+
+1. Create the GitHub environment `rubygems` with its protection rules.
+2. On rubygems.org, from an account with multi-factor authentication, add a pending trusted publisher for each gem on the [pending trusted publishers page](https://rubygems.org/profile/oidc/pending_trusted_publishers): gem name `flagnetic`, then `flagnetic-openfeature`; repository owner `azverinus`, repository name `flagnetic`, workflow filename `release.yml`, environment `rubygems`. Until a gem's first push nobody owns its name, so merge the release pull requests soon after, `flagnetic` first.
+3. Merge the release pull request. The first push creates the gem and turns the pending publisher into its trusted publisher.
+4. Once it has, check the gem's trusted publishers on rubygems.org and that no API key with push rights is scoped to it; both gemspecs require multi-factor authentication for any push made by hand.
 
 ## Licensing
 
