@@ -102,6 +102,7 @@ const signedIn: Route[] = [
     "flags/-/new",
     "experiments",
     "experiments/-/new",
+    "stale-flags",
     "segments",
     "segments/-/new",
     "change-requests",
@@ -112,6 +113,7 @@ const signedIn: Route[] = [
     "tokens",
     "settings",
     "audit",
+    "event-volume",
   ].map((screen) => ({
     name: `project ${screen}`,
     route: `/projects/$project/${screen}`,
