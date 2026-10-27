@@ -16,8 +16,8 @@ const staleReasonNames = {
 /** What makes a flag stale for each reason, as the filter explains it. */
 const staleReasonDescriptions = {
   lifetime_exceeded: msg`A temporary flag past the date it was expected to be removed by.`,
-  not_evaluated: msg`No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Remote evaluations do not count.`,
-  owner_inactive: msg`Its owner is deactivated, or no longer holds a grant in the project.`,
+  not_evaluated: msg`No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Only flags created more than 30 days ago are judged; remote evaluations do not count.`,
+  owner_inactive: msg`Its owner is deactivated, or is neither an instance admin nor holding a grant in the project.`,
   finished_rollout: msg`Every environment is on and serves the same variation to everyone: the code can keep that variation alone.`,
   experiment_overdue: msg`An experiment on it is still running past its expected end.`,
 } satisfies Record<StaleReason, unknown>;

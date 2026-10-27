@@ -2752,7 +2752,7 @@ msgid "Its conditions never leave the server: only server-side evaluation uses i
 msgstr ""
 
 #: src/lib/stale-flags.ts
-msgid "Its owner is deactivated, or no longer holds a grant in the project."
+msgid "Its owner is deactivated, or is neither an instance admin nor holding a grant in the project."
 msgstr ""
 
 #: src/components/invitation-acceptance.tsx
@@ -3370,7 +3370,7 @@ msgid "No rules: every context receives the fallthrough variation."
 msgstr ""
 
 #: src/lib/stale-flags.ts
-msgid "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Remote evaluations do not count."
+msgid "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Only flags created more than 30 days ago are judged; remote evaluations do not count."
 msgstr ""
 
 #: src/components/sdk-inventory.tsx

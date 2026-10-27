@@ -2752,8 +2752,8 @@ msgid "Its conditions never leave the server: only server-side evaluation uses i
 msgstr "Its conditions never leave the server: only server-side evaluation uses it, and a client SDK key never receives it."
 
 #: src/lib/stale-flags.ts
-msgid "Its owner is deactivated, or no longer holds a grant in the project."
-msgstr "Its owner is deactivated, or no longer holds a grant in the project."
+msgid "Its owner is deactivated, or is neither an instance admin nor holding a grant in the project."
+msgstr "Its owner is deactivated, or is neither an instance admin nor holding a grant in the project."
 
 #: src/components/invitation-acceptance.tsx
 msgid "Joining…"
@@ -3370,8 +3370,8 @@ msgid "No rules: every context receives the fallthrough variation."
 msgstr "No rules: every context receives the fallthrough variation."
 
 #: src/lib/stale-flags.ts
-msgid "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Remote evaluations do not count."
-msgstr "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Remote evaluations do not count."
+msgid "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Only flags created more than 30 days ago are judged; remote evaluations do not count."
+msgstr "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Only flags created more than 30 days ago are judged; remote evaluations do not count."
 
 #: src/components/sdk-inventory.tsx
 msgid "No SDK has used this environment yet. SDKs appear here after their first request, made with one of its SDK keys."
