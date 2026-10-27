@@ -60,7 +60,7 @@ class Exposure:
     platform: str = ""
     app_version: str = ""
 
-    def wire(self) -> dict[str, Any]:
+    def _wire(self) -> dict[str, Any]:
         out: dict[str, Any] = {
             "type": "exposure",
             "event_id": self.event_id,
@@ -92,7 +92,7 @@ class Alias:
     to_unit_type: str
     to_unit_id: str
 
-    def wire(self) -> dict[str, Any]:
+    def _wire(self) -> dict[str, Any]:
         return {
             "type": "alias",
             "event_id": self.event_id,
@@ -130,12 +130,12 @@ class Recorder:
         self._counts: dict[_Row, int] = {}
         self._events: list[Exposure | Alias] = []
 
-    def count(self, flag: str, variation: str, reason: str) -> None:
+    def _count(self, flag: str, variation: str, reason: str) -> None:
         row = (flag, variation, reason)
         with self._lock:
             self._counts[row] = self._counts.get(row, 0) + 1
 
-    def record(self, event: Exposure | Alias) -> None:
+    def _record(self, event: Exposure | Alias) -> None:
         with self._lock:
             self._events.append(event)
 

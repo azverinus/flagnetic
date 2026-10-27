@@ -212,13 +212,13 @@ jobs:
           fi
       # The Python SDK: its sources, the conformance suite its evaluator must
       # pass, the SDK contract, the Go release the Unicode tables come from,
-      # and the workflows that run it.
+      # the pages its tests compare with, and the workflows that run it.
       - id: sdk-python
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           if git diff --name-only "$BASE...HEAD" |
-            grep -qE '^(sdks/python/|conformance/|api/sdk\.yaml$|go\.mod$|\.github/workflows/(ci|sdk-python)\.yml$)'; then
+            grep -qE '^(sdks/python/|conformance/|api/sdk\.yaml$|go\.mod$|docs/sdks/(behaviour-matrix|compatibility)\.md$|\.github/scripts/behaviour-matrix\.sh$|\.github/workflows/(ci|sdk-python)\.yml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -528,6 +528,7 @@ jobs:
       FLAGNETIC_E2E: "1"
       RUBY_SMOKE: ${{ github.event_name != 'pull_request' || needs.changes.outputs.ruby == 'true' || startsWith(github.head_ref, 'release-please--') }}
       SDK_JS: ${{ github.event_name != 'pull_request' || needs.changes.outputs.sdk-js == 'true' || startsWith(github.head_ref, 'release-please--') }}
+      SDK_PYTHON: ${{ github.event_name != 'pull_request' || needs.changes.outputs.python == 'true' || startsWith(github.head_ref, 'release-please--') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -617,14 +618,41 @@ jobs:
             # starts with escape sequences.
             grep -o '{"sdk":"flagnetic-js","kill_switch_ms":-\?[0-9]*}' "$RUNNER_TEMP/smoke.log"
           } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-python@v7
+        if: env.SDK_PYTHON == 'true'
+        with:
+          python-version: 3.x
+      - uses: astral-sh/setup-uv@v10.3.2
+        if: env.SDK_PYTHON == 'true'
+      # Its own `up`, seeded again with new keys: the smokes before it end
+      # by revoking theirs. The smoke writes its kill-switch line to the job
+      # summary itself.
+      - name: Python SDK smoke against two replicas
+        if: env.SDK_PYTHON == 'true'
+        run: |
+          go build -o "$RUNNER_TEMP/flagnetic-e2e" ./e2e/cmd/flagnetic-e2e
+          export FLAGNETIC_E2E_SEED="$RUNNER_TEMP/seed-python.json" FLAGNETIC_E2E_CMD="$RUNNER_TEMP/flagnetic-e2e"
+          export FLAGNETIC_E2E_LOGS="$RUNNER_TEMP/replicas-python.log"
+          "$FLAGNETIC_E2E_CMD" up > "$RUNNER_TEMP/up-python.log" 2>&1 &
+          up=$!
+          trap 'kill "$up"; wait "$up" || true' EXIT
+          for _ in $(seq 180); do
+            [[ -s "$FLAGNETIC_E2E_SEED" ]] && break
+            kill -0 "$up" 2>/dev/null || { cat "$RUNNER_TEMP/up-python.log"; exit 1; }
+            sleep 1
+          done
+          [[ -s "$FLAGNETIC_E2E_SEED" ]] || { echo "no seed after 180 s"; cat "$RUNNER_TEMP/up-python.log"; exit 1; }
+          cd sdks/python
+          uv sync --locked --python "$(command -v python)"
+          uv run pytest e2e || { cat "$RUNNER_TEMP/up-python.log"; exit 1; }
       - name: Keep the replicas' log
-        if: failure() && env.SDK_JS == 'true'
+        if: failure() && (env.SDK_JS == 'true' || env.SDK_PYTHON == 'true')
         uses: actions/upload-artifact@v7
         with:
           name: sdk-e2e-replicas
           path: |
-            ${{ runner.temp }}/replicas.log
-            ${{ runner.temp }}/up.log
+            ${{ runner.temp }}/replicas*.log
+            ${{ runner.temp }}/up*.log
           retention-days: 7
 
   # Whether a pull request touches what the Dart SDK and the Flutter package

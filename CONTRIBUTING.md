@@ -100,6 +100,17 @@ npm lets a package trust a workflow only once the package exists, so the first v
 4. When the next release pull request of `sdks/js` is ready to merge, add a trusted publisher in the package's settings on npmjs.com: GitHub Actions, organization or user `azverinus`, repository `flagnetic`, workflow filename `release.yml`, environment `npm`. A new trusted publisher must publish within two days or it expires and has to be deleted and added again, so merge that pull request within those two days; its release is the first the workflow publishes.
 5. Once it has, set the package's publishing access to require two-factor authentication and disallow tokens, so that only the workflow publishes.
 
+### The Python SDK
+
+The PyPI package `flagnetic` in `sdks/python` is its own release-please component, tagged `sdks/python/vX.Y.Z`; use the scope `sdk-python`. release-please keeps `__version__` in `src/flagnetic/_version.py` at the release's version, and `pyproject.toml` reads the package's version from it, so `uv.lock` holds no version a release would leave stale. When its release pull request is merged, the `python wheel and sdist` job of `release.yml` checks out the tag, checks that the version is the tag's, builds and checks the wheel and the sdist and keeps them as the artifact `flagnetic-python-<version>` for 30 days; the `PyPI (flagnetic)` job then publishes them through [trusted publishing](https://docs.pypi.org/trusted-publishers/): PyPI accepts the workflow's OIDC token, so no PyPI token is stored, and each file carries an attestation. The job runs in the GitHub environment `pypi`; give it the protection rules a publish should have.
+
+PyPI accepts a publisher for a project that does not exist yet, so the first version is published by the workflow too. Before merging the first release pull request of `sdks/python`:
+
+1. Create the GitHub environment `pypi` with its protection rules.
+2. On pypi.org, from an account with two-factor authentication, add a pending publisher (Your account → Publishing): PyPI project name `flagnetic`, owner `azverinus`, repository `flagnetic`, workflow name `release.yml`, environment name `pypi`. A pending publisher does not reserve the name: whoever uploads `flagnetic` first owns it, so merge the release pull request soon after.
+3. Merge the release pull request. The first upload creates the project and turns the pending publisher into its trusted publisher.
+4. Once it has, check the project's publishers on pypi.org and that no API token is scoped to it.
+
 ## Licensing
 
 Flagnetic is licensed under [Apache-2.0](LICENSE). Contributions are accepted under the same license (inbound = outbound), certified by the sign-off above. There is no CLA.

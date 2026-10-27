@@ -74,7 +74,7 @@ class LocalOverrides:
         self._changed = changed
         self._lock = threading.Lock()
         # Replaced, never changed in place, so a getter reads it without the lock.
-        self.by_key: dict[str, LocalOverride] = {}
+        self._by_key: dict[str, LocalOverride] = {}
 
     def set(self, key: str, value: Any) -> None:
         """Serves ``value`` for the flag ``key`` in place of what the ruleset serves.
@@ -105,41 +105,41 @@ class LocalOverrides:
         if flag_type == "json":
             value = copy.deepcopy(value)
         with self._lock:
-            self.by_key = {**self.by_key, key: LocalOverride(flag_type, value)}
+            self._by_key = {**self._by_key, key: LocalOverride(flag_type, value)}
         self._log(logging.WARNING, _events.OVERRIDE_SET, flag=key)
         self._changed([key])
 
     def remove(self, key: str) -> None:
         """Drops the local override of ``key``; change listeners hear it when there was one."""
         with self._lock:
-            if key not in self.by_key:
+            if key not in self._by_key:
                 return
-            self.by_key = {k: o for k, o in self.by_key.items() if k != key}
+            self._by_key = {k: o for k, o in self._by_key.items() if k != key}
         self._changed([key])
 
     def clear(self) -> None:
         """Drops every local override; change listeners hear their keys."""
         with self._lock:
-            keys = sorted(self.by_key)
-            self.by_key = {}
+            keys = sorted(self._by_key)
+            self._by_key = {}
         if keys:
             self._changed(keys)
 
-    def after_fork(self) -> None:
+    def _after_fork(self) -> None:
         """A forked child makes its lock anew: a thread of the parent may have held it at the fork."""
         self._lock = threading.Lock()
 
     def list(self) -> dict[str, Any]:
         """The local overrides by flag key."""
-        return {key: copy.deepcopy(o.value) for key, o in self.by_key.items()}
+        return {key: copy.deepcopy(o.value) for key, o in self._by_key.items()}
 
-    def refuse(self, ruleset: Ruleset) -> builtins.list[str]:
+    def _refuse(self, ruleset: Ruleset) -> builtins.list[str]:
         """Drops every local override when ``ruleset`` is of a protected environment; returns their keys."""
         if not ruleset.protected:
             return []
         with self._lock:
-            keys = sorted(self.by_key)
-            self.by_key = {}
+            keys = sorted(self._by_key)
+            self._by_key = {}
         for key in keys:
             self._log(
                 logging.WARNING,

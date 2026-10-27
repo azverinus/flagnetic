@@ -4,9 +4,10 @@ name: sdk-python
 # newest supported Python (the evaluator's conformance suite and the speed
 # guarantee among them) with and without the openfeature extra, the OpenFeature
 # provider on the oldest OpenFeature SDK the extra accepts, Unicode tables
-# regenerated from Go and compared, and the wheel and the sdist built and
-# checked. ci.yml calls it behind a path
-# condition and ci-ok needs it.
+# regenerated from Go and compared, the wheel and the sdist built and
+# checked, and the protocol runner's report compared with the Python
+# column of the behaviour matrix. ci.yml calls it behind a path condition and
+# ci-ok needs it.
 on:
   workflow_call:
 
@@ -71,7 +72,16 @@ jobs:
           uv sync --locked --extra openfeature
       - name: Test
         # Includes the p99 guarantee, which writes its figures to the job summary.
+        env:
+          FLAGNETIC_SCENARIO_REPORT: ${{ runner.temp }}/scenarios.json
         run: uv run pytest
+      - name: Behaviour matrix
+        # The Python column of docs/sdks/behaviour-matrix.md is what the
+        # protocol runner reports as passed in the run above.
+        if: matrix.python == '3.x'
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/behaviour-matrix.sh" Python "$RUNNER_TEMP/scenarios.json"
+          git diff --exit-code -- "$GITHUB_WORKSPACE/docs/sdks/behaviour-matrix.md"
       - name: Test the provider on the oldest OpenFeature SDK the extra accepts
         run: uv run --with openfeature-sdk==0.9.0 pytest tests/test_openfeature.py
       - name: Test without the extra

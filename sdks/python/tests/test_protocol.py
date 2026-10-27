@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import os
+from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -50,12 +54,28 @@ def server_scenarios() -> list[dict[str, Any]]:
     return [s for s in every if s["mode"] == "server"]
 
 
+# The scenarios that passed in this run. When FLAGNETIC_SCENARIO_REPORT names a
+# file, the module ends by writing them there: the report
+# .github/scripts/behaviour-matrix.sh builds the Python column of
+# docs/sdks/behaviour-matrix.md from.
+PASSED: list[str] = []
+
+
+@pytest.fixture(scope="module", autouse=True)
+def scenario_report() -> Iterator[None]:
+    yield
+    report = os.environ.get("FLAGNETIC_SCENARIO_REPORT", "")
+    if report:
+        Path(report).write_text(json.dumps(sorted(PASSED)), encoding="utf-8")
+
+
 @pytest.mark.parametrize("name", [s["name"] for s in server_scenarios()])
 def test_scenario(name: str) -> None:
     scenario = next(s for s in server_scenarios() if s["name"] == name)
     answers = {**FILES["answers"], **EXPERIMENTS["answers"]}
     errors = play(scenario, CONTEXT, answers, DIVISORS.get(name, DEFAULT_DIVISOR))
     assert not errors, "\n".join(errors)
+    PASSED.append(name)
 
 
 DEGRADATION = read_json("degradation/cases.json")
