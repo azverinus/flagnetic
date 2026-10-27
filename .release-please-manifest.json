@@ -3,6 +3,6 @@
   "eval": "0.1.0",
   "sdks/go": "0.1.0",
   "sdks/go-openfeature": "0.1.0",
-  "sdks/js": "0.0.0",
+  "sdks/js": "0.1.0",
   "sdks/python": "0.0.0"
 }

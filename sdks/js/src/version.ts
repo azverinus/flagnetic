@@ -4,7 +4,7 @@
  * through the marker below, and tests check both; 0.0.0 is a build from the
  * repository before the first release.
  */
-export const VERSION = "0.0.0"; // x-release-please-version
+export const VERSION = "0.1.0"; // x-release-please-version
 
 /**
  * The lowest `schema_version` of the documents this SDK reads. A document outside
