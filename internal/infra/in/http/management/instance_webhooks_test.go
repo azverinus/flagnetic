@@ -278,7 +278,11 @@ func TestAProjectsDeletionReachesTheInstanceSubscription(t *testing.T) {
 	fanOut(t, srv)
 	deliver(t, srv)
 
-	deleted := instanceEntries(t, admin, management.ListAuditEntriesParams{Action: ptr("project.deleted"), Limit: ptr(200)})
+	// The package's tests share one database, so the entry is found by the
+	// project it names rather than by being the only deletion.
+	deleted := instanceEntries(t, admin, management.ListAuditEntriesParams{
+		Action: ptr("project.deleted"), EntityId: ptr(p.Id.String()),
+	})
 	if len(deleted) != 1 {
 		t.Fatalf("%d project.deleted entries, want 1", len(deleted))
 	}
