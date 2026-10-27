@@ -123,8 +123,8 @@ func (d WebhookDeps) checkTarget(ctx context.Context, url string) error {
 	return governance.CheckTargetAddresses(addrs, d.Targets)
 }
 
-// lockProject takes project's row lock, answering a project deleted since
-// the request found it as unknown.
+// lockProject takes the lock project's subscriptions are written under, as
+// lockSubscriptions does.
 func (d WebhookDeps) lockProject(ctx context.Context, project workspace.ProjectID) error {
 	return lockSubscriptions(ctx, d.Store, project)
 }
