@@ -307,6 +307,10 @@ export function violationMessage(i18n: I18n, violation: Violation): string {
         default:
           return i18n._(msg`Choose a stronger password.`);
       }
+    case "too_soon":
+      return i18n._(msg`Choose a later time: the server needs some lead to apply it.`);
+    case "too_late":
+      return i18n._(msg`Choose a time at most a year ahead.`);
     default:
       return violation.detail;
   }
