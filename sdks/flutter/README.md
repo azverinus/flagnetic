@@ -2,7 +2,13 @@
 
 Flutter widgets for Flagnetic feature flags and experiments, served by a self-hosted [Flagnetic](https://github.com/azverinus/flagnetic) instance: a scope holding the client, a builder widget rebuilding when a flag changes, listenables for a flag and for the fallback chain's stage, a lifecycle observer, a store on every platform and a Dev Tools screen for local overrides. The client itself lives in [`flagnetic`](https://pub.dev/packages/flagnetic), which this package re-exports, so an app imports one package.
 
-Requires Flutter 3.35 or newer, on iOS, Android, desktop and the web.
+```bash
+flutter pub add flagnetic_flutter
+```
+
+Requires Flutter 3.35 or newer, on iOS, Android, desktop and the web. Supported versions follow Flutter's stable releases of about the last twelve months; a version that leaves upstream support is dropped in a minor release.
+
+A kill switch reaches an app in the foreground within 5 seconds at the 99th percentile, a backgrounded app when it resumes, and an app built with `ClientOptions(sse: false)` within 5 minutes and at every resume; the [`flagnetic` README](https://pub.dev/packages/flagnetic) has the details and the offline test mode.
 
 ```dart
 import 'package:flagnetic_flutter/flagnetic_flutter.dart';

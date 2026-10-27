@@ -3,8 +3,9 @@ name: sdk-flutter
 # The Flutter package: format, static analysis with infos fatal, and the
 # widget tests on the VM and on Chrome, on the oldest Flutter stable it
 # supports and on the current stable. It resolves the Dart SDK from the
-# working tree, so a change to either package tests both. Called from
-# ci.yml.
+# working tree, so a change to either package tests both, and is tested
+# again against the flagnetic released on pub.dev, which is what a consumer
+# resolves. Called from ci.yml.
 on:
   workflow_call:
 
@@ -39,3 +40,53 @@ jobs:
         run: flutter test
       - name: Test on Chrome
         run: flutter test --platform chrome
+
+  # The package as a consumer gets it: without pubspec_overrides.yaml, so
+  # flagnetic resolves from pub.dev at the version pubspec.yaml requires,
+  # tested, and checked as pub.dev will score it (`dart pub publish
+  # --dry-run` without a warning, pana at full score). Neither can resolve
+  # before flagnetic's first version is on pub.dev, so until then the job
+  # says so and passes; Dependabot raises the requirement after each release
+  # of flagnetic.
+  released:
+    name: flutter against the released flagnetic
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/flutter
+    steps:
+      - uses: actions/checkout@v7
+      - name: Is flagnetic on pub.dev
+        id: core
+        run: |
+          status="$(curl -sS -o /dev/null -w '%{http_code}' https://pub.dev/api/packages/flagnetic)"
+          case "$status" in
+            200) echo "released=true" >> "$GITHUB_OUTPUT" ;;
+            404)
+              echo "released=false" >> "$GITHUB_OUTPUT"
+              echo "flagnetic is not on pub.dev yet: flagnetic_flutter was tested against the working tree only." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *) echo "pub.dev answered $status" >&2; exit 1 ;;
+          esac
+      - uses: subosito/flutter-action@v2
+        if: steps.core.outputs.released == 'true'
+        with:
+          channel: stable
+      - name: Resolve flagnetic from pub.dev
+        if: steps.core.outputs.released == 'true'
+        # Removed from the index too: a tracked file missing from the
+        # working tree is a warning in the dry run below.
+        run: |
+          git rm -q pubspec_overrides.yaml
+          flutter pub get
+          flutter pub deps --style=compact | grep -E '^- flagnetic '
+      - name: Analyze
+        if: steps.core.outputs.released == 'true'
+        run: flutter analyze --fatal-infos
+      - name: Test
+        if: steps.core.outputs.released == 'true'
+        run: flutter test
+      - name: Dry run and pana
+        if: steps.core.outputs.released == 'true'
+        working-directory: .
+        run: .github/scripts/check-pub-package.sh sdks/flutter

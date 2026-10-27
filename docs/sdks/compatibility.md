@@ -28,12 +28,13 @@ One row per SDK line: an SDK major version, or the version within a major from w
 
 | SDK | Version | `schema_version` | SDK API path | Server |
 |---|---|---|---|---|
+| Dart | 0.x | 1 | `/sdk/v1` | ≥ 0.1.0 |
 | Go | 0.x | 1 | `/sdk/v1` | ≥ 0.1.0 |
 | JavaScript | 0.x | 1 | `/sdk/v1` | ≥ 0.1.0 |
 | Python | 0.x | 1 | `/sdk/v1` | ≥ 0.1.0 |
 | Ruby | 0.x | 1 | `/sdk/v1` | ≥ 0.1.0 |
 
-The table names the core package of each SDK. The Go OpenFeature provider, `flagnetictest`, the Ruby gem `flagnetic-openfeature` and `Flagnetic::Testing` make no request of their own: they speak through the SDK they depend on, so its row is theirs; so do the React bindings and OpenFeature providers inside the `flagnetic` npm package, whose server mode and browser client speak the same path and range, and `flagnetic.testing` and the OpenFeature provider of the PyPI package `flagnetic`. The evaluator module (`eval`) reads `schema_version` 1 and makes no request at all.
+The table names the core package of each SDK. The Go OpenFeature provider, `flagnetictest`, the Ruby gem `flagnetic-openfeature` and `Flagnetic::Testing` make no request of their own: they speak through the SDK they depend on, so its row is theirs; so do the React bindings and OpenFeature providers inside the `flagnetic` npm package, whose server mode and browser client speak the same path and range, and `flagnetic.testing` and the OpenFeature provider of the PyPI package `flagnetic`; and the Flutter package `flagnetic_flutter`, whose widgets, store and Dev Tools speak through the pub.dev package `flagnetic`. The evaluator module (`eval`) reads `schema_version` 1 and makes no request at all.
 
 ## What a key learns
 
@@ -51,11 +52,11 @@ A **client key** ships inside apps and browsers, so it never receives a ruleset:
 | `experiment` | a running experiment assigned the value |
 | `error` | the flag could not be evaluated; the SDK serves its built-in default as `fallback` |
 
-A client key never learns which rule, segment or prerequisite produced a value, nor a rule identifier. The Go, Ruby and Python SDKs and the JavaScript server mode evaluate locally and refuse a client key at construction, and the JavaScript browser client refuses a server key.
+A client key never learns which rule, segment or prerequisite produced a value, nor a rule identifier. The Go, Ruby and Python SDKs and the JavaScript server mode evaluate locally and refuse a client key at construction, and the JavaScript browser client and the Dart SDK refuse a server key.
 
 ## Versioning policy
 
-- **Semantic versioning per SDK, independent numbers.** Each SDK releases on its own tag with its own version; the same number in two SDKs promises nothing about each other. The Go modules are tagged `eval/vX.Y.Z`, `sdks/go/vX.Y.Z` and `sdks/go-openfeature/vX.Y.Z`, the npm package `flagnetic` `sdks/js/vX.Y.Z`, the Ruby gems `sdks/ruby/vX.Y.Z` and `sdks/ruby-openfeature/vX.Y.Z`, the PyPI package `flagnetic` `sdks/python/vX.Y.Z`.
+- **Semantic versioning per SDK, independent numbers.** Each SDK releases on its own tag with its own version; the same number in two SDKs promises nothing about each other. The Go modules are tagged `eval/vX.Y.Z`, `sdks/go/vX.Y.Z` and `sdks/go-openfeature/vX.Y.Z`, the npm package `flagnetic` `sdks/js/vX.Y.Z`, the Ruby gems `sdks/ruby/vX.Y.Z` and `sdks/ruby-openfeature/vX.Y.Z`, the PyPI package `flagnetic` `sdks/python/vX.Y.Z`, the pub.dev packages `flagnetic` `sdks/dart/vX.Y.Z` and `flagnetic_flutter` `sdks/flutter/vX.Y.Z`.
 - **A new SDK API path prefix is a new SDK major version.** An SDK moving from `/sdk/v1` to `/sdk/v2` releases a new major, and the table gains a row for it. The server serves `/sdk/v2` alongside `/sdk/v1` for as long as a released SDK speaks `/sdk/v1`.
 - **`schema_version` changes only when structure changes.** Within `/sdk/v1` every change is additive and leaves `schema_version` alone. A new `schema_version` appears only when a change cannot be read under the degradation rules below; an SDK that reads it widens its range and the table gains a row.
 - **What an SDK sends.** Every request for a document (the ruleset, remote evaluation) and every events batch carries `Flagnetic-Schema-Version` with the highest `schema_version` the SDK reads. The server answers with a document of that schema or a lower one it still produces, and 406 `schema_version_unsupported` when it produces none that low, so a new server keeps sending an old build the schema it asked for.
@@ -93,6 +94,10 @@ The same holds the other way round. The server ignores what it does not know in 
 ## What the Python SDK declares
 
 `sdks/python/src/flagnetic/_version.py` holds `flagnetic.__version__`, which every request's User-Agent (`flagnetic-python/<version> (<platform>)`) and every events envelope report, which the package's metadata reads, and which release-please keeps equal to the tag; the `schema_version` it reads and the SDK API path stay internal. A test of the SDK fails when the last Python row of the table above is not that schema and path, and the release workflow checks `__version__` against the tag.
+
+## What the Dart SDK declares
+
+`sdks/dart/lib/src/client/options.dart` holds `sdkVersion`, which every request's User-Agent (`flagnetic-dart/<version> (<platform>)`), the context's `sdk_version` attribute and every events envelope report and which release-please keeps equal to `pubspec.yaml` and the tag, and `schemaVersionMin`, `schemaVersionMax` and `sdkApiPath`. A test of the SDK fails when the last Dart row of the table above is not that range and path, and the publishing workflow checks `sdkVersion` against the tag.
 
 ## Adding a row
 
