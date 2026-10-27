@@ -162,6 +162,8 @@ SDKs report how often they evaluated each flag in [evaluation summaries](sdks/ev
 
 Both lag the SDKs by the rollup's round of 10 seconds, and by as long as a transaction left open in the database holds the rollups back ([Operations](operations.md#a-long-transaction-holds-the-rollups-back)). A summary row naming a flag deleted since counts in no flag's evaluations.
 
+In the console, each environment's tab of a flag shows, under the configuration, when an SDK last evaluated the flag there and its evaluations over the last 7, 30 or 90 days (30 by default, kept in the address): one chart per UTC day for what SDKs reported and one for remote evaluations, each stacked by variation, and a table of every count by day, source, variation and reason. Changing the range keeps an unsaved draft of the configuration.
+
 ## Stale flags
 
 `GET /stale-flags` lists the project's stale flags, the ones to clean up, by key in byte order, `limit` per page (50 by default, at most 200) and `cursor` set to the previous page's `next_cursor`. Each item carries the flag's `key`, `name`, `owner`, `lifetime`, `expected_removal_at`, `last_evaluated` in every environment, and its `reasons`, in this order:
@@ -175,6 +177,8 @@ Both lag the SDKs by the rollup's round of 10 seconds, and by as long as a trans
 | `experiment_overdue` | A running experiment on the flag is past its expected end, from the UTC day after it. The item's `experiment` names it with its `expected_end_at`; when several are, the one due earliest. |
 
 `reason` (repeatable) lists only the flags stale for one of the reasons given. Archived flags are never listed. The report reads `last_evaluated_at`, so it lags the SDKs as evaluations do.
+
+In the console, **Stale flags** in the project navigation, also linked from the flags list, shows the report 50 flags a page with **Previous** and **Next**: each flag links to its page, with its reasons (an overdue experiment linked, with its expected end), owner, lifetime and when it was last evaluated in each environment. One toggle per reason narrows the list to the flags stale for any of the reasons pressed; the reasons and the page are kept in the address.
 
 ## Trying a configuration
 

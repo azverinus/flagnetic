@@ -240,6 +240,8 @@ A rollup far enough behind, held back by a long transaction for longer than the 
 
 `GET /api/v1/projects/{project}/events/volume?from=&to=` reads the events the project received per UTC day and type (`evaluation_summary`, `alias`, `exposure`), as the rollups counted them, with the gaps whose events were received within those days. A day without an event of a type is left out. Gaps are the instance's, not the project's: a rollup reads every project's rows, so a gap's `rows` counts every project's events lost. `from` and `to` are days, both included; `to` defaults to today and `from` to 29 days before `to`, and a range of more than 90 days is refused `400 invalid_request`.
 
+In the console, **Event volume** in the project navigation shows the same over the last 7, 30 or 90 days: a chart of the events received per UTC day, stacked by type, with a table of the counts, the days a gap's received period meets marked under the chart and in the table, and the gaps listed with their type, rollup, received period, events lost and when they were dropped.
+
 Every 10 seconds, rollups read the raw events committed since their last round and keep what the API reads: first exposures, exposure counts per day and conflicts of each experiment, evaluations per day of each flag and when SDKs last evaluated it, and events received per day, aliases included. A rollup reads only the rows of transactions that have ended, along transaction IDs, so a row committing late is never skipped; one replica at a time moves each rollup, so nothing is counted twice. Any transaction left open in the database, by Flagnetic or anything else connected to it, holds every rollup back until it ends: `flagnetic_rollup_lag_seconds` shows it.
 
 ### A long transaction holds the rollups back

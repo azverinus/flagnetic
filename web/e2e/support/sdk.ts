@@ -85,3 +85,44 @@ export async function postExposures(
   });
   return (await response.json()) as { accepted: number; rejected: { code: string }[] };
 }
+
+/**
+ * Posts one evaluation summary as an SDK reports it: so many evaluations
+ * of a flag's variation by a reason over the minute before `at`.
+ */
+export async function postEvaluationSummary(
+  key: string,
+  {
+    flag,
+    variation,
+    reason,
+    count,
+    at = new Date(),
+  }: {
+    flag: string;
+    variation: string | null;
+    reason: string;
+    count: number;
+    at?: Date;
+  },
+): Promise<void> {
+  const response = await sdkRequest(key, "/events", {
+    body: {
+      schema_version: 1,
+      sdk: { name: "flagnetic-js", version: "1.0.0" },
+      sent_at: new Date().toISOString(),
+      events: [
+        {
+          type: "evaluation_summary",
+          event_id: eventId(at),
+          interval_start: new Date(at.getTime() - 60_000).toISOString(),
+          interval_end: at.toISOString(),
+          ruleset_version: 1,
+          counts: [{ flag, variation, reason, count }],
+        },
+      ],
+    },
+  });
+  const result = (await response.json()) as { accepted: number };
+  if (result.accepted !== 1) throw new Error(`the summary was refused: ${JSON.stringify(result)}`);
+}

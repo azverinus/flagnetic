@@ -61,6 +61,18 @@ msgstr ""
 msgid "{created} by {creator}"
 msgstr ""
 
+#: src/components/daily-chart.tsx
+msgid "{date} (UTC): {counts}"
+msgstr ""
+
+#: src/components/daily-chart.tsx
+msgid "{date} (UTC): {counts}; {mark}"
+msgstr ""
+
+#: src/components/daily-chart.tsx
+msgid "{days, plural, one {Last # day} other {Last # days}}"
+msgstr ""
+
 #: src/components/condition-row.tsx
 #: src/lib/conditions.ts
 msgid "{entry} is not a full semantic version, such as 1.41.0."
@@ -97,6 +109,10 @@ msgstr ""
 
 #: src/lib/conditions.ts
 msgid "{flag} serves {variation}"
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "{from} to {to}"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/members.tsx
@@ -140,8 +156,16 @@ msgstr ""
 msgid "{label}: {status}"
 msgstr ""
 
+#: src/components/daily-chart.tsx
+msgid "{label}: {total} {dayCount, plural, one {over # day} other {over # days}}; the table below lists every day."
+msgstr ""
+
 #: src/components/compare-environments.tsx
 msgid "{left} and {right} side by side"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "{link}, expected to end {end}"
 msgstr ""
 
 #: src/components/member-credentials.tsx
@@ -334,6 +358,10 @@ msgstr ""
 msgid "A flag has at most 50 tags."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "A flag shows up here once it outlives its expected removal, stops being evaluated, loses its owner, finishes its rollout or keeps an overdue experiment."
+msgstr ""
+
 #: src/lib/problem-messages.ts
 msgid "A key never changes once it is set."
 msgstr ""
@@ -468,6 +496,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 msgid "A temporary flag is meant to be removed once its change is released; a permanent one stays."
+msgstr ""
+
+#: src/lib/stale-flags.ts
+msgid "A temporary flag past the date it was expected to be removed by."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -630,6 +662,10 @@ msgstr ""
 msgid "Alerts"
 msgstr ""
 
+#: src/lib/event-volume.ts
+msgid "Aliases"
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 msgid "All"
 msgstr ""
@@ -657,6 +693,10 @@ msgstr ""
 
 #: src/lib/experiments.ts
 msgid "An experiment has at most 50 tags."
+msgstr ""
+
+#: src/lib/stale-flags.ts
+msgid "An experiment on it is still running past its expected end."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -1306,6 +1346,7 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Clear filters"
 msgstr ""
 
@@ -1542,8 +1583,14 @@ msgstr ""
 msgid "Date"
 msgstr ""
 
+#: src/components/event-volume.tsx
 #: src/components/experiment-exposures.tsx
+#: src/components/flag-evaluations.tsx
 msgid "Day (UTC)"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/event-volume.tsx
+msgid "Days with a gap"
 msgstr ""
 
 #: src/components/member-actions.tsx
@@ -1751,6 +1798,10 @@ msgstr ""
 
 #: src/components/rule-editor.tsx
 msgid "Drag rule {position}"
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "Dropped"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
@@ -2038,6 +2089,40 @@ msgstr ""
 msgid "Evaluation result"
 msgstr ""
 
+#: src/lib/event-volume.ts
+msgid "Evaluation summaries"
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "Evaluations"
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "Evaluations per day"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/event-volume.tsx
+msgid "Event volume"
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "Events"
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "Events lost"
+msgstr ""
+
+#: src/components/event-volume.tsx
+#: src/routes/_signed-in/projects/$project/event-volume.tsx
+msgid "Events per day"
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "Events retention dropped before a rollup had read them: they are missing from the counts above and from everything read from them, such as evaluations and exposures. A rollup reads every project's events, so a gap counts the events of every project of the instance."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/audit.tsx
 msgid "Every change made in this project, newest first, with its values before and after."
 msgstr ""
@@ -2070,8 +2155,16 @@ msgstr ""
 msgid "Every earlier link for {name} stops working. The new one is shown once."
 msgstr ""
 
+#: src/lib/stale-flags.ts
+msgid "Every environment is on and serves the same variation to everyone: the code can keep that variation alone."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
 msgid "Every flag exists in every environment of the project, each environment serving it by its own configuration."
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "Every flag of every remote evaluation the server answered, whether the application reads the flag or not."
 msgstr ""
 
 #: src/components/auth-settings-form.tsx
@@ -2160,6 +2253,10 @@ msgstr ""
 msgid "Experiment not found"
 msgstr ""
 
+#: src/lib/stale-flags.ts
+msgid "Experiment overdue"
+msgstr ""
+
 #: src/lib/audit.ts
 msgid "Experiment salts regenerated"
 msgstr ""
@@ -2190,6 +2287,7 @@ msgid "Exposure conflicts"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
+#: src/lib/event-volume.ts
 msgid "Exposures"
 msgstr ""
 
@@ -2235,6 +2333,10 @@ msgstr ""
 msgid "Final check, taken at the stop on <0/>; it is never run again."
 msgstr ""
 
+#: src/lib/stale-flags.ts
+msgid "Finished rollout"
+msgstr ""
+
 #: src/components/experiment-exposures.tsx
 msgid "First exposed to"
 msgstr ""
@@ -2271,6 +2373,7 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Flag"
 msgstr ""
 
@@ -2320,6 +2423,10 @@ msgstr ""
 msgid "Flags"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "Flags that may be ready to leave the code: each one with why it is stale. Archived flags are never listed."
+msgstr ""
+
 #: src/components/prerequisites-section.tsx
 msgid "Flags that must serve a variation for this flag to be evaluated here; otherwise it serves its off variation."
 msgstr ""
@@ -2343,6 +2450,14 @@ msgstr ""
 
 #: src/components/audit-log.tsx
 msgid "From"
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "Gap"
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "Gaps"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/change-requests/$changeRequest.tsx
@@ -2636,6 +2751,10 @@ msgstr ""
 msgid "Its conditions never leave the server: only server-side evaluation uses it, and a client SDK key never receives it."
 msgstr ""
 
+#: src/lib/stale-flags.ts
+msgid "Its owner is deactivated, or is neither an instance admin nor holding a grant in the project."
+msgstr ""
+
 #: src/components/invitation-acceptance.tsx
 msgid "Joining…"
 msgstr ""
@@ -2716,6 +2835,14 @@ msgstr ""
 msgid "Last checked <0/>, while the experiment ran; the stop took no check here, as the environment no longer held its rule."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "Last evaluated"
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "Last evaluated by an SDK: <0/>"
+msgstr ""
+
 #: src/components/sdk-inventory.tsx
 msgid "Last ruleset version"
 msgstr ""
@@ -2765,6 +2892,10 @@ msgstr ""
 msgid "Left empty, it keeps “{sourceName}”."
 msgstr ""
 
+#: src/components/daily-chart.tsx
+msgid "Legend"
+msgstr ""
+
 #: src/lib/project-members.ts
 msgid "Lets the holder {list}."
 msgstr ""
@@ -2780,6 +2911,7 @@ msgstr ""
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Lifetime"
 msgstr ""
 
@@ -3095,6 +3227,7 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Next"
 msgstr ""
 
@@ -3122,6 +3255,14 @@ msgstr ""
 msgid "No entry matches these filters."
 msgstr ""
 
+#: src/components/flag-evaluations.tsx
+msgid "No evaluation in these days."
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "No event was lost in these days."
+msgstr ""
+
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 msgid "No experiment matches these filters."
 msgstr ""
@@ -3140,6 +3281,14 @@ msgstr ""
 
 #: src/lib/experiment-alerts.ts
 msgid "No exposures"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "No flag is stale for these reasons."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "No flag is stale."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
@@ -3220,8 +3369,16 @@ msgstr ""
 msgid "No rules: every context receives the fallthrough variation."
 msgstr ""
 
+#: src/lib/stale-flags.ts
+msgid "No SDK evaluated it or recorded an exposure of it in any environment for 30 days, while SDKs reported evaluations of the project. Only flags created more than 30 days ago are judged; remote evaluations do not count."
+msgstr ""
+
 #: src/components/sdk-inventory.tsx
 msgid "No SDK has used this environment yet. SDKs appear here after their first request, made with one of its SDK keys."
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "No SDK reported evaluating the flag here in these days."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/index.tsx
@@ -3242,6 +3399,10 @@ msgstr ""
 
 #: src/components/condition-row.tsx
 msgid "No value needed."
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "No variation"
 msgstr ""
 
 #: src/components/sign-in-form.tsx
@@ -3282,6 +3443,10 @@ msgstr ""
 
 #: src/components/experiment-exposures.tsx
 msgid "Not counted yet: the exposures are first counted within seconds of arriving."
+msgstr ""
+
+#: src/lib/stale-flags.ts
+msgid "Not evaluated"
 msgstr ""
 
 #: src/routes/_signed-in/$.tsx
@@ -3525,11 +3690,16 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Owner"
 msgstr ""
 
 #: src/components/structural-diff-view.tsx
 msgid "Owner changed from {before} to {after}."
+msgstr ""
+
+#: src/lib/stale-flags.ts
+msgid "Owner inactive"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
@@ -3560,6 +3730,10 @@ msgstr ""
 msgid "Pages of flags"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "Pages of stale flags"
+msgstr ""
+
 #: src/components/flag-history.tsx
 msgid "Pages of the history"
 msgstr ""
@@ -3587,6 +3761,10 @@ msgstr ""
 msgid "Past expected end"
 msgstr ""
 
+#: src/lib/stale-flags.ts
+msgid "Past expected removal"
+msgstr ""
+
 #: src/components/experiment-exposures.tsx
 msgid "Per day"
 msgstr ""
@@ -3606,6 +3784,7 @@ msgstr ""
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Permanent"
 msgstr ""
 
@@ -3662,6 +3841,7 @@ msgstr ""
 #: src/routes/_signed-in/projects/$project/change-requests/index.tsx
 #: src/routes/_signed-in/projects/$project/experiments/index.tsx
 #: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Previous"
 msgstr ""
 
@@ -3756,6 +3936,10 @@ msgstr ""
 msgid "Raised <0/>. Acknowledging hides it until it clears."
 msgstr ""
 
+#: src/components/daily-chart.tsx
+msgid "Range"
+msgstr ""
+
 #: src/components/member-actions.tsx
 msgid "Reactivate"
 msgstr ""
@@ -3784,8 +3968,13 @@ msgstr ""
 msgid "Reapplied after a conflict: saves as a new rule"
 msgstr ""
 
+#: src/components/flag-evaluations.tsx
 #: src/components/kill-switch-dialog.tsx
 msgid "Reason"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "Reasons"
 msgstr ""
 
 #: src/components/change-request-actions.tsx
@@ -3794,6 +3983,10 @@ msgstr ""
 
 #: src/components/change-request-actions.tsx
 msgid "Rebase the change request"
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "Received"
 msgstr ""
 
 #: src/components/project-audit.tsx
@@ -3854,6 +4047,10 @@ msgstr ""
 
 #: src/components/configuration-editor.tsx
 msgid "Reload and reapply my draft"
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "Remote evaluations"
 msgstr ""
 
 #: src/components/condition-row.tsx
@@ -3919,6 +4116,10 @@ msgstr ""
 
 #: src/components/compare-environments.tsx
 msgid "Replace the overrides of {to} with those of {source}"
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "Reported by SDKs"
 msgstr ""
 
 #: src/components/audit-entry-sheet.tsx
@@ -4371,6 +4572,15 @@ msgstr ""
 msgid "Shipped {winner}: its rules serve it."
 msgstr ""
 
+#: src/components/flag-evaluations.tsx
+#: src/routes/_signed-in/projects/$project/event-volume.tsx
+msgid "Show as table"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "Show flags stale for any of these reasons; none pressed shows every stale flag."
+msgstr ""
+
 #: src/components/app-shell.tsx
 msgid "Sidebar"
 msgstr ""
@@ -4458,8 +4668,22 @@ msgstr ""
 msgid "Sort by"
 msgstr ""
 
+#: src/components/flag-evaluations.tsx
+msgid "Source"
+msgstr ""
+
 #: src/components/weights-input.tsx
 msgid "Split evenly"
+msgstr ""
+
+#: src/components/navigation.tsx
+#: src/routes/_signed-in/projects/$project/flags/index.tsx
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "Stale flags"
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "Stale for"
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx
@@ -4626,6 +4850,7 @@ msgstr ""
 #: src/components/flag-definition-sheet.tsx
 #: src/routes/_signed-in/projects/$project/flags/[-].new.tsx
 #: src/routes/_signed-in/projects/$project/flags/$flag.tsx
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
 msgid "Temporary"
 msgstr ""
 
@@ -4820,6 +5045,10 @@ msgstr ""
 
 #: src/components/compare-environments.tsx
 msgid "The environments serve differently where marked."
+msgstr ""
+
+#: src/routes/_signed-in/projects/$project/event-volume.tsx
+msgid "The events SDKs posted to the project per UTC day they were received, as the rollups counted them. The counts stay after retention drops the events themselves."
 msgstr ""
 
 #: src/components/experiment-transitions.tsx
@@ -5098,6 +5327,10 @@ msgstr ""
 msgid "The project is saved."
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/event-volume.tsx
+msgid "The project received no event in these days."
+msgstr ""
+
 #: src/components/navigation.tsx
 msgid "The project's screens could not be read."
 msgstr ""
@@ -5162,6 +5395,10 @@ msgstr ""
 
 #: src/routes/_signed-in/projects/$project/segments/$segment.tsx
 msgid "The segment is saved."
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "The server answered no remote evaluation of the flag here in these days."
 msgstr ""
 
 #: src/lib/problem-messages.ts
@@ -5459,6 +5696,10 @@ msgstr ""
 msgid "To"
 msgstr ""
 
+#: src/routes/_signed-in/projects/$project/stale-flags.tsx
+msgid "to be removed by {by}"
+msgstr ""
+
 #: src/components/auth-settings-form.tsx
 msgid "Token expiry required"
 msgstr ""
@@ -5493,6 +5734,10 @@ msgstr ""
 
 #: src/lib/problem-messages.ts
 msgid "Too many."
+msgstr ""
+
+#: src/components/event-volume.tsx
+msgid "Total"
 msgstr ""
 
 #: src/components/weights-input.tsx
@@ -5682,6 +5927,7 @@ msgid "Values of {label}"
 msgstr ""
 
 #: src/components/experiment-exposures.tsx
+#: src/components/flag-evaluations.tsx
 #: src/components/overrides-section.tsx
 #: src/components/rule-editor.tsx
 #: src/components/tester-panel.tsx
@@ -5805,6 +6051,10 @@ msgstr ""
 
 #: src/routes/_signed-in/admin/members/$member.tsx
 msgid "What {name} holds"
+msgstr ""
+
+#: src/components/flag-evaluations.tsx
+msgid "What SDKs counted evaluating in the application, per UTC day the server received their summaries."
 msgstr ""
 
 #: src/routes/_signed-in/projects/$project/attributes.tsx

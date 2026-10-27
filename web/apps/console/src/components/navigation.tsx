@@ -4,11 +4,13 @@ import { useLingui } from "@lingui/react/macro";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, type LinkProps } from "@tanstack/react-router";
 import {
+  ActivityIcon,
   BoxesIcon,
   FlagIcon,
   FlaskConicalIcon,
   GitPullRequestArrowIcon,
   HistoryIcon,
+  HourglassIcon,
   LayersIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
@@ -70,6 +72,12 @@ const projectScreens = [
     permission: "project.read",
   },
   {
+    to: "/projects/$project/stale-flags",
+    label: msg`Stale flags`,
+    icon: HourglassIcon,
+    permission: "project.read",
+  },
+  {
     to: "/projects/$project/segments",
     label: msg`Segments`,
     icon: UsersRoundIcon,
@@ -115,6 +123,12 @@ const projectScreens = [
     to: "/projects/$project/audit",
     label: msg`Audit log`,
     icon: HistoryIcon,
+    permission: "project.read",
+  },
+  {
+    to: "/projects/$project/event-volume",
+    label: msg`Event volume`,
+    icon: ActivityIcon,
     permission: "project.read",
   },
   {
