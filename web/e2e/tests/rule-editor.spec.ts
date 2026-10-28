@@ -77,14 +77,20 @@ async function pickByKeyboard(page: Page, within: Locator, field: string, option
   if ((await select.textContent())?.trim() === option) return;
   await select.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("listbox")).toBeVisible();
+  const options = page.getByRole("listbox").getByRole("option");
+  // The list focuses an option of its own once it is placed, a moment after
+  // it shows: a key pressed before then is overridden by that focus.
+  await expect(page.getByRole("listbox").locator('[role="option"]:focus')).toHaveCount(1);
+  const names = (await options.allTextContents()).map((name) => name.trim());
+  const index = names.indexOf(option);
+  expect(index, `${option} among ${names.join(", ")}`).toBeGreaterThanOrEqual(0);
   await page.keyboard.press("Home");
-  for (let step = 0; step < 30; step++) {
-    const focused = await page.evaluate(() => document.activeElement?.textContent?.trim());
-    if (focused === option) break;
+  await expect(options.first()).toBeFocused();
+  // Each step waits for the focus to move, so no key lands on a stale option.
+  for (let i = 1; i <= index; i++) {
     await page.keyboard.press("ArrowDown");
+    await expect(options.nth(i)).toBeFocused();
   }
-  await expect(page.getByRole("option", { name: option, exact: true })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(within.getByRole("combobox", { name: field, exact: true })).toHaveText(option);
   // The list gives the focus back to its select once it has closed; the
