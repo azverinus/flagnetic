@@ -12,7 +12,7 @@ Flagnetic 0.1.0 is the first release, a developer preview. From it on:
 - **Upgrades only migrate forward, without data loss.** Migrations are never edited once released and there are no down migrations; upgrading a server keeps every flag, segment, key and audit entry. Take a database backup before an upgrade and upgrade all replicas together; 0.1 does not promise that an older version runs against a database a newer one migrated, nor that two versions serve side by side (see [Upgrades](../install.md#upgrades)).
 - **The management API and the console may still change.** `/api/v1` and the console may change incompatibly in a 0.x minor release; every such change is marked as breaking in the release notes.
 
-What 0.1 does not have yet: experiments (every exposure an SDK posts is rejected `unknown_experiment` until they exist), governance beyond roles and the audit log: protected environments, change requests, scheduled changes and webhooks (`environment.protected` is `false` everywhere, so local overrides work in every environment), single sign-on, and SDKs other than Go and its OpenFeature provider. It needs PostgreSQL 16 or later.
+What 0.1 does not have yet: experiments (every exposure an SDK posts is rejected `unknown_experiment` until they exist), governance beyond roles and the audit log: protected environments, change requests, scheduled changes and webhooks (`environment.protected` is `false` everywhere, so local overrides work in every environment) and single sign-on. It needs PostgreSQL 16 or later.
 
 ### Experiments
 

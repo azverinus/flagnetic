@@ -14,6 +14,7 @@
 
 ## SDKs
 
+- [Choosing an SDK](sdks/README.md): every SDK with its install line, mode, key, runtimes and propagation.
 - [Go SDK](../sdks/go/README.md), its [OpenFeature provider](../sdks/go-openfeature/README.md), and the [evaluator](../eval/README.md) every Go program shares.
 - [Ruby SDK](sdks/ruby.md): the `flagnetic` gem with its Rails integration and test helper, and the `flagnetic-openfeature` provider.
 - [Python SDK](sdks/python.md): the PyPI package `flagnetic`, its test helper and OpenFeature provider, and how it runs under pre-forking servers and asyncio.
